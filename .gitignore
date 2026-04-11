@@ -1,0 +1,66 @@
+# ===========================================================================
+# VnLaw-QA .gitignore
+# ===========================================================================
+
+# --- AI Agent context (private, do not commit) ---
+.agents
+
+# --- Environment ---
+.env
+.env.local
+.env.production
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Data (large files, crawled HTML) ---
+data/raw/
+data/processed/
+data/eval/
+
+# --- Models (large, downloaded) ---
+models/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Pytest ---
+.pytest_cache/
+htmlcov/
+.coverage
+
+# --- Mypy ---
+.mypy_cache/
+
+# --- Ruff ---
+.ruff_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/

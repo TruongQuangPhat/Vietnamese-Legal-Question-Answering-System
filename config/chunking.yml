@@ -1,0 +1,14 @@
+# ===========================================================================
+# VnLaw-QA — Chunking Configuration
+# ===========================================================================
+# Chiến lược chia chunk theo ADR-003: Parent-Child
+# - Child (tìm kiếm vector): Khoản hoặc Điểm
+# - Parent (context LLM): Toàn bộ Điều
+# ===========================================================================
+
+chunking:
+  strategy: "parent_child"
+  child_unit: "khoan"       # Đơn vị child: khoan | diem
+  parent_unit: "dieu"       # Đơn vị parent: dieu | chuong
+  max_parent_tokens: 2048   # Giới hạn max tokens cho parent_content
+  overlap_sentences: 1      # Số câu overlap (hiện không áp dụng cho legal chunks)

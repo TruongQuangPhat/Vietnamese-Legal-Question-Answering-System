@@ -1,0 +1,17 @@
+# ===========================================================================
+# VnLaw-QA — Retrieval Configuration
+# ===========================================================================
+# Cấu hình cho Hybrid Search (ADR-002) và Reranker
+# ===========================================================================
+
+hybrid_search:
+  dense_weight: 0.7         # Trọng số dense search (không dùng khi RRF)
+  sparse_weight: 0.3        # Trọng số sparse search (không dùng khi RRF)
+  top_k_prefetch: 40        # Số kết quả prefetch từ mỗi source
+  top_k_final: 20           # Số kết quả sau RRF fusion
+
+reranker:
+  model: "BAAI/bge-reranker-v2-m3"
+  top_k: 5                  # Số kết quả cuối cùng sau rerank
+  confidence_threshold: 0.75 # Ngưỡng tin cậy tối thiểu
+  batch_size: 16            # Batch size khi rerank
