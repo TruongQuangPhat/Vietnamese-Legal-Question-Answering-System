@@ -1,0 +1,731 @@
+# VnLaw-QA Corpus Registry
+# Source of truth for registry-driven crawling.
+#
+# Rules:
+# - Only crawl approved source_domain values.
+# - Default trusted source: thuvienphapluat.vn
+# - Prefer VBHN documents when available.
+# - Entries with url: null must not be crawled until the URL is filled and reviewed.
+#
+# Status values:
+# - pending
+# - crawling
+# - crawled
+# - parsed
+# - ingested
+# - verified
+# - failed
+# - manual_review
+#
+# Source type values:
+# - html
+# - pdf
+# - doc
+# - docx
+# - mixed
+# - unknown
+
+corpus:
+  # ---------------------------------------------------------------------------
+  # TIER 0 — Constitution
+  # ---------------------------------------------------------------------------
+  - law_id: "HP_2013"
+    name: "Hiến pháp 2013"
+    tier: 0
+    group: "Hiến pháp"
+    domain_tags: ["hiến pháp", "bộ máy nhà nước", "quyền con người", "quyền công dân"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Hien-phap-nam-2013-215627.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "TIER 0. Highest legal authority."
+
+  # ---------------------------------------------------------------------------
+  # TIER 1 — Core Codes
+  # ---------------------------------------------------------------------------
+  - law_id: "BLDS_2015"
+    name: "Bộ luật Dân sự 2015"
+    tier: 1
+    group: "Bộ luật cốt lõi"
+    domain_tags: ["dân sự", "hợp đồng", "tài sản", "nghĩa vụ dân sự"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Quyen-dan-su/Bo-luat-dan-su-2015-296215.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Original 2015 code."
+
+  - law_id: "BLHS_VBHN"
+    name: "Bộ luật Hình sự (VBHN 2025)"
+    tier: 1
+    group: "Bộ luật cốt lõi"
+    domain_tags: ["hình sự", "tội phạm", "trách nhiệm hình sự", "hình phạt"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Trach-nhiem-hinh-su/Van-ban-hop-nhat-135-VBHN-VPQH-2025-Bo-luat-Hinh-su-672275.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "BLTTHS_VBHN"
+    name: "Bộ luật Tố tụng hình sự (VBHN 2025)"
+    tier: 1
+    group: "Bộ luật cốt lõi"
+    domain_tags: ["tố tụng hình sự", "thủ tục tố tụng", "hình sự"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thu-tuc-To-tung/Van-ban-hop-nhat-46-VBHN-VPQH-2025-Bo-Luat-To-tung-hinh-su-647146.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "BLTTDS_VBHN"
+    name: "Bộ luật Tố tụng dân sự (VBHN 2025)"
+    tier: 1
+    group: "Bộ luật cốt lõi"
+    domain_tags: ["tố tụng dân sự", "thủ tục tố tụng", "dân sự"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thu-tuc-To-tung/Van-ban-hop-nhat-99-VBHN-VPQH-2025-Bo-luat-To-tung-dan-su-672478.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "BLLD_VBHN"
+    name: "Bộ luật Lao động (VBHN 2025)"
+    tier: 1
+    group: "Bộ luật cốt lõi"
+    domain_tags: ["lao động", "tiền lương", "hợp đồng lao động", "người lao động"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Lao-dong-Tien-luong/Van-ban-hop-nhat-125-VBHN-VPQH-2025-Bo-luat-Lao-dong-so-45-2019-QH14-672381.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "BLHH_VBHN"
+    name: "Bộ luật Hàng hải Việt Nam (VBHN 2025)"
+    tier: 1
+    group: "Bộ luật cốt lõi"
+    domain_tags: ["hàng hải", "giao thông vận tải", "tàu biển"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Giao-thong-Van-tai/Van-ban-hop-nhat-101-VBHN-VPQH-2025-Bo-luat-Hang-hai-Viet-Nam-672480.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  # ---------------------------------------------------------------------------
+  # TIER 2 — Group 1: Civil, Family, Identity
+  # ---------------------------------------------------------------------------
+  - law_id: "LCC_VBHN"
+    name: "Luật Căn cước (VBHN 2026)"
+    tier: 2
+    group: "Dân sự, Gia đình & Nhân thân"
+    domain_tags: ["căn cước", "nhân thân", "quyền dân sự"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Quyen-dan-su/Van-ban-hop-nhat-09-VBHN-VPQH-2026-Luat-Can-cuoc-696355.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LCT_VBHN"
+    name: "Luật Cư trú (VBHN 2026)"
+    tier: 2
+    group: "Dân sự, Gia đình & Nhân thân"
+    domain_tags: ["cư trú", "nhân thân", "quyền dân sự"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Quyen-dan-su/Van-ban-hop-nhat-06-VBHN-VPQH-2026-Luat-Cu-tru-694354.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LHT_2014"
+    name: "Luật Hộ tịch 2014"
+    tier: 2
+    group: "Dân sự, Gia đình & Nhân thân"
+    domain_tags: ["hộ tịch", "nhân thân", "quyền dân sự"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Quyen-dan-su/Luat-Ho-tich-2014-259727.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Original law."
+
+  - law_id: "LHNGD_VBHN"
+    name: "Luật Hôn nhân và gia đình (VBHN 2025)"
+    tier: 2
+    group: "Dân sự, Gia đình & Nhân thân"
+    domain_tags: ["hôn nhân", "gia đình", "ly hôn", "con cái", "tài sản chung"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Van-hoa-Xa-hoi/Van-ban-hop-nhat-121-VBHN-VPQH-2025-Luat-Hon-nhan-va-gia-dinh-672447.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LNVQS_VBHN"
+    name: "Luật Nghĩa vụ quân sự (VBHN 2025)"
+    tier: 2
+    group: "Dân sự, Gia đình & Nhân thân"
+    domain_tags: ["nghĩa vụ quân sự", "quốc phòng", "công dân"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-80-VBHN-VPQH-2025-Luat-Nghia-vu-quan-su-671951.aspx"
+    crawl_status: "pending"
+    priority: "medium"
+    notes: "Latest consolidated VBHN 2025."
+
+  # ---------------------------------------------------------------------------
+  # TIER 2 — Group 2: Land, Real Estate, Construction, Environment
+  # ---------------------------------------------------------------------------
+  - law_id: "LDD_VBHN"
+    name: "Luật Đất đai (VBHN 2025)"
+    tier: 2
+    group: "Đất đai, BĐS, Xây dựng & Môi trường"
+    domain_tags: ["đất đai", "bất động sản", "thu hồi đất", "quyền sử dụng đất"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bat-dong-san/Van-ban-hop-nhat-45-VBHN-VPQH-2025-Luat-Dat-dai-652284.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "High-traffic domain. Latest consolidated VBHN 2025."
+
+  - law_id: "LNO_VBHN"
+    name: "Luật Nhà ở (VBHN 2025)"
+    tier: 2
+    group: "Đất đai, BĐS, Xây dựng & Môi trường"
+    domain_tags: ["nhà ở", "bất động sản", "sở hữu nhà"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bat-dong-san/Van-ban-hop-nhat-132-VBHN-VPQH-2025-Luat-Nha-o-672378.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LKDBDS_VBHN"
+    name: "Luật Kinh doanh bất động sản (VBHN 2025)"
+    tier: 2
+    group: "Đất đai, BĐS, Xây dựng & Môi trường"
+    domain_tags: ["kinh doanh bất động sản", "bất động sản", "thương mại"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thuong-mai/Van-ban-hop-nhat-06-VBHN-VPQH-2025-Luat-Kinh-doanh-bat-dong-san-650908.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LXD_VBHN"
+    name: "Luật Xây dựng (VBHN 2025)"
+    tier: 2
+    group: "Đất đai, BĐS, Xây dựng & Môi trường"
+    domain_tags: ["xây dựng", "đô thị", "công trình"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Xay-dung-Do-thi/Van-ban-hop-nhat-43-VBHN-VPQH-2025-Luat-Xay-dung-652283.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LCCONGCHUNG_VBHN"
+    name: "Luật Công chứng (VBHN 2026)"
+    tier: 2
+    group: "Đất đai, BĐS, Xây dựng & Môi trường"
+    domain_tags: ["công chứng", "dịch vụ pháp lý", "bất động sản"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Dich-vu-phap-ly/Van-ban-hop-nhat-50-VBHN-VPQH-2026-Luat-Cong-chung-698019.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Renamed from ambiguous LCC_VBHN to avoid collision with Luật Căn cước."
+
+  - law_id: "LBVMT_VBHN"
+    name: "Luật Bảo vệ môi trường (VBHN 2025)"
+    tier: 2
+    group: "Đất đai, BĐS, Xây dựng & Môi trường"
+    domain_tags: ["môi trường", "tài nguyên", "bảo vệ môi trường"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Tai-nguyen-Moi-truong/Van-ban-hop-nhat-15-VBHN-VPQH-2025-Luat-Bao-ve-moi-truong-648873.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  # ---------------------------------------------------------------------------
+  # TIER 2 — Group 3: Business, Banking, Tax
+  # ---------------------------------------------------------------------------
+  - law_id: "LDN_VBHN"
+    name: "Luật Doanh nghiệp (VBHN 2025)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["doanh nghiệp", "kinh doanh", "công ty"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Doanh-nghiep/Van-ban-hop-nhat-67-VBHN-VPQH-2025-Luat-Doanh-nghiep-671127.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LDT_VBHN"
+    name: "Luật Đầu tư (VBHN 2025)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["đầu tư", "doanh nghiệp", "kinh doanh"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Dau-tu/Van-ban-hop-nhat-09-VBHN-VPQH-2025-Luat-Dau-tu-650914.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LTM_VBHN"
+    name: "Luật Thương mại (VBHN 2025)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["thương mại", "hợp đồng thương mại", "kinh doanh"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thuong-mai/Van-ban-hop-nhat-113-VBHN-VPQH-2025-Luat-Thuong-mai-672488.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LTCTD_VBHN"
+    name: "Luật Các tổ chức tín dụng (VBHN 2025)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["tín dụng", "ngân hàng", "tài chính"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Tien-te-Ngan-hang/Van-ban-hop-nhat-158-VBHN-VPQH-2025-Luat-Cac-to-chuc-tin-dung-672559.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LCT_2018"
+    name: "Luật Cạnh tranh 2018"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["cạnh tranh", "doanh nghiệp", "thị trường"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Doanh-nghiep/Luat-canh-tranh-345182.aspx"
+    crawl_status: "pending"
+    priority: "medium"
+    notes: "Original 2018 law."
+
+  - law_id: "LPS_VBHN"
+    name: "Luật Phá sản (VBHN 2025)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["phá sản", "doanh nghiệp", "thủ tục phá sản"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Doanh-nghiep/Van-ban-hop-nhat-119-VBHN-VPQH-2025-Luat-Pha-san-672452.aspx"
+    crawl_status: "pending"
+    priority: "medium"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LQLT_VBHN"
+    name: "Luật Quản lý thuế (VBHN 2025)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["thuế", "quản lý thuế", "nghĩa vụ thuế"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thue-Phi-Le-Phi/Van-ban-hop-nhat-29-VBHN-VPQH-2025-Luat-Quan-ly-thue-651534.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LTTNCN_VBHN"
+    name: "Luật Thuế thu nhập cá nhân (VBHN 2025)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["thuế", "thuế thu nhập cá nhân", "thu nhập"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thue-Phi-Le-Phi/Van-ban-hop-nhat-103-VBHN-VPQH-2025-Luat-Thue-thu-nhap-ca-nhan-672383.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LTGTGT_VBHN"
+    name: "Luật Thuế giá trị gia tăng (VBHN 2026)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["thuế", "VAT", "giá trị gia tăng"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thue-Phi-Le-Phi/Van-ban-hop-nhat-12-VBHN-VPQH-2026-Luat-Thue-gia-tri-gia-tang-694824.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LTTDN_VBHN"
+    name: "Luật Thuế thu nhập doanh nghiệp (VBHN 2026)"
+    tier: 2
+    group: "Kinh tế, Doanh nghiệp, Ngân hàng & Thuế"
+    domain_tags: ["thuế", "thuế thu nhập doanh nghiệp", "doanh nghiệp"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Doanh-nghiep/Van-ban-hop-nhat-61-VBHN-VPQH-2026-Luat-Thue-thu-nhap-Doanh-nghiep-698689.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  # ---------------------------------------------------------------------------
+  # TIER 2 — Group 4: Traffic, Public Order, Sanctions
+  # ---------------------------------------------------------------------------
+  - law_id: "LTATGT_VBHN"
+    name: "Luật Trật tự, an toàn giao thông đường bộ (VBHN 2026)"
+    tier: 2
+    group: "Giao thông, Trật tự & Xử phạt"
+    domain_tags: ["giao thông", "an toàn giao thông", "đường bộ"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Giao-thong-Van-tai/Van-ban-hop-nhat-55-VBHN-VPQH-2026-Luat-Trat-tu-an-toan-giao-thong-duong-bo-698683.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LDB_VBHN"
+    name: "Luật Đường bộ (VBHN 2026)"
+    tier: 2
+    group: "Giao thông, Trật tự & Xử phạt"
+    domain_tags: ["giao thông", "đường bộ", "hạ tầng giao thông"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Giao-thong-Van-tai/Van-ban-hop-nhat-49-VBHN-VPQH-2026-Luat-Duong-bo-697844.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LXLVPHC_VBHN"
+    name: "Luật Xử lý vi phạm hành chính (VBHN 2025)"
+    tier: 2
+    group: "Giao thông, Trật tự & Xử phạt"
+    domain_tags: ["xử phạt", "vi phạm hành chính", "hành chính"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Vi-pham-hanh-chinh/Van-ban-hop-nhat-63-VBHN-VPQH-2025-Luat-Xu-ly-vi-pham-hanh-chinh-671008.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LPCTRB_2019"
+    name: "Luật Phòng, chống tác hại của rượu, bia 2019"
+    tier: 2
+    group: "Giao thông, Trật tự & Xử phạt"
+    domain_tags: ["rượu bia", "y tế", "xử phạt", "an toàn giao thông"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/The-thao-Y-te/Luat-Phong-chong-tac-hai-cua-ruou-bia-336620.aspx"
+    crawl_status: "pending"
+    priority: "medium"
+    notes: "Original 2019 law."
+
+  # ---------------------------------------------------------------------------
+  # TIER 2 — Group 5: Labor, Employment, Social Security
+  # ---------------------------------------------------------------------------
+  - law_id: "LBHXH_VBHN"
+    name: "Luật Bảo hiểm xã hội (VBHN 2026)"
+    tier: 2
+    group: "Lao động, Việc làm & An sinh xã hội"
+    domain_tags: ["bảo hiểm xã hội", "an sinh", "lao động"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bao-hiem/Van-ban-hop-nhat-19-VBHN-VPQH-2026-Luat-Bao-hiem-xa-hoi-696579.aspx"
+    crawl_status: "pending"
+    priority: "critical"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LVL_2025"
+    name: "Luật Việc làm 2025"
+    tier: 2
+    group: "Lao động, Việc làm & An sinh xã hội"
+    domain_tags: ["việc làm", "lao động", "bảo hiểm thất nghiệp"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Lao-dong-Tien-luong/Luat-Viec-lam-2025-so-74-2025-QH15-530912.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Original 2025 law. Complete replacement of older employment law."
+
+  - law_id: "LBHYT_VBHN"
+    name: "Luật Bảo hiểm y tế (VBHN 2025)"
+    tier: 2
+    group: "Lao động, Việc làm & An sinh xã hội"
+    domain_tags: ["bảo hiểm y tế", "y tế", "an sinh"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bao-hiem/Van-ban-hop-nhat-22-VBHN-VPQH-2025-Luat-Bao-hiem-y-te-651354.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LATVSLD_VBHN"
+    name: "Luật An toàn, vệ sinh lao động (VBHN 2024)"
+    tier: 2
+    group: "Lao động, Việc làm & An sinh xã hội"
+    domain_tags: ["an toàn lao động", "vệ sinh lao động", "lao động"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Lao-dong-Tien-luong/Van-ban-hop-nhat-14-VBHN-VPQH-2024-Luat-An-toan-ve-sinh-lao-dong-629950.aspx"
+    crawl_status: "pending"
+    priority: "medium"
+    notes: "Latest consolidated VBHN 2024."
+
+  # ---------------------------------------------------------------------------
+  # TIER 2 — Group 6: Consumer, Health, Education, Digital Technology
+  # ---------------------------------------------------------------------------
+  - law_id: "LBVQLNTD_VBHN"
+    name: "Luật Bảo vệ quyền lợi người tiêu dùng (VBHN 2026)"
+    tier: 2
+    group: "Tiêu dùng, Y tế, Giáo dục & Công nghệ số"
+    domain_tags: ["người tiêu dùng", "bảo vệ người tiêu dùng", "thương mại"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Thuong-mai/Van-ban-hop-nhat-47-VBHN-VPQH-2026-Luat-Bao-ve-quyen-loi-nguoi-tieu-dung-697846.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LKBCB_VBHN"
+    name: "Luật Khám bệnh, chữa bệnh (VBHN 2026)"
+    tier: 2
+    group: "Tiêu dùng, Y tế, Giáo dục & Công nghệ số"
+    domain_tags: ["y tế", "khám bệnh", "chữa bệnh"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/The-thao-Y-te/Van-ban-hop-nhat-26-VBHN-VPQH-2026-Luat-Kham-benh-chua-benh-696163.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2026."
+
+  - law_id: "LGD_VBHN"
+    name: "Luật Giáo dục (VBHN 2026)"
+    tier: 2
+    group: "Tiêu dùng, Y tế, Giáo dục & Công nghệ số"
+    domain_tags: ["giáo dục", "trường học", "đào tạo"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "mixed"
+    url: "https://thuvienphapluat.vn/van-ban/Giao-duc/Van-ban-hop-nhat-72-VBHN-VPQH-2026-Luat-Giao-duc-699429.aspx"
+    crawl_status: "manual_review"
+    priority: "medium"
+    notes: "TVPL may embed PDF/DOC. Save landing page and attachment; parse attachment if supported."
+
+  - law_id: "LANM_2025"
+    name: "Luật An ninh mạng 2025"
+    tier: 2
+    group: "Tiêu dùng, Y tế, Giáo dục & Công nghệ số"
+    domain_tags: ["an ninh mạng", "công nghệ thông tin", "dữ liệu"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-An-ninh-mang-2025-so-116-2025-QH15-666020.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Original 2025 law. Complete replacement of older law."
+
+  - law_id: "LGDDT_VBHN"
+    name: "Luật Giao dịch điện tử (VBHN 2025)"
+    tier: 2
+    group: "Tiêu dùng, Y tế, Giáo dục & Công nghệ số"
+    domain_tags: ["giao dịch điện tử", "công nghệ thông tin", "chữ ký số"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Van-ban-hop-nhat-42-VBHN-VPQH-2025-Luat-Giao-dich-dien-tu-652014.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LSHTT_VBHN"
+    name: "Luật Sở hữu trí tuệ (VBHN 2025)"
+    tier: 2
+    group: "Tiêu dùng, Y tế, Giáo dục & Công nghệ số"
+    domain_tags: ["sở hữu trí tuệ", "bản quyền", "nhãn hiệu", "sáng chế"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/So-huu-tri-tue/Van-ban-hop-nhat-155-VBHN-VPQH-2025-Luat-So-huu-tri-tue-672556.aspx"
+    crawl_status: "pending"
+    priority: "high"
+    notes: "Latest consolidated VBHN 2025."
+
+  - law_id: "LATTP_VBHN"
+    name: "Luật An toàn thực phẩm (VBHN 2025)"
+    tier: 2
+    group: "Tiêu dùng, Y tế, Giáo dục & Công nghệ số"
+    domain_tags: ["an toàn thực phẩm", "y tế", "thực phẩm"]
+    status: "active"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/The-thao-Y-te/Van-ban-hop-nhat-61-VBHN-VPQH-2025-Luat-An-toan-thuc-pham-671006.aspx"
+    crawl_status: "pending"
+    priority: "medium"
+    notes: "Latest consolidated VBHN 2025."
+
+  # ---------------------------------------------------------------------------
+  # TIER 2 — Groups 7 and 8: deferred placeholders
+  # These are intentionally not crawlable until source URLs are added.
+  # ---------------------------------------------------------------------------
+  - law_id: "LTCQH"
+    name: "Luật Tổ chức Quốc hội"
+    tier: 2
+    group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
+    domain_tags: ["tổ chức nhà nước", "quốc hội"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LTCCP"
+    name: "Luật Tổ chức Chính phủ"
+    tier: 2
+    group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
+    domain_tags: ["tổ chức nhà nước", "chính phủ"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LTCCQDP"
+    name: "Luật Tổ chức chính quyền địa phương"
+    tier: 2
+    group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
+    domain_tags: ["tổ chức nhà nước", "chính quyền địa phương"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LTCTAND"
+    name: "Luật Tổ chức Tòa án nhân dân"
+    tier: 2
+    group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
+    domain_tags: ["tòa án", "tổ chức nhà nước", "tư pháp"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LTCVKSND"
+    name: "Luật Tổ chức Viện kiểm sát nhân dân"
+    tier: 2
+    group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
+    domain_tags: ["viện kiểm sát", "tổ chức nhà nước", "tư pháp"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LTTHC"
+    name: "Luật Tố tụng hành chính"
+    tier: 2
+    group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
+    domain_tags: ["tố tụng hành chính", "hành chính", "tòa án"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LKN"
+    name: "Luật Khiếu nại"
+    tier: 2
+    group: "Khiếu nại, Tố cáo & Tương tác chính quyền"
+    domain_tags: ["khiếu nại", "hành chính", "công dân"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LTC"
+    name: "Luật Tố cáo"
+    tier: 2
+    group: "Khiếu nại, Tố cáo & Tương tác chính quyền"
+    domain_tags: ["tố cáo", "hành chính", "công dân"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
+
+  - law_id: "LTCTT"
+    name: "Luật Tiếp cận thông tin"
+    tier: 2
+    group: "Khiếu nại, Tố cáo & Tương tác chính quyền"
+    domain_tags: ["tiếp cận thông tin", "hành chính", "công dân"]
+    status: "planned"
+    source_domain: "thuvienphapluat.vn"
+    source_type: "unknown"
+    url: null
+    crawl_status: "manual_review"
+    priority: "low"
+    notes: "URL missing. Fill before crawling."
