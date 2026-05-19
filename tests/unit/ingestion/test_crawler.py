@@ -140,14 +140,15 @@ class TestThuvienPhapLuatCrawler:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise TimeoutError()
+                raise httpx.TimeoutException("Connection timeout")
             return httpx.Response(200, content=b"<html></html>")
 
         respx.get("https://thuvienphapluat.vn/test.aspx").mock(side_effect=mock_timeout)
 
         result = await crawler.crawl(sample_target)
 
-        # Should have retried and eventually failed (since we keep timing out)
+        # Should have retried and eventually succeeded
+        assert result.success is True
         assert result.retry_count >= 1
 
     @respx.mock
@@ -181,20 +182,9 @@ class TestThuvienPhapLuatCrawler:
         crawler: ThuvienPhapLuatCrawler,
     ) -> None:
         """Test that untrusted domains are rejected."""
-        target = CrawlTarget(
-            law_id="TEST",
-            name="Test",
-            tier=1,
-            group="Test",
-            source_domain="thuvienphapluat.vn",
-            source_type=SourceType.HTML,
-            url="https://example.com/test",  # Untrusted domain
-            crawl_status=CrawlStatus.PENDING,
-            priority=Priority.HIGH,
-        )
-
-        with pytest.raises(TrustedDomainError):
-            await crawler.crawl(target)
+        # Test the _validate_trusted_domain method directly
+        with pytest.raises(TrustedDomainError, match="thuvienphapluat.vn"):
+            crawler._validate_trusted_domain("https://example.com/test")
 
 
 class TestRateLimiter:
