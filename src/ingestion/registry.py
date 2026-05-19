@@ -52,22 +52,16 @@ class CorpusRegistryLoader:
                 or contains invalid entries.
         """
         if not self.registry_path.exists():
-            raise RegistryError(
-                f"Registry file not found: {self.registry_path}"
-            )
+            raise RegistryError(f"Registry file not found: {self.registry_path}")
 
         try:
             with open(self.registry_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            raise RegistryError(
-                f"Invalid YAML in registry file: {e}"
-            ) from e
+            raise RegistryError(f"Invalid YAML in registry file: {e}") from e
 
         if not isinstance(data, dict) or "corpus" not in data:
-            raise RegistryError(
-                "Registry must contain 'corpus' key with list of entries"
-            )
+            raise RegistryError("Registry must contain 'corpus' key with list of entries")
 
         corpus_data = data["corpus"]
         if not isinstance(corpus_data, list):
@@ -76,18 +70,13 @@ class CorpusRegistryLoader:
         targets: list[CrawlTarget] = []
         for idx, entry in enumerate(corpus_data):
             if not isinstance(entry, dict):
-                raise RegistryError(
-                    f"Entry at index {idx} must be a dictionary"
-                )
+                raise RegistryError(f"Entry at index {idx} must be a dictionary")
 
             # Validate required fields
             self._validate_required_fields(entry, idx)
 
             # Validate URL for pending entries
-            if (
-                entry.get("crawl_status") == "pending"
-                and entry.get("url") is None
-            ):
+            if entry.get("crawl_status") == "pending" and entry.get("url") is None:
                 raise RegistryError(
                     f"Pending entry '{entry.get('law_id', idx)}' must have a URL",
                     law_id=entry.get("law_id"),
@@ -105,7 +94,7 @@ class CorpusRegistryLoader:
 
         return targets
 
-    def _validate_required_fields(self, entry: dict, idx: int) -> None:
+    def _validate_required_fields(self, entry: dict[str, object], idx: int) -> None:
         """Validate that required fields are present.
 
         Args:
@@ -119,9 +108,7 @@ class CorpusRegistryLoader:
 
         for field in required_fields:
             if field not in entry:
-                raise RegistryError(
-                    f"Entry at index {idx} missing required field: {field}"
-                )
+                raise RegistryError(f"Entry at index {idx} missing required field: {field}")
 
     def filter_by_legal_status(
         self,
@@ -141,10 +128,7 @@ class CorpusRegistryLoader:
         if legal_statuses is None:
             return targets
 
-        return [
-            target for target in targets
-            if target.status in legal_statuses
-        ]
+        return [target for target in targets if target.status in legal_statuses]
 
     def filter_by_source_type(
         self,
@@ -164,10 +148,7 @@ class CorpusRegistryLoader:
         if source_types is None:
             return targets
 
-        return [
-            target for target in targets
-            if target.source_type in source_types
-        ]
+        return [target for target in targets if target.source_type in source_types]
 
     def validate_trusted_domain(self, url: str) -> bool:
         """Validate that a URL is from a trusted domain.

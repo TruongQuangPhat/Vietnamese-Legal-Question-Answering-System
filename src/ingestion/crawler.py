@@ -167,7 +167,7 @@ class ThuvienPhapLuatCrawler(BaseCrawler):
                     # Apply rate limiting
                     async with self.rate_limiter.limit(host):
                         response = await client.get(
-                            target.url,
+                            target.url or "",
                             follow_redirects=True,
                         )
 
@@ -220,7 +220,7 @@ class ThuvienPhapLuatCrawler(BaseCrawler):
 
         # Prepare result
         if content is not None and http_status == codes.OK:
-            content_hash = self._compute_hash(content)
+            content_hash = self._compute_hash(content) if content else None
 
             # Store artifacts if storage is configured
             if self.storage:
@@ -242,7 +242,7 @@ class ThuvienPhapLuatCrawler(BaseCrawler):
                     logger.info(
                         "Crawl completed successfully",
                         law_id=target.law_id,
-                        content_hash=content_hash[:16],
+                        content_hash=(content_hash or "")[:16],
                         duration=duration,
                     )
                 except Exception as e:
@@ -359,7 +359,7 @@ async def crawl_with_retry(
 
         # Exponential backoff
         if retry_count <= max_retries:
-            backoff = 2 ** retry_count
+            backoff = 2**retry_count
             await asyncio.sleep(min(backoff, 30))
 
     return None, http_status, error_message, retry_count

@@ -199,10 +199,7 @@ class TestCrawlTargetSelector:
         assert not any(t.crawl_status == CrawlStatus.MANUAL_REVIEW for t in selection.targets)
 
         # Check skip record
-        manual_skips = [
-            s for s in selector.get_skip_records()
-            if s.target.law_id == "LAW4"
-        ]
+        manual_skips = [s for s in selector.get_skip_records() if s.target.law_id == "LAW4"]
         assert len(manual_skips) == 1
 
     def test_include_manual_review_when_flagged(

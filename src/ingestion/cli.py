@@ -104,8 +104,9 @@ def print_skip_table(skips: list[CrawlSkipRecord]) -> None:
     table.add_column("Previous Hash", max_width=20)
 
     for record in skips:
-        prev_hash = (record.existing_content_hash[:16] + "..."
-                     if record.existing_content_hash else "N/A")
+        prev_hash = (
+            record.existing_content_hash[:16] + "..." if record.existing_content_hash else "N/A"
+        )
         table.add_row(
             record.target.law_id,
             record.reason[:60] + "..." if len(record.reason) > 60 else record.reason,
@@ -197,20 +198,24 @@ async def run_batch_crawl(
     tasks = [crawl_with_semaphore(t) for t in targets]
 
     # Run with concurrency limit using gather
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results: list[CrawlResult | BaseException] = await asyncio.gather(
+        *tasks, return_exceptions=True
+    )
 
     # Process results
     crawl_results: list[CrawlResult] = []
     skip_records: list[CrawlSkipRecord] = []
 
     for i, result in enumerate(results):
-        if isinstance(result, Exception):
+        if isinstance(result, BaseException):
             # Convert exception to failed result
-            crawl_results.append(CrawlResult(
-                target=targets[i],
-                success=False,
-                error_message=f"Exception: {result}",
-            ))
+            crawl_results.append(
+                CrawlResult(
+                    target=targets[i],
+                    success=False,
+                    error_message=f"Exception: {result}",
+                )
+            )
         else:
             crawl_results.append(result)
 
@@ -420,6 +425,7 @@ Examples:
         console.print(f"[red]Unexpected error:[/] {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -602,6 +608,9 @@ async def crawl_single_url(args: argparse.Namespace) -> int:
         url=args.url,
         crawl_status=CrawlStatus.PENDING,
         priority=Priority.HIGH,
+        effective_date=None,
+        expiry_date=None,
+        notes=None,
     )
 
     # Crawl
@@ -610,7 +619,8 @@ async def crawl_single_url(args: argparse.Namespace) -> int:
 
     if result.success:
         console.print("[green]Success![/]")
-        console.print(f"  Content hash: {result.content_hash[:32]}...")
+        content_hash_display = result.content_hash[:32] + "..." if result.content_hash else "N/A"
+        console.print(f"  Content hash: {content_hash_display}")
         console.print(f"  Duration: {result.duration_seconds:.2f}s")
         if result.http_status:
             console.print(f"  HTTP Status: {result.http_status}")
@@ -703,17 +713,21 @@ async def crawl_from_registry(args: argparse.Namespace) -> int:
             return await crawler.crawl(target)
 
     tasks = [crawl_with_semaphore(t) for t in selection.targets]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results_raw: list[CrawlResult | BaseException] = await asyncio.gather(
+        *tasks, return_exceptions=True
+    )
 
     # Process results
     crawl_results: list[CrawlResult] = []
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            crawl_results.append(CrawlResult(
-                target=selection.targets[i],
-                success=False,
-                error_message=f"Exception: {result}",
-            ))
+    for i, result in enumerate(results_raw):
+        if isinstance(result, BaseException):
+            crawl_results.append(
+                CrawlResult(
+                    target=selection.targets[i],
+                    success=False,
+                    error_message=f"Exception: {result}",
+                )
+            )
         else:
             crawl_results.append(result)
 
@@ -727,4 +741,3 @@ async def crawl_from_registry(args: argparse.Namespace) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -87,9 +87,7 @@ class CrawlTarget(BaseModel):
     tier: int = Field(..., ge=0, description="Legal hierarchy tier")
     group: str = Field(..., description="Logical grouping")
     domain_tags: list[str] = Field(default_factory=list, description="Topic tags")
-    status: LegalStatus = Field(
-        default=LegalStatus.ACTIVE, description="Legal document status"
-    )
+    status: LegalStatus = Field(default=LegalStatus.ACTIVE, description="Legal document status")
     source_domain: str = Field(..., description="Expected source domain")
     source_type: SourceType = Field(..., description="Source content type")
     url: str | None = Field(None, description="URL to crawl")
@@ -98,14 +96,12 @@ class CrawlTarget(BaseModel):
     crawl_status: CrawlStatus = Field(
         default=CrawlStatus.PENDING, description="Current crawl state"
     )
-    priority: Priority = Field(
-        default=Priority.MEDIUM, description="Priority level"
-    )
+    priority: Priority = Field(default=Priority.MEDIUM, description="Priority level")
     notes: str | None = Field(None, description="Optional notes")
 
     @field_validator("url")
     @classmethod
-    def validate_url_domain(cls, v: str | None, info) -> str | None:
+    def validate_url_domain(cls, v: str | None, info: Any) -> str | None:
         """Validate that URL is from trusted domain."""
         if v is None:
             return v
@@ -114,9 +110,7 @@ class CrawlTarget(BaseModel):
         hostname = parsed.hostname
 
         if hostname and "thuvienphapluat.vn" not in hostname:
-            raise ValueError(
-                f"URL must be from thuvienphapluat.vn, got: {hostname}"
-            )
+            raise ValueError(f"URL must be from thuvienphapluat.vn, got: {hostname}")
 
         return v
 
@@ -125,9 +119,7 @@ class CrawlTarget(BaseModel):
     def validate_source_domain(cls, v: str) -> str:
         """Validate source domain."""
         if "thuvienphapluat.vn" not in v:
-            raise ValueError(
-                f"source_domain must be thuvienphapluat.vn, got: {v}"
-            )
+            raise ValueError(f"source_domain must be thuvienphapluat.vn, got: {v}")
         return v
 
     @field_validator("domain_tags")
@@ -183,9 +175,7 @@ class MetadataSchema(BaseModel):
     url: str = Field(..., description="Crawled URL")
     crawl_status: str = Field(..., description="Crawl status (success/failed)")
     http_status: int | None = Field(None, description="HTTP response status code")
-    crawled_at: str = Field(
-        ..., description="ISO 8601 timestamp of crawl"
-    )
+    crawled_at: str = Field(..., description="ISO 8601 timestamp of crawl")
     content_hash: str = Field(..., description="SHA-256 hash of content")
     crawler_version: str = Field(..., description="Crawler version")
     parser_hint: str = Field(..., description="Hint for parser selection")
@@ -195,12 +185,8 @@ class MetadataSchema(BaseModel):
         default_factory=list, description="Paths to downloaded attachments"
     )
     error_message: str | None = Field(None, description="Error message if failed")
-    refresh: bool = Field(
-        default=False, description="Whether this is a refresh crawl"
-    )
-    previous_content_hash: str | None = Field(
-        None, description="Content hash from previous crawl"
-    )
+    refresh: bool = Field(default=False, description="Whether this is a refresh crawl")
+    previous_content_hash: str | None = Field(None, description="Content hash from previous crawl")
 
     @staticmethod
     def now_iso() -> str:
@@ -275,7 +261,7 @@ class CrawlSelection:
     total_available: int
     selected_count: int
     skipped_count: int = 0
-    skip_reasons: dict[str, int] = None
+    skip_reasons: dict[str, int] | None = None
     dry_run: bool = False
 
     def __post_init__(self) -> None:

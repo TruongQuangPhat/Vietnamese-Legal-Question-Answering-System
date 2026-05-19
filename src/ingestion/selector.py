@@ -109,23 +109,18 @@ class CrawlTargetSelector:
         # Skip manual_review unless explicitly included
         if not include_manual_review:
             manual_review_count = sum(
-                1 for t in selected
-                if t.crawl_status == CrawlStatus.MANUAL_REVIEW
+                1 for t in selected if t.crawl_status == CrawlStatus.MANUAL_REVIEW
             )
             if manual_review_count > 0:
-                skipped = [
-                    t for t in selected
-                    if t.crawl_status == CrawlStatus.MANUAL_REVIEW
-                ]
-                selected = [
-                    t for t in selected
-                    if t.crawl_status != CrawlStatus.MANUAL_REVIEW
-                ]
+                skipped = [t for t in selected if t.crawl_status == CrawlStatus.MANUAL_REVIEW]
+                selected = [t for t in selected if t.crawl_status != CrawlStatus.MANUAL_REVIEW]
                 for target in skipped:
-                    self._skip_records.append(CrawlSkipRecord(
-                        target=target,
-                        reason="manual_review status and --include-manual-review not specified",
-                    ))
+                    self._skip_records.append(
+                        CrawlSkipRecord(
+                            target=target,
+                            reason="manual_review status and --include-manual-review not specified",
+                        )
+                    )
 
         # Skip already-crawled
         if skip_already_crawled:
@@ -185,13 +180,15 @@ class CrawlTargetSelector:
                         and metadata.get("content_hash")
                         and self._has_expected_artifact(target)
                     ):
-                        self._skip_records.append(CrawlSkipRecord(
-                            target=target,
-                            reason="Already crawled successfully (verified by metadata.json)",
-                            existing_metadata_path=str(metadata_path),
-                            existing_crawled_at=metadata.get("crawled_at"),
-                            existing_content_hash=metadata.get("content_hash"),
-                        ))
+                        self._skip_records.append(
+                            CrawlSkipRecord(
+                                target=target,
+                                reason="Already crawled successfully (verified by metadata.json)",
+                                existing_metadata_path=str(metadata_path),
+                                existing_crawled_at=metadata.get("crawled_at"),
+                                existing_content_hash=metadata.get("content_hash"),
+                            )
+                        )
                         continue
                 except (json.JSONDecodeError, OSError):
                     # If we can't read metadata, check registry status as fallback
@@ -273,7 +270,9 @@ class CrawlTargetSelector:
             print("\nSelected targets:")
             print("-" * 60)
             for target in selection.targets:
-                print(f"  {target.law_id:20} | {target.name[:30]:30} | {str(target.priority):8} | {target.url}")
+                print(
+                    f"  {target.law_id:20} | {target.name[:30]:30} | {str(target.priority):8} | {target.url}"
+                )
             print("-" * 60)
 
         if selection.skipped_count > 0:

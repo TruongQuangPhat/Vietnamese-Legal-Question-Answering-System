@@ -152,6 +152,7 @@ class RawArtifactStore:
             effective_date=metadata_fields.get("effective_date"),
             expiry_date=metadata_fields.get("expiry_date"),
             attachment_paths=metadata_fields.get("attachment_paths", []),
+            error_message=metadata_fields.get("error_message"),
             refresh=refresh,
             previous_content_hash=previous_content_hash,
         )
@@ -259,7 +260,7 @@ class RawArtifactStore:
                 raise StorageError(
                     f"Failed to create backup: {e}",
                     path=str(backup_dir),
-                )
+                ) from e
 
         return backup_dir
 
@@ -310,4 +311,4 @@ class RawArtifactStore:
             raise StorageError(
                 f"Failed to create output directory: {e}",
                 path=str(self.output_dir),
-            )
+            ) from e

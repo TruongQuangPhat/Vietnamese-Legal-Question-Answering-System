@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -113,7 +114,7 @@ class RateLimiter:
         # for synchronizing last_request updates
 
     @asynccontextmanager
-    async def limit(self, host: str):
+    async def limit(self, host: str) -> AsyncIterator[None]:
         """Async context manager for rate-limited requests.
 
         Usage:

@@ -4,6 +4,24 @@
 
 This document describes the **data crawling pipeline** for the VnLaw-QA system. The crawler fetches legal documents from trusted sources (primarily [thuvienphapluat.vn](https://thuvienphapluat.vn)), stores raw artifacts with metadata, and prepares data for subsequent parsing and ingestion stages.
 
+## Quick Start
+
+```bash
+# Dry run first to verify selection
+uv run python -m src.ingestion.cli \
+  --registry config/laws/corpus_registry.yml \
+  --output data/raw \
+  --only-status pending \
+  --dry-run
+
+# Then crawl
+uv run python -m src.ingestion.cli \
+  --registry config/laws/corpus_registry.yml \
+  --output data/raw \
+  --only-status pending \
+  --concurrency 2
+```
+
 ## Architecture
 
 ```
@@ -15,7 +33,7 @@ This document describes the **data crawling pipeline** for the VnLaw-QA system. 
                                                           v
 ┌─────────────────┐     ┌──────────────────┐     ┌────────┴────────┐
 │  Data Quality   │<────│  Artifact Store  │<────│  Rate Limiter   │
-│    Reports    │     │  (HTML, metadata) │     │  (throttle)     │
+│    Reports      │     │  (HTML, metadata)│     │  (throttle)     │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
@@ -23,7 +41,7 @@ This document describes the **data crawling pipeline** for the VnLaw-QA system. 
 
 ### 1. Corpus Registry (`config/laws/corpus_registry.yml`)
 
-The registry is the **source of truth** for which laws to crawl. Each entry contains:
+The registry is the **source of truth** for which laws to crawl.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -31,17 +49,17 @@ The registry is the **source of truth** for which laws to crawl. Each entry cont
 | `name` | string | Yes | Official law name |
 | `tier` | integer | Yes | Legal hierarchy (0=Constitution, 1=Core Codes, 2=Laws) |
 | `group` | string | Yes | Logical grouping |
-| `domain_tags` | list | No | Topic tags for search |
-| `status` | enum | No | `active` \| `planned` \| `inactive` \| `amended` \| `replaced` |
+| `domain_tags` | list[str] | No | Topic tags for search |
+| `status` | LegalStatus | No | `active` \| `planned` \| `inactive` \| `amended` \| `replaced` |
 | `source_domain` | string | Yes | Must contain `thuvienphapluat.vn` |
-| `source_type` | enum | Yes | `html` \| `pdf` \| `doc` \| `docx` \| `mixed` |
-| `url` | string | Conditional | URL to crawl (required for `pending` status) |
-| `effective_date` | date | No | Format: `YYYY-MM-DD` |
-| `expiry_date` | date | No | Format: `YYYY-MM-DD` |
-| `crawl_status` | enum | No | `pending` \| `crawled` \| `failed` \| `manual_review` |
-| `priority` | enum | No | `critical` \| `high` \| `medium` \| `low` |
+| `source_type` | SourceType | Yes | `html` \| `pdf` \| `doc` \| `docx` \| `mixed` |
+| `url` | str | Conditional | URL to crawl (required for `pending`) |
+| `effective_date` | str | No | Format: `YYYY-MM-DD` |
+| `expiry_date` | str | No | Format: `YYYY-MM-DD` |
+| `crawl_status` | CrawlStatus | No | `pending` \| `crawled` \| `failed` \| `manual_review` |
+| `priority` | Priority | No | `critical` \| `high` \| `medium` \| `low` |
 
-**Example Registry Entry:**
+**Example:**
 
 ```yaml
 - law_id: "BLDS_2015"
@@ -59,21 +77,21 @@ The registry is the **source of truth** for which laws to crawl. Each entry cont
 
 ### 2. Crawl Target Selector (`src/ingestion/selector.py`)
 
-The selector filters registry entries based on criteria:
+Filters registry entries using composable filters:
 
-**Filter Chain:**
+**Filter Chain (applied in order):**
 
-1. **Explicit law_ids** - Filter by specific law identifiers
-2. **Tier filter** - Filter by legal hierarchy tier
-3. **Group filter** - Filter by group name
-4. **Priority filter** - Filter by priority level
-5. **Crawl status filter** - Filter by `crawl_status`
-6. **Manual review exclusion** - Skip `manual_review` unless `--include-manual-review`
-7. **Already-crawled skip** - Skip if `metadata.json` exists with `crawl_status=success`
+1. **law_ids** - Filter by specific law identifiers
+2. **tiers** - Filter by legal hierarchy tier
+3. **groups** - Filter by group name
+4. **priorities** - Filter by priority level
+5. **only_statuses** - Filter by crawl status
+6. **manual_review exclusion** - Skip unless `--include-manual-review`
+7. **already-crawled skip** - Skip if metadata exists with success
 
 **Skip Detection Logic:**
 
-A target is skipped if ALL of these are true:
+A target is skipped when ALL are true:
 - `data/raw/{law_id}/latest/metadata.json` exists
 - `metadata.crawl_status == "success"`
 - `metadata.content_hash` is non-empty
@@ -81,9 +99,7 @@ A target is skipped if ALL of these are true:
 
 ### 3. Crawler (`src/ingestion/crawler.py`)
 
-The `ThuvienPhapLuatCrawler` implements async HTTP crawling with:
-
-**Features:**
+`ThuvienPhapLuatCrawler` implements async HTTP crawling:
 
 | Feature | Implementation |
 |---------|----------------|
@@ -91,59 +107,39 @@ The `ThuvienPhapLuatCrawler` implements async HTTP crawling with:
 | Retry logic | Exponential backoff: `2^retry_count` seconds, max 30s |
 | Rate limiting | Per-host delay + global semaphore |
 | Domain validation | All URLs must contain `thuvienphapluat.vn` |
-| Timeout | Configurable (default: settings value) |
-| Concurrency | Configurable (max: 3) |
+| Timeout | Configurable via `crawler_timeout_seconds` |
+| Concurrency | Max 3 concurrent requests |
 
 **Crawl Flow:**
 
 ```
-┌─────────────┐
-│  Target     │
-│  Received   │
-└──────┬──────┘
+Target Received
        │
        v
-┌─────────────┐
-│ Validate    │── X ──> Raise TrustedDomainError
-│  Domain     │
-└──────┬──────┘
+Validate Domain ──[invalid]──> Raise TrustedDomainError
        │
        v
-┌─────────────┐
-│ Acquire     │
-│ Rate Limit  │
-└──────┬──────┘
+Acquire Rate Limit
        │
        v
-┌─────────────┐     retry_count < max_retries
-│   HTTP GET  │─────(timeout/network error)────> Retry
-└──────┬──────┘
+HTTP GET ──[timeout/network]──> Retry with backoff
        │
        v
-┌─────────────┐     429
-│ Check HTTP  │─────> Wait Retry-After header, retry
-│  Status     │
-└──────┬──────┘
+Check HTTP Status ──[429]──> Wait Retry-After, retry
        │
-       v (200 OK)
-┌─────────────┐
-│  Save HTML  │
-│  + Metadata │
-└──────┬──────┘
+       v [200 OK]
+Save HTML + Metadata
        │
        v
-┌─────────────┐
-│  Return     │
-│  CrawlResult│
-└─────────────┘
+Return CrawlResult
 ```
 
 ### 4. Rate Limiter (`src/ingestion/rate_limiter.py`)
 
-The `RateLimiter` class provides:
+Provides per-host and global concurrency control:
 
-- **Per-host delay**: Minimum delay between requests to the same host (default: 2s)
-- **Global concurrency**: Maximum concurrent requests across all hosts (default: 2, max: 3)
+- **Per-host delay**: Minimum delay between requests to same host (default: 2s)
+- **Global concurrency**: Max concurrent requests across all hosts (default: 2, max: 3)
 - **Thread-safe**: Uses asyncio locks for host tracking
 
 **Usage:**
@@ -155,7 +151,7 @@ async with rate_limiter.limit(host):
 
 ### 5. Artifact Storage (`src/ingestion/storage.py`)
 
-The `RawArtifactStore` manages file output:
+Manages raw artifact file output:
 
 **Directory Structure:**
 
@@ -163,16 +159,16 @@ The `RawArtifactStore` manages file output:
 data/raw/
 └── {LAW_ID}/
     ├── latest/
-    │   ├── main.html           # Most recent HTML content
-    │   └── metadata.json       # Crawl metadata
-    │   └── attachments/        # PDF/DOC/DOCX files (if any)
+    │   ├── main.html           # Most recent HTML
+    │   ├── metadata.json       # Crawl metadata
+    │   └── attachments/        # PDF/DOC/DOCX (if any)
     └── crawls/
-        └── {TIMESTAMP}/        # Backups from force refresh
+        └── {TIMESTAMP}/        # Backups from --force
             ├── main.html
             └── metadata.json
 ```
 
-**Metadata Schema (`metadata.json`):**
+**metadata.json Schema:**
 
 ```json
 {
@@ -186,22 +182,19 @@ data/raw/
   "crawl_status": "success",
   "http_status": 200,
   "crawled_at": "2026-05-18T10:30:00+00:00",
-  "content_hash": "sha256_hex_hash_of_content",
+  "content_hash": "sha256_hex_hash",
   "crawler_version": "v1.0.0",
-  "parser_hint": "tvpl_html",
-  "effective_date": null,
-  "expiry_date": null
+  "parser_hint": "tvpl_html"
 }
 ```
 
-**Force Refresh Behavior:**
+**Force Refresh (`--force`):**
 
-When `--force` is specified:
-1. Existing `latest/` directory is moved to `crawls/{TIMESTAMP}/`
-2. New crawl saves to fresh `latest/` directory
+1. Moves `latest/` to `crawls/{TIMESTAMP}/`
+2. Saves new crawl to fresh `latest/`
 3. Backup preserved for rollback
 
-## CLI Usage
+## CLI Reference
 
 ### Entry Point
 
@@ -209,9 +202,9 @@ When `--force` is specified:
 python -m src.ingestion.cli [OPTIONS]
 ```
 
-### Command Examples
+### Commands
 
-#### Batch Crawl All Pending Laws
+**Batch crawl all pending:**
 
 ```bash
 uv run python -m src.ingestion.cli \
@@ -223,16 +216,16 @@ uv run python -m src.ingestion.cli \
   --retry 3
 ```
 
-#### Crawl Specific Laws by ID
+**Crawl specific laws:**
 
 ```bash
 uv run python -m src.ingestion.cli \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
-  --law-ids BLDS_2015 HP_2013 LDD_VBHN
+  --law-ids BLDS_2015 HP_2013
 ```
 
-#### Filter by Tier and Priority
+**Filter by tier and priority:**
 
 ```bash
 uv run python -m src.ingestion.cli \
@@ -243,7 +236,7 @@ uv run python -m src.ingestion.cli \
   --only-status pending
 ```
 
-#### Dry Run (No Actual Crawling)
+**Dry run (no crawling):**
 
 ```bash
 uv run python -m src.ingestion.cli \
@@ -253,7 +246,7 @@ uv run python -m src.ingestion.cli \
   --dry-run
 ```
 
-#### Force Re-crawl
+**Force re-crawl:**
 
 ```bash
 uv run python -m src.ingestion.cli \
@@ -263,7 +256,7 @@ uv run python -m src.ingestion.cli \
   --force
 ```
 
-#### Debug Single URL
+**Debug single URL:**
 
 ```bash
 uv run python -m src.ingestion.cli \
@@ -272,13 +265,13 @@ uv run python -m src.ingestion.cli \
   --output data/raw
 ```
 
-### CLI Options Reference
+### Options Table
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--registry PATH` | Path to corpus_registry.yml (batch mode) | required |
+| `--registry PATH` | Path to corpus_registry.yml | required |
 | `--url URL` | Single URL for debug mode | - |
-| `--law-ids IDS...` | Filter by specific law IDs | - |
+| `--law-ids IDS...` | Filter by law IDs | - |
 | `--tier N` | Filter by tier (repeatable) | - |
 | `--group NAME` | Filter by group (repeatable) | - |
 | `--priority LEVEL` | Filter by priority (repeatable) | - |
@@ -321,7 +314,7 @@ uv run python -m src.ingestion.cli \
                           │
                           v
 ┌─────────────────────────────────────────────────────────────────┐
-│ 4. Batch Crawl (run_batch_crawl / crawl_from_registry)          │
+│ 4. Batch Crawl (crawl_from_registry)                            │
 │    - Create ThuvienPhapLuatCrawler instances                    │
 │    - Configure RateLimiter (delay + concurrency)                │
 │    - Create asyncio.Semaphore for concurrency control           │
@@ -343,34 +336,50 @@ uv run python -m src.ingestion.cli \
                           v
 ┌─────────────────────────────────────────────────────────────────┐
 │ 6. Summary Output (print_crawl_summary)                         │
-│    - Total attempted count                                      │
-│    - Successful count                                           │
-│    - Failed count                                               │
-│    - Skipped count                                              │
+│    - Total attempted, successful, failed, skipped               │
 │    - Duration                                                   │
 │    - List of failures with error messages                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Data Models
+
+### Enum Types
+
+| Enum | Values |
+|------|--------|
+| `LegalStatus` | `ACTIVE`, `PLANNED`, `INACTIVE`, `AMENDED`, `REPLACED` |
+| `CrawlStatus` | `PENDING`, `CRAWLING`, `CRAWLED`, `PARSED`, `INGESTED`, `VERIFIED`, `FAILED`, `MANUAL_REVIEW` |
+| `SourceType` | `HTML`, `PDF`, `DOC`, `DOCX`, `MIXED`, `UNKNOWN` |
+| `Priority` | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
+
+### Key Classes
+
+| Class | Location | Purpose |
+|-------|----------|---------|
+| `CrawlTarget` | `src/ingestion/models.py` | Validated registry entry |
+| `CrawlResult` | `src/ingestion/models.py` | Crawl success/failure outcome |
+| `CrawlSelection` | `src/ingestion/models.py` | Batch selection summary |
+| `CrawlSkipRecord` | `src/ingestion/models.py` | Skip reason and metadata |
+| `MetadataSchema` | `src/ingestion/models.py` | metadata.json contract |
+
 ## Testing
 
-### Unit Tests
+### Run Tests
 
 ```bash
 # All ingestion tests
 uv run pytest tests/unit/ingestion/ -v
 
-# Crawler tests only
+# Specific test files
 uv run pytest tests/unit/ingestion/test_crawler.py -v
-
-# Storage tests only
 uv run pytest tests/unit/ingestion/test_storage.py -v
-
-# Rate limiter tests
-uv run pytest tests/unit/ingestion/test_rate_limiter.py -v
+uv run pytest tests/unit/ingestion/test_selector.py -v
+uv run pytest tests/unit/ingestion/test_registry.py -v
+uv run pytest tests/unit/ingestion/test_models.py -v
 
 # With coverage
-uv run pytest tests/unit/ingestion/ -v --cov=src/ingestion --cov-report=term-missing
+uv run pytest tests/unit/ingestion/ --cov=src/ingestion --cov-report=term-missing
 ```
 
 ### Test Coverage
@@ -383,29 +392,34 @@ uv run pytest tests/unit/ingestion/ -v --cov=src/ingestion --cov-report=term-mis
 | HTML saving | `test_storage.py` | Content + metadata |
 | Backup creation | `test_storage.py` | Force refresh |
 | Selection filters | `test_selector.py` | All filter combinations |
+| Registry loading | `test_registry.py` | YAML parsing, validation |
+| Models | `test_models.py` | All data classes, enums |
 
-### Run Quality Checks
+### Quality Checks
 
 ```bash
-# Lint
-uv run ruff check src tests
+# Lint (auto-fixable issues)
+uv run ruff check src tests --fix
 
 # Format
-uv run ruff format src tests --check
+uv run ruff format src tests
 
-# Type checking
-uv run mypy src
-
-# Tests
+# Run tests
 uv run pytest tests/unit/ingestion/ -v
+```
+
+**Note:** Mypy is currently disabled due to a known issue with hatchling build structure. To run mypy manually:
+
+```bash
+uv run mypy --explicit-package-bases src/ingestion src/core
 ```
 
 ## Error Handling
 
-### Crawl Failure Categories
+### HTTP Status Handling
 
-| HTTP Status | Behavior |
-|-------------|----------|
+| Status | Behavior |
+|--------|----------|
 | 200 OK | Success, save content |
 | 429 Too Many Requests | Wait Retry-After, retry |
 | 4xx Client Error | Fail immediately, no retry |
@@ -413,7 +427,7 @@ uv run pytest tests/unit/ingestion/ -v
 | Timeout | Retry with backoff |
 | Network error | Retry with backoff |
 
-### Exceptions
+### Custom Exceptions
 
 | Exception | When Raised |
 |-----------|-------------|
@@ -421,18 +435,20 @@ uv run pytest tests/unit/ingestion/ -v
 | `RegistryError` | Invalid YAML or registry entry |
 | `StorageError` | Failed to write files |
 
-## Monitoring and Logging
+All exceptions use proper chaining (`raise ... from err`) for traceability.
+
+## Logging
 
 ### Log Levels
 
-```
-INFO    - Crawl started, completed successfully
-WARNING - Rate limited, retry attempts, crawl failures
-ERROR   - Unexpected errors, storage failures
-DEBUG   - Detailed request/response info (with -v)
-```
+| Level | When Used |
+|-------|-----------|
+| INFO | Crawl started, completed successfully |
+| WARNING | Rate limited, retry attempts, crawl failures |
+| ERROR | Unexpected errors, storage failures |
+| DEBUG | Detailed request/response info (`-v` flag) |
 
-### Structured Logging Format
+### Structured Format (structlog)
 
 ```json
 {
@@ -448,42 +464,102 @@ DEBUG   - Detailed request/response info (with -v)
 
 ### "No targets to crawl"
 
-Check:
+**Check:**
 1. Registry file exists at specified path
 2. At least one entry has `crawl_status: pending`
 3. Pending entries have `url` field filled
 4. Filters aren't too restrictive
 
+**Fix:**
+```bash
+# Run dry-run to see selection
+uv run python -m src.ingestion.cli \
+  --registry config/laws/corpus_registry.yml \
+  --only-status pending \
+  --dry-run
+
+# Or disable skip for already-crawled
+uv run python -m src.ingestion.cli \
+  --registry config/laws/corpus_registry.yml \
+  --no-skip-crawled
+```
+
 ### "Domain validation failed"
 
-Check:
+**Check:**
 1. URL contains `thuvienphapluat.vn`
 2. No typos in domain name
 3. Using HTTPS (not HTTP)
 
+**Fix:**
+Update URL in registry to match: `https://thuvienphapluat.vn/...`
+
 ### "Already crawled" targets skipped
 
-Use `--no-skip-crawled` to force re-crawl, or:
-1. Check `data/raw/{law_id}/latest/metadata.json`
-2. Use `--force` to backup and re-crawl
+**Fix:**
+```bash
+# Force re-crawl with backup
+uv run python -m src.ingestion.cli \
+  --registry config/laws/corpus_registry.yml \
+  --law-ids YOUR_LAW_ID \
+  --force
+
+# Or disable skip
+uv run python -m src.ingestion.cli \
+  --registry config/laws/corpus_registry.yml \
+  --no-skip-crawled
+```
 
 ### Slow crawling
 
-Adjust:
-1. `--concurrency 3` (increase parallel crawls)
-2. `--delay-seconds 1` (reduce per-host delay)
+**Adjust:**
+```bash
+# Increase concurrency (max: 3)
+--concurrency 3
+
+# Reduce per-host delay
+--delay-seconds 1
+```
 
 ## Best Practices
 
-1. **Always run dry-run first** to verify selection
-2. **Use `--verbose`** for debugging crawl issues
-3. **Set reasonable concurrency** (2-3) to avoid overwhelming the source
-4. **Check metadata.json** after crawling to verify success
-5. **Keep backups** with `--force` when re-crawling
-6. **Monitor logs** for rate limiting (429) responses
+1. **Always run dry-run first** - Verify selection before actual crawling
+2. **Use `--verbose` for debugging** - See detailed logs
+3. **Set reasonable concurrency** - Start with 2, max is 3
+4. **Check metadata.json** - Verify crawl success after completion
+5. **Keep backups** - Use `--force` when re-crawling
+6. **Monitor logs for 429** - Rate limiting indicates need to reduce concurrency
+
+## Changelog
+
+### Version 1.1 (Latest)
+
+**Improvements:**
+- Fixed `start_time` scoping bug in `crawl_from_registry()`
+- Replaced `(str, Enum)` with `StrEnum` for all enum classes
+- Added exception chaining (`raise ... from err`) to all error handlers
+- Added `--no-skip-crawled` flag to override skip behavior
+- Improved CLI output formatting with table display
+- Fixed import sorting and code formatting (ruff compliance)
+- Added comprehensive documentation (`docs/crawling.md`)
+
+**Files Modified:**
+- `src/ingestion/cli.py` - Fixed start_time, improved formatting
+- `src/ingestion/models.py` - StrEnum migration
+- `src/ingestion/storage.py` - Exception chaining
+- `src/ingestion/registry.py` - Exception chaining
+- `docs/crawling.md` - New comprehensive documentation
+
+### Version 1.0 (Initial)
+
+- Basic crawling functionality
+- Registry-based target selection
+- Rate limiting and retry logic
+- Artifact storage with metadata
+- CLI interface
 
 ## Related Documentation
 
 - [Configuration](../config/README.md)
-- [Parsing Pipeline](./parsing.md) (coming soon)
-- [RAG Pipeline](../src/retrieval/README.md) (coming soon)
+- [Parsing Pipeline](./parsing.md)
+- [RAG Pipeline](../src/retrieval/README.md)

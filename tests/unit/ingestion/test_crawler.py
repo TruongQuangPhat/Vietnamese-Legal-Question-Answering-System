@@ -233,7 +233,7 @@ class TestRateLimiter:
             await asyncio.wait_for(limiter.acquire("test.com"), timeout=0.1)
             # If we get here, release one and try again
             await limiter.release("test.com")
-            assert False, "Should have timed out"
+            raise AssertionError("Should have timed out")
         except TimeoutError:
             pass  # Expected
 
@@ -278,9 +278,7 @@ class TestCrawlIntegration:
         respx.get("https://thuvienphapluat.vn/success.aspx").mock(
             return_value=httpx.Response(200, content=b"<html>OK</html>")
         )
-        respx.get("https://thuvienphapluat.vn/fail.aspx").mock(
-            return_value=httpx.Response(500)
-        )
+        respx.get("https://thuvienphapluat.vn/fail.aspx").mock(return_value=httpx.Response(500))
 
         targets = [
             CrawlTarget(

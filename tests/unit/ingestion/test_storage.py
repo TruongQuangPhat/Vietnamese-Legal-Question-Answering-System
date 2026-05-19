@@ -29,7 +29,7 @@ class TestRawArtifactStore:
     def test_ensure_output_dir_exists(self, tmp_path: Path) -> None:
         """Test that output directory is created."""
         test_dir = tmp_path / "test_output"
-        store = RawArtifactStore(test_dir)
+        RawArtifactStore(test_dir)
 
         # RawArtifactStore creates the dir in __init__, so this just verifies it exists
         assert test_dir.exists()
