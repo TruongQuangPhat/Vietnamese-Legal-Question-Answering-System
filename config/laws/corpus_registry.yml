@@ -553,7 +553,7 @@ corpus:
     source_domain: "thuvienphapluat.vn"
     source_type: "mixed"
     url: "https://thuvienphapluat.vn/van-ban/Giao-duc/Van-ban-hop-nhat-72-VBHN-VPQH-2026-Luat-Giao-duc-699429.aspx"
-    crawl_status: "manual_review"
+    crawl_status: "pending"
     priority: "medium"
     notes: "TVPL may embed PDF/DOC. Save landing page and attachment; parse attachment if supported."
 
@@ -610,122 +610,122 @@ corpus:
     notes: "Latest consolidated VBHN 2025."
 
   # ---------------------------------------------------------------------------
-  # TIER 2 — Groups 7 and 8: deferred placeholders
-  # These are intentionally not crawlable until source URLs are added.
+  # TIER 2 — Groups 7 and 8: State organization, administrative procedure,
+  # complaints, denunciations, and access to information
   # ---------------------------------------------------------------------------
   - law_id: "LTCQH"
     name: "Luật Tổ chức Quốc hội"
     tier: 2
     group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
     domain_tags: ["tổ chức nhà nước", "quốc hội"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-48-VBHN-VPQH-2025-Luat-To-chuc-Quoc-hoi-654325.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 48/VBHN-VPQH 2025. URL added after manual review."
 
   - law_id: "LTCCP"
     name: "Luật Tổ chức Chính phủ"
     tier: 2
     group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
     domain_tags: ["tổ chức nhà nước", "chính phủ"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-27-VBHN-VPQH-2026-Luat-To-chuc-Chinh-phu-698025.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 27/VBHN-VPQH 2026. URL added after manual review."
 
   - law_id: "LTCCQDP"
     name: "Luật Tổ chức chính quyền địa phương"
     tier: 2
     group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
     domain_tags: ["tổ chức nhà nước", "chính quyền địa phương"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-35-VBHN-VPQH-2025-Luat-To-chuc-chinh-quyen-dia-phuong-651561.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 35/VBHN-VPQH 2025. URL added after manual review."
 
   - law_id: "LTCTAND"
     name: "Luật Tổ chức Tòa án nhân dân"
     tier: 2
     group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
     domain_tags: ["tòa án", "tổ chức nhà nước", "tư pháp"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-111-VBHN-VPQH-2025-Luat-To-chuc-Toa-an-nhan-dan-672486.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 111/VBHN-VPQH 2025. URL added after manual review."
 
   - law_id: "LTCVKSND"
     name: "Luật Tổ chức Viện kiểm sát nhân dân"
     tier: 2
     group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
     domain_tags: ["viện kiểm sát", "tổ chức nhà nước", "tư pháp"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-110-VBHN-VPQH-2025-Luat-To-chuc-Vien-kiem-sat-nhan-dan-673902.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 110/VBHN-VPQH 2025. URL added after manual review."
 
   - law_id: "LTTHC"
     name: "Luật Tố tụng hành chính"
     tier: 2
     group: "Tổ chức bộ máy Nhà nước & Tố tụng Hành chính"
     domain_tags: ["tố tụng hành chính", "hành chính", "tòa án"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Vi-pham-hanh-chinh/Van-ban-hop-nhat-109-VBHN-VPQH-2025-Luat-To-tung-hanh-chinh-673752.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 109/VBHN-VPQH 2025. URL added after manual review."
 
   - law_id: "LKN"
     name: "Luật Khiếu nại"
     tier: 2
     group: "Khiếu nại, Tố cáo & Tương tác chính quyền"
     domain_tags: ["khiếu nại", "hành chính", "công dân"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-28-VBHN-VPQH-2026-Luat-Khieu-nai-697698.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 28/VBHN-VPQH 2026. URL added after manual review."
 
   - law_id: "LTC"
     name: "Luật Tố cáo"
     tier: 2
     group: "Khiếu nại, Tố cáo & Tương tác chính quyền"
     domain_tags: ["tố cáo", "hành chính", "công dân"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Van-ban-hop-nhat-29-VBHN-VPQH-2026-Luat-To-cao-697699.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "VBHN 29/VBHN-VPQH 2026. URL added after manual review."
 
   - law_id: "LTCTT"
     name: "Luật Tiếp cận thông tin"
     tier: 2
     group: "Khiếu nại, Tố cáo & Tương tác chính quyền"
     domain_tags: ["tiếp cận thông tin", "hành chính", "công dân"]
-    status: "planned"
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "unknown"
-    url: null
-    crawl_status: "manual_review"
+    source_type: "html"
+    url: "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Luat-tiep-can-thong-tin-2016-280116.aspx"
+    crawl_status: "pending"
     priority: "low"
-    notes: "URL missing. Fill before crawling."
+    notes: "Original Luật Tiếp cận thông tin 2016, not VBHN. No VBHN URL provided yet."
