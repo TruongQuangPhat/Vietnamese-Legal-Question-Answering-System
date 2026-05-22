@@ -1,6 +1,7 @@
 .claude
 CLAUDE.md
 MANIFEST.json
+PROJECT_CONTEXT.md
 
 # --- Environment ---
 .env

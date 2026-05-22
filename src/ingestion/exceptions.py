@@ -47,3 +47,20 @@ class CrawlStatusError(IngestionError):
             super().__init__(f"[{law_id}] {message}")
         else:
             super().__init__(message)
+
+
+class AuditError(IngestionError):
+    """Raised when there is an error during raw corpus audit.
+
+    This exception is raised when:
+    - Registry file is missing or invalid
+    - YAML parse error
+    - Duplicate law_id in registry
+    - Critical I/O errors during scanning
+
+    Attributes:
+        message: Error description.
+    """
+
+    def __init__(self, message: str):
+        super().__init__(message)
