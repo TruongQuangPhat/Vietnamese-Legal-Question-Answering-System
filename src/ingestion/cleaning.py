@@ -6,7 +6,7 @@ import unicodedata
 import html
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Tuple, Optional, Set, Any
 from bs4 import BeautifulSoup
 
 from src.ingestion.audit import scan_raw_artifacts
@@ -32,8 +32,47 @@ SAFE_BOILERPLATE = {
 
 # Regex patterns for legal structure
 RE_ARTICLE = re.compile(r"Điều\s+\d+", re.IGNORECASE)
-RE_CLAUSE = re.compile(r"^\s*\d+\..+")
+RE_CLAUSE = re.compile(r"^\s*\d+\..+")  # require some text after "1."
 RE_POINT = re.compile(r"^\s*[a-zđ]\).+", re.IGNORECASE)
+
+# Boundary trimming markers
+START_MARKERS = [
+    (re.compile(r"QUỐC HỘI.*CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", re.S | re.I), 10),
+    (re.compile(r"(?m)^\s*VĂN BẢN HỢP NHẤT\b", re.I), 8),
+    (re.compile(r"(?m)^\s*HIẾN PHÁP\b", re.I), 7),
+    (re.compile(r"(?m)^\s*BỘ LUẬT\b", re.I), 6),
+    (re.compile(r"(?m)^\s*LUẬT\s+[A-ZÀ-Ỵ]", re.I), 5),
+    (re.compile(r"(?m)^\s*LỜI NÓI ĐẦU\b", re.I), 4),
+    (re.compile(r"(?m)^\s*Chương\s+I\b", re.I), 3),
+    (re.compile(r"(?m)^\s*Điều\s+1\.", re.I), 2),
+]
+END_MARKERS = [
+    "Văn bản liên quan",
+    "Liên quan hiệu lực",
+    "Liên quan nội dung",
+    "Thuộc tính",
+    "Tải về",
+    "Đăng nhập để sử dụng tiện ích",
+    "Bình luận",
+    "Hỏi đáp",
+    "Tin liên quan",
+]
+
+# Candidate scoring penalties
+BAD_ID_CLASS = {
+    'nav', 'navigation', 'menu', 'sidebar', 'header', 'footer', 'search', 'login',
+    'dangnhap', 'dangky', 'tracuu', 'danhmuc', 'hotro', 'widget', 'tukhoa', 'tomtat'
+}
+METADATA_ID_CLASS = {
+    'tab', 'tabs', 'tooltip', 'related', 'relation', 'lienquan', 'lien-quan',
+    'hieuluc', 'hieu-luc', 'thuoc-tinh', 'thuoctinh', 'metadata', 'popup', 'modal'
+}
+SITE_NOISE_PHRASES = {
+    'Đăng nhập', 'Đăng ký', 'Tra cứu', 'Danh mục', 'Hỗ trợ', 'Dịch vụ', 'Google',
+    'Widget', 'Từ khóa', 'Tóm tắt nội dung', 'Liên quan hiệu lực', 'Liên quan nội dung',
+    'Thuộc tính', 'Xem chi tiết', 'Văn bản liên quan', 'Văn bản gốc',
+    'CÁC NỘI DUNG ĐƯỢC SỬA ĐỔI, HƯỚNG DẪN', 'Tra cứu nhanh', 'Hỗ trợ Dịch Vụ'
+}
 
 # Unicode handling
 REPLACEMENT_CHAR = "�"
@@ -77,7 +116,8 @@ class NormalizedArtifact:
     text_stats: CleaningStats
     markers: LegalMarkersSummary
     warnings: List[str] = field(default_factory=list)
-    metadata: Dict[str, str] = field(default_factory=lambda: {"cleaner_version": "v0.3"})
+    metadata: Dict[str, str] = field(default_factory=lambda: {"cleaner_version": "v0.4"})
+    candidate_info: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
         return {
@@ -105,18 +145,18 @@ class NormalizedArtifact:
             },
             "warnings": self.warnings,
             "metadata": self.metadata,
+            "candidate_info": self.candidate_info,
         }
 
-def extract_legal_text_from_html(html_content: str) -> str:
+def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]]:
     """Extracts the best legal content container from HTML using scoring.
 
     Args:
         html_content: Raw HTML string.
 
     Returns:
-        Extracted text from the best candidate container.
+        Tuple of (extracted text, candidate info).
     """
-    # Parser strategy: lxml -> html5lib -> html.parser
     parser_options = ["lxml", "html5lib", "html.parser"]
     soup = None
     for p in parser_options:
@@ -127,7 +167,7 @@ def extract_legal_text_from_html(html_content: str) -> str:
             continue
 
     if soup is None:
-        return ""
+        return "", {"tag": None, "class": [], "id": "", "marker_sum": 0, "text_len": 0}
 
     # 1. Decompose known noisy elements (Do NOT decompose 'form')
     skip_tags = {
@@ -142,15 +182,30 @@ def extract_legal_text_from_html(html_content: str) -> str:
     candidates = soup.find_all(['div', 'article', 'main', 'section', 'td'])
 
     best_candidate = None
-    max_score = -1.0
+    best_score = -float('inf')
+
+    # Terms that indicate navigation/site chrome containers
+    BAD_ID_CLASS = {
+        'nav', 'navigation', 'menu', 'sidebar', 'header', 'footer', 'search', 'login',
+        'dangnhap', 'dangky', 'tracuu', 'danhmuc', 'hotro', 'widget', 'tukhoa', 'tomtat'
+    }
+    # Terms that indicate metadata/tabs/tooltips (higher penalty)
+    METADATA_ID_CLASS = {
+        'tab', 'tabs', 'tooltip', 'related', 'relation', 'lienquan', 'lien-quan',
+        'hieuluc', 'hieu-luc', 'thuoc-tinh', 'thuoctinh', 'metadata', 'popup', 'modal'
+    }
+    SITE_NOISE_PHRASES = {
+        'Đăng nhập', 'Đăng ký', 'Tra cứu', 'Danh mục', 'Hỗ trợ', 'Dịch vụ', 'Google',
+        'Widget', 'Từ khóa', 'Tóm tắt nội dung', 'Liên quan hiệu lực', 'Liên quan nội dung',
+        'Thuộc tính', 'Xem chi tiết', 'Văn bản liên quan', 'Văn bản gốc',
+        'CÁC NỘI DUNG ĐƯỢC SỬA ĐỔI, HƯỚNG DẪN', 'Tra cứu nhanh', 'Hỗ trợ Dịch Vụ'
+    }
+
 
     for candidate in candidates:
-        # Fast extraction of text for scoring
-        text = candidate.get_text(separator=" ", strip=True)
+        text = candidate.get_text(separator="\n", strip=True)
         if not text:
             continue
-
-        text_len = len(text)
 
         # Quick check for any legal marker
         if not any(m in text for m in ('Điều', 'Chương', 'Mục')):
@@ -160,52 +215,190 @@ def extract_legal_text_from_html(html_content: str) -> str:
         dieu_count = len(RE_ARTICLE.findall(text))
         chapter_count = len(re.findall(r'Chương\s+[IVXLCDM]+', text, re.I))
         muc_count = text.count("Mục")
-        luat_count = text.count("Luật") + text.count("Bộ luật")
-        quoc_hoi = 1 if "QUỐC HỘI" in text else 0
-        can_cu = 1 if "Căn cứ" in text else 0
-
-        # Base score with strong weighting for markers, scaled by text density
         marker_sum = dieu_count + chapter_count + muc_count
-        marker_benefit = (
-            dieu_count * 10000 +
-            chapter_count * 5000 +
-            muc_count * 2000 +
-            luat_count * 1000 +
-            quoc_hoi * 5000 +
-            can_cu * 5000
-        )
 
-        # Scaling factor: reduce benefit if average text per marker is too low (likely nav/TOC)
-        # We expect at least 150 chars per legal marker for it to be actual content
-        density_factor = 1.0
-        if marker_sum > 0:
-            density_factor = min(1.0, text_len / (marker_sum * 150))
+        text_len = len(text)
 
-        score = text_len + (marker_benefit * density_factor)
+        # Skip if no substantial legal markers
+        if marker_sum == 0:
+            continue
 
+        # Base score: reward markers and length
+        score = marker_sum * 1000 + text_len
 
-        # Penalize high link density and few legal markers
+        # 1. Penalize link density (Corrected order)
         link_count = len(candidate.find_all('a'))
-        if link_count > 5 and dieu_count < 3:
+        link_text_len = sum(len(a.get_text(strip=True)) for a in candidate.find_all('a') if a.get_text(strip=True))
+        link_density = link_text_len / text_len if text_len > 0 else 0
+        if link_density > 0.5:
+            score *= 0.2
+        elif link_density > 0.3:
             score *= 0.5
 
-        if score > max_score:
-            max_score = score
+        # 2. Penalize/Reward content density per article
+        avg_chars_per_marker = text_len / marker_sum
+        if avg_chars_per_marker < 50:
+            score *= 0.3
+        elif avg_chars_per_marker >= 100:
+            score *= 1.2
+
+        # 3. Penalize bad id/class names
+        candidate_id = (candidate.get('id') or '').lower()
+        candidate_class = ' '.join(candidate.get('class') or []).lower()
+
+        # Strong penalty for metadata/tabs/tooltips
+        if any(bad in candidate_id or bad in candidate_class for bad in METADATA_ID_CLASS):
+            score *= 0.1
+        # Standard penalty for nav/chrome
+        elif any(bad in candidate_id or bad in candidate_class for bad in BAD_ID_CLASS):
+            score *= 0.3
+
+        # 4. Penalize site noise phrases
+        noise_count = sum(1 for phrase in SITE_NOISE_PHRASES if phrase.lower() in text.lower())
+        if noise_count > 2:
+            score *= 0.5
+
+        # Debug: record scores for analysis
+        # (could be logged if needed)
+
+        if score > best_score:
+            best_score = score
             best_candidate = candidate
 
     if best_candidate:
-        return best_candidate.get_text(separator="\n")
+        # Recalculate detailed stats for the selected candidate
+        final_text = best_candidate.get_text(separator="\n")
+        final_dieu = len(RE_ARTICLE.findall(final_text))
+        final_chapter = len(re.findall(r'Chương\s+[IVXLCDM]+', final_text, re.I))
+        final_muc = final_text.count("Mục")
+        link_count = len(best_candidate.find_all('a'))
+        link_text_len = sum(len(a.get_text(strip=True)) for a in best_candidate.find_all('a') if a.get_text(strip=True))
+        link_density = link_text_len / len(final_text) if final_text else 0
+
+        candidate_info = {
+            "tag": best_candidate.name,
+            "class": best_candidate.get("class", []),
+            "id": best_candidate.get("id", ""),
+            "article_count": final_dieu,
+            "chapter_count": final_chapter,
+            "section_count": final_muc,
+            "text_len": len(final_text),
+            "link_density": link_density,
+            "avg_chars_per_article": len(final_text) / (final_dieu + 1),
+        }
+        return final_text, candidate_info
 
     # Fallback: use body text
     body = soup.body
     if body:
-        return body.get_text(separator="\n")
-    return soup.get_text(separator="\n")
+        text = body.get_text(separator="\n")
+        return text, {"tag": "body", "class": [], "id": "", "article_count": 0, "chapter_count": 0, "section_count": 0, "text_len": len(text), "link_density": 0, "avg_chars_per_article": 0}
+    text = soup.get_text(separator="\n")
+    return text, {"tag": "soup", "class": [], "id": "", "article_count": 0, "chapter_count": 0, "section_count": 0, "text_len": len(text), "link_density": 0, "avg_chars_per_article": 0}
+
+def trim_to_legal_body(text: str) -> str:
+    """Trims website chrome from the beginning and end of extracted text.
+
+    Uses reliable legal headers to find the start of the actual legal document.
+    Only applies end trimming after confirming substantial legal body content.
+
+    Args:
+        text: Extracted text from HTML.
+
+    Returns:
+        Trimmed text starting from the legal body.
+    """
+    original = text.lstrip()
+
+    # 1. Find start using reliable markers with validation
+    start_pos = _find_legal_body_start(original)
+    if start_pos < len(original):
+        text = original[start_pos:]
+    else:
+        text = original
+
+    # 2. Trim trailing post-body noise only after confirming body exists
+    text = _trim_trailing_noise(text)
+
+    return text
+
+def _find_legal_body_start(text: str) -> int:
+    """Finds the start position of the legal body using context-aware markers.
+
+    Returns character index or len(text) if no reliable start found.
+    """
+    # Try markers in order of reliability (high to low)
+    for pattern, _ in START_MARKERS:
+        m = pattern.search(text)
+        if m:
+            pos = m.start()
+            # Validate: after this marker, there should be evidence of a legal body
+            after_text = text[pos:]
+            if _has_sufficient_legal_evidence(after_text, min_articles=2, min_chars=500):
+                return pos
+    return len(text)
+
+def _has_sufficient_legal_evidence(text: str, min_articles: int, min_chars: int) -> bool:
+    """Checks if text contains enough legal structure to confirm it's the real body."""
+    # Count article markers
+    article_count = len(RE_ARTICLE.findall(text))
+    if article_count < min_articles:
+        return False
+    # Also check total length
+    if len(text) < min_chars:
+        return False
+    return True
+
+def _trim_trailing_noise(text: str) -> str:
+    """Trims trailing website chrome only after confirming legal body is present."""
+    lines = text.splitlines()
+
+    # First, confirm we have enough legal body content before considering trimming
+    body_start_idx = None
+    legal_articles_seen = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if RE_ARTICLE.search(stripped):
+            legal_articles_seen += 1
+            if body_start_idx is None:
+                body_start_idx = i
+        # Require at least 3 articles before we trust the body has started
+        if legal_articles_seen >= 3:
+            break
+
+    if body_start_idx is None:
+        # No clear legal body found; don't trim
+        return text
+
+    # Now look for end markers, but only after we've seen at least 3 articles
+    cutoff_idx = None
+    for i in range(body_start_idx, len(lines)):
+        stripped = lines[i].strip()
+        if not stripped:
+            continue
+        # Check for end markers
+        if any(marker.lower() in stripped.lower() for marker in END_MARKERS):
+            # Calculate evidence so far
+            body_so_far = "\n".join(lines[body_start_idx:i])
+            article_count_so_far = len(RE_ARTICLE.findall(body_so_far))
+            body_chars_so_far = len(body_so_far)
+
+            # Allow trimming if we have sufficient legal body evidence
+            if (article_count_so_far >= 3 and body_chars_so_far >= 100) or \
+               (article_count_so_far >= 3 and (body_chars_so_far >= 500 or i - body_start_idx >= 5)):
+                cutoff_idx = i
+                break
+
+    if cutoff_idx is not None:
+        lines = lines[:cutoff_idx]
+
+    return "\n".join(lines)
 
 def remove_safe_boilerplate(text: str) -> str:
     """Removes repeated non-legal boilerplate patterns conservatively.
 
-    Preserves lines containing strong legal markers or structural numbering.
+    Preserves lines containing strong legal markers, structural numbering,
+    and bare numbering to avoid damaging legal structure.
     """
     lines = text.splitlines()
     cleaned_lines = []
@@ -231,9 +424,8 @@ def remove_safe_boilerplate(text: str) -> str:
             cleaned_lines.append(line)
             continue
 
-        # 4. Remove bare numbering (e.g., "1." or "a)") without content
-        if re.match(r"^\s*\d+\.\s*$", stripped) or re.match(r"^\s*[a-zđ]\)\s*$", stripped, re.I):
-            continue
+        # 4. Preserving bare numbering (formerly removed) to avoid damaging structure
+        # during the cleaning phase before the legal parser.
 
         # 5. Remove if the line matches a known boilerplate phrase exactly
         if any(bp == stripped for bp in SAFE_BOILERPLATE):
@@ -306,9 +498,10 @@ def detect_legal_markers(text: str) -> LegalMarkersSummary:
     """Detects legal hierarchy markers and estimates article count."""
     summary = LegalMarkersSummary()
 
-    summary.contains_part = "Phần" in text
-    summary.contains_chapter = "Chương" in text
-    summary.contains_section = "Mục" in text
+    # Case-insensitive check for legal hierarchy
+    summary.contains_part = bool(re.search(r"\bPhần\b", text, re.I))
+    summary.contains_chapter = bool(re.search(r"\bChương\b", text, re.I))
+    summary.contains_section = bool(re.search(r"\bMục\b", text, re.I))
     summary.contains_article = bool(RE_ARTICLE.search(text))
 
     lines = text.splitlines()
@@ -346,10 +539,12 @@ def clean_raw_artifact(
         with main_html_path.open("r", encoding="utf-8") as f:
             html_content = f.read()
 
-        extracted_text = extract_legal_text_from_html(html_content)
+        # Pipeline
+        extracted_text, candidate_info = extract_legal_text_from_html(html_content)
         extracted_chars = len(extracted_text)
 
-        text = remove_safe_boilerplate(extracted_text)
+        text = trim_to_legal_body(extracted_text)
+        text = remove_safe_boilerplate(text)
         text, uni_warnings = normalize_unicode(text)
         text = normalize_whitespace(text)
 
@@ -368,17 +563,19 @@ def clean_raw_artifact(
         if not markers.contains_article:
             warnings.append("missing_article_marker")
 
+        # Optimized metadata fallback
         artifact = NormalizedArtifact(
             law_id=meta.get("law_id", law_id),
-            law_name=meta.get("name", meta.get("law_name", "Unknown")),
-            source_url=meta.get("url", meta.get("source_url", "Unknown")),
-            source_domain=meta.get("source_domain", "Unknown"),
-            source_type=meta.get("source_type", "Unknown"),
+            law_name=meta.get("law_name") or meta.get("name") or "Unknown",
+            source_url=meta.get("source_url") or meta.get("url") or "Unknown",
+            source_domain=meta.get("source_domain") or "Unknown",
+            source_type=meta.get("source_type") or "Unknown",
             raw_artifact_path=str(main_html_path),
             normalized_text=text,
             text_stats=stats,
             markers=markers,
-            warnings=warnings
+            warnings=warnings,
+            candidate_info=candidate_info
         )
 
         law_out_dir = output_dir / artifact.law_id
@@ -447,7 +644,8 @@ def clean_raw_corpus(
                 "line_count": artifact.text_stats.line_count,
                 "article_count_estimate": artifact.markers.article_count_estimate,
                 "warnings": artifact.warnings,
-                "errors": []
+                "errors": [],
+                "candidate_info": artifact.candidate_info
             })
         else:
             summary["failed"] += 1
