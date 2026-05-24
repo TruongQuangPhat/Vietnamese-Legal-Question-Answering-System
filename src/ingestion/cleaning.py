@@ -7,14 +7,14 @@ import html
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Set
-from html.parser import HTMLParser
+from bs4 import BeautifulSoup
 
 from src.ingestion.audit import scan_raw_artifacts
 
 # --- Constants ---
 
 LEGAL_MARKERS_KEYWORDS = {"điều", "khoản", "điểm", "luật", "bộ luật", "văn bản hợp nhất", "quốc hội", "căn cứ"}
-STRONG_LEGAL_MARKERS = {"Điều", "Chương", "Mục", "Phần", "Văn bản hợp nhất", "QUỐC HỘI", "Căn cứ"}
+STRONG_LEGAL_MARKERS = {"Điều", "Chương", "Mục", "Phần", "Văn bản hợp nhất", "QUỐC HỘI", "Căn cứ", "Bộ luật", "Luật"}
 
 SAFE_BOILERPLATE = {
     "THƯ VIỆN PHÁP LUẬT",
@@ -32,15 +32,17 @@ SAFE_BOILERPLATE = {
 
 # Regex patterns for legal structure
 RE_ARTICLE = re.compile(r"Điều\s+\d+", re.IGNORECASE)
-RE_CLAUSE = re.compile(r"^\s*\d+\.")
-RE_POINT = re.compile(r"^\s*[a-zđ]\)")
+RE_CLAUSE = re.compile(r"^\s*\d+\..+")
+RE_POINT = re.compile(r"^\s*[a-zđ]\).+", re.IGNORECASE)
 
-# Unicode removal targets
+# Unicode handling
+REPLACEMENT_CHAR = "�"
+NBSP = " "
 ZERO_WIDTH_CHARS = {
-    "​", # zero-width space
-    "‌", # zero-width non-joiner
-    "‍", # zero-width joiner
-    "﻿", # BOM
+    "​",  # zero-width space
+    "‌",  # zero-width non-joiner
+    "‍",  # zero-width joiner
+    "﻿",  # BOM
 }
 
 @dataclass
@@ -75,7 +77,7 @@ class NormalizedArtifact:
     text_stats: CleaningStats
     markers: LegalMarkersSummary
     warnings: List[str] = field(default_factory=list)
-    metadata: Dict[str, str] = field(default_factory=lambda: {"cleaner_version": "v0.1"})
+    metadata: Dict[str, str] = field(default_factory=lambda: {"cleaner_version": "v0.3"})
 
     def to_dict(self) -> Dict:
         return {
@@ -105,94 +107,105 @@ class NormalizedArtifact:
             "metadata": self.metadata,
         }
 
-class LegalTextExtractor(HTMLParser):
-    """Deterministic HTML extractor for legal text.
-
-    Removes scripts, styles, and non-content elements while preserving
-    basic line structure.
-    """
-    # Void elements: no closing tag, cannot contain content
-    VOID_TAGS = {
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr"
-    }
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.text_parts: List[str] = []
-        self.skip_tags: Set[str] = {
-            "script", "style", "noscript", "iframe", "svg"
-        }
-        self.ignore_stack: List[str] = []
-
-    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
-        # Void tags have no content; ignore them entirely
-        if tag in self.VOID_TAGS:
-            return
-        if tag in self.skip_tags:
-            self.ignore_stack.append(tag)
-            return
-        # Handle hidden elements via style attribute
-        for attr, val in attrs:
-            if attr == "style" and val and "display:none" in val.lower():
-                self.ignore_stack.append(tag)
-                break
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag in self.ignore_stack:
-            # Robust pop: remove everything up to the matching start tag
-            while self.ignore_stack:
-                popped = self.ignore_stack.pop()
-                if popped == tag:
-                    break
-
-    def handle_data(self, data: str) -> None:
-        if not self.ignore_stack:
-            # Preserve a newline for common block-level elements
-            # (implemented in the wrapper function).
-            self.text_parts.append(data)
-
-    def get_text(self) -> str:
-        return "".join(self.text_parts)
-
 def extract_legal_text_from_html(html_content: str) -> str:
-    """Extracts visible text from HTML while removing non-content elements.
+    """Extracts the best legal content container from HTML using scoring.
 
     Args:
         html_content: Raw HTML string.
 
     Returns:
-        Extracted text with basic structure preserved.
+        Extracted text from the best candidate container.
     """
-    # 1. Remove large blocks that are likely to be imbalanced or not contain legal text
-    # Use DOTALL to match across newlines
-    for pattern in [
-        (r"<script.*?>.*?</script>", ""),
-        (r"<style.*?>.*?</style>", ""),
-        (r"<noscript.*?>.*?</noscript>", ""),
-        (r"<iframe.*?>.*?</iframe>", ""),
-        (r"<svg.*?>.*?</svg>", ""),
-    ]:
-        html_content = re.sub(pattern[0], pattern[1], html_content, flags=re.DOTALL | re.IGNORECASE)
+    # Parser strategy: lxml -> html5lib -> html.parser
+    parser_options = ["lxml", "html5lib", "html.parser"]
+    soup = None
+    for p in parser_options:
+        try:
+            soup = BeautifulSoup(html_content, p)
+            break
+        except Exception:
+            continue
 
-    # 2. To preserve some structure, we manually add newlines before block-level tags
-    processed_html = html_content.replace("</div>", "</div>\n")
-    processed_html = processed_html.replace("</p>", "</p>\n")
-    processed_html = processed_html.replace("</tr>", "</tr>\n")
-    processed_html = processed_html.replace("</h1>", "</h1>\n")
-    processed_html = processed_html.replace("</h2>", "</h2>\n")
-    processed_html = processed_html.replace("</h3>", "</h3>\n")
-    processed_html = processed_html.replace("</h4>", "</h4>\n")
-    processed_html = processed_html.replace("<li>", "\n<li>")
+    if soup is None:
+        return ""
 
-    parser = LegalTextExtractor()
-    parser.feed(processed_html)
-    return parser.get_text()
+    # 1. Decompose known noisy elements (Do NOT decompose 'form')
+    skip_tags = {
+        "script", "style", "noscript", "iframe",
+        "button", "select", "input", "svg"
+    }
+    for tag in soup.find_all(skip_tags):
+        tag.decompose()
+
+    # 2. Candidate scoring to find the main content container
+    # We consider block-level containers but not body (as fallback only)
+    candidates = soup.find_all(['div', 'article', 'main', 'section', 'td'])
+
+    best_candidate = None
+    max_score = -1.0
+
+    for candidate in candidates:
+        # Fast extraction of text for scoring
+        text = candidate.get_text(separator=" ", strip=True)
+        if not text:
+            continue
+
+        text_len = len(text)
+
+        # Quick check for any legal marker
+        if not any(m in text for m in ('Điều', 'Chương', 'Mục')):
+            continue
+
+        # Count legal markers
+        dieu_count = len(RE_ARTICLE.findall(text))
+        chapter_count = len(re.findall(r'Chương\s+[IVXLCDM]+', text, re.I))
+        muc_count = text.count("Mục")
+        luat_count = text.count("Luật") + text.count("Bộ luật")
+        quoc_hoi = 1 if "QUỐC HỘI" in text else 0
+        can_cu = 1 if "Căn cứ" in text else 0
+
+        # Base score with strong weighting for markers, scaled by text density
+        marker_sum = dieu_count + chapter_count + muc_count
+        marker_benefit = (
+            dieu_count * 10000 +
+            chapter_count * 5000 +
+            muc_count * 2000 +
+            luat_count * 1000 +
+            quoc_hoi * 5000 +
+            can_cu * 5000
+        )
+
+        # Scaling factor: reduce benefit if average text per marker is too low (likely nav/TOC)
+        # We expect at least 150 chars per legal marker for it to be actual content
+        density_factor = 1.0
+        if marker_sum > 0:
+            density_factor = min(1.0, text_len / (marker_sum * 150))
+
+        score = text_len + (marker_benefit * density_factor)
+
+
+        # Penalize high link density and few legal markers
+        link_count = len(candidate.find_all('a'))
+        if link_count > 5 and dieu_count < 3:
+            score *= 0.5
+
+        if score > max_score:
+            max_score = score
+            best_candidate = candidate
+
+    if best_candidate:
+        return best_candidate.get_text(separator="\n")
+
+    # Fallback: use body text
+    body = soup.body
+    if body:
+        return body.get_text(separator="\n")
+    return soup.get_text(separator="\n")
 
 def remove_safe_boilerplate(text: str) -> str:
-    """Removes repeated non-legal boilerplate patterns.
+    """Removes repeated non-legal boilerplate patterns conservatively.
 
-    Preserves lines containing strong legal markers.
+    Preserves lines containing strong legal markers or structural numbering.
     """
     lines = text.splitlines()
     cleaned_lines = []
@@ -203,12 +216,26 @@ def remove_safe_boilerplate(text: str) -> str:
             cleaned_lines.append(line)
             continue
 
-        # Rule: Never remove lines containing strong legal markers
+        # 1. Never remove lines containing strong legal markers
         if any(marker in stripped for marker in STRONG_LEGAL_MARKERS):
             cleaned_lines.append(line)
             continue
 
-        # Remove if the line matches a known boilerplate phrase exactly or is a subset
+        # 2. Never remove numbered clause lines (e.g., "1. Nội dung")
+        if RE_CLAUSE.match(stripped):
+            cleaned_lines.append(line)
+            continue
+
+        # 3. Never remove point labels (e.g., "a) Nội dung")
+        if RE_POINT.match(stripped):
+            cleaned_lines.append(line)
+            continue
+
+        # 4. Remove bare numbering (e.g., "1." or "a)") without content
+        if re.match(r"^\s*\d+\.\s*$", stripped) or re.match(r"^\s*[a-zđ]\)\s*$", stripped, re.I):
+            continue
+
+        # 5. Remove if the line matches a known boilerplate phrase exactly
         if any(bp == stripped for bp in SAFE_BOILERPLATE):
             continue
 
@@ -230,53 +257,38 @@ def normalize_unicode(text: str) -> Tuple[str, List[str]]:
     # 2. NFC Normalization
     text = unicodedata.normalize("NFC", text)
 
-    # 3. Check for replacement character
-    if "�" in text:
+    # 3. Check for Unicode replacement character U+FFFD
+    if REPLACEMENT_CHAR in text:
         warnings.append("encoding_replacement_character_found")
 
-    # 4. Remove NBSP and other targets
-    text = text.replace(" ", " ") # NBSP -> space
+    # 4. Normalize NBSP to regular space
+    text = text.replace(NBSP, " ")
 
+    # 5. Remove zero-width characters
     for char in ZERO_WIDTH_CHARS:
         text = text.replace(char, "")
 
-    # 5. Remove invalid control characters (C0 except \n, \r, \t)
-    # This keeps the text clean for downstream regex.
+    # 6. Remove invalid control characters (C0 except \n, \r, \t)
     text = "".join(ch for ch in text if ord(ch) >= 32 or ch in "\n\r\t")
 
     return text, warnings
 
 def normalize_whitespace(text: str) -> str:
-    """Collapses excessive whitespace while preserving legal boundaries.
-
-    Returns:
-        Normalized text.
-    """
-    # \r\n and \r to \n
+    """Collapses excessive whitespace while preserving legal boundaries."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-
-    # Tabs to spaces
     text = text.replace("\t", "    ")
 
     lines = text.splitlines()
     normalized_lines = []
 
     for line in lines:
-        # Strip leading/trailing whitespace
         stripped = line.strip()
-
-        # Collapse repeated spaces within each line
-        # But preserve leading spaces if they are part of a known pattern?
-        # No, the requirement says "strip leading/trailing whitespace on each line".
         collapsed = re.sub(r"[ \t]+", " ", stripped)
-
         if collapsed:
             normalized_lines.append(collapsed)
         else:
-            # Preserve single blank lines as paragraph breaks
             normalized_lines.append("")
 
-    # Collapse excessive blank lines (more than 2)
     final_lines = []
     blank_count = 0
     for line in normalized_lines:
@@ -291,23 +303,14 @@ def normalize_whitespace(text: str) -> str:
     return "\n".join(final_lines)
 
 def detect_legal_markers(text: str) -> LegalMarkersSummary:
-    """Detects legal hierarchy markers and estimates article count.
-
-    Args:
-        text: Normalized legal text.
-
-    Returns:
-        LegalMarkersSummary object.
-    """
+    """Detects legal hierarchy markers and estimates article count."""
     summary = LegalMarkersSummary()
 
-    # Simple keyword detection
     summary.contains_part = "Phần" in text
     summary.contains_chapter = "Chương" in text
     summary.contains_section = "Mục" in text
     summary.contains_article = bool(RE_ARTICLE.search(text))
 
-    # Pattern detection for clauses and points
     lines = text.splitlines()
     for line in lines:
         if RE_CLAUSE.match(line):
@@ -315,20 +318,12 @@ def detect_legal_markers(text: str) -> LegalMarkersSummary:
         if RE_POINT.match(line):
             summary.contains_point_labeling = True
 
-    # Estimate article count
     summary.article_count_estimate = len(RE_ARTICLE.findall(text))
 
     return summary
 
 def load_raw_metadata(metadata_path: Path) -> Dict:
-    """Loads metadata from JSON file.
-
-    Args:
-        metadata_path: Path to metadata.json
-
-    Returns:
-        Metadata dictionary.
-    """
+    """Loads metadata from JSON file."""
     with metadata_path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -337,46 +332,29 @@ def clean_raw_artifact(
     output_dir: Path,
     min_text_length: int,
     write_txt: bool
-) -> Tuple[NormalizedArtifact, List[str]]:
-    """Cleans a single raw legal artifact.
-
-    Args:
-        artifact_paths: Tuple of (main_html_path, metadata_json_path).
-        output_dir: Base output directory.
-        min_text_length: Length threshold for warnings.
-        write_txt: Whether to write debug .txt file.
-
-    Returns:
-        Tuple of (NormalizedArtifact, errors).
-    """
+) -> Tuple[Optional[NormalizedArtifact], List[str]]:
+    """Cleans a single raw legal artifact."""
     main_html_path, metadata_json_path = artifact_paths
     law_id = main_html_path.parent.name
     if "latest" in main_html_path.parts:
-        # If layout is {law_id}/latest/main.html, the parent is 'latest'.
-        # We need the grandparent.
         law_id = main_html_path.parent.parent.name
 
     try:
-        # 1. Metadata
         meta = load_raw_metadata(metadata_json_path)
-
-        # 2. HTML Extraction
         raw_html_size = main_html_path.stat().st_size
+
         with main_html_path.open("r", encoding="utf-8") as f:
             html_content = f.read()
 
         extracted_text = extract_legal_text_from_html(html_content)
         extracted_chars = len(extracted_text)
 
-        # 3. Cleaning Pipeline
         text = remove_safe_boilerplate(extracted_text)
         text, uni_warnings = normalize_unicode(text)
         text = normalize_whitespace(text)
 
-        # 4. Markers
         markers = detect_legal_markers(text)
 
-        # 5. Build Artifact
         stats = CleaningStats(
             raw_html_size_bytes=raw_html_size,
             extracted_text_chars=extracted_chars,
@@ -403,15 +381,12 @@ def clean_raw_artifact(
             warnings=warnings
         )
 
-        # Write outputs
         law_out_dir = output_dir / artifact.law_id
         law_out_dir.mkdir(parents=True, exist_ok=True)
 
-        # normalized.json
         with (law_out_dir / "normalized.json").open("w", encoding="utf-8") as f:
             json.dump(artifact.to_dict(), f, indent=2, ensure_ascii=False)
 
-        # cleaned.txt (optional)
         if write_txt:
             with (law_out_dir / "cleaned.txt").open("w", encoding="utf-8") as f:
                 f.write(artifact.normalized_text)
@@ -427,11 +402,7 @@ def clean_raw_corpus(
     min_text_length: int,
     write_txt: bool
 ) -> Dict:
-    """Processes the entire raw corpus.
-
-    Returns:
-        The final cleaning report.
-    """
+    """Processes the entire raw corpus."""
     artifacts = scan_raw_artifacts(raw_dir)
 
     results = []
@@ -497,12 +468,7 @@ def clean_raw_corpus(
     }
 
 def write_cleaning_report(report: Dict, report_path: Path) -> None:
-    """Writes the final cleaning report to JSON.
-
-    Args:
-        report: The report dictionary.
-        report_path: Output path for the report.
-    """
+    """Writes the final cleaning report to JSON."""
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with report_path.open("w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
