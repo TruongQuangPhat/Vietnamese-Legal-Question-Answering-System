@@ -2,301 +2,795 @@
 
 ## Overview
 
-The Cleaning & Normalization phase transforms raw HTML artifacts into clean, UTF-8 encoded Vietnamese legal text while preserving the legal hierarchy boundaries (Điều, Khoản, Điểm). This stage prepares text for the Legal Hierarchy Parser by removing boilerplate, normalizing Unicode, and maintaining structural markers.
+The Cleaning & Normalization phase converts audited raw HTML artifacts into normalized Vietnamese legal text while preserving the structural signals required by the Legal Hierarchy Parser.
 
-Cleaning is deterministic and stateless — the same input always produces the same output. This ensures reproducibility and enables incremental processing.
+This phase is not responsible for parsing legal hierarchy, creating chunks, generating embeddings, or building RAG. Its responsibility is narrower and stricter:
+
+```text
+raw HTML + source metadata
+→ deterministic text extraction
+→ Unicode and whitespace normalization
+→ legal boundary preservation
+→ normalized.json
+→ cleaning_report.json
+```
+
+The output must be clean enough for parsing, but it must not destroy the original legal structure. In Vietnamese legal documents, the legal hierarchy is often expressed through headings and numbering patterns such as:
+
+```text
+Phần ...
+Chương ...
+Mục ...
+Điều 1. ...
+1. ...
+a) ...
+```
+
+Therefore, the cleaner must preserve not only explicit words such as `Điều`, but also numbered clause lines and lettered point labels.
+
+This phase is deterministic and stateless. The same input should always produce the same output. No LLM-based cleaning is allowed.
 
 ## Quick Start
 
-**Intended CLI** (design phase, not yet implemented):
+### Intended CLI
 
 ```bash
-uv run python -m src.processing.cleaner \
-  --input-dir data/raw \
+uv run python scripts/clean_raw_corpus.py \
+  --raw-dir data/raw \
   --output-dir data/interim \
-  --law-ids BLDS_2015 LDD_2024  # or omit for all 52
+  --report data/reports/cleaning_report.json
 ```
 
-**Expected workflow**:
-1. Input: `data/raw/{law_id}/latest/main.html`
-2. Output: `data/interim/{law_id}/cleaned.txt` (or `cleaned.json` with offsets)
-3. Logs: structured JSON with cleaning statistics (boilerplate removed, characters normalized).
+### Optional Development Run
+
+```bash
+uv run python scripts/clean_raw_corpus.py \
+  --raw-dir data/raw \
+  --output-dir data/interim \
+  --report data/reports/cleaning_report.json \
+  --min-text-length 10000 \
+  --write-txt \
+  --verbose
+```
+
+### Expected Inputs
+
+Preferred raw artifact layout:
+
+```text
+data/raw/{LAW_ID}/latest/main.html
+data/raw/{LAW_ID}/latest/metadata.json
+```
+
+Fallback flat layout:
+
+```text
+data/raw/{LAW_ID}/main.html
+data/raw/{LAW_ID}/metadata.json
+```
+
+### Expected Outputs
+
+Primary output for each law:
+
+```text
+data/interim/{LAW_ID}/normalized.json
+```
+
+Optional debug output:
+
+```text
+data/interim/{LAW_ID}/cleaned.txt
+```
+
+Corpus-level report:
+
+```text
+data/reports/cleaning_report.json
+```
 
 ## Architecture
 
-```
-┌──────────────────────┐
-│  Raw HTML Artifact   │
-│  (from crawler)      │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  HTML Content        │
-│  Extraction          │
-│  (remove script/style)│
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Boilerplate         │
-│  Removal             │
-│  (nav, ads, footer)  │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Unicode             │
-│  Normalization       │
-│  (NFC, Vietnamese)   │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Whitespace          │
-│  Normalization       │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Legal Boundary      │
-│  Preservation        │
-│  (Điều/Khoản/Điểm)   │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Normalized Legal    │
-│  Text                │
-└──────────────────────┘
+```text
+┌──────────────────────────────┐
+│  Raw HTML Artifact           │
+│  main.html + metadata.json   │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Raw Artifact Discovery      │
+│  latest/ layout or flat      │
+│  fallback layout             │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Metadata Loader             │
+│  law_id, source_url, domain, │
+│  source_type, raw path       │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  HTML Content Extraction     │
+│  visible legal text only     │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Safe Boilerplate Removal    │
+│  navigation, footer, ads,    │
+│  repeated non-legal blocks   │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Unicode Normalization       │
+│  NFC, NBSP, BOM, zero-width  │
+│  characters                  │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Whitespace Normalization    │
+│  spaces, newlines, paragraph │
+│  boundaries                  │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Legal Boundary Preservation │
+│  Điều, Chương, Mục, 1., a)   │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Normalized JSON Writer      │
+│  data/interim/{LAW_ID}/      │
+│  normalized.json             │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│  Cleaning Report Writer      │
+│  data/reports/               │
+│  cleaning_report.json        │
+└──────────────────────────────┘
 ```
 
 ## Components
 
-### 1. HTML Content Extraction
+### 1. Raw Artifact Discovery
 
-**Input**: Raw HTML file from `data/raw/{law_id}/latest/main.html`.
+**Goal**: Locate raw artifacts without recursively scanning the entire raw corpus and without mutating `data/raw`.
 
-**Process**:
-- Parse HTML with `lxml` or `html5lib` (robust to malformed markup).
-- Extract text content while discarding:
-  - `<script>`, `<style>` blocks
-  - Navigation menus, sidebars, footers
-  - Advertisements, pop-ups
-  - Forms, buttons
-- Preserve semantic structure where possible (headings, paragraphs, lists).
+The cleaner should discover only immediate child directories under `data/raw`.
 
-**Output**: Plain text with basic structure (newlines, indentation).
+Supported layouts:
 
-**Validation**:
-- Extracted text length > 1KB (non-empty).
-- No leftover HTML tags in text (except entities converted to characters).
+```text
+data/raw/{LAW_ID}/latest/main.html
+data/raw/{LAW_ID}/latest/metadata.json
+```
 
-### 2. Boilerplate Removal
+```text
+data/raw/{LAW_ID}/main.html
+data/raw/{LAW_ID}/metadata.json
+```
 
-**Goal**: Remove repetitive non-legal content that appears on all pages.
+**Responsibilities**:
+- Identify `LAW_ID` directories.
+- Resolve `main.html` and `metadata.json`.
+- Prefer `latest/` layout when both layouts exist.
+- Skip or mark failed artifacts that do not contain required files.
+- Never modify raw artifacts.
 
-**Targets**:
-- Header/footer text: "Thu viện pháp luật", "Hotline", "Đăng nhập"
-- Navigation links: "Trang chủ", "Tìm kiếm", "Liên hệ"
-- Copyright notices, timestamps
-- Promotional content
-
-**Method**:
-- Pattern-based removal (regex) for known boilerplate strings.
-- Optional: use a boilerplate detection library (e.g., `readability-lxml`).
-- Preserve any content that appears to be legal text (contains "Điều", "Luật", "Bộ luật").
+**Output**:
+- A list of artifact descriptors containing:
+  - `law_id`
+  - `main_html_path`
+  - `metadata_json_path`
+  - `output_dir`
 
 **Validation**:
-- Post-clean text still contains legal markers ("Điều", "Khoản", "Điểm").
-- Boilerplate removal reduces text size by expected amount (10–30%).
+- `main.html` path exists.
+- `metadata.json` path exists.
+- Artifact path is traceable in the final output.
 
-### 3. Unicode Normalization
+### 2. Metadata Loader
 
-**Goal**: Ensure consistent Vietnamese diacritics and prevent garbled characters.
+**Goal**: Preserve traceability from normalized text back to the raw artifact and legal source.
 
-**Process**:
-- Apply Unicode NFC normalization (composed form).
-- Fix common encoding errors:
-  - Replace mis-encoded Vietnamese characters (e.g., "t�i" → "tải")
-  - Normalize combining diacritics
-- Remove zero-width characters (`​`, `‌`, `‍`, `﻿`).
-- Validate UTF-8; if decode fails, attempt recovery with `errors='replace'` and log warning.
+The loader should read `metadata.json` and preserve the following fields when available:
+
+```text
+law_id
+law_name or name
+source_url or url
+source_domain
+source_type
+content_hash
+crawled_at
+raw_artifact_path
+```
+
+**Rules**:
+- Use metadata as the source of truth for source URL and source type.
+- Do not infer legal metadata from the visible HTML if metadata already provides it.
+- If metadata lacks optional fields, preserve `null` or omit only when the downstream schema allows it.
+- If `law_id` is missing in metadata, use the directory name as fallback and add a warning.
+
+**Validation**:
+- `law_id` is available from metadata or directory name.
+- `source_url` or `url` is available.
+- `raw_artifact_path` is recorded.
+
+### 3. HTML Content Extraction
+
+**Goal**: Extract visible legal text while removing obvious non-content HTML elements.
+
+The extractor should remove or ignore:
+
+```text
+<script>
+<style>
+<noscript>
+<iframe>
+<form>
+button
+select
+input
+svg
+hidden elements
+irrelevant navigation when safely identifiable
+footer blocks when safely identifiable
+advertisement blocks when safely identifiable
+```
+
+Recommended deterministic parsers:
+
+```text
+BeautifulSoup
+lxml
+html5lib
+```
+
+**Extraction strategy**:
+
+1. Try to identify the main legal document container if stable selectors are available.
+2. If no reliable container exists, extract visible body text conservatively.
+3. Preserve headings, paragraphs, list items, and line boundaries.
+4. Avoid aggressive deletion of generic `div` or `span` containers because legal text may appear inside them.
+
+**Output**:
+- Extracted visible text with basic line structure.
+
+**Validation**:
+- Extracted text is not empty.
+- Extracted text contains legal markers when the source is valid.
+- No obvious raw HTML tags remain in the extracted text.
+
+### 4. Safe Boilerplate Removal
+
+**Goal**: Remove repeated non-legal page content without damaging legal provisions.
+
+Common boilerplate candidates:
+
+```text
+THƯ VIỆN PHÁP LUẬT
+Đăng nhập
+Đăng ký
+Tra cứu pháp luật
+Hotline
+Liên hệ
+Tải về
+Văn bản liên quan
+Lược đồ
+Nội dung MIX
+Quảng cáo
+```
+
+**Rules**:
+- Prefer keeping minor boilerplate over deleting legal content.
+- Never remove lines containing strong legal markers unless the rule is deterministic and tested.
+- Strong legal markers include:
+  - `Điều`
+  - `Chương`
+  - `Mục`
+  - `Phần`
+  - `Văn bản hợp nhất`
+  - `QUỐC HỘI`
+  - `Căn cứ`
+- Boilerplate rules should be explicit and testable.
+
+**Validation**:
+- Text still contains article markers after boilerplate removal.
+- Text does not shrink suspiciously.
+- Removal statistics are recorded in `text_stats` or warnings.
+
+### 5. Unicode Normalization
+
+**Goal**: Ensure consistent Vietnamese Unicode representation.
+
+Operations:
+
+```text
+Apply Unicode NFC normalization.
+Decode HTML entities.
+Replace non-breaking spaces with regular spaces.
+Remove zero-width characters.
+Remove BOM characters.
+Remove invalid control characters except useful whitespace.
+```
+
+Characters to normalize or remove:
+
+```text
+\u00a0  NBSP → regular space
+\u200b  zero-width space → remove
+\u200c  zero-width non-joiner → remove
+\u200d  zero-width joiner → remove
+\ufeff  BOM → remove
+```
+
+Important rule:
+
+```text
+Do not guess corrupted Vietnamese text corrections such as "t�i" → "tải" unless there is a deterministic, tested mapping.
+```
+
+If the replacement character `�` appears, the cleaner should add a warning:
+
+```text
+encoding_replacement_character_found
+```
 
 **Validation**:
 - Text is valid UTF-8.
-- No control characters in [0x00–0x1F] except allowed whitespace (`\n`, `\t`, `\r`).
-- Vietnamese diacritics render correctly (spot-check common words: "pháp", "luật", "nhà nước").
+- Vietnamese diacritics are preserved.
+- Unwanted control characters are removed.
+- Replacement characters are reported, not silently “fixed”.
 
-### 4. Whitespace Normalization
+### 6. Whitespace Normalization
 
-**Goal**: Consistent spacing without collapsing legal structure.
+**Goal**: Make text spacing consistent while preserving legal structure.
 
-**Process**:
-- Collapse multiple consecutive spaces into single space.
-- Normalize newlines: convert `\r\n` and `\r` to `\n`.
-- Trim leading/trailing whitespace on each line.
-- Preserve paragraph breaks (detect multiple newlines as paragraph separators).
-- Remove trailing whitespace at line ends.
+Operations:
 
-**Validation**:
-- No tabs (`\t`) remaining (converted to spaces).
-- No more than 2 consecutive newlines (paragraph boundary).
-- No lines with only whitespace.
+```text
+Convert \r\n and \r to \n.
+Convert tabs to spaces.
+Strip leading and trailing whitespace on each line.
+Collapse repeated spaces within each line.
+Collapse excessive blank lines.
+Preserve paragraph breaks.
+Preserve line boundaries around legal headings and numbering.
+```
 
-### 5. Legal Boundary Preservation
+Do not:
 
-**Goal**: Keep Vietnamese legal heading markers intact and detectable.
-
-**Critical markers** (must survive cleaning):
-- "Điều" followed by number (e.g., "Điều 123")
-- "Khoản" followed by number or letter (e.g., "Khoản 2", "Khoản a")
-- "Điểm" followed by letter (e.g., "Điểm a", "Điểm b")
-- "Phần", "Chương", "Mục" with their numbers/titles
-
-**Enforcement**:
-- Do not split lines at these markers arbitrarily.
-- Ensure markers are on their own line or clearly separated by whitespace.
-- If boilerplate removal accidentally deletes a marker, flag as warning.
+```text
+Join the entire document into one line.
+Remove all newlines.
+Merge article headings into previous paragraphs.
+Destroy numbering patterns such as "1.", "2.", "a)", "b)".
+```
 
 **Validation**:
-- At least one "Điều" pattern exists in cleaned text (regex: `r"Điều\s+\d+"`).
-- All "Điều" occurrences are followed by content (not orphaned).
+- No tabs remain.
+- No lines contain only whitespace.
+- No excessive consecutive blank lines remain.
+- Article headings remain line-visible and parseable.
+
+### 7. Legal Boundary Preservation
+
+**Goal**: Preserve structural signals needed by the Legal Hierarchy Parser.
+
+Important markers and patterns:
+
+```text
+Phần ...
+Chương ...
+Mục ...
+Điều 1. ...
+Điều 2. ...
+1. ...
+2. ...
+3. ...
+a)
+b)
+c)
+```
+
+Important note:
+
+Vietnamese legal documents often do not literally contain the words `Khoản` and `Điểm` in the body text. Clauses are commonly represented as numbered lines:
+
+```text
+1. Nội dung khoản thứ nhất
+2. Nội dung khoản thứ hai
+```
+
+Points are commonly represented as lettered lines:
+
+```text
+a) Nội dung điểm a
+b) Nội dung điểm b
+```
+
+Therefore, marker detection should include pattern-based checks:
+
+```text
+Article marker:
+Điều\s+\d+
+
+Clause numbering:
+^\s*\d+\.
+
+Point labeling:
+^\s*[a-zđ]\)
+```
+
+**Rules**:
+- Preserve line breaks before article headings.
+- Preserve line breaks before numbered clauses when possible.
+- Preserve line breaks before lettered points when possible.
+- Missing clause or point patterns should be a warning only when the document is expected to contain them.
+- Missing article markers should always be a warning.
+
+**Validation**:
+- `article_count_estimate` is computed.
+- `contains_article` is computed.
+- `contains_clause_numbering` is computed.
+- `contains_point_labeling` is computed.
+- Missing `Điều` patterns are reported in the cleaning report.
+
+### 8. Normalized JSON Writer
+
+**Goal**: Write a structured normalized artifact for each legal document.
+
+Primary output:
+
+```text
+data/interim/{LAW_ID}/normalized.json
+```
+
+Optional debug output:
+
+```text
+data/interim/{LAW_ID}/cleaned.txt
+```
+
+The normalized JSON must preserve:
+- source traceability
+- normalized legal text
+- text statistics
+- legal marker summary
+- warnings
+- cleaner metadata
+
+### 9. Cleaning Report Writer
+
+**Goal**: Produce a corpus-level report for cleaning quality and parsing readiness.
+
+Output:
+
+```text
+data/reports/cleaning_report.json
+```
+
+This report is the validation gate for moving into Legal Hierarchy Parsing.
 
 ## Pipeline Execution Flow
 
-1. Read raw HTML from `data/raw/{law_id}/latest/main.html`.
-2. Extract text content (strip tags, keep visible text).
-3. Remove boilerplate using pattern database.
-4. Normalize Unicode (NFC, fix encoding, remove zero-width).
-5. Normalize whitespace (collapse spaces, standardize newlines).
-6. Verify legal markers present; if missing, log warning but continue.
-7. Write to `data/interim/{law_id}/cleaned.txt` (UTF-8).
-8. Optionally write `cleaned.json` with metadata (character offsets, statistics).
+1. Parse CLI arguments.
+2. Discover raw artifacts from `data/raw`.
+3. For each artifact:
+   1. Resolve `main.html` and `metadata.json`.
+   2. Load source metadata.
+   3. Read `main.html` as UTF-8.
+   4. Extract visible legal text from HTML.
+   5. Remove safe boilerplate.
+   6. Normalize Unicode.
+   7. Normalize whitespace.
+   8. Preserve legal boundaries and numbering patterns.
+   9. Detect legal markers.
+   10. Build normalized output object.
+   11. Write `normalized.json`.
+   12. Optionally write `cleaned.txt`.
+4. Aggregate item-level statuses.
+5. Write `cleaning_report.json`.
+6. Print a compact CLI summary.
+
+Example CLI summary:
+
+```text
+Cleaning & Normalization Summary
+--------------------------------
+Input artifacts:          52
+Successfully cleaned:     52
+Warning artifacts:        0
+Failed artifacts:         0
+Suspiciously short texts: 0
+Missing article markers:  0
+Output directory:         data/interim
+Report:                   data/reports/cleaning_report.json
+```
 
 ## Data Models / Output Schema
 
-### Cleaned Text File (`cleaned.txt`)
+### Normalized JSON
 
-Plain UTF-8 text file. Example excerpt:
+Primary output:
 
-```
-Luật Đất đai 2024
-
-Điều 1. Phạm vi điều chỉnh
-
-Luật này quy định về quản lý nhà nước đối với đất đai, quyền và nghĩa vụ của Nhà nước, tổ chức, cá nhân có liên quan đến đất đai.
-
-Điều 2. Giải thích thuật ngữ
-
-Trong Luật này, các thuật ngữ được giải thích như sau:
-1. "Đất đai" bao gồm đất mặt tiền, đất nền...
-2. "Quyền sử dụng đất" là quyền của tổ chức, cá nhân...
+```text
+data/interim/{LAW_ID}/normalized.json
 ```
 
-### Optional Cleaned JSON (`cleaned.json`)
-
-If metadata offsets are needed for downstream parsing:
+Schema:
 
 ```json
 {
-  "law_id": "LDD_2024",
-  "source_file": "data/raw/LDD_2024/latest/main.html",
-  "cleaning_stats": {
-    "original_size_bytes": 456789,
-    "cleaned_size_bytes": 345678,
-    "boilerplate_removed_bytes": 111111,
-    "normalization_issues_fixed": 0,
-    "warnings": []
+  "law_id": "BLDS_2015",
+  "law_name": "Bộ luật Dân sự 2015",
+  "source_url": "https://thuvienphapluat.vn/...",
+  "source_domain": "thuvienphapluat.vn",
+  "source_type": "html",
+  "raw_artifact_path": "data/raw/BLDS_2015/latest/main.html",
+  "normalized_text": "...",
+  "text_stats": {
+    "raw_html_size_bytes": 123456,
+    "extracted_text_chars": 110000,
+    "normalized_text_chars": 98765,
+    "line_count": 3000
   },
-  "paragraph_offsets": [
-    {"start": 0, "end": 125, "text": "Luật Đất đai 2024\n"},
-    {"start": 126, "end": 289, "text": "Điều 1. Phạm vi điều chỉnh\n"}
+  "markers": {
+    "contains_part": false,
+    "contains_chapter": true,
+    "contains_section": true,
+    "contains_article": true,
+    "contains_clause_numbering": true,
+    "contains_point_labeling": true,
+    "article_count_estimate": 689
+  },
+  "warnings": [],
+  "metadata": {
+    "cleaner_version": "v0.1"
+  }
+}
+```
+
+### Cleaning Report
+
+Output:
+
+```text
+data/reports/cleaning_report.json
+```
+
+Schema:
+
+```json
+{
+  "summary": {
+    "total_artifacts": 52,
+    "successfully_cleaned": 52,
+    "warning_artifacts": 0,
+    "failed": 0,
+    "suspiciously_short_texts": 0,
+    "missing_article_marker": 0,
+    "output_dir": "data/interim"
+  },
+  "items": [
+    {
+      "law_id": "BLDS_2015",
+      "status": "success",
+      "output_path": "data/interim/BLDS_2015/normalized.json",
+      "normalized_text_chars": 98765,
+      "line_count": 3000,
+      "article_count_estimate": 689,
+      "warnings": [],
+      "errors": []
+    }
   ]
 }
 ```
 
-## CLI Reference
+### Optional Cleaned Text
 
-### Intended Main Command
+Optional debug output:
 
-```bash
-uv run python -m src.processing.cleaner \
-  --input-dir data/raw \
-  --output-dir data/interim \
-  [--law-ids LAW_ID [LAW_ID ...]] \
-  [--format txt|json] \
-  [--log-level INFO]
+```text
+data/interim/{LAW_ID}/cleaned.txt
 ```
 
-**Arguments**:
-- `--input-dir`: Root directory containing `{law_id}/latest/main.html` (default: `data/raw`)
-- `--output-dir`: Where to write `cleaned.txt` or `cleaned.json` (default: `data/interim`)
-- `--law-ids`: Specific laws to process; if omitted, process all found in input dir.
-- `--format`: Output format (`txt` for plain text, `json` for enriched).
-- `--log-level`: Logging verbosity.
+This file should contain only normalized legal text. It is useful for manual inspection but should not replace `normalized.json` as the primary pipeline artifact.
+
+## CLI Reference
+
+### Main Command
+
+```bash
+uv run python scripts/clean_raw_corpus.py \
+  --raw-dir data/raw \
+  --output-dir data/interim \
+  --report data/reports/cleaning_report.json
+```
+
+### Optional Arguments
+
+```bash
+--min-text-length 10000
+```
+
+Minimum normalized text length before an artifact is marked suspicious.
+
+```bash
+--write-txt
+```
+
+Write optional `cleaned.txt` files for manual debugging.
+
+```bash
+--verbose
+```
+
+Print item-level details.
+
+### Example: Process All Laws
+
+```bash
+uv run python scripts/clean_raw_corpus.py \
+  --raw-dir data/raw \
+  --output-dir data/interim \
+  --report data/reports/cleaning_report.json \
+  --write-txt
+```
+
+### Example: Development Run With Verbose Logging
+
+```bash
+uv run python scripts/clean_raw_corpus.py \
+  --raw-dir data/raw \
+  --output-dir data/interim \
+  --report data/reports/cleaning_report.json \
+  --min-text-length 10000 \
+  --verbose
+```
 
 ## Testing
 
-**Unit tests**:
-- `test_unicode_normalization()`: Vietnamese diacritics preserved, NFC applied.
-- `test_whitespace_normalization()`: tabs → spaces, newlines normalized, trailing whitespace removed.
-- `test_boilerplate_removal()`: known boilerplate strings removed, legal text retained.
-- `test_legal_marker_detection()`: regex finds "Điều \d+", "Khoản \d+", "Điểm [a-z]".
+Tests should be placed in:
 
-**Integration test**:
-- Given a sample raw HTML from the corpus, cleaner produces `cleaned.txt` > 1KB.
-- Cleaned text contains at least one "Điều" pattern.
-- Cleaned text is valid UTF-8; `open(..., encoding="utf-8")` succeeds.
+```text
+tests/unit/ingestion/test_cleaning.py
+```
+
+Use `tmp_path`. Do not use network calls. Do not depend on real `data/raw`.
+
+### Required Unit Tests
+
+- `test_remove_script_style_noscript()`
+- `test_unicode_normalization_to_nfc()`
+- `test_remove_zero_width_characters()`
+- `test_normalize_non_breaking_spaces()`
+- `test_collapse_excessive_whitespace()`
+- `test_preserve_article_heading()`
+- `test_preserve_clause_numbering()`
+- `test_preserve_point_labeling()`
+- `test_detect_legal_markers()`
+- `test_generate_normalized_json()`
+- `test_generate_cleaning_report()`
+- `test_warn_when_text_is_suspiciously_short()`
+- `test_warn_when_article_marker_missing()`
+- `test_warn_when_replacement_character_found()`
+- `test_handle_missing_main_html_gracefully()`
+- `test_handle_invalid_or_unreadable_html_gracefully()`
+
+### Integration Test
+
+A lightweight integration test may use a small synthetic HTML page that mimics a TVPL legal document.
+
+It should verify:
+
+```text
+raw HTML
+→ extracted text
+→ normalized text
+→ normalized.json
+→ cleaning_report.json
+```
+
+without touching real network resources.
 
 ## Error Handling
 
-- **HTML parse error**: Log warning, attempt recovery with different parser; if fails, mark artifact as `invalid`.
-- **File not found**: Raise `FileNotFoundError` with clear message; abort processing for that `law_id`.
-- **Output directory not writable**: `OSError`; abort.
-- **Unicode decode error**: Attempt `errors='replace'`, log warning, continue.
+| Error | Behavior |
+|------|----------|
+| Missing `main.html` | Mark artifact as failed; continue other artifacts |
+| Missing `metadata.json` | Mark artifact as failed; continue other artifacts |
+| Invalid metadata JSON | Mark artifact as failed; include error in report |
+| HTML read error | Mark artifact as failed; include path and exception |
+| HTML parse error | Attempt robust parsing; if unrecoverable, mark failed |
+| Text suspiciously short | Mark as warning, not failure |
+| Missing article marker | Mark as warning, not failure |
+| Replacement character found | Mark as warning |
+| Output directory not writable | Fail fast with clear error |
+| Report writing failure | Fail fast with clear error |
 
-All errors include `law_id` and file path in structured log.
+The cleaner should continue processing independent artifacts even if one law fails.
 
 ## Troubleshooting
 
 | Issue | Possible Cause | How to Check | Recommended Fix |
-|-------|----------------|--------------|-----------------|
-| Cleaned text < 1KB | Boilerplate removal too aggressive OR source HTML was empty | Compare original HTML size; spot-check content | Adjust boilerplate patterns; ensure source HTML is valid |
-| Vietnamese diacritics corrupted | Unicode normalization failed or wrong encoding | Look for "t�i", "ph�p" in output | Ensure UTF-8 throughout; fix source encoding in crawler |
-| No "Điều" found in output | Legal marker removed by boilerplate remover | Search for "Điều" in original HTML | Refine boilerplate patterns to preserve legal headings |
-| Many zero-width chars remain | Normalization step skipped or incomplete | Check for `​` in output | Ensure zero-width char removal runs |
-| Output file empty | Write error or permission issue | Check file size on disk | Verify output directory permissions; check disk space |
-| Parser downstream fails | Cleaning produced unexpected line breaks | Inspect `cleaned.txt` manually | Adjust whitespace normalization rules |
+|------|----------------|--------------|-----------------|
+| `normalized_text` is empty | Extraction selected the wrong container or source HTML is invalid | Compare raw size and extracted text length | Improve extraction strategy or inspect audit report |
+| Text is too short | Boilerplate removal too aggressive | Check `suspiciously_short_texts` in report | Relax boilerplate rules |
+| `Điều` markers missing | Legal headings removed or extraction selected wrong area | Check `missing_article_marker` count | Preserve article heading lines and improve extraction |
+| Clause numbering missing | Whitespace normalization merged numbered lines | Search for `1.` / `2.` patterns | Preserve line breaks before numbered clauses |
+| Point labels missing | Cleaner removed lettered list structure | Search for `a)` / `b)` patterns | Preserve list item boundaries |
+| Vietnamese text is corrupted | Encoding issue in raw HTML or decode stage | Search for `�` in normalized text | Add warning, review crawler encoding, avoid guessing corrections |
+| HTML tags remain | Extraction did not strip markup correctly | Search for `<div`, `<span`, `<p` | Improve HTML text extraction |
+| Too much boilerplate remains | Patterns too conservative | Inspect optional `cleaned.txt` | Add safe boilerplate rules |
+| Parser fails downstream | Cleaning destroyed hierarchy boundary | Compare normalized text around `Điều` headings | Adjust legal boundary preservation rules |
 
 ## Best Practices
 
-- **Determinism** — same input must produce identical output every time.
-- **Preserve legal markers** — never remove "Điều", "Khoản", "Điểm" even if they appear in boilerplate; better to keep false positive than lose structure.
-- **Log statistics** — track bytes removed, normalization fixes applied; aids debugging.
-- **Validate early** — run marker detection after cleaning; if zero markers found, flag immediately.
-- **Keep intermediate files** — `data/interim/` may be kept for audit; document their purpose.
-- **Stateless operation** — cleaner should not depend on previous runs or external state.
+- Keep cleaning deterministic.
+- Do not use LLM-based cleaning.
+- Do not mutate `data/raw`.
+- Run cleaning only after raw audit has passed.
+- Prefer keeping minor boilerplate over deleting legal provisions.
+- Preserve line boundaries around `Điều`, numbered clauses, and point labels.
+- Use `normalized.json` as the primary artifact.
+- Use `cleaned.txt` only as optional debug output.
+- Track warnings instead of silently fixing uncertain text.
+- Treat `�` as a warning, not as a string to guess-correct.
+- Keep source metadata and traceability with every normalized artifact.
+- Do not parse legal hierarchy in this phase.
+- Do not create chunks in this phase.
+- Do not embed or index text in this phase.
+
+## Validation Gate
+
+The Cleaning & Normalization phase passes only when:
+
+```text
+all valid audited artifacts produce normalized.json
+normalized_text is UTF-8 readable
+article markers are preserved
+numbered clause patterns are preserved when present
+point label patterns are preserved when present
+no obvious HTML tags remain
+cleaning_report.json is generated
+cleaning_report.json has no critical failures
+```
+
+If this gate fails, the project should not proceed to Legal Hierarchy Parsing.
 
 ## Changelog
 
-### Version 0.1 (2026-05-21)
+### Version 0.1
 
-- Created initial cleaning & normalization documentation.
-- Defined components: HTML extraction, boilerplate removal, Unicode normalization, whitespace cleanup, legal boundary preservation.
-- Provided pipeline box diagram and intended CLI.
-- Specified output formats (txt, optional json with offsets).
-- Documented validation criteria and testing strategy.
-- Added troubleshooting for common cleaning failures.
+- Defined deterministic cleaning and normalization pipeline.
+- Changed primary output from `cleaned.txt` to `normalized.json`.
+- Added optional `cleaned.txt` debug artifact.
+- Added corpus-level `cleaning_report.json`.
+- Added Vietnamese legal marker preservation rules.
+- Clarified that clause and point structures are often represented by `1.`, `2.`, `a)`, `b)` rather than literal words `Khoản` and `Điểm`.
+- Added Unicode, whitespace, metadata, and traceability requirements.
+- Added validation gate for Legal Hierarchy Parsing readiness.
 
 ## Related Documentation
 
 | Document | Status | Description |
 |----------|--------|-------------|
+| `docs/end_to_end_pipeline.md` | Existing | High-level project pipeline overview |
 | `docs/crawling.md` | Existing | Registry-driven crawling implementation |
-| `docs/project_setup.md` | Implemented | Environment setup and coding standards |
-| `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
-| `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
+| `docs/project_setup.md` | Existing | Environment setup and coding standards |
+| `docs/corpus_registry.md` | Existing | Corpus registry schema and design |
+| `docs/raw_corpus_audit.md` | Existing | Raw artifact audit and validation |
 | `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
 | `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
 | `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
