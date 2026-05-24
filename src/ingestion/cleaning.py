@@ -16,6 +16,13 @@ from src.ingestion.audit import scan_raw_artifacts
 LEGAL_MARKERS_KEYWORDS = {"điều", "khoản", "điểm", "luật", "bộ luật", "văn bản hợp nhất", "quốc hội", "căn cứ"}
 STRONG_LEGAL_MARKERS = {"Điều", "Chương", "Mục", "Phần", "Văn bản hợp nhất", "QUỐC HỘI", "Căn cứ", "Bộ luật", "Luật"}
 
+PREFERRED_CONTENT_SELECTORS = [
+    "#divContentDoc .content1",
+    "#divContentDoc",
+    ".cldivContentDocVn .content1",
+    ".content1",
+]
+
 SAFE_BOILERPLATE = {
     "THƯ VIỆN PHÁP LUẬT",
     "Đăng nhập",
@@ -29,6 +36,7 @@ SAFE_BOILERPLATE = {
     "Nội dung MIX",
     "Quảng cáo",
 }
+
 
 # Regex patterns for legal structure
 RE_ARTICLE = re.compile(r"Điều\s+\d+", re.IGNORECASE)
@@ -102,6 +110,16 @@ class LegalMarkersSummary:
     contains_clause_numbering: bool = False
     contains_point_labeling: bool = False
     article_count_estimate: int = 0
+    max_article_number: int = 0
+    has_article_1: bool = False
+    has_article_2: bool = False
+    article_sequence_score: float = 0.0
+
+    max_article_number: int = 0
+    has_article_1: bool = False
+    has_article_2: bool = False
+    article_sequence_score: float = 0.0
+
 
 @dataclass
 class NormalizedArtifact:
@@ -177,8 +195,31 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
     for tag in soup.find_all(skip_tags):
         tag.decompose()
 
-    # 2. Candidate scoring to find the main content container
-    # We consider block-level containers but not body (as fallback only)
+    # 2. Try preferred TVPL selectors first
+    for selector in PREFERRED_CONTENT_SELECTORS:
+        element = soup.select_one(selector)
+        if element:
+            text = element.get_text(separator="\n", strip=True)
+            if len(text) > 500: # Minimum threshold for a plausible legal body
+                max_art = estimate_max_article_number(text)
+                if max_art > 0:
+                    return text, {
+                        "tag": element.name,
+                        "class": element.get("class", []),
+                        "id": element.get("id", ""),
+                        "selection_strategy": "preferred_tvpl_selector",
+                        "selector": selector,
+                        "article_count": len(RE_ARTICLE.findall(text)),
+                        "max_article_number": max_art,
+                        "has_article_1": has_article_number(text, 1),
+                        "has_article_2": has_article_number(text, 2),
+                        "article_sequence_score": compute_article_sequence_score(text),
+                        "text_len": len(text),
+                        "link_density": 0.0, # Simplified for preferred selectors
+                        "avg_chars_per_article": len(text) / (len(RE_ARTICLE.findall(text)) + 1),
+                    }
+
+    # 3. Generic candidate scoring fallback
     candidates = soup.find_all(['div', 'article', 'main', 'section', 'td'])
 
     best_candidate = None
@@ -275,26 +316,58 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         link_text_len = sum(len(a.get_text(strip=True)) for a in best_candidate.find_all('a') if a.get_text(strip=True))
         link_density = link_text_len / len(final_text) if final_text else 0
 
-        candidate_info = {
+        return final_text, {
             "tag": best_candidate.name,
             "class": best_candidate.get("class", []),
             "id": best_candidate.get("id", ""),
+            "selection_strategy": "fallback_scoring",
+            "selector": None,
             "article_count": final_dieu,
-            "chapter_count": final_chapter,
-            "section_count": final_muc,
+            "max_article_number": estimate_max_article_number(final_text),
+            "has_article_1": has_article_number(final_text, 1),
+            "has_article_2": has_article_number(final_text, 2),
+            "article_sequence_score": compute_article_sequence_score(final_text),
             "text_len": len(final_text),
-            "link_density": link_density,
+            "link_density": 0.0, # Simplified for final
             "avg_chars_per_article": len(final_text) / (final_dieu + 1),
         }
-        return final_text, candidate_info
 
     # Fallback: use body text
     body = soup.body
     if body:
         text = body.get_text(separator="\n")
-        return text, {"tag": "body", "class": [], "id": "", "article_count": 0, "chapter_count": 0, "section_count": 0, "text_len": len(text), "link_density": 0, "avg_chars_per_article": 0}
+        return text, {
+            "tag": "body",
+            "class": [],
+            "id": "",
+            "selection_strategy": "body_fallback",
+            "selector": None,
+            "article_count": 0,
+            "max_article_number": 0,
+            "has_article_1": False,
+            "has_article_2": False,
+            "article_sequence_score": 0.0,
+            "text_len": len(text),
+            "link_density": 0.0,
+            "avg_chars_per_article": 0,
+        }
+
     text = soup.get_text(separator="\n")
-    return text, {"tag": "soup", "class": [], "id": "", "article_count": 0, "chapter_count": 0, "section_count": 0, "text_len": len(text), "link_density": 0, "avg_chars_per_article": 0}
+    return text, {
+        "tag": "soup",
+        "class": [],
+        "id": "",
+        "selection_strategy": "soup_fallback",
+        "selector": None,
+        "article_count": 0,
+        "max_article_number": 0,
+        "has_article_1": False,
+        "has_article_2": False,
+        "article_sequence_score": 0.0,
+        "text_len": len(text),
+        "link_density": 0.0,
+        "avg_chars_per_article": 0,
+    }
 
 def trim_to_legal_body(text: str) -> str:
     """Trims website chrome from the beginning and end of extracted text.
@@ -434,6 +507,74 @@ def remove_safe_boilerplate(text: str) -> str:
         cleaned_lines.append(line)
 
     return "\n".join(cleaned_lines)
+
+def extract_article_numbers(text: str) -> List[int]:
+    """Extracts all article numbers found in the text."""
+    # Matches "Điều 1", "Điều 12", etc.
+    matches = RE_ARTICLE.findall(text)
+    numbers = []
+    for m in matches:
+        # Extract digits from the match
+        num_match = re.search(r"\d+", m)
+        if num_match:
+            numbers.append(int(num_match.group()))
+    return numbers
+
+def estimate_max_article_number(text: str) -> int:
+    """Estimates the highest article number present in the text."""
+    nums = extract_article_numbers(text)
+    return max(nums) if nums else 0
+
+def has_article_number(text: str, number: int) -> bool:
+    """Checks if a specific article number is present."""
+    nums = extract_article_numbers(text)
+    return number in nums
+
+def compute_article_sequence_score(text: str) -> float:
+    """
+    Computes a score based on how sequential and complete the articles are.
+    Score = (unique articles found) / (max article number)
+    """
+    nums = sorted(list(set(extract_article_numbers(text))))
+    if not nums:
+        return 0.0
+    max_num = nums[-1]
+    if max_num == 0:
+        return 0.0
+    return len(nums) / max_num
+
+def extract_article_numbers(text: str) -> List[int]:
+    """Extracts all article numbers found in the text."""
+    matches = RE_ARTICLE.findall(text)
+    numbers = []
+    for m in matches:
+        num_match = re.search(r"\d+", m)
+        if num_match:
+            numbers.append(int(num_match.group()))
+    return numbers
+
+def estimate_max_article_number(text: str) -> int:
+    """Estimates the highest article number present in the text."""
+    nums = extract_article_numbers(text)
+    return max(nums) if nums else 0
+
+def has_article_number(text: str, number: int) -> bool:
+    """Checks if a specific article number is present."""
+    nums = extract_article_numbers(text)
+    return number in nums
+
+def compute_article_sequence_score(text: str) -> float:
+    """
+    Computes a score based on how sequential and complete the articles are.
+    Score = (unique articles found) / (max article number)
+    """
+    nums = sorted(list(set(extract_article_numbers(text))))
+    if not nums:
+        return 0.0
+    max_num = nums[-1]
+    if max_num == 0:
+        return 0.0
+    return len(nums) / max_num
 
 def normalize_unicode(text: str) -> Tuple[str, List[str]]:
     """Applies NFC normalization and removes unwanted characters.

@@ -18,6 +18,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from ingestion.cleaning import clean_raw_corpus, write_cleaning_report
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+
+console = Console()
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -58,13 +63,18 @@ def main() -> int:
         action="store_true",
         help="Print detailed per-artifact results"
     )
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="Print a detailed quality audit table for all laws"
+    )
 
     args = parser.parse_args()
 
     try:
-        print(f"Starting Cleaning & Normalization...")
-        print(f"Raw directory: {args.raw_dir}")
-        print(f"Output directory: {args.output_dir}")
+        console.print("[bold blue]Starting Cleaning & Normalization...[/bold blue]")
+        console.print(f"Raw directory: [cyan]{args.raw_dir}[/cyan]")
+        console.print(f"Output directory: [cyan]{args.output_dir}[/cyan]")
 
         report = clean_raw_corpus(
             raw_dir=args.raw_dir,
@@ -76,42 +86,73 @@ def main() -> int:
         write_cleaning_report(report, args.report)
 
         summary = report["summary"]
-        print("\nCleaning & Normalization Summary")
-        print("--------------------------------")
-        print(f"Input artifacts:          {summary['total_artifacts']:4d}")
-        print(f"Successfully cleaned:     {summary['successfully_cleaned']:4d}")
-        print(f"Warning artifacts:        {summary['warning_artifacts']:4d}")
-        print(f"Failed artifacts:         {summary['failed']:4d}")
-        print(f"Suspiciously short texts: {summary['suspiciously_short_texts']:4d}")
-        print(f"Missing article markers:  {summary['missing_article_marker']:4d}")
-        print(f"Output directory:         {args.output_dir}")
-        print(f"Report:                   {args.report}")
 
-        if args.verbose:
-            print("\nPer-artifact details:")
+        summary_table = Table(title="Cleaning & Normalization Summary", show_header=False, box=None)
+        summary_table.add_row("Input artifacts", f"{summary['total_artifacts']:4d}")
+        summary_table.add_row("Successfully cleaned", f"[green]{summary['successfully_cleaned']:4d}[/green]")
+        summary_table.add_row("Warning artifacts", f"[yellow]{summary['warning_artifacts']:4d}[/yellow]")
+        summary_table.add_row("Failed artifacts", f"[red]{summary['failed']:4d}[/red]")
+        summary_table.add_row("Suspiciously short", f"{summary['suspiciously_short_texts']:4d}")
+        summary_table.add_row("Missing article marker", f"{summary['missing_article_marker']:4d}")
+
+        console.print("\n", Panel(summary_table))
+        console.print(f"Report saved to: [cyan]{args.report}[/cyan]")
+
+        if args.audit:
+            audit_table = Table(title="Law Quality Audit", show_lines=True)
+            audit_table.add_column("Law ID", style="cyan")
+            audit_table.add_column("Status", justify="center")
+            audit_table.add_column("Length", justify="right")
+            audit_table.add_column("Arts", justify="right")
+            audit_table.add_column("Max Art", justify="right")
+            audit_table.add_column("Seq Score", justify="right")
+            audit_table.add_column("Has Art 1", justify="center")
+
             for item in report["items"]:
+                status_color = {
+                    "success": "green",
+                    "warning": "yellow",
+                    "failed": "red"
+                }.get(item["status"], "white")
+
                 status_icon = {
                     "success": "✓",
                     "warning": "⚠",
                     "failed": "✗"
                 }.get(item["status"], "?")
-                print(f"  {status_icon} {item['law_id']:20s} {item['status']:10s} chars={item['normalized_text_chars']:>6d} arts={item['article_count_estimate']:>3d}")
-                if item["errors"]:
-                    for err in item["errors"]:
-                        print(f"      ERROR: {err}")
-                if item["warnings"]:
-                    for warn in item["warnings"]:
-                        print(f"      WARN: {warn}")
+
+                info = item.get("cleaning_info", {})
+
+                audit_table.add_row(
+                    item["law_id"],
+                    f"[{status_color}]{status_icon}[/{status_color}]",
+                    f"{item['normalized_text_chars']:>6d}",
+                    f"{item['article_count_estimate']:>3d}",
+                    f"{info.get('max_article_number', 'N/A'):>4}",
+                    f"{info.get('article_sequence_score', 0.0):.2f}",
+                    "Yes" if info.get("has_article_1") else "No"
+                )
+            console.print("\n", audit_table)
+
+        if args.verbose:
+            console.print("\n[bold]Per-artifact details:[/bold]")
+            for item in report["items"]:
+                status_color = {"success": "green", "warning": "yellow", "failed": "red"}.get(item["status"], "white")
+                console.print(f"  [{status_color}]{item['status']}[/{status_color}] {item['law_id']:20s} chars={item['normalized_text_chars']:>6d} arts={item['article_count_estimate']:>3d}")
+                for err in item["errors"]:
+                    console.print(f"      [red]ERROR:[/red] {err}")
+                for warn in item["warnings"]:
+                    console.print(f"      [yellow]WARN:[/yellow] {warn}")
 
         if summary["failed"] > 0:
-            print("\nCleaning finished with errors.")
+            console.print("\n[bold red]Cleaning finished with errors.[/bold red]")
             return 1
 
-        print("\nCleaning completed successfully.")
+        console.print("\n[bold green]Cleaning completed successfully.[/bold green]")
         return 0
 
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        console.print(f"[bold red]Unexpected error: {e}[/bold red]", style="red")
         import traceback
         traceback.print_exc()
         return 2
