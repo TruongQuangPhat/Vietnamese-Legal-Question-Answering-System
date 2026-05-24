@@ -121,7 +121,7 @@ def main() -> int:
                     "failed": "✗"
                 }.get(item["status"], "?")
 
-                info = item.get("cleaning_info", {})
+                info = item.get("candidate_info", {})
 
                 audit_table.add_row(
                     item["law_id"],

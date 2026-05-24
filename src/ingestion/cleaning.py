@@ -197,27 +197,43 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
 
     # 2. Try preferred TVPL selectors first
     for selector in PREFERRED_CONTENT_SELECTORS:
-        element = soup.select_one(selector)
-        if element:
-            text = element.get_text(separator="\n", strip=True)
-            if len(text) > 500: # Minimum threshold for a plausible legal body
-                max_art = estimate_max_article_number(text)
-                if max_art > 0:
-                    return text, {
-                        "tag": element.name,
-                        "class": element.get("class", []),
-                        "id": element.get("id", ""),
-                        "selection_strategy": "preferred_tvpl_selector",
-                        "selector": selector,
-                        "article_count": len(RE_ARTICLE.findall(text)),
-                        "max_article_number": max_art,
-                        "has_article_1": has_article_number(text, 1),
-                        "has_article_2": has_article_number(text, 2),
-                        "article_sequence_score": compute_article_sequence_score(text),
-                        "text_len": len(text),
-                        "link_density": 0.0, # Simplified for preferred selectors
-                        "avg_chars_per_article": len(text) / (len(RE_ARTICLE.findall(text)) + 1),
-                    }
+        elements = soup.select(selector)
+        if not elements:
+            continue
+
+        # For TVPL, the legal body is often split across multiple blocks with the same class.
+        # We concatenate them in DOM order to ensure completeness.
+        # However, we only concatenate blocks that show legal evidence to avoid noise.
+        valid_blocks = []
+        for el in elements:
+            block_text = el.get_text(separator="\n", strip=True)
+            if len(block_text) > 100 and (RE_ARTICLE.search(block_text) or any(m in block_text for m in STRONG_LEGAL_MARKERS)):
+                valid_blocks.append(block_text)
+
+        if not valid_blocks:
+            continue
+
+        full_text = "\n\n".join(valid_blocks)
+        text_len = len(full_text)
+
+        if text_len > 500: # Minimum threshold for a plausible legal body
+            max_art = estimate_max_article_number(full_text)
+            if max_art > 0:
+                return full_text, {
+                    "tag": elements[0].name,
+                    "class": elements[0].get("class", []),
+                    "id": elements[0].get("id", ""),
+                    "selection_strategy": "preferred_tvpl_selector",
+                    "selector": selector,
+                    "article_count": len(RE_ARTICLE.findall(full_text)),
+                    "max_article_number": max_art,
+                    "has_article_1": has_article_number(full_text, 1),
+                    "has_article_2": has_article_number(full_text, 2),
+                    "article_sequence_score": compute_article_sequence_score(full_text),
+                    "text_len": text_len,
+                    "link_density": 0.0,
+                    "avg_chars_per_article": text_len / (len(RE_ARTICLE.findall(full_text)) + 1),
+                }
 
     # 3. Generic candidate scoring fallback
     candidates = soup.find_all(['div', 'article', 'main', 'section', 'td'])
@@ -369,7 +385,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         "avg_chars_per_article": 0,
     }
 
-def trim_to_legal_body(text: str) -> str:
+def trim_to_legal_body(text: str, candidate_info: Optional[Dict] = None) -> str:
     """Trims website chrome from the beginning and end of extracted text.
 
     Uses reliable legal headers to find the start of the actual legal document.
@@ -377,6 +393,7 @@ def trim_to_legal_body(text: str) -> str:
 
     Args:
         text: Extracted text from HTML.
+        candidate_info: Info about how text was extracted (used to adjust trimming).
 
     Returns:
         Trimmed text starting from the legal body.
@@ -391,6 +408,12 @@ def trim_to_legal_body(text: str) -> str:
         text = original
 
     # 2. Trim trailing post-body noise only after confirming body exists
+    # If we used a preferred selector, be extremely conservative with end trimming
+    if candidate_info and candidate_info.get("selection_strategy") == "preferred_tvpl_selector":
+        # Only trim if we have clearly passed the legal body (very aggressive markers)
+        # Or just skip end trim entirely for preferred selectors to ensure completeness
+        return text
+
     text = _trim_trailing_noise(text)
 
     return text
@@ -684,7 +707,7 @@ def clean_raw_artifact(
         extracted_text, candidate_info = extract_legal_text_from_html(html_content)
         extracted_chars = len(extracted_text)
 
-        text = trim_to_legal_body(extracted_text)
+        text = trim_to_legal_body(extracted_text, candidate_info)
         text = remove_safe_boilerplate(text)
         text, uni_warnings = normalize_unicode(text)
         text = normalize_whitespace(text)
@@ -703,6 +726,18 @@ def clean_raw_artifact(
             warnings.append("text_suspiciously_short")
         if not markers.contains_article:
             warnings.append("missing_article_marker")
+
+        # Quality check for known long laws using candidate_info (actual extraction metrics)
+        LONG_LAWS_MIN_ARTICLES = {
+            "BLDS_2015": 650,
+            "BLHS_VBHN": 400,
+            "BLTTDS_VBHN": 400,
+            "BLTTHS_VBHN": 400,
+        }
+        actual_max_art = candidate_info.get("max_article_number", 0)
+        if law_id in LONG_LAWS_MIN_ARTICLES:
+            if actual_max_art < LONG_LAWS_MIN_ARTICLES[law_id]:
+                warnings.append("suspicious_low_max_article_number")
 
         # Optimized metadata fallback
         artifact = NormalizedArtifact(
