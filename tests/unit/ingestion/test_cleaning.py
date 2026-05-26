@@ -15,11 +15,9 @@ from src.ingestion.cleaning import (
     normalize_whitespace,
     detect_legal_markers,
     LegalMarkersSummary,
-    clean_raw_artifact,
-    clean_raw_corpus,
-    write_cleaning_report,
     trim_to_legal_body,
 )
+from src.services.cleaning_service import clean_raw_artifact
 
 # --- Fixtures ---
 

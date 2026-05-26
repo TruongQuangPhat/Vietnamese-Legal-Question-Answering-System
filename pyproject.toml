@@ -30,8 +30,6 @@ dev = [
     "respx>=0.21.0",
 ]
 
-[project.scripts]
-vnlaw-crawl = "src.ingestion.cli:main"
 
 [build-system]
 requires = ["hatchling"]

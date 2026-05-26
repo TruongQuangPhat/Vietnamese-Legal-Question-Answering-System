@@ -17,7 +17,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ingestion.cleaning import clean_raw_corpus, write_cleaning_report
+from services.cleaning_service import execute_cleaning_pipeline, CleaningPipelineConfig
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -76,16 +76,20 @@ def main() -> int:
         console.print(f"Raw directory: [cyan]{args.raw_dir}[/cyan]")
         console.print(f"Output directory: [cyan]{args.output_dir}[/cyan]")
 
-        report = clean_raw_corpus(
+        # Construct pipeline config
+        config = CleaningPipelineConfig(
             raw_dir=args.raw_dir,
             output_dir=args.output_dir,
+            report_path=args.report,
             min_text_length=args.min_text_length,
-            write_txt=args.write_txt
+            write_txt=args.write_txt,
+            verbose=args.verbose,
         )
 
-        write_cleaning_report(report, args.report)
+        report = execute_cleaning_pipeline(config)
 
         summary = report["summary"]
+
 
         summary_table = Table(title="Cleaning & Normalization Summary", show_header=False, box=None)
         summary_table.add_row("Input artifacts", f"{summary['total_artifacts']:4d}")

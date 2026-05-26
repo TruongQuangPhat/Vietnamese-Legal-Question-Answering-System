@@ -90,6 +90,7 @@ data/reports/cleaning_report.json
 ```
 
 ## Architecture
+`scripts/clean_raw_corpus.py` (CLI) $\rightarrow$ `src/services/cleaning_service.py` (Orchestration) $\rightarrow$ `src/ingestion/cleaning.py` (Core Logic)
 
 ```text
 ┌──────────────────────────────┐

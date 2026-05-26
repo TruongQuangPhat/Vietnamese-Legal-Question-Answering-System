@@ -8,14 +8,14 @@ This document describes the **data crawling pipeline** for the VnLaw-QA system. 
 
 ```bash
 # Dry run first to verify selection
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --dry-run
 
 # Then crawl
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
@@ -38,6 +38,8 @@ uv run python -m src.ingestion.cli \
 ```
 
 ## Components
+Lies in the new services architecture:
+`scripts/crawl_raw_corpus.py` (CLI) $\rightarrow$ `src/services/crawl_service.py` (Orchestration) $\rightarrow$ `src/ingestion/` (Domain Logic)
 
 ### 1. Corpus Registry (`config/laws/corpus_registry.yml`)
 
@@ -199,7 +201,7 @@ data/raw/
 ### Entry Point
 
 ```bash
-python -m src.ingestion.cli [OPTIONS]
+uv run python scripts/crawl_raw_corpus.py [OPTIONS]
 ```
 
 ### Commands
@@ -207,7 +209,7 @@ python -m src.ingestion.cli [OPTIONS]
 **Batch crawl all pending:**
 
 ```bash
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
@@ -219,7 +221,7 @@ uv run python -m src.ingestion.cli \
 **Crawl specific laws:**
 
 ```bash
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --law-ids BLDS_2015 HP_2013
@@ -228,7 +230,7 @@ uv run python -m src.ingestion.cli \
 **Filter by tier and priority:**
 
 ```bash
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --tier 1 \
@@ -239,7 +241,7 @@ uv run python -m src.ingestion.cli \
 **Dry run (no crawling):**
 
 ```bash
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
@@ -249,7 +251,7 @@ uv run python -m src.ingestion.cli \
 **Force re-crawl:**
 
 ```bash
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --law-ids BLDS_2015 \
@@ -259,7 +261,7 @@ uv run python -m src.ingestion.cli \
 **Debug single URL:**
 
 ```bash
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --url "https://thuvienphapluat.vn/van-ban/..." \
   --law-id BLDS_2015 \
   --output data/raw
@@ -473,13 +475,13 @@ All exceptions use proper chaining (`raise ... from err`) for traceability.
 **Fix:**
 ```bash
 # Run dry-run to see selection
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --only-status pending \
   --dry-run
 
 # Or disable skip for already-crawled
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --no-skip-crawled
 ```
@@ -499,13 +501,13 @@ Update URL in registry to match: `https://thuvienphapluat.vn/...`
 **Fix:**
 ```bash
 # Force re-crawl with backup
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --law-ids YOUR_LAW_ID \
   --force
 
 # Or disable skip
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --no-skip-crawled
 ```

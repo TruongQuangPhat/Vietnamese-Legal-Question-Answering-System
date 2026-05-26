@@ -17,7 +17,8 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from ingestion.audit import audit_raw_corpus, AuditError
+from services.raw_audit_service import run_raw_audit_pipeline
+from src.ingestion.exceptions import AuditError
 
 
 def main() -> int:
@@ -72,7 +73,7 @@ Examples:
     args = parser.parse_args()
 
     try:
-        report = audit_raw_corpus(
+        report = run_raw_audit_pipeline(
             registry_path=args.registry,
             raw_dir=args.raw_dir,
             min_html_size=args.min_html_size,

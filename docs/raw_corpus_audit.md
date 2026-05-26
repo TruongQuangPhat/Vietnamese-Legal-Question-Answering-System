@@ -31,6 +31,7 @@ uv run python scripts/audit_raw_corpus.py \
 The script reads the registry, scans `data/raw/{law_id}/latest/`, validates `main.html` and `metadata.json`, and produces an audit report.
 
 ## Architecture
+`scripts/audit_raw_corpus.py` (CLI) $\rightarrow$ `src/services/raw_audit_service.py` (Orchestration) $\rightarrow$ `src/ingestion/audit.py` (Domain Logic)
 
 ```
 ┌──────────────────────┐
