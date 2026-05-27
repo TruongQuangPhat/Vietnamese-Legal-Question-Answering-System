@@ -755,22 +755,41 @@ The cleaner should continue processing independent artifacts even if one law fai
 
 ## Validation Gate
 
-The Cleaning & Normalization phase passes only when:
+The Cleaning & Normalization phase is complete/gate-ready. Final validation
+confirmed:
 
 ```text
-all valid audited artifacts produce normalized.json
+52/52 valid audited artifacts produce normalized.json
+52/52 optional cleaned.txt debug artifacts were generated in final validation
 normalized_text is UTF-8 readable
-article markers are preserved
+article markers and Article 1 headings are preserved
+article references and real article headings are separately reported
 numbered clause patterns are preserved when present
 point label patterns are preserved when present
 no obvious HTML tags remain
-cleaning_report.json is generated
-cleaning_report.json has no critical failures
+known encoded TVPL footer/watermark artifacts are removed
+cleaning_report.json is generated with no warning or failed artifacts
 ```
 
-If this gate fails, the project should not proceed to Legal Hierarchy Parsing.
+The next phase is Legal Hierarchy Parsing. Do not proceed directly to chunking,
+embedding, RAG, Advanced RAG, or GraphRAG before parser correctness is validated.
 
 ## Changelog
+
+### Version 0.8.0
+
+- Completed the Phase 4 Cleaning & Normalization gate for the 52-law corpus.
+- Added robust start trimming while preserving early Article 1 bodies.
+- Added conservative line-fragment repair for Vietnamese legal text.
+- Added block-aware TVPL HTML extraction so inline spans/fonts do not create
+  artificial line breaks.
+- Added targeted source-law/amendment pre-body note trimming.
+- Removed known encoded TVPL footer/watermark artifact lines.
+- Clarified article metrics:
+  - `article_reference_count` counts all `Điều N` mentions.
+  - `article_heading_count` counts real article heading lines.
+  - `max_heading_article_number` reports the highest real heading number.
+- Updated cleaner metadata to `cleaner_version` `v0.8.0`.
 
 ### Version 0.1
 

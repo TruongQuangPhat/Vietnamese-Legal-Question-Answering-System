@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 
 # --- Constants ---
 
+CLEANER_VERSION = "v0.8.0"
+
 LEGAL_MARKERS_KEYWORDS = {"điều", "khoản", "điểm", "luật", "bộ luật", "văn bản hợp nhất", "quốc hội", "căn cứ"}
 STRONG_LEGAL_MARKERS = {"Điều", "Chương", "Mục", "Phần", "Văn bản hợp nhất", "QUỐC HỘI", "Căn cứ", "Bộ luật", "Luật"}
 
@@ -40,6 +42,7 @@ SAFE_BOILERPLATE = {
 
 # Regex patterns for legal structure
 RE_ARTICLE = re.compile(r"Điều\s+\d+", re.IGNORECASE)
+RE_ARTICLE_HEADING_LINE = re.compile(r"(?im)^\s*Điều\s+(\d+)\.")
 RE_ARTICLE_1_LINE = re.compile(r"(?im)^\s*Điều\s+1\.")
 RE_CLAUSE = re.compile(r"^\s*\d+\..+")  # require some text after "1."
 RE_POINT = re.compile(r"^\s*[a-zđ]\).+", re.IGNORECASE)
@@ -114,12 +117,15 @@ class LegalMarkersSummary:
     contains_article: bool = False
     contains_clause_numbering: bool = False
     contains_point_labeling: bool = False
+    article_reference_count: int = 0
+    article_heading_count: int = 0
+    max_heading_article_number: int = 0
+    has_heading_article_1: bool = False
+    has_heading_article_2: bool = False
+    heading_sequence_score: float = 0.0
+    # Deprecated compatibility alias: equals article_reference_count.
     article_count_estimate: int = 0
-    max_article_number: int = 0
-    has_article_1: bool = False
-    has_article_2: bool = False
-    article_sequence_score: float = 0.0
-
+    # Deprecated compatibility aliases for heading-based fields.
     max_article_number: int = 0
     has_article_1: bool = False
     has_article_2: bool = False
@@ -139,7 +145,7 @@ class NormalizedArtifact:
     text_stats: CleaningStats
     markers: LegalMarkersSummary
     warnings: List[str] = field(default_factory=list)
-    metadata: Dict[str, str] = field(default_factory=lambda: {"cleaner_version": "v0.4"})
+    metadata: Dict[str, str] = field(default_factory=lambda: {"cleaner_version": CLEANER_VERSION})
     candidate_info: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
@@ -164,7 +170,17 @@ class NormalizedArtifact:
                 "contains_article": self.markers.contains_article,
                 "contains_clause_numbering": self.markers.contains_clause_numbering,
                 "contains_point_labeling": self.markers.contains_point_labeling,
+                "article_reference_count": self.markers.article_reference_count,
+                "article_heading_count": self.markers.article_heading_count,
+                "max_heading_article_number": self.markers.max_heading_article_number,
+                "has_heading_article_1": self.markers.has_heading_article_1,
+                "has_heading_article_2": self.markers.has_heading_article_2,
+                "heading_sequence_score": self.markers.heading_sequence_score,
                 "article_count_estimate": self.markers.article_count_estimate,
+                "max_article_number": self.markers.max_article_number,
+                "has_article_1": self.markers.has_article_1,
+                "has_article_2": self.markers.has_article_2,
+                "article_sequence_score": self.markers.article_sequence_score,
             },
             "warnings": self.warnings,
             "metadata": self.metadata,
@@ -218,7 +234,9 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         text_len = len(full_text)
 
         if text_len > 500: # Minimum threshold for a plausible legal body
-            max_art = estimate_max_article_number(full_text)
+            article_reference_count = len(RE_ARTICLE.findall(full_text))
+            article_heading_count = len(extract_article_heading_numbers(full_text))
+            max_art = estimate_max_heading_article_number(full_text)
             if max_art > 0:
                 return full_text, {
                     "tag": elements[0].name,
@@ -226,14 +244,20 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
                     "id": elements[0].get("id", ""),
                     "selection_strategy": "preferred_tvpl_selector",
                     "selector": selector,
-                    "article_count": len(RE_ARTICLE.findall(full_text)),
+                    "article_count": article_reference_count,
+                    "article_reference_count": article_reference_count,
+                    "article_heading_count": article_heading_count,
                     "max_article_number": max_art,
-                    "has_article_1": has_article_number(full_text, 1),
-                    "has_article_2": has_article_number(full_text, 2),
-                    "article_sequence_score": compute_article_sequence_score(full_text),
+                    "max_heading_article_number": max_art,
+                    "has_article_1": has_article_heading_number(full_text, 1),
+                    "has_article_2": has_article_heading_number(full_text, 2),
+                    "has_heading_article_1": has_article_heading_number(full_text, 1),
+                    "has_heading_article_2": has_article_heading_number(full_text, 2),
+                    "article_sequence_score": compute_article_heading_sequence_score(full_text),
+                    "heading_sequence_score": compute_article_heading_sequence_score(full_text),
                     "text_len": text_len,
                     "link_density": 0.0,
-                    "avg_chars_per_article": text_len / (len(RE_ARTICLE.findall(full_text)) + 1),
+                    "avg_chars_per_article": text_len / (article_heading_count + 1),
                 }
 
     # 3. Generic candidate scoring fallback
@@ -327,6 +351,8 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         # Recalculate detailed stats for the selected candidate
         final_text = extract_text_with_block_boundaries(best_candidate)
         final_dieu = len(RE_ARTICLE.findall(final_text))
+        final_heading_count = len(extract_article_heading_numbers(final_text))
+        final_max_heading = estimate_max_heading_article_number(final_text)
         final_chapter = len(re.findall(r'Chương\s+[IVXLCDM]+', final_text, re.I))
         final_muc = final_text.count("Mục")
         link_count = len(best_candidate.find_all('a'))
@@ -340,13 +366,19 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
             "selection_strategy": "fallback_scoring",
             "selector": None,
             "article_count": final_dieu,
-            "max_article_number": estimate_max_article_number(final_text),
-            "has_article_1": has_article_number(final_text, 1),
-            "has_article_2": has_article_number(final_text, 2),
-            "article_sequence_score": compute_article_sequence_score(final_text),
+            "article_reference_count": final_dieu,
+            "article_heading_count": final_heading_count,
+            "max_article_number": final_max_heading,
+            "max_heading_article_number": final_max_heading,
+            "has_article_1": has_article_heading_number(final_text, 1),
+            "has_article_2": has_article_heading_number(final_text, 2),
+            "has_heading_article_1": has_article_heading_number(final_text, 1),
+            "has_heading_article_2": has_article_heading_number(final_text, 2),
+            "article_sequence_score": compute_article_heading_sequence_score(final_text),
+            "heading_sequence_score": compute_article_heading_sequence_score(final_text),
             "text_len": len(final_text),
             "link_density": 0.0, # Simplified for final
-            "avg_chars_per_article": len(final_text) / (final_dieu + 1),
+            "avg_chars_per_article": len(final_text) / (final_heading_count + 1),
         }
 
     # Fallback: use body text
@@ -360,10 +392,16 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
             "selection_strategy": "body_fallback",
             "selector": None,
             "article_count": 0,
+            "article_reference_count": 0,
+            "article_heading_count": 0,
             "max_article_number": 0,
+            "max_heading_article_number": 0,
             "has_article_1": False,
             "has_article_2": False,
+            "has_heading_article_1": False,
+            "has_heading_article_2": False,
             "article_sequence_score": 0.0,
+            "heading_sequence_score": 0.0,
             "text_len": len(text),
             "link_density": 0.0,
             "avg_chars_per_article": 0,
@@ -377,10 +415,16 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         "selection_strategy": "soup_fallback",
         "selector": None,
         "article_count": 0,
+        "article_reference_count": 0,
+        "article_heading_count": 0,
         "max_article_number": 0,
+        "max_heading_article_number": 0,
         "has_article_1": False,
         "has_article_2": False,
+        "has_heading_article_1": False,
+        "has_heading_article_2": False,
         "article_sequence_score": 0.0,
+        "heading_sequence_score": 0.0,
         "text_len": len(text),
         "link_density": 0.0,
         "avg_chars_per_article": 0,
@@ -659,32 +703,41 @@ def remove_safe_boilerplate(text: str) -> str:
     return "\n".join(cleaned_lines)
 
 def extract_article_numbers(text: str) -> List[int]:
-    """Extracts all article numbers found in the text."""
-    # Matches "Điều 1", "Điều 12", etc.
+    """Extract all article numbers mentioned anywhere in text."""
     matches = RE_ARTICLE.findall(text)
     numbers = []
     for m in matches:
-        # Extract digits from the match
         num_match = re.search(r"\d+", m)
         if num_match:
             numbers.append(int(num_match.group()))
     return numbers
 
+def extract_article_heading_numbers(text: str) -> List[int]:
+    """Extract article numbers from real article heading lines only."""
+    return [int(match.group(1)) for match in RE_ARTICLE_HEADING_LINE.finditer(text)]
+
 def estimate_max_article_number(text: str) -> int:
-    """Estimates the highest article number present in the text."""
+    """Estimate the highest article number mentioned anywhere in text."""
     nums = extract_article_numbers(text)
     return max(nums) if nums else 0
 
+def estimate_max_heading_article_number(text: str) -> int:
+    """Estimate the highest article number among article heading lines."""
+    nums = extract_article_heading_numbers(text)
+    return max(nums) if nums else 0
+
 def has_article_number(text: str, number: int) -> bool:
-    """Checks if a specific article number is present."""
+    """Check if a specific article number is mentioned anywhere in text."""
     nums = extract_article_numbers(text)
     return number in nums
 
+def has_article_heading_number(text: str, number: int) -> bool:
+    """Check if a specific article number appears as a heading line."""
+    nums = extract_article_heading_numbers(text)
+    return number in nums
+
 def compute_article_sequence_score(text: str) -> float:
-    """
-    Computes a score based on how sequential and complete the articles are.
-    Score = (unique articles found) / (max article number)
-    """
+    """Compute sequence continuity for article references."""
     nums = sorted(list(set(extract_article_numbers(text))))
     if not nums:
         return 0.0
@@ -693,32 +746,9 @@ def compute_article_sequence_score(text: str) -> float:
         return 0.0
     return len(nums) / max_num
 
-def extract_article_numbers(text: str) -> List[int]:
-    """Extracts all article numbers found in the text."""
-    matches = RE_ARTICLE.findall(text)
-    numbers = []
-    for m in matches:
-        num_match = re.search(r"\d+", m)
-        if num_match:
-            numbers.append(int(num_match.group()))
-    return numbers
-
-def estimate_max_article_number(text: str) -> int:
-    """Estimates the highest article number present in the text."""
-    nums = extract_article_numbers(text)
-    return max(nums) if nums else 0
-
-def has_article_number(text: str, number: int) -> bool:
-    """Checks if a specific article number is present."""
-    nums = extract_article_numbers(text)
-    return number in nums
-
-def compute_article_sequence_score(text: str) -> float:
-    """
-    Computes a score based on how sequential and complete the articles are.
-    Score = (unique articles found) / (max article number)
-    """
-    nums = sorted(list(set(extract_article_numbers(text))))
+def compute_article_heading_sequence_score(text: str) -> float:
+    """Compute sequence continuity for article heading lines."""
+    nums = sorted(list(set(extract_article_heading_numbers(text))))
     if not nums:
         return 0.0
     max_num = nums[-1]
@@ -875,7 +905,7 @@ def _join_line_fragments(current: str, next_line: str) -> str:
     return f"{current}{next_line}"
 
 def detect_legal_markers(text: str) -> LegalMarkersSummary:
-    """Detects legal hierarchy markers and estimates article count."""
+    """Detect legal hierarchy markers and article heading/reference metrics."""
     summary = LegalMarkersSummary()
 
     # Case-insensitive check for legal hierarchy
@@ -891,6 +921,22 @@ def detect_legal_markers(text: str) -> LegalMarkersSummary:
         if RE_POINT.match(line):
             summary.contains_point_labeling = True
 
-    summary.article_count_estimate = len(RE_ARTICLE.findall(text))
+    article_references = extract_article_numbers(text)
+    article_headings = extract_article_heading_numbers(text)
+
+    summary.article_reference_count = len(article_references)
+    summary.article_heading_count = len(article_headings)
+    summary.max_heading_article_number = max(article_headings) if article_headings else 0
+    summary.has_heading_article_1 = 1 in article_headings
+    summary.has_heading_article_2 = 2 in article_headings
+    summary.heading_sequence_score = compute_article_heading_sequence_score(text)
+
+    # Deprecated compatibility fields. Keep them explicit so downstream users
+    # can migrate from reference-based to heading-based article metrics.
+    summary.article_count_estimate = summary.article_reference_count
+    summary.max_article_number = summary.max_heading_article_number
+    summary.has_article_1 = summary.has_heading_article_1
+    summary.has_article_2 = summary.has_heading_article_2
+    summary.article_sequence_score = summary.heading_sequence_score
 
     return summary

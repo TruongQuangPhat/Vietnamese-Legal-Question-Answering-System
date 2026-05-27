@@ -1,4 +1,4 @@
-"""Orchestration service for Stage 1A cleaning quality audits.
+"""Orchestration service for cleaning quality audits.
 
 This service coordinates diagnostic computations and writes JSON reports.
 Argument parsing and terminal formatting belong to the CLI layer.

@@ -1,6 +1,6 @@
 """Reusable diagnostic logic for cleaning quality audits.
 
-This module computes Stage 1A diagnostics for raw HTML, selector candidates,
+This module computes diagnostics for raw HTML, selector candidates,
 current normalized outputs, raw-vs-cleaning comparisons, and coarse law pattern
 groups. It does not mutate raw artifacts or invoke the cleaning pipeline.
 """
@@ -358,7 +358,7 @@ def compute_raw_vs_cleaning_comparison(raw_dir: Path, interim_dir: Path) -> dict
 
 
 def compute_pattern_groups(registry_path: Path, raw_dir: Path, interim_dir: Path) -> dict[str, Any]:
-    """Group laws into coarse Stage 1A pattern categories.
+    """Group laws into coarse cleaning pattern categories.
 
     Args:
         registry_path: Path to the corpus registry.

@@ -107,7 +107,8 @@ def main() -> int:
             audit_table.add_column("Law ID", style="cyan")
             audit_table.add_column("Status", justify="center")
             audit_table.add_column("Length", justify="right")
-            audit_table.add_column("Arts", justify="right")
+            audit_table.add_column("Headings", justify="right")
+            audit_table.add_column("Refs", justify="right")
             audit_table.add_column("Max Art", justify="right")
             audit_table.add_column("Seq Score", justify="right")
             audit_table.add_column("Has Art 1", justify="center")
@@ -125,16 +126,15 @@ def main() -> int:
                     "failed": "✗"
                 }.get(item["status"], "?")
 
-                info = item.get("candidate_info", {})
-
                 audit_table.add_row(
                     item["law_id"],
                     f"[{status_color}]{status_icon}[/{status_color}]",
                     f"{item['normalized_text_chars']:>6d}",
-                    f"{item['article_count_estimate']:>3d}",
-                    f"{info.get('max_article_number', 'N/A'):>4}",
-                    f"{info.get('article_sequence_score', 0.0):.2f}",
-                    "Yes" if info.get("has_article_1") else "No"
+                    f"{item.get('article_heading_count', 0):>3d}",
+                    f"{item.get('article_reference_count', item.get('article_count_estimate', 0)):>3d}",
+                    f"{item.get('max_heading_article_number', 'N/A'):>4}",
+                    f"{item.get('heading_sequence_score', 0.0):.2f}",
+                    "Yes" if item.get("has_heading_article_1") else "No"
                 )
             console.print("\n", audit_table)
 
@@ -142,7 +142,12 @@ def main() -> int:
             console.print("\n[bold]Per-artifact details:[/bold]")
             for item in report["items"]:
                 status_color = {"success": "green", "warning": "yellow", "failed": "red"}.get(item["status"], "white")
-                console.print(f"  [{status_color}]{item['status']}[/{status_color}] {item['law_id']:20s} chars={item['normalized_text_chars']:>6d} arts={item['article_count_estimate']:>3d}")
+                console.print(
+                    f"  [{status_color}]{item['status']}[/{status_color}] "
+                    f"{item['law_id']:20s} chars={item['normalized_text_chars']:>6d} "
+                    f"headings={item.get('article_heading_count', 0):>3d} "
+                    f"refs={item.get('article_reference_count', item.get('article_count_estimate', 0)):>3d}"
+                )
                 for err in item["errors"]:
                     console.print(f"      [red]ERROR:[/red] {err}")
                 for warn in item["warnings"]:

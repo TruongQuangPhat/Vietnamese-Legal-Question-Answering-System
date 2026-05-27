@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Stage 1A cleaning quality diagnostic audits."""
+"""Run cleaning quality diagnostic audits."""
 
 from __future__ import annotations
 
@@ -27,9 +27,9 @@ console = Console()
 
 
 def main() -> int:
-    """Parse CLI arguments, run Stage 1A diagnostics, and print summaries."""
+    """Parse CLI arguments, run diagnostics, and print summaries."""
     parser = argparse.ArgumentParser(
-        description="Run Stage 1A diagnostics for raw HTML, selectors, cleaning quality, and pattern groups."
+        description="Run diagnostics for raw HTML, selectors, cleaning quality, and pattern groups."
     )
     parser.add_argument(
         "--raw-dir",
@@ -58,13 +58,13 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        console.print("[bold blue]Stage 1A cleaning quality diagnostics[/bold blue]")
+        console.print("[bold blue]Cleaning Quality Audit[/bold blue]")
         console.print(f"Raw artifacts:       [cyan]{args.raw_dir}[/cyan]")
         console.print(f"Cleaning artifacts:  [cyan]{args.interim_dir}[/cyan]")
         console.print(f"Report directory:    [cyan]{args.report_dir}[/cyan]")
         console.print(f"Corpus registry:     [cyan]{args.registry}[/cyan]\n")
 
-        stage_results = [
+        audit_steps = [
             (
                 "Corpus inventory",
                 "cleaning_quality_inventory.json",
@@ -115,13 +115,13 @@ def main() -> int:
         ]
 
         reports: list[tuple[str, str, dict[str, Any], float]] = []
-        for title, filename, runner in stage_results:
-            reports.append(_run_stage(title, filename, args.report_dir, runner))
+        for title, filename, runner in audit_steps:
+            reports.append(_run_audit_step(title, filename, args.report_dir, runner))
 
-        console.print("\n[bold green]Stage 1A cleaning quality diagnostics completed.[/bold green]")
+        console.print("\n[bold green]Cleaning quality diagnostics completed.[/bold green]")
         total_errors = 0
         summary_table = Table(title="Cleaning Quality Audit Summary")
-        summary_table.add_column("Stage", style="cyan")
+        summary_table.add_column("Audit", style="cyan")
         summary_table.add_column("Records", justify="right")
         summary_table.add_column("Errors", justify="right")
         summary_table.add_column("Duration", justify="right")
@@ -152,19 +152,19 @@ def main() -> int:
         return 1
 
 
-def _run_stage(
+def _run_audit_step(
     title: str,
     filename: str,
     report_dir: Path,
     runner: Callable[[], dict[str, Any]],
 ) -> tuple[str, str, dict[str, Any], float]:
-    """Run one diagnostic report stage and print progress.
+    """Run one diagnostic report and print progress.
 
     Args:
-        title: Human-readable stage title.
-        filename: Report filename written by the stage.
+        title: Human-readable audit title.
+        filename: Report filename written by the audit.
         report_dir: Directory where the report is written.
-        runner: Zero-argument callable that executes the stage.
+        runner: Zero-argument callable that executes the audit.
 
     Returns:
         Tuple of title, filename, report dictionary, and duration in seconds.

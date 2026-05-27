@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.ingestion.audit import scan_raw_artifacts
 from src.ingestion.cleaning import (
+    CLEANER_VERSION,
     CleaningStats,
     LegalMarkersSummary,
     NormalizedArtifact,
@@ -86,6 +87,11 @@ def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> Dict:
                 "output_path": str(config.output_dir / artifact.law_id / "normalized.json"),
                 "normalized_text_chars": artifact.text_stats.normalized_text_chars,
                 "line_count": artifact.text_stats.line_count,
+                "article_reference_count": artifact.markers.article_reference_count,
+                "article_heading_count": artifact.markers.article_heading_count,
+                "max_heading_article_number": artifact.markers.max_heading_article_number,
+                "has_heading_article_1": artifact.markers.has_heading_article_1,
+                "heading_sequence_score": artifact.markers.heading_sequence_score,
                 "article_count_estimate": artifact.markers.article_count_estimate,
                 "warnings": artifact.warnings,
                 "errors": [],
@@ -99,12 +105,20 @@ def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> Dict:
                 "output_path": None,
                 "normalized_text_chars": 0,
                 "line_count": 0,
+                "article_reference_count": 0,
+                "article_heading_count": 0,
+                "max_heading_article_number": 0,
+                "has_heading_article_1": False,
+                "heading_sequence_score": 0.0,
                 "article_count_estimate": 0,
                 "warnings": [],
                 "errors": errors
             })
 
     report = {
+        "metadata": {
+            "cleaner_version": CLEANER_VERSION,
+        },
         "summary": summary,
         "items": results
     }
@@ -181,7 +195,7 @@ def clean_raw_artifact(
             "BLTTDS_VBHN": 400,
             "BLTTHS_VBHN": 400,
         }
-        actual_max_art = candidate_info.get("max_article_number", 0)
+        actual_max_art = markers.max_heading_article_number
         if law_id in LONG_LAWS_MIN_ARTICLES:
             if actual_max_art < LONG_LAWS_MIN_ARTICLES[law_id]:
                 warnings.append("suspicious_low_max_article_number")
@@ -192,7 +206,7 @@ def clean_raw_artifact(
             law_name=meta.get("law_name") or meta.get("name") or "Unknown",
             source_url=meta.get("source_url") or meta.get("url") or "Unknown",
             source_domain=meta.get("source_domain") or "Unknown",
-            source_type=meta.get("source_type") or "Unknown",
+            source_type="html",
             raw_artifact_path=str(main_html_path),
             normalized_text=text,
             text_stats=stats,

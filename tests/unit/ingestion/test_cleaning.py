@@ -749,7 +749,7 @@ class TestFullArtifactCleaning:
         assert errors
 
 class TestCorpusWideRegression:
-    """Regression tests for corpus-wide failure modes seen in v0.4."""
+    """Regression tests for corpus-wide cleaning failure modes."""
 
     def test_nav_phap_luat_not_start(self) -> None:
         # Navigation with "Pháp Luật" links should not be the start
