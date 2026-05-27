@@ -298,8 +298,8 @@ All errors are logged with structured context.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |

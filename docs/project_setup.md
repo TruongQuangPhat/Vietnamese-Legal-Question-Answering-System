@@ -295,10 +295,10 @@ logger.error("crawl_failed", law_id=law_id, url=url, exc_info=True)
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
-| `docs/corpus_registry.md` | Planned | Corpus registry schema and design |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
+| `docs/corpus_registry.md` | Existing | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |

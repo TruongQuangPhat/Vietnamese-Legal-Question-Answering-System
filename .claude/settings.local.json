@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(uv add *)",
+      "Bash(uv sync *)",
+      "Bash(uv pip *)",
+      "Bash(uv --version)",
+      "Bash(python3 *)",
+      "Bash(python *)",
+      "Bash(git add *)",
+      "Bash(awk '{print $9, \"\\(\" $5 \"\\)\"}')"
+    ]
+  }
+}

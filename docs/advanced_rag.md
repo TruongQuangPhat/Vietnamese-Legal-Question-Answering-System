@@ -388,14 +388,14 @@ All errors include `query_id` for tracing; partial results still returned if pos
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding model and Qdrant indexing |
 | `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, time-aware filtering |

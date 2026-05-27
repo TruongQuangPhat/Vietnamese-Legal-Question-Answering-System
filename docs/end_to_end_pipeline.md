@@ -187,7 +187,7 @@ End-to-end pipeline:
 
 **Status**: Implemented
 
-**Detailed documentation**: See `config/laws/corpus_registry.yml`, `docs/crawling.md` (registry design).
+**Detailed documentation**: See `config/laws/corpus_registry.yml`, `docs/project_phase_journal.md` (registry design and phase journal).
 
 ---
 
@@ -197,19 +197,52 @@ End-to-end pipeline:
 
 **Input**: `config/laws/corpus_registry.yml`.
 
-**Pipeline Summary**: Registry Crawler reads the registry, iterates through each `law_id`, fetches HTML, saves to `data/raw/{law_id}/index.html` with metadata JSON. Includes retry, rate-limiting, and error logging.
+**Pipeline Summary**: Registry Crawler reads the registry, selects eligible
+targets, fetches HTML, saves to `data/raw/{law_id}/latest/main.html` with
+metadata JSON, and preserves previous snapshots under `crawls/{timestamp}/`
+when force refresh is used. Includes retry, rate-limiting, and error logging.
 
-**Output**: `data/raw/{law_id}/` (52 directories, each containing HTML + metadata).
+**Output**: `data/raw/{law_id}/latest/` (52 directories, each containing
+`main.html` and `metadata.json`).
 
 **Validation Criteria**:
 - 52/52 directories exist in `data/raw/`
-- Each `index.html` > 10KB (non-empty)
+- Each `latest/main.html` is present and non-empty
 - Metadata matches registry entry
 - No unresolved HTTP 4xx/5xx errors
 
 **Status**: Implemented (52/52 laws crawled successfully)
 
-**Detailed documentation**: `docs/raw_corpus_audit.md` (to be created)
+**Detailed documentation**: `docs/project_phase_journal.md`
+
+---
+
+### Phase 3 — Raw Corpus Audit & Validation
+
+**Goal**: Verify that crawled artifacts are complete, readable, trusted, and
+safe to feed into Cleaning & Normalization.
+
+**Input**: `data/raw/{law_id}/latest/main.html` and
+`data/raw/{law_id}/latest/metadata.json`.
+
+**Pipeline Summary**:
+- Load registry law IDs
+- Scan raw artifact directories
+- Validate `main.html` and `metadata.json`
+- Detect suspiciously small HTML, error pages, and metadata mismatches
+- Write `data/reports/raw_corpus_audit.json`
+
+**Output**: `data/reports/raw_corpus_audit.json`.
+
+**Validation Criteria**:
+- 52 registry entries are represented in `data/raw/`
+- 52 raw artifacts are valid
+- No missing raw HTML or metadata files
+- No critical metadata mismatches
+
+**Status**: Implemented
+
+**Detailed documentation**: `docs/raw_corpus_audit.md`
 
 ---
 
@@ -217,25 +250,32 @@ End-to-end pipeline:
 
 **Goal**: Convert raw HTML into clean Vietnamese legal text, normalize Unicode and whitespace, preserve legal heading structure.
 
-**Input**: `data/raw/{law_id}/index.html`.
+**Input**: `data/raw/{law_id}/latest/main.html` plus
+`data/raw/{law_id}/latest/metadata.json`.
 
 **Pipeline Summary**:
-- HTML-to-text extraction (remove script, style, navigation, ads)
-- Unicode normalization (NFC, encoding error handling, Vietnamese diacritic standardization)
-- Whitespace cleanup (collapse multiple spaces, normalize newlines, remove zero-width chars)
-- Preserve legal headings (`Điều`, `Khoản`, `Điểm`) and boundaries
-- Remove HTML artifacts (entities, leftover tags) while retaining legal content
-- Output: cleaned text or normalized intermediate JSON (with metadata position offsets)
+- Preferred TVPL legal body selection
+- Block-aware HTML extraction that keeps block boundaries but avoids inline
+  node fragmentation
+- Start trimming that preserves early Article 1 and skips source-law/amendment
+  pre-body notes
+- Unicode and conservative whitespace normalization
+- Safe line-fragment repair without merging clause or point boundaries
+- Encoded TVPL footer/watermark artifact cleanup
+- Article metric generation with references separated from real headings
 
-**Output**: `data/interim/{law_id}/cleaned.txt` or `cleaned.json`.
+**Output**: `data/interim/{law_id}/normalized.json` and optional
+`data/interim/{law_id}/cleaned.txt`.
 
 **Validation Criteria**:
-- Text is readable, no broken characters
-- Legal headings (Điều/Khoản/Điểm) are preserved and clearly separated
-- No content loss from over-aggressive cleaning
-- Valid UTF-8 encoding
+- 52/52 valid audited artifacts produce `normalized.json`
+- Article markers and Article 1 headings are preserved
+- Article references and real article headings are reported separately
+- No suspiciously short outputs
+- No missing article markers
+- Known encoded TVPL watermark/footer artifacts are removed
 
-**Status**: Planned
+**Status**: Implemented and gate-ready
 
 **Detailed documentation**: `docs/cleaning_normalization.md`
 
@@ -245,7 +285,7 @@ End-to-end pipeline:
 
 **Goal**: Parse the hierarchy Part → Chapter → Section → Article → Clause → Point from cleaned text.
 
-**Input**: `data/interim/{law_id}/cleaned.txt` (or JSON).
+**Input**: `data/interim/{law_id}/normalized.json`.
 
 **Pipeline Summary**:
 - Use regex as recognizer for hierarchy levels (not the main parser)
@@ -685,10 +725,10 @@ Each phase must pass its gate before proceeding to the next.
 | `corpus_registry.yml` count mismatch (≠52) | Registry not finalized, extra/missing entries | `grep -c "law_id:" config/laws/corpus_registry.yml` | Reconcile with intended corpus list, ensure exactly 52 |
 | Missing raw artifact directory | Crawl failed, network error, skipped law | `ls data/raw/` vs registry `law_id` list | Rerun crawler for missing `law_id`, check logs |
 | Extra raw artifact directory | Stale data from previous crawl | `ls data/raw/` shows dirs not in registry | Remove dirs not in registry, or update registry if intended |
-| `index.html` very small (<1KB) | Blocked page, captcha, login required, error page | `du -h data/raw/{law_id}/index.html` | Inspect HTML manually (but do not read per restrictions), fix crawler headers/retry |
-| Metadata `law_id` mismatch | Crawler saved wrong metadata | Check `data/raw/{law_id}/metadata.json` vs registry | Fix crawler to use correct `law_id` from registry |
+| `main.html` very small (<1KB) | Blocked page, captcha, login required, error page | `du -h data/raw/{law_id}/latest/main.html` | Inspect only targeted snippets, fix crawler headers/retry |
+| Metadata `law_id` mismatch | Crawler saved wrong metadata | Check `data/raw/{law_id}/latest/metadata.json` vs registry | Fix crawler to use correct `law_id` from registry |
 | Missing `source_url` in metadata | Crawler bug | Inspect metadata file | Ensure crawler populates all required fields from registry |
-| Vietnamese text shows garbled characters | Wrong encoding, encoding not normalized | `file -I data/raw/{law_id}/index.html` | Ensure crawler saves as UTF-8, cleaner normalizes Unicode |
+| Vietnamese text shows garbled characters | Wrong encoding, encoding not normalized | `file -I data/raw/{law_id}/latest/main.html` | Ensure crawler saves as UTF-8, cleaner normalizes Unicode |
 | Parser fails to detect `Article` | Unusual numbering, regex too strict | Run parser on sample, check logs | Loosen regex patterns, handle edge cases (Roman, LaTeX-style) |
 | Chunk has no `citation` field | Chunker didn't build citation properly | Inspect `chunks.jsonl` | Ensure chunker constructs citation from article/clause/point numbers |
 | Duplicate `chunk_id` within same law | Chunker logic error, same clause parsed twice | Validate `chunk_id` uniqueness | Fix chunker to generate unique IDs, deduplicate |
@@ -736,14 +776,14 @@ Each phase must pass its gate before proceeding to the next.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation details |
-| `docs/project_setup.md` | Planned | Project setup, tooling, standards |
-| `docs/corpus_registry.md` | Planned | Corpus registry schema and maintenance |
-| `docs/raw_corpus_audit.md` | Planned | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text, Unicode, whitespace handling |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm and edge cases |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design and citation construction |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
+| `docs/project_setup.md` | Existing | Project setup, tooling, standards |
+| `docs/corpus_registry.md` | Existing | Corpus registry schema and maintenance |
+| `docs/raw_corpus_audit.md` | Existing | Raw artifact audit procedure |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text, Unicode, whitespace handling |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm and edge cases |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design and citation construction |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding model choice, vector store setup, indexing strategy |
 | `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, RRF, reranking, time-aware filtering |

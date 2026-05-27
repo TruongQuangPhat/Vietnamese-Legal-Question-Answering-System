@@ -773,14 +773,14 @@ All maintenance actions should write structured logs with `maintenance_id`, `cor
 | Document | Status | Description |
 |----------|--------|-------------|
 | `docs/end_to_end_pipeline.md` | Existing | High-level project pipeline and phase roadmap |
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Existing | Environment setup and development principles |
 | `docs/corpus_registry.md` | Existing | Corpus registry schema and lifecycle |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit and validation |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text extraction and normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing into Phần/Chương/Mục/Điều/Khoản/Điểm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking and citation construction |
-| `docs/processed_jsonl.md` | Planned | Processed JSONL schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text extraction and normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing into Phần/Chương/Mục/Điều/Khoản/Điểm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking and citation construction |
+| `docs/processed_jsonl.md` | Existing | Processed JSONL schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding generation and vector indexing |
 | `docs/naive_rag.md` | Future extension | Baseline RAG pipeline |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, and time-aware filtering |

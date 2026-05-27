@@ -339,8 +339,8 @@ All errors are captured in the JSON report's `items[].issues` list.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |

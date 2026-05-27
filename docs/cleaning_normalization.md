@@ -807,10 +807,10 @@ embedding, RAG, Advanced RAG, or GraphRAG before parser correctness is validated
 | Document | Status | Description |
 |----------|--------|-------------|
 | `docs/end_to_end_pipeline.md` | Existing | High-level project pipeline overview |
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Existing | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Existing | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Existing | Raw artifact audit and validation |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |

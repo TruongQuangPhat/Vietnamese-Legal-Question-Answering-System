@@ -350,11 +350,11 @@ Aggregate error count determines exit code; partial success still writes valid c
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
 | `docs/embedding_indexing.md` | Planned | Embedding model and Qdrant indexing |

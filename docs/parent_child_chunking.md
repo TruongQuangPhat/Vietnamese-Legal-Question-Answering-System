@@ -335,10 +335,10 @@ All errors include `law_id` and node identifier.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
