@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 import unicodedata
 import html
@@ -92,6 +94,8 @@ ZERO_WIDTH_CHARS = {
     "‍",  # zero-width joiner
     "﻿",  # BOM
 }
+ENCODED_ARTIFACT_LINE_RE = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
+TVPL_MARKER_RE = re.compile(r"^TVPL_\d{8}$", re.I)
 
 @dataclass
 class CleaningStats:
@@ -782,6 +786,56 @@ def normalize_whitespace(text: str) -> str:
             final_lines.append(line)
 
     return "\n".join(final_lines)
+
+def remove_encoded_footer_artifacts(text: str) -> str:
+    """Remove standalone encoded TVPL watermark/footer artifact lines.
+
+    The cleanup is intentionally narrow: it removes only standalone base64-like
+    lines that decode to known TVPL watermark markers, while preserving legal
+    identifiers, dates, signatures, table abbreviations, and ordinary text.
+    """
+    lines = text.splitlines()
+    kept_lines = [
+        line for line in lines
+        if not _looks_like_encoded_artifact_line(line.strip())
+    ]
+    return "\n".join(kept_lines)
+
+def _looks_like_encoded_artifact_line(line: str) -> bool:
+    """Return true for standalone base64-like TVPL watermark artifacts."""
+    if len(line) < 24 or not ENCODED_ARTIFACT_LINE_RE.fullmatch(line):
+        return False
+
+    return any(_decoded_text_is_tvpl_artifact(decoded) for decoded in _decode_artifact_line(line))
+
+def _decode_artifact_line(line: str) -> List[str]:
+    """Decode likely base64 text with the TVPL watermark encodings observed."""
+    candidates = [line]
+    if len(line) % 4 == 1:
+        candidates.append(line[1:])
+
+    decoded_texts: List[str] = []
+    for candidate in candidates:
+        padded = candidate + ("=" * ((4 - len(candidate) % 4) % 4))
+        try:
+            raw = base64.b64decode(padded, validate=True)
+        except binascii.Error:
+            continue
+
+        for encoding in ("utf-16le", "utf-8"):
+            try:
+                decoded = raw.decode(encoding).strip("\x00\ufeff ")
+            except UnicodeDecodeError:
+                continue
+            if decoded:
+                decoded_texts.append(decoded)
+
+    return decoded_texts
+
+def _decoded_text_is_tvpl_artifact(decoded: str) -> bool:
+    """Identify decoded TVPL watermark text, not legal content."""
+    normalized = decoded.strip().lower()
+    return "thuvienphapluat.vn" in normalized or bool(TVPL_MARKER_RE.fullmatch(decoded.strip()))
 
 def repair_line_fragments(lines: List[str]) -> List[str]:
     """Repair narrow, known-safe line fragments without flattening structure."""

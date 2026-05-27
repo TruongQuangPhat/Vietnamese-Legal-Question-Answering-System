@@ -8,6 +8,7 @@ from typing import Dict, Any
 
 import pytest
 
+import src.ingestion.cleaning as cleaning
 from src.ingestion.cleaning import (
     extract_legal_text_from_html,
     remove_safe_boilerplate,
@@ -578,6 +579,65 @@ class TestP1LineFragmentRepair:
     def test_preserve_point_label(self) -> None:
         normalized = normalize_whitespace("a) nội dung")
         assert normalized == "a) nội dung"
+
+class TestStage2HEncodedFooterArtifacts:
+    """Stage 2H tests for conservative encoded footer artifact cleanup."""
+
+    def test_remove_standalone_base64_artifact_after_signature(self) -> None:
+        text = "\n".join([
+            "Điều 10. Hiệu lực thi hành",
+            "CHỦ TỊCH QUỐC HỘI Nguyễn Sinh Hùng",
+            "LdABoAHUAdgBpAGUAbgBwAGgAYQBwAGwAdQBhAHQALgB2AG4A",
+        ])
+
+        cleaned = cleaning.remove_encoded_footer_artifacts(text)
+
+        assert "CHỦ TỊCH QUỐC HỘI Nguyễn Sinh Hùng" in cleaned
+        assert "LdABoAHUAdgBpAGUAbgBwAGgAYQBwAGwAdQBhAHQALgB2AG4A" not in cleaned
+
+    def test_remove_repeated_encoded_artifact_lines(self) -> None:
+        encoded = "LdABoAHUAdgBpAGUAbgBwAGgAYQBwAGwAdQBhAHQALgB2AG4A"
+        text = "\n".join([
+            "Điều 10. Hiệu lực thi hành",
+            "CHỦ TỊCH QUỐC HỘI Nguyễn Sinh Hùng",
+            encoded,
+            encoded,
+            encoded,
+        ])
+
+        cleaned = cleaning.remove_encoded_footer_artifacts(text)
+
+        assert "CHỦ TỊCH QUỐC HỘI Nguyễn Sinh Hùng" in cleaned
+        assert encoded not in cleaned
+
+    def test_remove_tvpl_encoded_marker_around_tail_signature(self) -> None:
+        text = "\n".join([
+            "VABWAFAATABfADIAMAAyADYAMAA1ADEAOQA=",
+            "CHỦ TỊCH QUỐC HỘI Nguyễn Sinh Hùng",
+        ])
+
+        cleaned = cleaning.remove_encoded_footer_artifacts(text)
+
+        assert cleaned == "CHỦ TỊCH QUỐC HỘI Nguyễn Sinh Hùng"
+
+    def test_preserve_normal_legal_lines_with_numbers_and_slashes(self) -> None:
+        text = "\n".join([
+            "Luật số 85/2015/QH13",
+            "Điều 1. Phạm vi điều chỉnh",
+            "01/07/2026",
+            "Mã HS 0101.21.00",
+        ])
+
+        cleaned = cleaning.remove_encoded_footer_artifacts(text)
+
+        assert cleaned.splitlines() == text.splitlines()
+
+    def test_preserve_short_uppercase_legal_table_abbreviations(self) -> None:
+        text = "\n".join(["STT", "DMA", "DET", "PMA"])
+
+        cleaned = cleaning.remove_encoded_footer_artifacts(text)
+
+        assert cleaned.splitlines() == ["STT", "DMA", "DET", "PMA"]
 
 class TestLegalMarkersDetection:
     """Tests for legal marker detection."""

@@ -20,6 +20,7 @@ from src.ingestion.cleaning import (
     extract_legal_text_from_html,
     normalize_unicode,
     normalize_whitespace,
+    remove_encoded_footer_artifacts,
     remove_safe_boilerplate,
     trim_to_legal_body,
 )
@@ -156,6 +157,7 @@ def clean_raw_artifact(
         text = remove_safe_boilerplate(text)
         text, uni_warnings = normalize_unicode(text)
         text = normalize_whitespace(text)
+        text = remove_encoded_footer_artifacts(text)
 
         markers = detect_legal_markers(text)
 
