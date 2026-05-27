@@ -26,14 +26,14 @@ MLOps for VnLaw-QA is not only about model deployment. It is also about **legal 
 git checkout -b maintenance/corpus-refresh-YYYYMMDD
 
 # 2. Dry-run the crawl selection
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --dry-run
 
 # 3. Recrawl selected legal documents
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
@@ -628,14 +628,14 @@ uv run python scripts/switch_index_alias.py \
 
 ```bash
 # Dry-run recrawl selection
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --dry-run
 
 # Recrawl selected laws
-uv run python -m src.ingestion.cli \
+uv run python scripts/crawl_raw_corpus.py \
   --registry config/laws/corpus_registry.yml \
   --output data/raw \
   --law-ids LDD_2024 BLDS_2015 \

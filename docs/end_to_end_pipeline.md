@@ -764,11 +764,16 @@ Each phase must pass its gate before proceeding to the next.
 
 ### Phase 2 — Registry-driven Crawling — Implemented (52/52 laws crawled successfully)
 
-### Phase 3 — Raw Corpus Audit & Validation — Planned
+### Phase 3 — Raw Corpus Audit & Validation — Implemented
 
-### Phase 4 — Cleaning & Normalization — Planned
+### Phase 4 — Cleaning & Normalization — Implemented and gate-ready
 
-### Phase 5 — Legal Hierarchy Parsing — Planned
+Final Cleaning & Normalization validation produced 52/52 normalized artifacts
+and 52/52 optional cleaned text artifacts. The cleaner removes known TVPL
+encoded footer/watermark artifacts and reports article references separately
+from real article headings.
+
+### Phase 5 — Legal Hierarchy Parsing — Current next phase
 
 ### Phase 6 — Parent-child Chunking — Planned
 

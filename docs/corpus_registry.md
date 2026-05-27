@@ -228,17 +228,15 @@ The registry file itself should contain exactly 52 top-level list entries. A val
 
 ## CLI Reference
 
-### Intended CLI (future)
+### Intended CLI (deprecated)
+The following module-based commands are deprecated. Registry validation now occurs automatically during the Crawling and Audit phases.
 
 ```bash
-# Validate registry syntax and Pydantic schema
-uv run python -m src.ingestion.validate_registry --config config/laws/corpus_registry.yml
-
-# List registry entries with filters
-uv run python -m src.ingestion.list_registry --tier 1 --status active
+# Use official scripts instead:
+# uv run python scripts/crawl_raw_corpus.py ...
+# uv run python scripts/audit_raw_corpus.py ...
 ```
 
-Currently, registry validation occurs during crawler startup.
 
 ## Testing
 
