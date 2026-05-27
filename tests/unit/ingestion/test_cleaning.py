@@ -86,6 +86,30 @@ def valid_artifact_dir(tmp_path: Path) -> Path:
 
 # --- Tests ---
 
+def _extract_and_normalize_html(html: str) -> str:
+    """Run public extraction and normalization helpers for synthetic HTML."""
+    extracted, _ = extract_legal_text_from_html(html)
+    normalized, _ = normalize_unicode(extracted)
+    return normalize_whitespace(normalized)
+
+def _tvpl_content_html(*paragraphs: str) -> str:
+    """Wrap paragraphs in the preferred TVPL legal-body selector."""
+    filler = " ".join(["Nội dung bổ sung để vượt ngưỡng chọn nội dung."] * 20)
+    paragraph_html = "\n".join(paragraphs)
+    return f"""
+    <html>
+      <body>
+        <div id="divContentDoc">
+          <div class="content1">
+            {paragraph_html}
+            <p>Điều 3. Nội dung kiểm thử.</p>
+            <p>{filler}</p>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+
 class TestTrimToLegalBody:
     """Tests for trim_to_legal_body function."""
 
@@ -111,6 +135,145 @@ class TestTrimToLegalBody:
         text = "Just some random text without markers"
         trimmed = trim_to_legal_body(text)
         assert trimmed == text
+
+class TestP0StartTrimmingRepair:
+    """Stage 2A tests for P0 start-trimming failure modes."""
+
+    def test_fragmented_header_keeps_article_1_before_later_amendment(self) -> None:
+        text = "\n".join([
+            "Trang đầu",
+            "L",
+            "UẬT AN NINH MẠNG",
+            "Điều 1. Phạm vi điều chỉnh.",
+            "Điều 2. Giải thích từ ngữ.",
+            "Nội dung thân luật chính. " * 12,
+            "LUẬT SỬA ĐỔI, BỔ SUNG MỘT SỐ ĐIỀU",
+            "Điều 50. Điều khoản sửa đổi.",
+            "Điều 51. Hiệu lực thi hành.",
+            "Nội dung phần sửa đổi. " * 30,
+        ])
+
+        trimmed = trim_to_legal_body(text, {"selection_strategy": "preferred_tvpl_selector"})
+
+        assert "Điều 1. Phạm vi điều chỉnh." in trimmed[:250]
+        assert not trimmed.startswith("LUẬT SỬA ĐỔI")
+
+    def test_lanm_style_keeps_beginning_when_later_section_has_many_law_markers(self) -> None:
+        text = "\n".join([
+            "L",
+            "UẬT AN NINH MẠNG",
+            "Điều 1. Phạm vi điều chỉnh.",
+            "Điều 2. Đối tượng áp dụng.",
+            "Điều 3. Giải thích từ ngữ.",
+            "Nội dung thân luật chính. " * 10,
+            "LUẬT SỬA ĐỔI LUẬT ĐẦU TƯ, LUẬT DOANH NGHIỆP, LUẬT AN NINH MẠNG",
+            "Điều 64. Sửa đổi, bổ sung một số điều.",
+            "Điều 65. Điều khoản chuyển tiếp.",
+            "Nội dung phần sửa đổi. " * 30,
+        ])
+
+        trimmed = trim_to_legal_body(text, {"selection_strategy": "preferred_tvpl_selector"})
+
+        assert trimmed.startswith("L\nUẬT AN NINH MẠNG")
+        assert "Điều 1. Phạm vi điều chỉnh." in trimmed[:200]
+
+    def test_lvl_style_does_not_start_at_article_32(self) -> None:
+        text = "\n".join([
+            "LUẬT VIỆC LÀM",
+            "Điều 1. Phạm vi điều chỉnh.",
+            "Điều 2. Đối tượng áp dụng.",
+            "Điều 3. Giải thích từ ngữ.",
+            "Nội dung thân luật chính. " * 15,
+            "Điều 32. Chính sách hỗ trợ việc làm.",
+            "Nội dung Điều 32. " * 30,
+        ])
+
+        trimmed = trim_to_legal_body(text, {"selection_strategy": "preferred_tvpl_selector"})
+
+        assert trimmed.startswith("LUẬT VIỆC LÀM")
+        assert not trimmed.startswith("Điều 32.")
+        assert "Điều 1. Phạm vi điều chỉnh." in trimmed[:160]
+
+    def test_vbhn_style_chooses_consolidated_body_before_source_law_notes(self) -> None:
+        text = "\n".join([
+            "VĂN BẢN HỢP",
+            "NHẤT",
+            "Điều 1. Phạm vi điều chỉnh.",
+            "Điều 2. Đối tượng áp dụng.",
+            "Điều 3. Nguyên tắc áp dụng.",
+            "Nội dung văn bản hợp nhất. " * 10,
+            "LUẬT SỬA ĐỔI, BỔ SUNG MỘT SỐ ĐIỀU CỦA LUẬT GỐC",
+            "Điều 70. Điều khoản sửa đổi.",
+            "Điều 71. Điều khoản thi hành.",
+            "Nội dung ghi chú luật nguồn. " * 30,
+        ])
+
+        trimmed = trim_to_legal_body(text, {"selection_strategy": "preferred_tvpl_selector"})
+
+        assert trimmed.startswith("VĂN BẢN HỢP\nNHẤT")
+        assert "Điều 1. Phạm vi điều chỉnh." in trimmed[:180]
+        assert not trimmed.startswith("LUẬT SỬA ĐỔI")
+
+class TestStage2GSourceLawNoteTrimming:
+    """Stage 2G tests for pre-body source-law/amendment notes."""
+
+    def test_lhngd_style_source_law_note_is_trimmed_before_main_body(self) -> None:
+        text = "\n".join([
+            "Luật số 81/2025/QH15 ngày 24 tháng 6 năm 2025 của Quốc hội sửa đổi, bổ sung một số điều của Luật Tổ chức Tòa án nhân dân, có hiệu lực kể từ ngày 01 tháng 7 năm 2025.",
+            "Căn cứ Hiến pháp nước Cộng hòa xã hội chủ nghĩa Việt Nam; Quốc hội ban hành Luật Hôn nhân và gia đình[1].",
+            "Chương I",
+            "NHỮNG QUY ĐỊNH CHUNG",
+            "Điều 1. Phạm vi điều chỉnh",
+            "Luật này quy định chế độ hôn nhân và gia đình.",
+            "Điều 2. Những nguyên tắc cơ bản của chế độ hôn nhân và gia đình",
+            "Nội dung thân luật chính. " * 20,
+        ])
+
+        trimmed = trim_to_legal_body(text, {"selection_strategy": "preferred_tvpl_selector"})
+
+        assert not trimmed.startswith("Luật số 81/2025/QH15")
+        assert (
+            trimmed.startswith("Căn cứ Hiến pháp")
+            or "Quốc hội ban hành Luật Hôn nhân và gia đình" in trimmed[:180]
+        )
+        assert "Điều 1. Phạm vi điều chỉnh" in trimmed[:260]
+
+    def test_ltatgt_style_source_law_note_is_trimmed_before_main_body(self) -> None:
+        text = "\n".join([
+            "Luật số 118/2025/QH15 ngày 10 tháng 12 năm 2025 của Quốc hội sửa đổi, bổ sung một số điều của 10 luật có liên quan đến an ninh, trật tự, có hiệu lực kể từ ngày 01 tháng 7 năm 2026.",
+            "Căn cứ Hiến pháp nước Cộng hòa xã hội chủ nghĩa Việt Nam; Quốc hội ban hành Luật Trật tự, an toàn giao thông đường bộ[1].",
+            "Chương I",
+            "NHỮNG QUY ĐỊNH CHUNG",
+            "Điều 1. Phạm vi điều chỉnh",
+            "Luật này quy định về quy tắc, phương tiện, người tham gia giao thông đường bộ.",
+            "Điều 2. Giải thích từ ngữ",
+            "Nội dung thân luật chính. " * 20,
+        ])
+
+        trimmed = trim_to_legal_body(text, {"selection_strategy": "preferred_tvpl_selector"})
+
+        assert not trimmed.startswith("Luật số 118/2025/QH15")
+        assert (
+            trimmed.startswith("Căn cứ Hiến pháp")
+            or "Quốc hội ban hành Luật Trật tự, an toàn giao thông đường bộ" in trimmed[:220]
+        )
+        assert "Điều 1. Phạm vi điều chỉnh" in trimmed[:300]
+
+    def test_normal_law_start_is_not_overtrimmed(self) -> None:
+        text = "\n".join([
+            "Quốc hội ban hành Luật Việc làm.",
+            "Chương I",
+            "NHỮNG QUY ĐỊNH CHUNG",
+            "Điều 1. Phạm vi điều chỉnh.",
+            "Luật này quy định chính sách hỗ trợ tạo việc làm.",
+            "Điều 2. Giải thích từ ngữ.",
+            "Nội dung thân luật chính. " * 20,
+        ])
+
+        trimmed = trim_to_legal_body(text, {"selection_strategy": "preferred_tvpl_selector"})
+
+        assert trimmed.startswith("Quốc hội ban hành Luật Việc làm.")
+        assert "Điều 1. Phạm vi điều chỉnh." in trimmed[:180]
 
 class TestExtractLegalText:
     """Tests for HTML text extraction."""
@@ -180,6 +343,93 @@ class TestExtractLegalText:
         assert "actual content of article 2" in text
         # If it chose the content div, the nav div text is not included
         assert "Điều 3" not in text
+
+class TestP2AHtmlExtractionFragmentation:
+    """Stage 2D tests for inline-heavy TVPL extraction patterns."""
+
+    def test_inline_span_font_split_words_do_not_create_newline_fragments(self) -> None:
+        html = _tvpl_content_html(
+            "<p>Qu<span>ốc</span> hội ban hành Luật.</p>",
+            "<p>Điều 1. Phạm vi điều chỉnh.</p>",
+            "<p>Cơ quan, t<span>ổ</span><span> chức</span>, cá nhân.</p>",
+            "<p>Điều 2. Giải thích từ ngữ.</p>",
+        )
+
+        text = _extract_and_normalize_html(html)
+
+        assert "Quốc hội" in text
+        assert "tổ chức" in text
+        assert "Qu\nốc" not in text
+        assert "t\nổ" not in text
+
+    def test_inline_font_formatting_nodes_join_as_inline_text(self) -> None:
+        html = _tvpl_content_html(
+            "<p>An ninh <font>mạng</font> là nội dung được bảo vệ.</p>",
+            "<p>Bảo <b>vệ</b> <i>an ninh</i> <u>mạng</u>.</p>",
+            "<p>Tham chiếu <a href='/x'>văn bản</a> liên quan.</p>",
+            "<p>Điều 1. Phạm vi điều chỉnh.</p>",
+            "<p>Điều 2. Giải thích từ ngữ.</p>",
+        )
+
+        text = _extract_and_normalize_html(html)
+
+        assert "An ninh mạng" in text
+        assert "Bảo vệ" in text
+        assert "m\nạng" not in text
+        assert "Bảo\nvệ" not in text
+
+    def test_block_boundaries_remain_between_article_clause_and_point(self) -> None:
+        html = _tvpl_content_html(
+            "<p>Điều 1. Tên điều.</p>",
+            "<p>1. Nội dung khoản.</p>",
+            "<p>a) Nội dung điểm.</p>",
+            "<p>Điều 2. Điều tiếp theo.</p>",
+        )
+
+        lines = _extract_and_normalize_html(html).splitlines()
+
+        assert "Điều 1. Tên điều." in lines
+        assert "1. Nội dung khoản." in lines
+        assert "a) Nội dung điểm." in lines
+        assert lines.index("Điều 1. Tên điều.") < lines.index("1. Nội dung khoản.")
+        assert lines.index("1. Nội dung khoản.") < lines.index("a) Nội dung điểm.")
+
+    def test_table_td_legal_body_preserves_blocks_without_inline_splits(self) -> None:
+        html = _tvpl_content_html(
+            """
+            <table>
+              <tr>
+                <td>
+                  <p>Ủy<span> ban</span> thường vụ Quốc hội.</p>
+                  <p>Điều 1. Phạm vi điều chỉnh.</p>
+                  <p>Điều 2. Giải thích từ ngữ.</p>
+                </td>
+              </tr>
+            </table>
+            """,
+        )
+
+        text = _extract_and_normalize_html(html)
+
+        assert "Ủy ban thường vụ Quốc hội" in text
+        assert "Ủy\nban" not in text
+        assert "Điều 1. Phạm vi điều chỉnh." in text
+
+    def test_preferred_selector_still_preserves_detectable_articles(self) -> None:
+        html = _tvpl_content_html(
+            "<p>Luật này quy định về t<span>ổ</span><span> chức</span>.</p>",
+            "<p>Điều 1. Phạm vi điều chỉnh.</p>",
+            "<p>Điều 2. Đối tượng áp dụng.</p>",
+        )
+
+        text = _extract_and_normalize_html(html)
+        markers = detect_legal_markers(text)
+
+        assert markers.contains_article
+        assert markers.article_count_estimate >= 2
+        assert "Điều 1. Phạm vi điều chỉnh." in text
+        assert "Điều 2. Đối tượng áp dụng." in text
+        assert "tổ chức" in text
 
 class TestBoilerplateRemoval:
     """Tests for boilerplate removal."""
@@ -297,6 +547,37 @@ class TestWhitespaceNormalization:
         text = "Line1\tTabbed\nLine2"
         normalized = normalize_whitespace(text)
         assert "\t" not in normalized
+
+class TestP1LineFragmentRepair:
+    """Stage 2A tests for conservative line-fragment repair."""
+
+    def test_join_split_article_marker_and_number(self) -> None:
+        normalized = normalize_whitespace("Điều\n32. Nội dung")
+        assert normalized == "Điều 32. Nội dung"
+
+    def test_join_lowercase_dieu_intra_word_split(self) -> None:
+        normalized = normalize_whitespace("đ\niều")
+        assert normalized == "điều"
+
+    def test_join_lowercase_muc_intra_word_split(self) -> None:
+        normalized = normalize_whitespace("m\nục")
+        assert normalized == "mục"
+
+    def test_join_viec_intra_word_split(self) -> None:
+        normalized = normalize_whitespace("Vi\nệc")
+        assert normalized == "Việc"
+
+    def test_preserve_article_to_clause_boundary(self) -> None:
+        text = "Điều 1. Tên điều\n1. Nội dung khoản"
+        normalized = normalize_whitespace(text)
+        assert normalized.splitlines() == [
+            "Điều 1. Tên điều",
+            "1. Nội dung khoản",
+        ]
+
+    def test_preserve_point_label(self) -> None:
+        normalized = normalize_whitespace("a) nội dung")
+        assert normalized == "a) nội dung"
 
 class TestLegalMarkersDetection:
     """Tests for legal marker detection."""

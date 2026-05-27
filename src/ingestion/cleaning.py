@@ -5,7 +5,7 @@ import unicodedata
 import html
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional, Any
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 # --- Constants ---
 
@@ -18,6 +18,8 @@ PREFERRED_CONTENT_SELECTORS = [
     ".cldivContentDocVn .content1",
     ".content1",
 ]
+TEXT_BLOCK_TAGS = {"p", "li", "h1", "h2", "h3", "h4", "h5", "h6"}
+SKIP_TEXT_TAGS = {"script", "style", "noscript", "iframe", "button", "select", "input", "svg"}
 
 SAFE_BOILERPLATE = {
     "THƯ VIỆN PHÁP LUẬT",
@@ -36,8 +38,11 @@ SAFE_BOILERPLATE = {
 
 # Regex patterns for legal structure
 RE_ARTICLE = re.compile(r"Điều\s+\d+", re.IGNORECASE)
+RE_ARTICLE_1_LINE = re.compile(r"(?im)^\s*Điều\s+1\.")
 RE_CLAUSE = re.compile(r"^\s*\d+\..+")  # require some text after "1."
 RE_POINT = re.compile(r"^\s*[a-zđ]\).+", re.IGNORECASE)
+EARLY_ARTICLE_1_WINDOW_CHARS = 3000
+HEADER_LOOKBACK_LINES = 6
 
 # Boundary trimming markers
 START_MARKERS = [
@@ -184,11 +189,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         return "", {"tag": None, "class": [], "id": "", "marker_sum": 0, "text_len": 0}
 
     # 1. Decompose known noisy elements (Do NOT decompose 'form')
-    skip_tags = {
-        "script", "style", "noscript", "iframe",
-        "button", "select", "input", "svg"
-    }
-    for tag in soup.find_all(skip_tags):
+    for tag in soup.find_all(SKIP_TEXT_TAGS):
         tag.decompose()
 
     # 2. Try preferred TVPL selectors first
@@ -202,7 +203,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         # However, we only concatenate blocks that show legal evidence to avoid noise.
         valid_blocks = []
         for el in elements:
-            block_text = el.get_text(separator="\n", strip=True)
+            block_text = extract_text_with_block_boundaries(el)
             if len(block_text) > 100 and (RE_ARTICLE.search(block_text) or any(m in block_text for m in STRONG_LEGAL_MARKERS)):
                 valid_blocks.append(block_text)
 
@@ -256,7 +257,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
 
 
     for candidate in candidates:
-        text = candidate.get_text(separator="\n", strip=True)
+        text = extract_text_with_block_boundaries(candidate)
         if not text:
             continue
 
@@ -320,7 +321,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
 
     if best_candidate:
         # Recalculate detailed stats for the selected candidate
-        final_text = best_candidate.get_text(separator="\n")
+        final_text = extract_text_with_block_boundaries(best_candidate)
         final_dieu = len(RE_ARTICLE.findall(final_text))
         final_chapter = len(re.findall(r'Chương\s+[IVXLCDM]+', final_text, re.I))
         final_muc = final_text.count("Mục")
@@ -347,7 +348,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
     # Fallback: use body text
     body = soup.body
     if body:
-        text = body.get_text(separator="\n")
+        text = extract_text_with_block_boundaries(body)
         return text, {
             "tag": "body",
             "class": [],
@@ -364,7 +365,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
             "avg_chars_per_article": 0,
         }
 
-    text = soup.get_text(separator="\n")
+    text = extract_text_with_block_boundaries(soup)
     return text, {
         "tag": "soup",
         "class": [],
@@ -380,6 +381,45 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         "link_density": 0.0,
         "avg_chars_per_article": 0,
     }
+
+def extract_text_with_block_boundaries(node: Tag) -> str:
+    """Extract visible text while preserving block, not inline, boundaries.
+
+    Paragraph-like tags become separate lines. Inline formatting tags such as
+    `span`, `font`, `b`, `i`, `u`, and `a` are joined as normal inline text so
+    they do not create artificial word-fragment line breaks.
+    """
+    lines: List[str] = []
+
+    def append_text(text: str) -> None:
+        line = _normalize_extracted_line(text)
+        if line:
+            lines.append(line)
+
+    def visit(current: Any) -> None:
+        if isinstance(current, NavigableString):
+            append_text(str(current))
+            return
+        if not isinstance(current, Tag):
+            return
+        if current.name in SKIP_TEXT_TAGS:
+            return
+        if current.name in TEXT_BLOCK_TAGS:
+            append_text(current.get_text(separator="", strip=False))
+            return
+
+        for child in current.children:
+            visit(child)
+
+    visit(node)
+    return "\n".join(lines)
+
+def _normalize_extracted_line(text: str) -> str:
+    """Normalize one extracted block line without altering legal structure."""
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    text = re.sub(r"([(])\s+", r"\1", text)
+    return text
 
 def trim_to_legal_body(text: str, candidate_info: Optional[Dict] = None) -> str:
     """Trims website chrome from the beginning and end of extracted text.
@@ -419,6 +459,10 @@ def _find_legal_body_start(text: str) -> int:
 
     Returns character index or len(text) if no reliable start found.
     """
+    early_article_start = _find_start_from_early_article_1(text)
+    if early_article_start is not None:
+        return early_article_start
+
     # Try markers in order of reliability (high to low)
     for pattern, _ in START_MARKERS:
         m = pattern.search(text)
@@ -429,6 +473,89 @@ def _find_legal_body_start(text: str) -> int:
             if _has_sufficient_legal_evidence(after_text, min_articles=2, min_chars=500):
                 return pos
     return len(text)
+
+def _find_start_from_early_article_1(text: str) -> Optional[int]:
+    """Find the legal body start when Article 1 appears near the beginning.
+
+    Later amendment/source-law sections often contain strong `LUẬT...` markers.
+    If Article 1 is already present early with enough following body evidence,
+    prefer that earlier body and preserve nearby official title/header lines.
+    """
+    match = RE_ARTICLE_1_LINE.search(text)
+    if not match or match.start() > EARLY_ARTICLE_1_WINDOW_CHARS:
+        return None
+
+    after_article_1 = text[match.start():]
+    if not _has_sufficient_legal_evidence(after_article_1, min_articles=2, min_chars=100):
+        return None
+
+    return _find_nearby_official_header_start(text, match.start())
+
+def _find_nearby_official_header_start(text: str, article_start: int) -> int:
+    """Return the nearest official title/header start before Article 1."""
+    line_spans = _line_spans(text)
+    article_line_idx = next(
+        (idx for idx, (start, end, _) in enumerate(line_spans) if start <= article_start < end),
+        None,
+    )
+    if article_line_idx is None:
+        return article_start
+
+    lookback_start = max(0, article_line_idx - HEADER_LOOKBACK_LINES)
+    for idx in range(article_line_idx - 1, lookback_start - 1, -1):
+        line_text = line_spans[idx][2].strip()
+        if not line_text:
+            continue
+        if _looks_like_amendment_source_note(line_text):
+            continue
+
+        header_lines = [
+            span[2].strip()
+            for span in line_spans[idx:article_line_idx]
+            if span[2].strip()
+        ]
+        if _looks_like_official_header(header_lines):
+            return line_spans[idx][0]
+
+    return article_start
+
+def _line_spans(text: str) -> List[Tuple[int, int, str]]:
+    """Build `(start, end, line)` spans while preserving text offsets."""
+    spans = []
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        start = offset
+        end = offset + len(line)
+        spans.append((start, end, line.rstrip("\r\n")))
+        offset = end
+    if text and not spans:
+        spans.append((0, len(text), text))
+    return spans
+
+def _looks_like_official_header(lines: List[str]) -> bool:
+    """Detect official legal title/header lines, including short split lines."""
+    joined = " ".join(lines)
+    joined_lower = joined.lower()
+    if "căn cứ hiến pháp" in joined_lower and "quốc hội ban hành luật" in joined_lower:
+        return True
+
+    compact = re.sub(r"\s+", "", " ".join(lines)).upper()
+    return compact.startswith((
+        "LUẬT",
+        "BỘLUẬT",
+        "VĂNBẢNHỢPNHẤT",
+        "HIẾNPHÁP",
+        "PHÁPLỆNH",
+        "NGHỊĐỊNH",
+        "THÔNGTƯ",
+        "QUỐCHỘI",
+        "CHÍNHPHỦ",
+    ))
+
+def _looks_like_amendment_source_note(line: str) -> bool:
+    """Detect pre-body source-law notes that should not anchor body start."""
+    normalized = re.sub(r"\s+", " ", line).strip().lower()
+    return normalized.startswith("luật số ") and "sửa đổi, bổ sung" in normalized
 
 def _has_sufficient_legal_evidence(text: str, min_articles: int, min_chars: int) -> bool:
     """Checks if text contains enough legal structure to confirm it's the real body."""
@@ -641,6 +768,8 @@ def normalize_whitespace(text: str) -> str:
         else:
             normalized_lines.append("")
 
+    normalized_lines = repair_line_fragments(normalized_lines)
+
     final_lines = []
     blank_count = 0
     for line in normalized_lines:
@@ -653,6 +782,43 @@ def normalize_whitespace(text: str) -> str:
             final_lines.append(line)
 
     return "\n".join(final_lines)
+
+def repair_line_fragments(lines: List[str]) -> List[str]:
+    """Repair narrow, known-safe line fragments without flattening structure."""
+    repaired = []
+    idx = 0
+    while idx < len(lines):
+        current = lines[idx]
+        next_line = lines[idx + 1] if idx + 1 < len(lines) else None
+
+        if next_line is not None and _should_join_line_fragments(current, next_line):
+            repaired.append(_join_line_fragments(current, next_line))
+            idx += 2
+            continue
+
+        repaired.append(current)
+        idx += 1
+
+    return repaired
+
+def _should_join_line_fragments(current: str, next_line: str) -> bool:
+    """Return true only for safe legal heading or intra-word fragments."""
+    if not current or not next_line:
+        return False
+
+    if current == "Điều" and re.match(r"^\d+\.", next_line):
+        return True
+
+    if " " in current or " " in next_line:
+        return False
+
+    return (current + next_line).lower() in {"điều", "mục", "việc"}
+
+def _join_line_fragments(current: str, next_line: str) -> str:
+    """Join a pair of fragments using the spacing needed by the fragment type."""
+    if current == "Điều" and re.match(r"^\d+\.", next_line):
+        return f"{current} {next_line}"
+    return f"{current}{next_line}"
 
 def detect_legal_markers(text: str) -> LegalMarkersSummary:
     """Detects legal hierarchy markers and estimates article count."""
