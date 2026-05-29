@@ -1,7 +1,6 @@
 # Codex Mirror Notice
 
-This file is a Codex-compatible mirror of `PROJECT_CONTEXT.md`. The original
-content is preserved below.
+This file is a Codex-compatible mirror of `PROJECT_CONTEXT.md`. The original content is preserved below.
 
 # VnLaw-QA Project Context
 
@@ -12,29 +11,19 @@ This file is intended to help Claude Code, Codex, or any future AI coding assist
 VnLaw-QA is a Vietnamese Legal QA/RAG system. It is not a generic chatbot.
 
 ### Architecture
+
 - `scripts/` = CLI entrypoints (parse arguments, call services, print results)
 - `src/services/` = pipeline orchestration (coordinate phase execution, build reports)
 - `src/ingestion/` = reusable domain logic (crawler, audit, cleaning, storage)
 
-The system must retrieve, process, and answer questions based on Vietnamese legal documents while preserving legal structure, source traceability, and citation integrity. The long-term goal is to build a reliable Legal RAG pipeline that can answer Vietnamese legal questions with grounded evidence, explicit citations, and safe fallback behavior when evidence is insufficient.
+The system must retrieve, process, and answer questions based on Vietnamese legal documents while preserving legal structure, source traceability, and citation integrity.
+
+The long-term goal is to build a reliable Legal RAG pipeline that can answer Vietnamese legal questions with grounded evidence, explicit citations, and safe fallback behavior when evidence is insufficient.
 
 The project pipeline is organized as:
 
 ```text
-Corpus Registry
-→ Registry-driven Crawling
-→ Raw Corpus Audit
-→ Cleaning / Normalization
-→ Legal Hierarchy Parsing
-→ Parent-child Chunking
-→ Processed JSONL Validation
-→ Embedding / Indexing
-→ Naive RAG
-→ Advanced RAG
-→ GraphRAG
-→ Evaluation
-→ API / Deployment
-→ MLOps / Maintenance
+Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning / Normalization → Legal Hierarchy Parsing → Parent-child Chunking → Processed JSONL Validation → Embedding / Indexing → Naive RAG → Advanced RAG → GraphRAG → Evaluation → API / Deployment → MLOps / Maintenance
 ```
 
 ## 2. Core Legal RAG Principles
@@ -60,24 +49,18 @@ Corpus Registry
 - Raw artifacts are stored under `data/raw/`.
 - Raw Corpus Audit & Validation has been implemented.
 - **Phase 4 — Cleaning & Normalization is complete/gate-ready.**
-- The cleaned corpus has 52/52 `normalized.json` artifacts and 52/52 optional
-  `cleaned.txt` debug artifacts under `data/interim/`.
+- The cleaned corpus has 52/52 `normalized.json` artifacts and 52/52 optional `cleaned.txt` debug artifacts under `data/interim/`.
 - Cleaner output uses `cleaner_version` `v0.8.0`.
 - Encoded TVPL footer/watermark artifacts are removed from cleaned outputs.
-- Article metrics are explicit: `article_reference_count` counts all `Điều N`
-  mentions, while `article_heading_count` and `max_heading_article_number`
-  describe real article headings.
-- Remaining duplicate-style flags such as BLHS_VBHN are diagnostic/semantic
-  concerns, not cleaning blockers unless extraction duplication is proven.
+- Article metrics are explicit: `article_reference_count` counts all `Điều N` mentions, while `article_heading_count` and `max_heading_article_number` describe real article headings.
+- Remaining duplicate-style flags such as BLHS_VBHN are diagnostic/semantic concerns, not cleaning blockers unless extraction duplication is proven.
 - The next engineering phase is **Phase 5 — Legal Hierarchy Parsing**.
 
 ## 4. Implemented Phases
 
 ### Phase 0 — Project Setup and Principles
 
-Implemented.
-
-Relevant files:
+Implemented. Relevant files:
 
 - `pyproject.toml`
 - `CLAUDE.md`
@@ -87,9 +70,7 @@ Relevant files:
 
 ### Phase 1 — Legal Corpus Registry
 
-Implemented.
-
-Relevant files:
+Implemented. Relevant files:
 
 - `config/laws/corpus_registry.yml`
 - `docs/corpus_registry.md`
@@ -98,9 +79,7 @@ The registry is the source of truth for the legal corpus. It defines each legal 
 
 ### Phase 2 — Registry-driven Crawling
 
-Implemented.
-
-Relevant files:
+Implemented. Relevant files:
 
 - `src/ingestion/`
 - `scripts/`
@@ -112,9 +91,7 @@ The crawler reads from `config/laws/corpus_registry.yml`, fetches legal source a
 
 ### Phase 3 — Raw Corpus Audit & Validation
 
-Implemented.
-
-Relevant files:
+Implemented. Relevant files:
 
 - `src/ingestion/audit.py`
 - `scripts/audit_raw_corpus.py`
@@ -126,9 +103,7 @@ This phase validates that crawled raw artifacts are complete, readable, not bloc
 
 ### Phase 4 — Cleaning & Normalization
 
-Implemented and gate-ready.
-
-Relevant files:
+Implemented and gate-ready. Relevant files:
 
 - `src/ingestion/cleaning.py`
 - `src/services/cleaning_service.py`
@@ -138,14 +113,12 @@ Relevant files:
 - `scripts/audit_cleaning_quality.py`
 - `tests/unit/ingestion/test_cleaning.py`
 - `docs/cleaning_normalization.md`
-- `data/interim/`
+- `data/interim/{LAW_ID}/normalized.json`
+- `data/interim/{LAW_ID}/cleaned.txt`
 - `data/reports/cleaning_report.json`
 - `data/reports/cleaning_quality_audit.json`
 
-The full 52-law corpus cleans successfully with no warning artifacts, failed
-artifacts, suspiciously short outputs, or missing article markers. Cleaning
-preserves legal text structure for the Legal Hierarchy Parser and removes known
-TVPL encoded footer/watermark artifacts.
+The full 52-law corpus cleans successfully with no warning artifacts, failed artifacts, suspiciously short outputs, or missing article markers. Cleaning preserves legal text structure for the Legal Hierarchy Parser and removes known TVPL encoded footer/watermark artifacts.
 
 ## 5. Current Phase
 
@@ -155,13 +128,15 @@ Current phase:
 Phase 5 — Legal Hierarchy Parsing
 ```
 
-Goal:
+Goal: Extract deterministic Vietnamese legal hierarchy from the normalized corpus:
 
-Extract deterministic Vietnamese legal hierarchy from the normalized corpus:
-Phần → Chương → Mục → Điều → Khoản → Điểm.
+```text
+Phần → Chương → Mục → Điều → Khoản → Điểm
+```
 
-This phase should consume `data/interim/{LAW_ID}/normalized.json`. It should
-not jump directly to embedding, RAG, Advanced RAG, or GraphRAG.
+This phase should consume `data/interim/{LAW_ID}/normalized.json`.
+
+It should not jump directly to embedding, RAG, Advanced RAG, or GraphRAG.
 
 Expected outputs:
 
@@ -174,8 +149,7 @@ Key requirements:
 
 - Read normalized artifacts from `data/interim/`.
 - Do not mutate `data/raw/`.
-- Do not rewrite cleaning behavior unless a parser-blocking cleaning defect is
-  proven.
+- Do not rewrite cleaning behavior unless a parser-blocking cleaning defect is proven.
 - Preserve source traceability from normalized artifact metadata.
 - Preserve legal markers and numbering patterns:
   - Phần
@@ -206,13 +180,11 @@ Vietnamese legal documents often do not literally write the words `Khoản` and 
 4. Generate `data/interim/{LAW_ID}/hierarchy.json`.
 5. Generate `data/reports/legal_parsing_report.json`.
 6. Add parser unit tests before any chunking implementation.
-7. Validate parser correctness on known complex laws such as BLDS_2015,
-   BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
+7. Validate parser correctness on known complex laws such as BLDS_2015, BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
 
 ## 7. Do Not Do Yet
 
-- Do not implement Parent-child Chunking until hierarchy parsing passes its
-  validation gate.
+- Do not implement Parent-child Chunking until hierarchy parsing passes its validation gate.
 - Do not implement Processed JSONL export yet.
 - Do not implement embedding/indexing yet.
 - Do not implement Naive RAG yet.
@@ -251,53 +223,12 @@ docs/processed_jsonl.md
 Official user-facing commands for the ingestion pipeline:
 
 - Crawl raw legal corpus:
-  ```bash
-  uv run python scripts/crawl_raw_corpus.py [OPTIONS]
-  ```
+
+```bash
+uv run python scripts/crawl_raw_corpus.py [OPTIONS]
+```
 
 - Audit raw corpus:
-  ```bash
-  uv run python scripts/audit_raw_corpus.py \
-    --registry config/laws/corpus_registry.yml \
-    --raw-dir data/raw \
-    --output data/reports/raw_corpus_audit.json
-  ```
-
-- Clean and normalize corpus:
-  ```bash
-  uv run python scripts/clean_raw_corpus.py \
-    --raw-dir data/raw \
-    --output-dir data/interim \
-    --report data/reports/cleaning_report.json
-  ```
-
-## 10. Development Commands
-
-Environment setup:
-
-```bash
-uv sync
-```
-
-Run tests:
-
-```bash
-uv run pytest
-```
-
-Run linting:
-
-```bash
-uv run ruff check .
-```
-
-Inspect crawler CLI (internal/package):
-
-```bash
-uv run python scripts/crawl_raw_corpus.py --help
-```
-
-Run raw corpus audit:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
@@ -306,98 +237,85 @@ uv run python scripts/audit_raw_corpus.py \
   --output data/reports/raw_corpus_audit.json
 ```
 
-Run Cleaning & Normalization:
-
-```bash
-uv run python scripts/clean_raw_corpus.py \
-  --raw-dir data/raw \
-  --output-dir data/interim \
-  --report data/reports/cleaning_report.json
-```
-
-Optional debug text output:
+- Clean and normalize corpus:
 
 ```bash
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report data/reports/cleaning_report.json \
-  --write-txt
+  --write-txt \
+  --audit
 ```
 
-Focused cleaning tests:
+- Audit cleaning quality:
 
 ```bash
-uv run pytest tests/unit/ingestion/test_cleaning.py -v
+uv run python scripts/audit_cleaning_quality.py \
+  --raw-dir data/raw \
+  --interim-dir data/interim \
+  --report-dir data/reports \
+  --registry config/laws/corpus_registry.yml
 ```
 
-## 10. Documentation Map
+- Run unit tests:
 
-- `PROJECT_CONTEXT.md` gives the current project state and current phase.
-- `CLAUDE.md` gives coding, workflow, and assistant rules.
-- `docs/end_to_end_pipeline.md` gives the full roadmap.
-- `docs/project_phase_journal.md` is the chronological project notebook for
-  completed phases, pipeline decisions, and validation gates.
-- `docs/raw_data_crawling.md` explains Phase 2 raw data crawling in detail.
-- `docs/raw_corpus_audit.md` explains the raw audit phase.
-- `docs/cleaning_normalization.md` explains the completed Cleaning & Normalization phase.
-- `docs/legal_parsing.md` explains the current Legal Hierarchy Parsing phase.
-- `docs/parent_child_chunking.md` explains the planned Parent-child Chunking phase.
-- `docs/processed_jsonl.md` explains the planned processed JSONL schema and validation phase.
-- `docs/evaluation.md` explains the future evaluation strategy.
+```bash
+uv run pytest tests/unit/ingestion -q
+```
 
-## 11. Branch Roadmap
+## 10. Trusted Source Policy
+
+The only default trusted source is:
 
 ```text
-feature/data-crawling                done
-feature/raw-corpus-audit             done
-feature/cleaning-normalization       done
-feature/legal-parser-chunking        current
-feature/processed-jsonl-validation   planned
-feature/embedding-indexing           future
-feature/naive-rag                    future
-feature/advanced-rag                 future
-feature/graphrag-agents              future
-feature/evaluation                   future
-feature/api-deployment               future
+https://thuvienphapluat.vn
 ```
 
-Branch guidance:
+Do not add another data source unless the task explicitly asks for it and the change is documented as an approved architectural decision.
 
-- Keep branches small and phase-focused.
-- Each branch should pass its validation gate before merging.
-- Do not mix cleaning, parsing, chunking, and RAG in the same branch.
-- Documentation should be updated together with each phase implementation.
+Prefer **VBHN** consolidated documents when available. If no VBHN exists, crawl and represent the original document and amendments in chronological order with accurate `effective_date`, `expiry_date`, and status metadata.
 
-## 12. Current Phase Validation Gate
+## 11. Current Completed Work Summary
 
-The Cleaning & Normalization phase has passed with:
+### Phase 4 — Cleaning & Normalization
 
-```text
-52/52 valid audited artifacts produce normalized.json
-52/52 optional cleaned.txt debug artifacts were generated in final validation
-normalized_text is UTF-8 readable
-article markers and Article 1 headings are preserved
-article references and real article headings are separately reported
-numbered clause patterns are preserved when present
-point label patterns are preserved when present
-known encoded TVPL watermark/footer artifacts are removed
-cleaning_report.json is generated with no critical failures
-```
+- 52/52 legal documents cleaned successfully.
+- Outputs: `normalized.json` + optional `cleaned.txt` per law under `data/interim/{LAW_ID}/`.
+- Cleaner version: `v0.8.0`.
+- Known fixes applied:
+  - Start-trimming defects corrected for LANM_2025, LVL_2025, LNO_VBHN, LXD_VBHN.
+  - Conservative line-fragment repair for split Vietnamese words.
+  - Block-aware HTML extraction to avoid artificial newlines from inline elements.
+  - Source-law / amendment pre-body note removal for LHNGD_VBHN, LTATGT_VBHN.
+  - Encoded TVPL footer/watermark artifacts removed.
+  - Article metric clarity: `article_reference_count`, `article_heading_count`, `max_heading_article_number`, `has_heading_article_1`, `heading_sequence_score`.
+- Final validation: 57 cleaning tests passed; 159 total ingestion tests passed.
+- Gate decision: **Phase 4 complete/gate-ready.**
 
-Legal Hierarchy Parsing may start next. Do not proceed to chunking, embedding,
-RAG, Advanced RAG, or GraphRAG until parser output passes its own validation
-gate.
+## 12. Next Phase Preparation
 
-## 13. Notes for Future AI Assistants
+Phase 5 — Legal Hierarchy Parsing is the active engineering focus.
 
-Before making changes:
+Key design constraints:
 
-1. Read `PROJECT_CONTEXT.md`.
-2. Read `CLAUDE.md`.
-3. Read the relevant phase documentation under `docs/`.
-4. Inspect existing code patterns in `src/ingestion/`, `scripts/`, and `tests/unit/ingestion/`.
-5. Do not scan large raw directories recursively.
-6. Do not read all raw HTML files manually.
-7. Do not implement future phases early.
-8. Keep source traceability and legal hierarchy preservation as first-class requirements.
+- Must consume `data/interim/{LAW_ID}/normalized.json` only.
+- Must not mutate `data/raw/`.
+- Must preserve `Phần / Chương / Mục / Điều / Khoản / Điểm` hierarchy.
+- Must validate hierarchy before any chunking or embedding work.
+- Must add focused parser unit tests covering at least three law templates and edge cases (Roman numerals, Vietnamese `đ`, mixed clause styles).
+
+## 13. Out-of-Scope Reminders
+
+These are explicitly deferred until their respective phase gates are met:
+
+- Parent-child chunking
+- Processed JSONL export
+- Embedding / indexing (Qdrant)
+- Neo4j graph construction
+- Naive RAG baseline
+- Advanced RAG (hybrid search, RRF, reranking)
+- GraphRAG and multi-agent retrieval
+- API / deployment (FastAPI)
+- Fine-tuning / MLOps
+- UI work
