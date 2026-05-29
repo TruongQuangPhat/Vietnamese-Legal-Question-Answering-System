@@ -187,7 +187,7 @@ End-to-end pipeline:
 
 **Status**: Implemented
 
-**Detailed documentation**: See `config/laws/corpus_registry.yml`, `docs/project_phase_journal.md` (registry design and phase journal).
+**Detailed documentation**: See `config/laws/corpus_registry.yml` and `docs/corpus_registry.md`.
 
 ---
 
@@ -213,7 +213,7 @@ when force refresh is used. Includes retry, rate-limiting, and error logging.
 
 **Status**: Implemented (52/52 laws crawled successfully)
 
-**Detailed documentation**: `docs/project_phase_journal.md`
+**Detailed documentation**: `docs/raw_data_crawling.md`
 
 ---
 
@@ -777,6 +777,7 @@ Each phase must pass its gate before proceeding to the next.
 | Document | Status | Description |
 |----------|--------|-------------|
 | `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
+| `docs/raw_data_crawling.md` | Existing | Raw data crawling phase details |
 | `docs/project_setup.md` | Existing | Project setup, tooling, standards |
 | `docs/corpus_registry.md` | Existing | Corpus registry schema and maintenance |
 | `docs/raw_corpus_audit.md` | Existing | Raw artifact audit procedure |

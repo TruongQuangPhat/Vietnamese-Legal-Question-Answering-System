@@ -469,6 +469,7 @@ data/reports/pattern_groups.json
 | `PROJECT_CONTEXT.md` | Current project state and phase boundary |
 | `AGENTS.md` | Codex workflow, safety, and project rules |
 | `docs/project_phase_journal.md` | Chronological phase notebook and pipeline decisions |
+| `docs/raw_data_crawling.md` | Detailed Phase 2 raw data crawling pipeline |
 | `docs/corpus_registry.md` | Registry schema and trusted corpus rules |
 | `docs/raw_corpus_audit.md` | Raw artifact audit gate |
 | `docs/cleaning_normalization.md` | Cleaning pipeline and validation details |

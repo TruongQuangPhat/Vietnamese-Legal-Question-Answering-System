@@ -104,6 +104,7 @@ Relevant files:
 
 - `src/ingestion/`
 - `scripts/`
+- `docs/raw_data_crawling.md`
 - `docs/project_phase_journal.md`
 - `data/raw/`
 
@@ -237,6 +238,7 @@ scripts/
 tests/unit/ingestion/
 docs/end_to_end_pipeline.md
 docs/project_phase_journal.md
+docs/raw_data_crawling.md
 docs/raw_corpus_audit.md
 docs/cleaning_normalization.md
 docs/legal_parsing.md
@@ -336,6 +338,7 @@ uv run pytest tests/unit/ingestion/test_cleaning.py -v
 - `docs/end_to_end_pipeline.md` gives the full roadmap.
 - `docs/project_phase_journal.md` is the chronological project notebook for
   completed phases, pipeline decisions, and validation gates.
+- `docs/raw_data_crawling.md` explains Phase 2 raw data crawling in detail.
 - `docs/raw_corpus_audit.md` explains the raw audit phase.
 - `docs/cleaning_normalization.md` explains the completed Cleaning & Normalization phase.
 - `docs/legal_parsing.md` explains the current Legal Hierarchy Parsing phase.

@@ -179,149 +179,58 @@ Phase 1 is valid when:
 
 ### Goal
 
-Fetch raw legal artifacts from the approved registry without mixing crawling
-logic with later cleaning, parsing, or retrieval concerns.
+Fetch raw legal artifacts from the approved registry and store them as immutable raw evidence under `data/raw/`. This phase is intentionally limited to trusted-source crawling, raw artifact persistence, and source metadata capture.
+
+Detailed phase documentation:
+
+- `docs/raw_data_crawling.md`
+
+### Phase Boundary
+
+Phase 2 does:
+
+- load crawl targets from `config/laws/corpus_registry.yml`;
+- validate trusted `thuvienphapluat.vn` URLs;
+- apply target filters and skip already-crawled artifacts;
+- fetch raw HTML with rate limiting and retry handling;
+- write `data/raw/{LAW_ID}/latest/main.html`;
+- write `data/raw/{LAW_ID}/latest/metadata.json`;
+- preserve raw artifacts for audit, cleaning, parsing, and future citation traceability.
+
+Phase 2 does not audit legal content quality, clean HTML, normalize text, parse legal hierarchy, create chunks, or build retrieval indexes.
 
 ### Main Files
 
 - `scripts/crawl_raw_corpus.py`
 - `src/services/crawl_service.py`
+- `src/ingestion/registry.py`
+- `src/ingestion/selector.py`
 - `src/ingestion/crawler.py`
 - `src/ingestion/rate_limiter.py`
-- `src/ingestion/selector.py`
 - `src/ingestion/storage.py`
-- `src/ingestion/exceptions.py`
+- `src/ingestion/models.py`
 - `tests/unit/ingestion/test_crawler.py`
 - `tests/unit/ingestion/test_selector.py`
 - `tests/unit/ingestion/test_storage.py`
 
-### User-Facing Command
-
-Dry run:
-
-```bash
-uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
-  --output data/raw \
-  --only-status pending \
-  --dry-run
-```
-
-Actual crawl:
-
-```bash
-uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
-  --output data/raw \
-  --only-status pending \
-  --concurrency 2
-```
-
-### Architecture
+### High-Level Pipeline
 
 ```text
-scripts/crawl_raw_corpus.py
-→ src/services/crawl_service.py
-→ src/ingestion/registry.py
-→ src/ingestion/selector.py
-→ src/ingestion/crawler.py
-→ src/ingestion/rate_limiter.py
-→ src/ingestion/storage.py
-→ data/raw/{LAW_ID}/latest/
+corpus_registry.yml
+→ CrawlTarget selection
+→ trusted domain validation
+→ rate-limited HTTP fetch
+→ raw artifact storage
+→ main.html + metadata.json
+→ Raw Corpus Audit
 ```
-
-### Target Selection
-
-The target selector filters registry entries by:
-
-```text
-law_ids
-tiers
-groups
-priorities
-only_statuses
-manual_review inclusion
-already-crawled skip detection
-```
-
-Skip detection checks whether a prior successful artifact exists:
-
-```text
-data/raw/{LAW_ID}/latest/metadata.json
-metadata.crawl_status == "success"
-metadata.content_hash exists
-expected artifact exists
-```
-
-### Crawl Logic
-
-`ThuvienPhapLuatCrawler` handles:
-
-- trusted domain validation;
-- async HTTP requests with `httpx.AsyncClient`;
-- per-host delay and global concurrency limits;
-- retry with exponential backoff;
-- `429 Too Many Requests` handling;
-- raw HTML and metadata persistence.
-
-Individual crawl flow:
-
-```text
-target
-→ validate trusted domain
-→ acquire rate limit
-→ HTTP GET
-→ handle timeout/network/status failures
-→ save main.html
-→ save metadata.json
-→ return CrawlResult
-```
-
-### Raw Artifact Layout
-
-```text
-data/raw/
-└── {LAW_ID}/
-    ├── latest/
-    │   ├── main.html
-    │   └── metadata.json
-    └── crawls/
-        └── {TIMESTAMP}/
-            ├── main.html
-            └── metadata.json
-```
-
-`latest/` is the active raw snapshot. `crawls/{TIMESTAMP}/` is used when
-`--force` backs up a previous snapshot before re-crawling.
-
-### metadata.json Role
-
-The raw metadata records:
-
-```text
-law_id
-name
-tier
-group
-source_domain
-source_type
-url
-crawl_status
-http_status
-crawled_at
-content_hash
-crawler_version
-parser_hint
-```
-
-This metadata is legal traceability evidence. It must not be rewritten by later
-phases.
 
 ### Current Result
 
 - 52/52 registry entries were crawled successfully.
 - 52 `data/raw/{LAW_ID}/latest/main.html` files exist.
 - 52 `data/raw/{LAW_ID}/latest/metadata.json` files exist.
+- Raw artifacts are treated as immutable legal evidence for downstream phases.
 
 ### Validation Gate
 
@@ -330,8 +239,18 @@ The crawling phase passes when:
 - each registry law has a raw artifact directory;
 - successful crawls have `main.html` and `metadata.json`;
 - content hashes are recorded;
-- raw files are stored under `data/raw/`;
+- source metadata points back to `thuvienphapluat.vn`;
 - no downstream phase mutates raw artifacts.
+
+Final Phase 2 gate evidence:
+
+```text
+registry entries:        52
+latest/main.html files:  52
+latest/metadata.json:    52
+trusted source domain:   thuvienphapluat.vn
+downstream raw mutation: none
+```
 
 ## 7. Phase 3 — Raw Corpus Audit and Validation
 
