@@ -23,7 +23,7 @@ If these artifacts pass undetected, they will cause parsing failures, broken cit
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 ```
@@ -84,7 +84,7 @@ The script reads the registry, scans `data/raw/{law_id}/latest/`, validates `mai
 
 ### 1. Registry Law ID Loader
 
-Loads all `law_id` values from `config/laws/corpus_registry.yml`. This is the authoritative list of expected artifacts.
+Loads all `law_id` values from `configs/laws/corpus_registry.yml`. This is the authoritative list of expected artifacts.
 
 **Output**: Set of 52 law identifiers.
 
@@ -268,13 +268,13 @@ Any `invalid` items block progression to cleaning/normalization. `warning` items
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 ```
 
 **Arguments**:
-- `--registry`: Path to corpus registry YAML (default: `config/laws/corpus_registry.yml`)
+- `--registry`: Path to corpus registry YAML (default: `configs/laws/corpus_registry.yml`)
 - `--raw-dir`: Root directory containing `{law_id}` folders (default: `data/raw`)
 - `--output`: Output JSON report path (default: `data/reports/raw_corpus_audit.json`)
 

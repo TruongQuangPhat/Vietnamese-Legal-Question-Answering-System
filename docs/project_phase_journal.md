@@ -67,7 +67,7 @@ The project follows a simple service/domain split:
 scripts/        CLI entrypoints, argparse, terminal summaries, exit codes
 src/services/   orchestration and report building
 src/ingestion/  reusable ingestion and cleaning domain logic
-config/laws/    registry and legal corpus configuration
+configs/laws/    registry and legal corpus configuration
 data/raw/       immutable crawl artifacts
 data/interim/   derived intermediate artifacts
 data/reports/   audit and validation reports
@@ -119,7 +119,7 @@ for which legal documents the system may fetch and process.
 
 ### Main Files
 
-- `config/laws/corpus_registry.yml`
+- `configs/laws/corpus_registry.yml`
 - `src/ingestion/models.py`
 - `src/ingestion/registry.py`
 - `tests/unit/ingestion/test_models.py`
@@ -189,7 +189,7 @@ Detailed phase documentation:
 
 Phase 2 does:
 
-- load crawl targets from `config/laws/corpus_registry.yml`;
+- load crawl targets from `configs/laws/corpus_registry.yml`;
 - validate trusted `thuvienphapluat.vn` URLs;
 - apply target filters and skip already-crawled artifacts;
 - fetch raw HTML with rate limiting and retry handling;
@@ -273,7 +273,7 @@ non-legal content.
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 ```
@@ -371,7 +371,7 @@ uv run python scripts/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir data/reports \
-  --registry config/laws/corpus_registry.yml
+  --registry configs/laws/corpus_registry.yml
 ```
 
 ### Cleaning Pipeline
@@ -642,7 +642,7 @@ uv run python scripts/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir data/reports \
-  --registry config/laws/corpus_registry.yml
+  --registry configs/laws/corpus_registry.yml
 ```
 
 ## 11. Related Documentation

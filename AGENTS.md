@@ -73,7 +73,7 @@ the pipeline.
   clear reason not to.
 - Use complete type hints for public functions, public methods, class
   attributes, and data boundaries.
-- Use Pydantic V2 for config/schema boundaries where appropriate.
+- Use Pydantic V2 for configs/schema boundaries where appropriate.
 - Use `async def` / `await` for I/O involving crawling, vector stores, graph
   stores, Redis, LLM calls, HTTP clients, and API operations.
 - Do not pass untyped raw dictionaries across module boundaries; prefer

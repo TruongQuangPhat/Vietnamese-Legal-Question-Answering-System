@@ -11,7 +11,7 @@ Use this skill when implementing, reviewing, or debugging legal data ingestion.
 The preferred ingestion workflow is registry-driven:
 
 ```text
-config/laws/corpus_registry.yml
+configs/laws/corpus_registry.yml
   → async crawler
   → raw artifact storage
   → metadata.json
@@ -41,7 +41,7 @@ Prefer VBHN documents when available. If no VBHN exists, preserve original law a
 ## Expected Files
 
 ```text
-config/laws/corpus_registry.yml
+configs/laws/corpus_registry.yml
 
 src/ingestion/crawler.py
 src/ingestion/parsers/html_parser.py
@@ -64,7 +64,7 @@ tests/integration/test_ingestion_pipeline.py
 The crawler must read crawl targets from:
 
 ```text
-config/laws/corpus_registry.yml
+configs/laws/corpus_registry.yml
 ```
 
 Minimum registry fields:
@@ -198,7 +198,7 @@ Crawl all pending laws:
 
 ```bash
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --concurrency 2 \
@@ -210,7 +210,7 @@ Crawl specific laws:
 
 ```bash
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --law-ids HP_2013 BLDS_2015 LDD_VBHN \
   --output data/raw
 ```
@@ -219,7 +219,7 @@ Run raw corpus audit:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 ```

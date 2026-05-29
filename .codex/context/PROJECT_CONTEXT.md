@@ -41,7 +41,7 @@ Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning /
 ## 3. Current Project Status
 
 - The project uses `uv` for environment and dependency management.
-- The corpus registry exists at `config/laws/corpus_registry.yml`.
+- The corpus registry exists at `configs/laws/corpus_registry.yml`.
 - The registry-driven crawler has been implemented.
 - The crawling phase has completed successfully.
 - The registry contains 52 legal document entries.
@@ -72,7 +72,7 @@ Implemented. Relevant files:
 
 Implemented. Relevant files:
 
-- `config/laws/corpus_registry.yml`
+- `configs/laws/corpus_registry.yml`
 - `docs/corpus_registry.md`
 
 The registry is the source of truth for the legal corpus. It defines each legal document using metadata such as `law_id`, `name`, `tier`, `group`, `domain_tags`, `source_domain`, `source_type`, `url`, `crawl_status`, `priority`, and `notes`.
@@ -87,7 +87,7 @@ Implemented. Relevant files:
 - `docs/project_phase_journal.md`
 - `data/raw/`
 
-The crawler reads from `config/laws/corpus_registry.yml`, fetches legal source artifacts from approved sources, and stores raw artifacts under `data/raw/`.
+The crawler reads from `configs/laws/corpus_registry.yml`, fetches legal source artifacts from approved sources, and stores raw artifacts under `data/raw/`.
 
 ### Phase 3 — Raw Corpus Audit & Validation
 
@@ -200,7 +200,7 @@ Vietnamese legal documents often do not literally write the words `Khoản` and 
 ## 8. Important Paths
 
 ```text
-config/laws/corpus_registry.yml
+configs/laws/corpus_registry.yml
 data/raw/
 data/interim/
 data/processed/
@@ -232,7 +232,7 @@ uv run python scripts/crawl_raw_corpus.py [OPTIONS]
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 ```
@@ -255,7 +255,7 @@ uv run python scripts/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir data/reports \
-  --registry config/laws/corpus_registry.yml
+  --registry configs/laws/corpus_registry.yml
 ```
 
 - Run unit tests:

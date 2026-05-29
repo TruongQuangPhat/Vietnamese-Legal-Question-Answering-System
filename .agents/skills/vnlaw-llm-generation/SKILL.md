@@ -32,8 +32,8 @@ src/generation/answer_formatter.py
 src/generation/citation_validator.py
 src/generation/fallback_policy.py
 
-config/prompts/legal_qa.j2
-config/models.yml
+configs/prompts/legal_qa.j2
+configs/models.yml
 
 tests/unit/generation/
 ```

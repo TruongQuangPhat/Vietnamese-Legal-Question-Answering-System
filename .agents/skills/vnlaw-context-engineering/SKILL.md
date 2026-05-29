@@ -112,7 +112,7 @@ src/generation/prompts.py
 src/generation/context_packer.py
 src/generation/answer_formatter.py
 src/generation/citation_validator.py
-config/prompts/legal_qa.j2
+configs/prompts/legal_qa.j2
 tests/unit/generation/
 ```
 

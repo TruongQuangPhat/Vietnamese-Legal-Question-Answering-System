@@ -52,7 +52,7 @@ def main() -> int:
     parser.add_argument(
         "--registry",
         type=Path,
-        default=Path("config/laws/corpus_registry.yml"),
+        default=Path("configs/laws/corpus_registry.yml"),
         help="Path to corpus registry YAML.",
     )
     args = parser.parse_args()

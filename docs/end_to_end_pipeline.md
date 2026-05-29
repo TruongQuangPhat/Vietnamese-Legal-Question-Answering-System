@@ -19,7 +19,7 @@ Recommended development flow:
 ```
 uv sync
   ↓
-Registry & Corpus check (config/laws/corpus_registry.yml)
+Registry & Corpus check (configs/laws/corpus_registry.yml)
   ↓
 Crawling → data/raw/ (52 laws)
   ↓
@@ -54,7 +54,7 @@ End-to-end pipeline:
 
 ```
 ┌─────────────────────┐
-│  Corpus Registry    │ config/laws/corpus_registry.yml
+│  Corpus Registry    │ configs/laws/corpus_registry.yml
 │  (52 law_id entries)│
 └──────────┬──────────┘
            │
@@ -177,7 +177,7 @@ End-to-end pipeline:
 
 **Pipeline Summary**: Build YAML registry with fields: `law_id`, `title`, `url`, `effective_date`, `expiry_date`, `status`, `vbhn_id` (if available). Each `law_id` is unique.
 
-**Output**: `config/laws/corpus_registry.yml` (52 entries).
+**Output**: `configs/laws/corpus_registry.yml` (52 entries).
 
 **Validation Criteria**:
 - All entries have the 7 required fields
@@ -187,7 +187,7 @@ End-to-end pipeline:
 
 **Status**: Implemented
 
-**Detailed documentation**: See `config/laws/corpus_registry.yml` and `docs/corpus_registry.md`.
+**Detailed documentation**: See `configs/laws/corpus_registry.yml` and `docs/corpus_registry.md`.
 
 ---
 
@@ -195,7 +195,7 @@ End-to-end pipeline:
 
 **Goal**: Download all 52 HTML artifacts from thuvienphapluat.vn based on the registry.
 
-**Input**: `config/laws/corpus_registry.yml`.
+**Input**: `configs/laws/corpus_registry.yml`.
 
 **Pipeline Summary**: Registry Crawler reads the registry, selects eligible
 targets, fetches HTML, saves to `data/raw/{law_id}/latest/main.html` with
@@ -698,7 +698,7 @@ Each phase must pass its gate before proceeding to the next.
 | Gate | Required Evidence | Example Check | Why It Matters |
 |------|-------------------|---------------|----------------|
 | Setup gate | `pyproject.toml`, `CLAUDE.md`, `mypy`/`pytest` pass | `uv run mypy src` → 0 errors | Code quality baseline |
-| Registry gate | `config/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
+| Registry gate | `configs/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
 | Crawling gate | 52 raw artifact directories | `ls data/raw/ | wc -l` = 52 | Raw data exists before processing |
 | Raw audit gate | `data/reports/raw_corpus_audit.json` zero critical errors | Audit script exits 0 | Detect corrupted/missing artifacts early |
 | Cleaning gate | All texts UTF-8, legal headings intact | Spot-check `Điều`, `Khoản`, `Điểm` readable | Input text quality affects parsing |
@@ -722,7 +722,7 @@ Each phase must pass its gate before proceeding to the next.
 
 | Issue | Possible Cause | How to Check | Recommended Fix |
 |-------|----------------|--------------|-----------------|
-| `corpus_registry.yml` count mismatch (≠52) | Registry not finalized, extra/missing entries | `grep -c "law_id:" config/laws/corpus_registry.yml` | Reconcile with intended corpus list, ensure exactly 52 |
+| `corpus_registry.yml` count mismatch (≠52) | Registry not finalized, extra/missing entries | `grep -c "law_id:" configs/laws/corpus_registry.yml` | Reconcile with intended corpus list, ensure exactly 52 |
 | Missing raw artifact directory | Crawl failed, network error, skipped law | `ls data/raw/` vs registry `law_id` list | Rerun crawler for missing `law_id`, check logs |
 | Extra raw artifact directory | Stale data from previous crawl | `ls data/raw/` shows dirs not in registry | Remove dirs not in registry, or update registry if intended |
 | `main.html` very small (<1KB) | Blocked page, captcha, login required, error page | `du -h data/raw/{law_id}/latest/main.html` | Inspect only targeted snippets, fix crawler headers/retry |

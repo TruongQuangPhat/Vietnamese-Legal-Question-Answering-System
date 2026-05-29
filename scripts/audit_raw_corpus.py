@@ -3,7 +3,7 @@
 
 Usage:
     uv run python scripts/audit_raw_corpus.py \
-      --registry config/laws/corpus_registry.yml \
+      --registry configs/laws/corpus_registry.yml \
       --raw-dir data/raw \
       --output data/reports/raw_corpus_audit.json
 """
@@ -28,13 +28,13 @@ def main() -> int:
         epilog="""
 Examples:
   uv run python scripts/audit_raw_corpus.py \\
-    --registry config/laws/corpus_registry.yml \\
+    --registry configs/laws/corpus_registry.yml \\
     --raw-dir data/raw \\
     --output data/reports/raw_corpus_audit.json
 
   # With custom minimum HTML size:
   uv run python scripts/audit_raw_corpus.py \\
-    --registry config/laws/corpus_registry.yml \\
+    --registry configs/laws/corpus_registry.yml \\
     --raw-dir data/raw \\
     --output data/reports/audit.json \\
     --min-html-size 5000
@@ -43,8 +43,8 @@ Examples:
     parser.add_argument(
         "--registry",
         type=Path,
-        default=Path("config/laws/corpus_registry.yml"),
-        help="Path to corpus registry YAML (default: config/laws/corpus_registry.yml)"
+        default=Path("configs/laws/corpus_registry.yml"),
+        help="Path to corpus registry YAML (default: configs/laws/corpus_registry.yml)"
     )
     parser.add_argument(
         "--raw-dir",

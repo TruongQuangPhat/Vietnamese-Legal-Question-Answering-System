@@ -63,7 +63,7 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 
 ```text
 VnLaw-QA/
-├── config/
+├── configs/
 │   └── laws/
 │       └── corpus_registry.yml
 ├── data/
@@ -122,7 +122,7 @@ Implemented and planned pipeline:
 ┌──────────────────────────────┐
 │ Phase 1                      │
 │ Legal Corpus Registry        │
-│ config/laws/*.yml            │
+│ configs/laws/*.yml            │
 └──────────────┬───────────────┘
                │
                ▼
@@ -179,7 +179,7 @@ through Cleaning & Normalization:
 ```text
 ┌────────────────────────────────────────────┐
 │ 1. Corpus Registry                         │
-│ config/laws/corpus_registry.yml            │
+│ configs/laws/corpus_registry.yml            │
 │ 52 law_id entries                          │
 └────────────────────┬───────────────────────┘
                      │
@@ -396,7 +396,7 @@ Audit raw corpus:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 ```
@@ -419,7 +419,7 @@ uv run python scripts/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir data/reports \
-  --registry config/laws/corpus_registry.yml
+  --registry configs/laws/corpus_registry.yml
 ```
 
 Focused cleaning tests:

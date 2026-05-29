@@ -131,7 +131,7 @@ vnlaw_qa/
 ├── .claude/                # Claude Code settings
 │   ├── settings.example.json
 │   └── skills/
-├── config/                 # YAML configurations
+├── configs/                 # YAML configurations
 │   ├── laws/
 │   │   └── corpus_registry.yml
 │   ├── models.yml
@@ -184,7 +184,7 @@ vnlaw_qa/
 
 ### Configuration Models
 
-All configuration files (`config/*.yml`) are validated against Pydantic models. Example for corpus registry:
+All configuration files (`configs/*.yml`) are validated against Pydantic models. Example for corpus registry:
 
 ```python
 from pydantic import BaseModel, Field

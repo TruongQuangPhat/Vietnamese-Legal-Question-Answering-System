@@ -14,7 +14,7 @@ Use this skill to enforce repository organization and module boundaries.
 vnlaw_qa/
 ├── .github/workflows/
 ├── .claude/skills/
-├── config/
+├── configs/
 │   ├── models.yml
 │   ├── retrieval.yml
 │   ├── chunking.yml
@@ -112,7 +112,7 @@ routes
 
 ## Config Rules
 
-Use `config/` for non-secret settings:
+Use `configs/` for non-secret settings:
 
 ```text
 model names
@@ -147,7 +147,7 @@ Do not run Claude from `~/` or a parent folder that includes unrelated projects.
 
 - Do not put business logic in FastAPI routes.
 - Do not hardcode retrieval parameters in source code.
-- Do not put secrets in `config/`.
+- Do not put secrets in `configs/`.
 - Do not commit `.env`.
 - Do not commit large raw datasets unless explicitly approved.
 - Do not create duplicate modules with overlapping responsibility.

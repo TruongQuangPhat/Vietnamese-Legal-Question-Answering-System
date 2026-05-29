@@ -66,7 +66,7 @@ LVL_2025
 Use:
 
 ```text
-config/laws/corpus_registry.yml
+configs/laws/corpus_registry.yml
 ```
 
 This file is the source of truth for crawl targets and legal metadata.

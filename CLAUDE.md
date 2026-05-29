@@ -91,7 +91,7 @@ vnlaw_qa/
 ├── .claude/
 │   ├── settings.example.json
 │   └── skills/
-├── config/
+├── configs/
 │   ├── models.yml
 │   ├── retrieval.yml
 │   ├── chunking.yml

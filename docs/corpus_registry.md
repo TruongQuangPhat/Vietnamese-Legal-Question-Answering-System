@@ -15,7 +15,7 @@ Registry and raw artifacts maintain a strict 1:1 correspondence: 52 `law_id` ent
 
 ## Quick Start
 
-The registry is a YAML file at `config/laws/corpus_registry.yml`.
+The registry is a YAML file at `configs/laws/corpus_registry.yml`.
 
 ```yaml
 # Example entry
@@ -256,7 +256,7 @@ The following module-based commands are deprecated. Registry validation now occu
 
 - **Invalid YAML syntax**: `yaml.YAMLError` raised; fix YAML formatting.
 - **Pydantic validation failure**: `ValidationError` with field-level errors; correct entry fields.
-- **Missing registry file**: `FileNotFoundError`; ensure `config/laws/corpus_registry.yml` exists.
+- **Missing registry file**: `FileNotFoundError`; ensure `configs/laws/corpus_registry.yml` exists.
 - **Duplicate law_id**: Raise `DuplicateLawIdError` with conflicting IDs listed.
 - **source_domain mismatch**: Raise `TrustedDomainError` if any entry lacks `thuvienphapluat.vn`.
 
@@ -271,7 +271,7 @@ All errors are logged with structured context.
 | Duplicate `law_id` error | Two entries share same ID | Check error message | Assign unique `law_id` |
 | `url` field missing for pending entry | Registry incomplete | Look for `url: null` | Add valid `thuvienphapluat.vn` URL |
 | Crawler rejects source_domain | Domain not trusted | Verify `source_domain` value | Must contain `thuvienphapluat.vn` exactly |
-| Registry loads 0 entries | Wrong file path or empty YAML | Check `config/laws/corpus_registry.yml` exists and has content | Fix path or add entries |
+| Registry loads 0 entries | Wrong file path or empty YAML | Check `configs/laws/corpus_registry.yml` exists and has content | Fix path or add entries |
 
 ## Best Practices
 

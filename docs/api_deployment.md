@@ -185,7 +185,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 COPY src/ ./src/
-COPY config/ ./config/
+COPY configs/ ./configs/
 COPY data/processed/ ./data/processed/  # read-only mount in prod; better: separate volume
 EXPOSE 8000
 CMD ["uv", "run", "python", "-m", "src.api.main"]

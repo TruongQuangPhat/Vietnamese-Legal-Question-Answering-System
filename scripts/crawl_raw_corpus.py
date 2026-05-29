@@ -3,7 +3,7 @@
 
 Usage:
     uv run python scripts/crawl_raw_corpus.py \
-      --registry config/laws/corpus_registry.yml \
+      --registry configs/laws/corpus_registry.yml \
       --output data/raw \
       --only-status pending
 """
@@ -32,22 +32,22 @@ def main() -> int:
         epilog="""
 Examples:
   # Batch crawl all pending
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --output data/raw --only-status pending
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --output data/raw --only-status pending
 
   # Crawl specific laws
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --law-ids BLDS_2015 HP_2013 --output data/raw
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids BLDS_2015 HP_2013 --output data/raw
 
   # Crawl by tier
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --tier 1 --output data/raw
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --tier 1 --output data/raw
 
   # Debug single URL
   uv run python scripts/crawl_raw_corpus.py --url "https://thuvienphapluat.vn/..." --law-id "BLDS_2015" --output data/raw
 
   # Dry run
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --only-status pending --dry-run
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --only-status pending --dry-run
 
   # Force refresh
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --law-ids LDD_VBHN --force --output data/raw
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids LDD_VBHN --force --output data/raw
         """
     )
 

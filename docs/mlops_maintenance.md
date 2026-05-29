@@ -27,14 +27,14 @@ git checkout -b maintenance/corpus-refresh-YYYYMMDD
 
 # 2. Dry-run the crawl selection
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --dry-run
 
 # 3. Recrawl selected legal documents
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --concurrency 2 \
@@ -43,13 +43,13 @@ uv run python scripts/crawl_raw_corpus.py \
 
 # 4. Run raw corpus audit
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 
 # 5. Re-run downstream processing after audit passes
 uv run python scripts/process_legal_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --processed-dir data/processed
 
@@ -66,7 +66,7 @@ uv run python scripts/evaluate_rag.py \
 
 **Expected maintenance outputs**:
 
-- updated `config/laws/corpus_registry.yml`;
+- updated `configs/laws/corpus_registry.yml`;
 - versioned raw artifacts;
 - versioned processed JSONL;
 - refreshed vector index;
@@ -79,7 +79,7 @@ uv run python scripts/evaluate_rag.py \
 ```
 ┌────────────────────────────────────────────┐
 │        Registry Update / Source Review     │
-│        config/laws/corpus_registry.yml     │
+│        configs/laws/corpus_registry.yml     │
 └───────────────┬────────────────────────────┘
                 │
                 ▼
@@ -147,7 +147,7 @@ uv run python scripts/evaluate_rag.py \
 **Responsibilities**:
 
 - review legal sources before changing the registry;
-- add or update entries in `config/laws/corpus_registry.yml`;
+- add or update entries in `configs/laws/corpus_registry.yml`;
 - preserve `law_id` stability unless the legal document truly represents a new source;
 - update lifecycle fields such as `status`, `crawl_status`, `effective_date`, `expiry_date`, and `notes`;
 - document why a corpus change was made.
@@ -395,7 +395,7 @@ Regression evaluation should run before promoting a new corpus or index version.
 uv run ruff check .
 uv run pytest tests/unit -v
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 uv run python scripts/validate_processed_jsonl.py \
@@ -629,14 +629,14 @@ uv run python scripts/switch_index_alias.py \
 ```bash
 # Dry-run recrawl selection
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --dry-run
 
 # Recrawl selected laws
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --law-ids LDD_2024 BLDS_2015 \
   --concurrency 2 \
@@ -649,7 +649,7 @@ uv run python scripts/crawl_raw_corpus.py \
 ```bash
 # Raw corpus audit
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
 

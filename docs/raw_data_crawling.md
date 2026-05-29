@@ -24,7 +24,7 @@ hierarchy, and does not create retrieval chunks.
 ┌──────────────────────────────┐
 │ Phase 1                      │
 │ Legal Corpus Registry        │
-│ config/laws/corpus_registry  │
+│ configs/laws/corpus_registry  │
 └──────────────┬───────────────┘
                │
                ▼
@@ -56,7 +56,7 @@ Phase 3 depends on Phase 2 because it validates the produced raw artifacts.
 
 Phase 2 goals:
 
-- Load the approved legal corpus from `config/laws/corpus_registry.yml`.
+- Load the approved legal corpus from `configs/laws/corpus_registry.yml`.
 - Select crawl targets using filters such as law ID, tier, group, priority, and
   crawl status.
 - Validate that each target URL belongs to the trusted source domain.
@@ -100,7 +100,7 @@ Dry run before any crawl:
 
 ```bash
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --dry-run
@@ -110,7 +110,7 @@ Actual batch crawl:
 
 ```bash
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --only-status pending \
   --concurrency 2
@@ -120,7 +120,7 @@ Targeted crawl:
 
 ```bash
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --law-ids BLDS_2015 HP_2013
 ```

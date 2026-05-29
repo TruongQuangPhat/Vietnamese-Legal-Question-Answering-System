@@ -33,7 +33,7 @@ src/retrieval/vector_store.py
 src/retrieval/reranker.py
 src/retrieval/filters.py
 src/retrieval/confidence.py
-config/retrieval.yml
+configs/retrieval.yml
 tests/unit/retrieval/
 ```
 

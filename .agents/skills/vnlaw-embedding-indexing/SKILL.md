@@ -28,8 +28,8 @@ processed JSONL
 src/ingestion/embedder.py
 src/retrieval/vector_store.py
 src/core/config.py
-config/models.yml
-config/retrieval.yml
+configs/models.yml
+configs/retrieval.yml
 data/processed/{law_id}.jsonl
 tests/unit/ingestion/test_embedder.py
 tests/unit/retrieval/test_vector_store.py
@@ -46,7 +46,7 @@ Requirements:
 - batch embedding;
 - deterministic configuration;
 - metadata-preserving payload;
-- reproducible model config in `config/models.yml`.
+- reproducible model config in `configs/models.yml`.
 
 Do not embed arbitrary raw HTML or unvalidated text.
 
