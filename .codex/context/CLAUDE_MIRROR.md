@@ -119,6 +119,26 @@ Future phase directories such as `src/retrieval/`, `src/generation/`,
 `src/agents/`, `src/api/`, `tests/integration/`, `tests/evaluation/`, and
 `deploy/` should be added only when their implementation phase begins.
 
+Target production structure, to be added incrementally:
+
+```text
+VnLaw-QA/
+├── configs/{laws,sources,ingestion,processing,indexing,retrieval,generation,evaluation}/
+├── data/{raw,interim,processed,indexes,eval}/
+├── artifacts/{audit_reports,parsing_reports,chunking_reports,retrieval_reports,evaluation_reports,traces}/
+├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
+├── scripts/
+├── tests/{unit,integration,regression,fixtures}/
+├── docs/
+├── docker/
+├── deployment/
+├── monitoring/
+└── .github/workflows/
+```
+
+This target is a roadmap, not a demand to create empty directories. The current
+phase gate determines which folders should exist.
+
 ## 5. Python, OOP, and Architecture Standards
 
 All production Python code must follow these standards:

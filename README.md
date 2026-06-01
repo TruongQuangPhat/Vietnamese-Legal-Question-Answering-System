@@ -61,6 +61,8 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 
 ## Repository Layout
 
+Current implemented layout:
+
 ```text
 VnLaw-QA/
 ├── configs/
@@ -89,6 +91,26 @@ VnLaw-QA/
     └── unit/
         └── ingestion/
 ```
+
+Target production layout, added incrementally by phase:
+
+```text
+VnLaw-QA/
+├── configs/{laws,sources,ingestion,processing,indexing,retrieval,generation,evaluation}/
+├── data/{raw,interim,processed,indexes,eval}/
+├── artifacts/{audit_reports,parsing_reports,chunking_reports,retrieval_reports,evaluation_reports,traces}/
+├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
+├── scripts/
+├── tests/{unit,integration,regression,fixtures}/
+├── docs/
+├── docker/
+├── deployment/
+├── monitoring/
+└── .github/workflows/
+```
+
+The target layout is intentionally a roadmap. Do not create empty future-phase
+folders until their phase starts.
 
 Architecture boundary:
 

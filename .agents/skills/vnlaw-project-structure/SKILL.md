@@ -43,6 +43,65 @@ Future phases may add `src/retrieval/`, `src/generation/`, `src/agents/`,
 additional config files under `configs/`. Add and document them only when their
 phase starts.
 
+## Target Production Layout
+
+Use this as the compact roadmap for future phases. The current repository does
+not need to contain every folder yet; add folders when their phase begins and
+keep names consistent with this target.
+
+```text
+VnLaw-QA/
+├── configs/
+│   ├── laws/corpus_registry.yml
+│   ├── sources/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   └── evaluation/
+├── data/
+│   ├── raw/
+│   ├── interim/
+│   ├── processed/
+│   ├── indexes/
+│   └── eval/
+├── artifacts/
+│   ├── crawling_reports/
+│   ├── audit_reports/
+│   ├── parsing_reports/
+│   ├── chunking_reports/
+│   ├── retrieval_reports/
+│   └── evaluation_reports/
+├── src/
+│   ├── core/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   ├── services/
+│   ├── api/
+│   ├── evaluation/
+│   ├── monitoring/
+│   └── security/
+├── scripts/
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── regression/
+│   └── fixtures/
+├── docs/
+├── docker/
+├── deployment/
+├── monitoring/
+└── .github/workflows/
+```
+
+Prefer this compact target over a deeply nested enterprise layout unless the
+extra separation removes real operational complexity. Do not create empty
+architecture folders just to satisfy the target.
+
 ## Module Responsibilities
 
 ### `src/core/`

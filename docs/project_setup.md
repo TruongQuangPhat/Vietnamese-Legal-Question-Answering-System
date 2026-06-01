@@ -167,6 +167,55 @@ Future phases may add `src/retrieval/`, `src/generation/`, `src/agents/`,
 directories when their phase gates begin. Do not document those directories as
 implemented before they exist.
 
+Target production layout:
+
+```
+VnLaw-QA/
+├── configs/
+│   ├── laws/
+│   ├── sources/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   └── evaluation/
+├── data/
+│   ├── raw/
+│   ├── interim/
+│   ├── processed/
+│   ├── indexes/
+│   └── eval/
+├── artifacts/              # generated reports, traces, experiment outputs
+├── src/
+│   ├── core/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   ├── services/
+│   ├── api/
+│   ├── evaluation/
+│   ├── monitoring/
+│   └── security/
+├── scripts/
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── regression/
+│   └── fixtures/
+├── docs/
+├── docker/
+├── deployment/
+├── monitoring/
+└── .github/workflows/
+```
+
+This target is intentionally smaller than a full enterprise template. Add a
+folder only when a phase needs it, and keep the current `scripts/` →
+`src/services/` → domain-module boundary.
+
 ### 5. Security Principles
 
 - **Secrets**: Never hardcode. Use `.env` with `pydantic-settings`. Add `.env` to `.gitignore`.

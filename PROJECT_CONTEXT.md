@@ -241,6 +241,30 @@ docs/parent_child_chunking.md
 docs/processed_jsonl.md
 ```
 
+## 8.1 Target Production Layout
+
+The current repository should stay phase-focused, but agents should understand
+the intended production direction:
+
+```text
+VnLaw-QA/
+├── configs/{laws,sources,ingestion,processing,indexing,retrieval,generation,evaluation}/
+├── data/{raw,interim,processed,indexes,eval}/
+├── artifacts/{audit_reports,parsing_reports,chunking_reports,retrieval_reports,evaluation_reports,traces}/
+├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
+├── scripts/
+├── tests/{unit,integration,regression,fixtures}/
+├── docs/
+├── docker/
+├── deployment/
+├── monitoring/
+└── .github/workflows/
+```
+
+Do not create empty future-phase directories early. Add them only when their
+phase starts and keep the current boundary: CLI in `scripts/`, orchestration in
+`src/services/`, reusable domain logic in focused `src/` modules.
+
 ## 9. Official Pipeline Commands
 
 Official user-facing commands for the ingestion pipeline:
