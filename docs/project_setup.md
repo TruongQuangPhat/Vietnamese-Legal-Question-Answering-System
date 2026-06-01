@@ -77,11 +77,14 @@ uv run python scripts/crawl_raw_corpus.py --help
 **Key dependencies**:
 - `pydantic` V2 for configuration and data validation
 - `pydantic-settings` for environment variable loading
-- `httpx` for async HTTP crawling
-- `qdrant-client` for vector storage
-- `neo4j` for graph storage
-- `anthropic` for Claude API
+- `aiohttp` and `httpx` for async HTTP crawling and request handling
+- `beautifulsoup4`, `lxml`, and `html5lib` for TVPL HTML extraction
+- `pyyaml` for corpus registry loading
+- `rich` for CLI summaries
 - `structlog` for structured logging
+
+Future phases may add `qdrant-client`, `neo4j`, LLM provider SDKs, and API
+framework dependencies when those gates begin.
 
 ### 2. Configuration System
 
@@ -91,11 +94,10 @@ uv run python scripts/crawl_raw_corpus.py --help
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    qdrant_url: str
-    qdrant_api_key: str | None
-    neo4j_uri: str
-    neo4j_password: str
-    anthropic_api_key: str
+    raw_dir: str = "data/raw"
+    interim_dir: str = "data/interim"
+    report_dir: str = "data/reports"
+    corpus_registry_path: str = "configs/laws/corpus_registry.yml"
 
     class Config:
         env_file = ".env"
@@ -123,46 +125,47 @@ class Settings(BaseSettings):
 
 ### 4. Project Structure
 
-Canonical layout:
+Current repository layout:
 
 ```
-vnlaw_qa/
-├── .github/workflows/      # CI/CD
-├── .claude/                # Claude Code settings
-│   ├── settings.example.json
-│   └── skills/
+VnLaw-QA/
+├── .agents/skills/         # Active Codex repo skills
+├── .codex/context/         # Codex context and mirrors
+├── .claude/                # Claude-only settings and skills
 ├── configs/                 # YAML configurations
-│   ├── laws/
-│   │   └── corpus_registry.yml
-│   ├── models.yml
-│   ├── retrieval.yml
-│   ├── chunking.yml
-│   └── prompts/
+│   └── laws/
+│       └── corpus_registry.yml
 ├── data/                   # Data directories (gitignored)
-│   ├── raw/
-│   ├── interim/
-│   ├── processed/
-│   └── eval/
-├── deploy/
-│   └── docker/
+│   ├── raw/                # Immutable crawl artifacts
+│   ├── interim/            # Normalized artifacts and future hierarchy/chunks
+│   ├── reports/            # Audit and quality reports
+│   └── processed/          # Future validated JSONL chunks
 ├── docs/                   # Documentation
-├── scripts/                # One-off scripts
+├── scripts/                # CLI entrypoints
+│   ├── crawl_raw_corpus.py
+│   ├── audit_raw_corpus.py
+│   ├── clean_raw_corpus.py
+│   └── audit_cleaning_quality.py
 ├── src/                    # Production code
 │   ├── core/
 │   ├── ingestion/
-│   ├── retrieval/
-│   ├── generation/
-│   ├── agents/
-│   └── api/
+│   └── services/
 ├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── evaluation/
+│   └── unit/
+│       └── ingestion/
+├── AGENTS.md
+├── CLAUDE.md
+├── PROJECT_CONTEXT.md
 ├── .env.example
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
 ```
+
+Future phases may add `src/retrieval/`, `src/generation/`, `src/agents/`,
+`src/api/`, `tests/integration/`, `tests/evaluation/`, and deployment
+directories when their phase gates begin. Do not document those directories as
+implemented before they exist.
 
 ### 5. Security Principles
 
@@ -209,8 +212,11 @@ class CorpusEntry(BaseModel):
 ### Project Metadata Files
 
 - `CLAUDE.md`: Project-wide instructions for Claude Code
-- `PROJECT_CONTEXT.md`: Current status, completed phases, next tasks (to be created)
-- `.claude/settings.json`: Harness configuration (permissions, hooks)
+- `PROJECT_CONTEXT.md`: Current status, completed phases, next tasks
+- `.agents/skills/`: Active Codex skills for this repository
+- `.codex/context/`: Codex context and compatibility mirrors
+- `.claude/`: Claude-only local settings and skills; do not copy secrets or
+  local settings into Codex context files
 
 ## CLI Reference
 
@@ -220,11 +226,15 @@ class CorpusEntry(BaseModel):
 # Show help for ingestion CLI
 uv run python scripts/crawl_raw_corpus.py --help
 
-# Expected commands (to be implemented in later phases):
-# - Crawler: uv run python scripts/crawl_raw_corpus.py --registry ... --output ...
-# - Parser: uv run python -m src.processing.parser ...
-# - Chunker: uv run python -m src.processing.chunker ...
-# - Evaluator: uv run python -m src.evaluation.run ...
+# Current ingestion commands:
+# - Crawler: uv run python scripts/crawl_raw_corpus.py --help
+# - Raw audit: uv run python scripts/audit_raw_corpus.py --help
+# - Cleaning: uv run python scripts/clean_raw_corpus.py --help
+# - Cleaning audit: uv run python scripts/audit_cleaning_quality.py --help
+#
+# Intended future commands should follow the same pattern:
+# scripts/<action>.py for CLI, src/services/ for orchestration,
+# src/ingestion/ for ingestion/domain logic.
 ```
 
 ## Testing

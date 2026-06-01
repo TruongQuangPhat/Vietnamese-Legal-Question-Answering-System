@@ -113,7 +113,8 @@ Use `manual_review` for unusual pages, missing URLs, or documents embedded as PD
 
 - Respect rate limiting.
 - Use a clear User-Agent.
-- Cache raw artifacts under `data/raw/{law_id}/`.
+- Cache raw artifacts under `data/raw/{law_id}/latest/`, preserving timestamped
+  snapshots under `data/raw/{law_id}/crawls/{timestamp}/` when refreshed.
 - Never overwrite raw source without timestamp/hash traceability.
 - Preserve source URL and parser version in every processed node.
 

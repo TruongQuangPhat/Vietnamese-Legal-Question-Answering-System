@@ -300,7 +300,7 @@ if not filtered_chunks:
 
 ```bash
 # Run hybrid retrieval without generation
-uv run python -m src.retrieval.advanced \
+uv run python scripts/run_advanced_retrieval.py \
   --query "Quy định về hình phạt tù?" \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks \
@@ -315,13 +315,13 @@ uv run python -m src.retrieval.advanced \
 
 ```bash
 # Naive retrieval
-uv run python -m src.retrieval.naive --query "..." --output naive_results.json
+uv run python scripts/run_naive_retrieval.py --query "..." --output naive_results.json
 
 # Advanced retrieval
-uv run python -m src.retrieval.advanced --query "..." --output advanced_results.json
+uv run python scripts/run_advanced_retrieval.py --query "..." --output advanced_results.json
 
 # Compare metrics (precision, recall against golden set)
-uv run python -m src.evaluation.compare --naive naive_results.json --advanced advanced_results.json --golden data/eval/golden_qa.jsonl
+uv run python scripts/compare_retrieval.py --naive naive_results.json --advanced advanced_results.json --golden data/eval/golden_qa.jsonl
 ```
 
 ## Testing

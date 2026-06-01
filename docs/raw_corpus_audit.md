@@ -19,7 +19,7 @@ If these artifacts pass undetected, they will cause parsing failures, broken cit
 
 ## Quick Start
 
-**Intended CLI** (design phase, not yet implemented):
+**Implemented CLI**:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
@@ -264,7 +264,7 @@ Any `invalid` items block progression to cleaning/normalization. `warning` items
 
 ### `scripts/audit_raw_corpus.py`
 
-**Intended interface** (to be implemented):
+**Implemented interface**:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \

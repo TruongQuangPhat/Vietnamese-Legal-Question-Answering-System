@@ -8,6 +8,10 @@ description: Use for embedding legal chunks, BGE-M3 dense/sparse representations
 Use this skill for embedding legal chunks and indexing them into Qdrant.
 
 This skill should be used only after processed JSONL chunks already validate against the `LegalChunkNode` schema.
+Current project status: this is a future phase. Do not create `src/retrieval/`,
+`configs/models.yml`, `configs/retrieval.yml`, or embedding/indexing code until
+Legal Hierarchy Parsing, Parent-child Chunking, and Processed JSONL validation
+have passed their gates.
 
 ## Goal
 
@@ -22,7 +26,7 @@ processed JSONL
   → verify point count and filters
 ```
 
-## Expected Files
+## Expected Future Files
 
 ```text
 src/ingestion/embedder.py

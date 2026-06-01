@@ -6,6 +6,10 @@ description: Use for RAGAS evaluation, golden QA datasets, parser/retrieval/gene
 # Evaluation and CI/CD Skill
 
 Use this skill to evaluate system quality and enforce merge/release gates.
+Current project status: only ingestion/cleaning unit tests are implemented.
+Parser, chunking, retrieval, generation, integration, evaluation, Docker, and
+release gates are future work unless the current task explicitly starts that
+phase.
 
 ## Goal
 
@@ -21,10 +25,11 @@ security        → secret scan, unsafe logs, injection risks
 release         → Docker build, config validation, deployment readiness
 ```
 
-## Expected Files
+## Current and Expected Future Files
 
 ```text
 tests/unit/
+future:
 tests/integration/
 tests/evaluation/run_ragas.py
 tests/evaluation/golden_qa_v1.jsonl

@@ -8,6 +8,9 @@ description: Use for LLM client wrappers, legal QA generation prompts, provider 
 Use this skill when implementing or reviewing legal answer generation.
 
 This skill starts after retrieval/context packing has produced evidence packets. It must not perform retrieval itself.
+Current project status: generation is a future phase. Do not create generation
+modules, prompt templates, or model config until retrieval/indexing gates have
+passed.
 
 ## Goal
 
@@ -23,7 +26,7 @@ evidence packets
   → response object
 ```
 
-## Expected Files
+## Expected Future Files
 
 ```text
 src/generation/llm_client.py

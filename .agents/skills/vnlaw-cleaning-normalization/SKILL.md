@@ -74,20 +74,26 @@ text = unicodedata.normalize("NFC", text)
 ## Expected Components
 
 ```text
-src/ingestion/normalization.py
-src/ingestion/parsers/html_parser.py
-tests/unit/ingestion/test_normalization.py
+src/ingestion/cleaning.py
+src/ingestion/cleaning_diagnostics.py
+src/services/cleaning_service.py
+src/services/cleaning_quality_audit_service.py
+scripts/clean_raw_corpus.py
+scripts/audit_cleaning_quality.py
+tests/unit/ingestion/test_cleaning.py
 ```
 
 Recommended functions/classes:
 
 ```text
-LegalTextNormalizer
-HtmlCleaner
+extract_legal_text_from_html
+extract_text_with_block_boundaries
 normalize_unicode
 normalize_whitespace
-fix_ocr_spacing
-preserve_legal_boundaries
+repair_line_fragments
+trim_to_legal_body
+remove_encoded_footer_artifacts
+compute_cleaned_text_markers
 ```
 
 ## OOP and Docstring Rules

@@ -6,6 +6,9 @@ description: Use when building the first Naive RAG baseline, simple retrieval, b
 # Naive RAG Baseline Skill
 
 Use this skill to build the first working legal QA baseline before Advanced RAG or GraphRAG.
+Current project status: Naive RAG is a future phase. Do not create API,
+retrieval, or generation modules until parser, chunking, processed JSONL,
+embedding, and indexing gates have passed.
 
 ## Goal
 
@@ -21,7 +24,7 @@ query
   → fallback if unsupported
 ```
 
-## Expected Files
+## Expected Future Files
 
 ```text
 src/retrieval/vector_store.py

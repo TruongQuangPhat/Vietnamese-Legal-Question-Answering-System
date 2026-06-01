@@ -48,15 +48,32 @@ uv run python scripts/audit_raw_corpus.py \
   --output data/reports/raw_corpus_audit.json
 
 # 5. Re-run downstream processing after audit passes
-uv run python scripts/process_legal_corpus.py \
-  --registry configs/laws/corpus_registry.yml \
+uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
-  --processed-dir data/processed
+  --output-dir data/interim \
+  --report data/reports/cleaning_report.json \
+  --write-txt \
+  --audit
+
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report data/reports/legal_parsing_report.json
+
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report data/reports/chunking_report.json
+
+uv run python scripts/export_processed_jsonl.py \
+  --input-dir data/interim \
+  --output-dir data/processed \
+  --report-dir data/reports
 
 # 6. Rebuild or refresh indexes
-uv run python scripts/build_index.py \
-  --processed-dir data/processed \
-  --collection vnlaw_qa_chunks
+uv run python scripts/build_embedding_index.py \
+  --input-dir data/processed \
+  --collection-name vnlaw_qa_chunks
 
 # 7. Run regression evaluation
 uv run python scripts/evaluate_rag.py \
@@ -179,7 +196,7 @@ uv run python scripts/evaluate_rag.py \
 
 | Mode | Purpose | Example |
 |------|---------|---------|
-| Targeted recrawl | Refresh one law | `--law-ids LDD_2024` |
+| Targeted recrawl | Refresh one law | `--law-ids LDD_VBHN` |
 | Status-based recrawl | Crawl pending entries | `--only-status pending` |
 | Priority refresh | Refresh high-value laws | `--priority critical` |
 | Forced recrawl | Replace latest artifact with backup | `--force` |
@@ -241,12 +258,12 @@ Processed data is the input to embedding/indexing. If the chunk schema changes, 
 data/processed/
 ├── latest/
 │   ├── BLDS_2015.jsonl
-│   ├── LDD_2024.jsonl
+│   ├── LDD_VBHN.jsonl
 │   └── manifest.json
 └── versions/
     └── v2026-05-21/
         ├── BLDS_2015.jsonl
-        ├── LDD_2024.jsonl
+        ├── LDD_VBHN.jsonl
         └── manifest.json
 ```
 
@@ -398,8 +415,11 @@ uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output data/reports/raw_corpus_audit.json
-uv run python scripts/validate_processed_jsonl.py \
-  --processed-dir data/processed
+uv run python scripts/export_processed_jsonl.py \
+  --input-dir data/interim \
+  --output-dir data/processed \
+  --report-dir data/reports \
+  --validate-only
 uv run python scripts/evaluate_retrieval.py \
   --golden data/eval/golden_qa.jsonl
 ```
@@ -566,7 +586,7 @@ uv run python scripts/switch_index_alias.py \
   "reason": "scheduled monthly corpus refresh",
   "registry_hash_before": "sha256...",
   "registry_hash_after": "sha256...",
-  "affected_law_ids": ["LDD_2024", "BLDS_2015"],
+  "affected_law_ids": ["LDD_VBHN", "BLDS_2015"],
   "raw_snapshot_id": "raw-2026-05-21",
   "processed_version": "processed-v2026-05-21",
   "index_version": "qdrant-v2026-05-21",
@@ -616,7 +636,7 @@ uv run python scripts/switch_index_alias.py \
   "query_id": "query-abc123",
   "index_version": "qdrant-v2026-05-21",
   "processed_version": "processed-v2026-05-21",
-  "retrieved_chunk_ids": ["LDD_2024__article_123__clause_2"],
+  "retrieved_chunk_ids": ["LDD_VBHN__article_123__clause_2"],
   "severity": "warning",
   "action": "sample_for_review"
 }
@@ -638,7 +658,7 @@ uv run python scripts/crawl_raw_corpus.py \
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
-  --law-ids LDD_2024 BLDS_2015 \
+  --law-ids LDD_VBHN BLDS_2015 \
   --concurrency 2 \
   --delay-seconds 2 \
   --retry 3
@@ -654,18 +674,20 @@ uv run python scripts/audit_raw_corpus.py \
   --output data/reports/raw_corpus_audit.json
 
 # Processed JSONL validation
-uv run python scripts/validate_processed_jsonl.py \
-  --processed-dir data/processed \
-  --output data/reports/processed_validation.json
+uv run python scripts/export_processed_jsonl.py \
+  --input-dir data/interim \
+  --output-dir data/processed \
+  --report-dir data/reports \
+  --validate-only
 ```
 
 ### Index and Evaluation
 
 ```bash
 # Build or refresh index
-uv run python scripts/build_index.py \
-  --processed-dir data/processed \
-  --collection vnlaw_qa_chunks_candidate
+uv run python scripts/build_embedding_index.py \
+  --input-dir data/processed \
+  --collection-name vnlaw_qa_chunks_candidate
 
 # Run regression evaluation
 uv run python scripts/evaluate_rag.py \

@@ -13,7 +13,7 @@ GraphRAG is not a replacement for vector retrieval; it augments it with explicit
 ```bash
 # Start Neo4j and load legal graph
 docker-compose up neo4j
-uv run python -m src.graphrag.build --input data/processed --output neo4j_import/
+uv run python scripts/build_legal_graph.py --input data/processed --output neo4j_import/
 
 # Run agent-based QA
 curl -X POST "http://localhost:8000/api/v1/graph_qa" \
@@ -264,7 +264,7 @@ For debugging, log agent decisions:
 ### Graph Build Command
 
 ```bash
-uv run python -m src.graphrag.build \
+uv run python scripts/build_legal_graph.py \
   --input data/processed \
   --neo4j-uri bolt://localhost:7687 \
   --user neo4j \
@@ -274,7 +274,7 @@ uv run python -m src.graphrag.build \
 ### Graph QA Command
 
 ```bash
-uv run python -m src.graphrag.qa \
+uv run python scripts/run_graph_qa.py \
   --query "Quan hệ giữa Điều 123 và Điều 124?" \
   --qdrant-url http://localhost:6333 \
   --neo4j-uri bolt://localhost:7687

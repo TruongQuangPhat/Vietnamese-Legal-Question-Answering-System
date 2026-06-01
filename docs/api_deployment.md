@@ -315,7 +315,7 @@ volumes:
 
 **Development**:
 - Docker Compose local stack.
-- Hot-reload with `uv run python -m src.api.main --reload`.
+- Hot-reload with `uv run uvicorn src.api.main:app --reload`.
 - `.env.dev` configuration.
 - Debug logging.
 

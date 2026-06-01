@@ -1,6 +1,6 @@
 ---
 name: vnlaw-data-ingestion
-description: Use for registry-driven legal crawling, raw source storage, source metadata, batch ingestion, retry/rate-limit policy, and Phase 1 ingestion pipeline implementation for VnLaw-QA.
+description: Use for registry-driven legal crawling, raw source storage, source metadata, batch ingestion, retry/rate-limit policy, and raw corpus audit for VnLaw-QA.
 ---
 
 # Data Ingestion Skill
@@ -21,9 +21,12 @@ configs/laws/corpus_registry.yml
   → verification
 ```
 
-For Phase 1, focus only on reliable corpus acquisition, raw storage, parsing, chunking, and JSONL validation.
+For the crawling/audit phase, focus only on reliable corpus acquisition, raw
+storage, and raw artifact validation. Parsing, chunking, JSONL validation,
+embedding, Qdrant, Neo4j, Advanced RAG, and GraphRAG belong to later gates.
 
-Do not jump into embedding, Qdrant, Neo4j, Advanced RAG, or GraphRAG until the parsed corpus is reliable.
+Phase 4 Cleaning & Normalization is already complete/gate-ready. The current
+next engineering phase is Legal Hierarchy Parsing.
 
 ## Trusted Source
 
@@ -43,19 +46,22 @@ Prefer VBHN documents when available. If no VBHN exists, preserve original law a
 configs/laws/corpus_registry.yml
 
 src/ingestion/crawler.py
-src/ingestion/parsers/html_parser.py
-src/ingestion/parsers/attachment_parser.py
-src/ingestion/parsers/legal_parser.py
-src/ingestion/chunkers.py
-src/ingestion/pipeline.py
+src/ingestion/audit.py
+src/ingestion/registry.py
+src/ingestion/storage.py
+src/services/crawl_service.py
+src/services/raw_audit_service.py
+scripts/crawl_raw_corpus.py
+scripts/audit_raw_corpus.py
 
-data/raw/{law_id}/main.html
-data/raw/{law_id}/metadata.json
+data/raw/{law_id}/latest/main.html
+data/raw/{law_id}/latest/metadata.json
+data/raw/{law_id}/crawls/{timestamp}/
 data/raw/{law_id}/attachments/
-data/processed/{law_id}.jsonl
 
 tests/unit/ingestion/
-tests/integration/test_ingestion_pipeline.py
+tests/unit/ingestion/test_crawler.py
+tests/unit/ingestion/test_audit.py
 ```
 
 ## Corpus Registry
@@ -100,14 +106,17 @@ Every crawled law must be stored under:
 data/raw/{law_id}/
 ```
 
-Recommended layout:
+Implemented layout:
 
 ```text
 data/raw/{law_id}/
-├── main.html
-├── metadata.json
-├── pages/
-└── attachments/
+├── latest/
+│   ├── main.html
+│   └── metadata.json
+└── crawls/
+    └── {timestamp}/
+        ├── main.html
+        └── metadata.json
 ```
 
 Always save the raw artifact before parsing.
@@ -119,7 +128,7 @@ If the legal content is embedded in PDF/DOC/DOCX, save both the landing HTML and
 Every law must have:
 
 ```text
-data/raw/{law_id}/metadata.json
+data/raw/{law_id}/latest/metadata.json
 ```
 
 Metadata must include at least:
@@ -234,17 +243,15 @@ uv run python scripts/clean_raw_corpus.py \
 
 ## Definition of Done
 
-- [ ] `corpus_registry.yml` exists and contains Phase 1 targets.
+- [ ] `configs/laws/corpus_registry.yml` exists and contains the approved 52-law corpus.
 - [ ] Batch crawler supports registry-driven crawling.
 - [ ] Single-law crawling still works for debugging.
-- [ ] Every crawled law has raw artifacts and `metadata.json`.
+- [ ] Every crawled law has `latest/main.html` and `latest/metadata.json`.
 - [ ] Every raw artifact has a content hash.
 - [ ] Failed crawls are traceable and actionable.
 - [ ] Attachment-based documents are handled or marked `manual_review`.
-- [ ] Processed JSONL validates against `LegalChunkNode`.
-- [ ] No arbitrary character splitting is used.
-- [ ] Article count matches source within ±2%.
-- [ ] Parser/chunker tests cover at least three law templates.
+- [ ] Raw corpus audit reports missing/corrupt artifacts before cleaning.
+- [ ] No parser, chunker, embedding, vector DB, or graph DB work is mixed into the crawling service.
 
 ## Do Not
 

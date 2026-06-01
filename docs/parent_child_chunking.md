@@ -15,10 +15,11 @@ This design ensures that:
 **Intended CLI** (design phase, not yet implemented):
 
 ```bash
-uv run python -m src.processing.chunker \
+uv run python scripts/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --law-ids LDD_2024 BLDS_2015
+  --report data/reports/chunking_report.json \
+  --law-ids LDD_VBHN BLDS_2015
 ```
 
 **Expected workflow**:
@@ -126,9 +127,9 @@ Components:
 - Always include `Luật {law_name}` and `Điều {article_number}`.
 
 **Examples**:
-- `"Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c"`
-- `"Luật Đất đai 2024, Điều 123, Khoản 2"` (no point)
-- `"Luật Đất đai 2024, Điều 123"` (article-level only)
+- `"Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c"`
+- `"Luật Đất đai (VBHN 2025), Điều 123, Khoản 2"` (no point)
+- `"Luật Đất đai (VBHN 2025), Điều 123"` (article-level only)
 
 **Important**: Do NOT use English "Article/Clause/Point".
 
@@ -199,17 +200,17 @@ Pattern: `{law_id}__article_{article_number}__clause_{clause_number}__point_{poi
 - For article-level chunk (no clauses): `{law_id}__article_{article_number}`
 
 Examples:
-- `LDD_2024__article_123__clause_2__point_c`
-- `LDD_2024__article_123__clause_2`
-- `LDD_2024__article_123`
+- `LDD_VBHN__article_123__clause_2__point_c`
+- `LDD_VBHN__article_123__clause_2`
+- `LDD_VBHN__article_123`
 
 ### Canonical Chunk Schema
 
 ```json
 {
-  "chunk_id": "LDD_2024__article_123__clause_2__point_c",
-  "law_id": "LDD_2024",
-  "law_name": "Luật Đất đai 2024",
+  "chunk_id": "LDD_VBHN__article_123__clause_2__point_c",
+  "law_id": "LDD_VBHN",
+  "law_name": "Luật Đất đai (VBHN 2025)",
   "law_type": "law",
   "legal_status": "active",
 
@@ -229,10 +230,10 @@ Examples:
   },
 
   "text": "Nội dung của Điểm c...",
-  "parent_id": "LDD_2024__article_123",
+  "parent_id": "LDD_VBHN__article_123",
   "parent_text": "Toàn bộ nội dung Điều 123...",
 
-  "citation": "Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c",
+  "citation": "Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c",
   "source_url": "https://thuvienphapluat.vn/...",
   "source_domain": "thuvienphapluat.vn",
   "source_type": "html",
@@ -245,7 +246,7 @@ Examples:
   "metadata": {
     "parser_version": "v0.1",
     "chunker_version": "v0.1",
-    "raw_artifact_path": "data/raw/LDD_2024/latest/main.html"
+    "raw_artifact_path": "data/raw/LDD_VBHN/latest/main.html"
   }
 }
 ```
@@ -266,13 +267,21 @@ Parent-child chunking respects legal structure and ensures every retrieved chunk
 
 ```bash
 # Generate chunks for all laws
-uv run python -m src.processing.chunker --input-dir data/interim --output-dir data/interim
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report data/reports/chunking_report.json
 
 # Specific laws with format options
-uv run python -m src.processing.chunker --law-ids LDD_2024 --output-format jsonl
+uv run python scripts/chunk_legal_corpus.py \
+  --law-ids LDD_VBHN \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --output-format jsonl
 
 # Validate existing chunks.jsonl
-uv run python -m src.processing.chunker --validate data/interim/LDD_2024/chunks.jsonl
+uv run python scripts/chunk_legal_corpus.py \
+  --validate data/interim/LDD_VBHN/chunks.jsonl
 ```
 
 ## Testing

@@ -8,6 +8,9 @@ description: "Use for retrieval/search internals: Qdrant hybrid search, dense/sp
 Use this skill for retrieval implementation details.
 
 This skill focuses on search internals. For full Advanced RAG orchestration, also use `vnlaw-advanced-rag`.
+Current project status: retrieval is a future phase. Do not create retrieval
+modules or config until parser, chunking, processed JSONL, and embedding gates
+have passed.
 
 ## Goal
 
@@ -25,7 +28,7 @@ query preprocessing
   → evidence selection
 ```
 
-## Expected Files
+## Expected Future Files
 
 ```text
 src/retrieval/vector_store.py

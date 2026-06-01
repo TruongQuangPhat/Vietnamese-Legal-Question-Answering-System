@@ -30,11 +30,11 @@ curl -X POST "http://localhost:8000/api/v1/qa" \
 **Expected response**:
 ```json
 {
-  "answer": "Theo Điều 98 Luật Đất đai 2024, hộ gia đình có quyền sử dụng đất...",
+  "answer": "Theo Điều 98 Luật Đất đai (VBHN 2025), hộ gia đình có quyền sử dụng đất...",
   "citations": [
     {
-      "chunk_id": "LDD_2024__article_98__clause_1",
-      "citation": "Luật Đất đai 2024, Điều 98, Khoản 1",
+      "chunk_id": "LDD_VBHN__article_98__clause_1",
+      "citation": "Luật Đất đai (VBHN 2025), Điều 98, Khoản 1",
       "source_url": "https://thuvienphapluat.vn/..."
     }
   ],
@@ -143,7 +143,7 @@ results = client.search(
 - Sort retrieved chunks by score (highest first).
 - For each chunk, format as:
   ```
-  [Citation: Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c]
+  [Citation: Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c]
   Nội dung của Điểm c...
   ```
 - Concatenate up to `max_chunks` (e.g., 10) with newlines between.
@@ -239,18 +239,18 @@ I could not find a specific regulation for this issue in the current legal corpu
 
 ```json
 {
-  "answer": "Theo Điều 98 Luật Đất đai 2024, hộ gia đình có quyền sử dụng đất để xây dựng nhà ở...",
+  "answer": "Theo Điều 98 Luật Đất đai (VBHN 2025), hộ gia đình có quyền sử dụng đất để xây dựng nhà ở...",
   "citations": [
     {
-      "chunk_id": "LDD_2024__article_98__clause_1__point_a",
-      "citation": "Luật Đất đai 2024, Điều 98, Khoản 1, Điểm a",
+      "chunk_id": "LDD_VBHN__article_98__clause_1__point_a",
+      "citation": "Luật Đất đai (VBHN 2025), Điều 98, Khoản 1, Điểm a",
       "source_url": "https://thuvienphapluat.vn/..."
     }
   ],
   "confidence": 0.89,
   "retrieved_chunks": [
     {
-      "chunk_id": "LDD_2024__article_98__clause_1__point_a",
+      "chunk_id": "LDD_VBHN__article_98__clause_1__point_a",
       "score": 0.92,
       "payload": { ... }
     }
@@ -279,13 +279,13 @@ I could not find a specific regulation for this issue in the current legal corpu
 
 ```bash
 # Single query
-uv run python -m src.generation.naive_rag \
+uv run python scripts/run_naive_rag.py \
   --query "Quyền về đất đai của hộ gia đình?" \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks
 
 # Batch evaluation (with golden QA)
-uv run python -m src.generation.naive_rag \
+uv run python scripts/run_naive_rag.py \
   --eval-dataset data/eval/golden_qa.jsonl \
   --output-dir data/eval/naive_rag_results
 ```

@@ -10,7 +10,9 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **52/52** legal documents successfully crawled from corpus registry, ready for audit phase.
+Current status: **Phase 4 Cleaning & Normalization is complete/gate-ready**.
+The corpus has 52/52 raw artifacts and 52/52 normalized outputs. The next
+engineering phase is **Phase 5 — Legal Hierarchy Parsing**.
 
 ## 2. Quick Start
 
@@ -46,7 +48,9 @@ Evaluation (RAGAS, golden QA)
 API / Deployment
 ```
 
-**Important**: The following phase is not RAG — it is **Raw Corpus Audit & Validation** — verifying integrity of 52 raw artifacts before processing.
+**Important**: The next phase is not RAG. It is **Legal Hierarchy Parsing** over
+`data/interim/{law_id}/normalized.json`. Parent-child chunking, embedding, RAG,
+Advanced RAG, and GraphRAG remain blocked until the parser passes its gate.
 
 ## 3. Full Architecture
 
@@ -155,7 +159,9 @@ End-to-end pipeline:
 
 **Pipeline Summary**: Defines Python 3.11+, OOP standards, type hints, Pydantic V2, async I/O, Google-style docstrings, logging, security policies, and directory structure.
 
-**Output**: CLAUDE.md, pyproject.toml, `vnlaw_qa/` directory structure.
+**Output**: `AGENTS.md`, `CLAUDE.md`, `PROJECT_CONTEXT.md`,
+`pyproject.toml`, `.agents/skills/`, `.codex/context/`, and the repository
+layout used by `scripts/`, `src/`, `tests/`, `configs/`, and `docs/`.
 
 **Validation Criteria**:
 - Code follows PEP8 + type hints
@@ -283,7 +289,7 @@ safe to feed into Cleaning & Normalization.
 
 ### Phase 5 — Legal Hierarchy Parsing
 
-**Goal**: Parse the hierarchy Part → Chapter → Section → Article → Clause → Point from cleaned text.
+**Goal**: Parse the hierarchy Part → Chapter → Section → Article → Clause → Point from normalized legal text.
 
 **Input**: `data/interim/{law_id}/normalized.json`.
 
@@ -348,7 +354,7 @@ safe to feed into Cleaning & Normalization.
 
 **Status**: Planned
 
-**Detailed documentation**: `docs/chunking.md`
+**Detailed documentation**: `docs/parent_child_chunking.md`
 
 ---
 
@@ -363,9 +369,9 @@ safe to feed into Cleaning & Normalization.
 - Required fields per line (canonical schema):
   ```json
   {
-    "chunk_id": "LDD_2024__article_123__clause_2__point_c",
-    "law_id": "LDD_2024",
-    "law_name": "Luật Đất đai 2024",
+    "chunk_id": "LDD_VBHN__article_123__clause_2__point_c",
+    "law_id": "LDD_VBHN",
+    "law_name": "Luật Đất đai (VBHN 2025)",
     "law_type": "law",
     "legal_status": "active",
 
@@ -385,10 +391,10 @@ safe to feed into Cleaning & Normalization.
     },
 
     "text": "Nội dung của Điểm c...",
-    "parent_id": "LDD_2024__article_123",
+    "parent_id": "LDD_VBHN__article_123",
     "parent_text": "Toàn bộ nội dung Điều 123...",
 
-    "citation": "Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c",
+    "citation": "Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c",
     "source_url": "https://thuvienphapluat.vn/...",
     "source_domain": "thuvienphapluat.vn",
     "source_type": "html",
@@ -401,7 +407,7 @@ safe to feed into Cleaning & Normalization.
     "metadata": {
       "parser_version": "v0.1",
       "chunker_version": "v0.1",
-      "raw_artifact_path": "data/raw/LDD_2024/latest/main.html"
+      "raw_artifact_path": "data/raw/LDD_VBHN/latest/main.html"
     }
   }
   ```
@@ -650,7 +656,7 @@ safe to feed into Cleaning & Normalization.
 
 **Status**: Future extension
 
-**Detailed documentation**: `docs/deployment.md`
+**Detailed documentation**: `docs/api_deployment.md`
 
 ---
 
@@ -687,7 +693,8 @@ safe to feed into Cleaning & Normalization.
 
 **Status**: Future extension
 
-**Detailed documentation**: Integrated into `docs/deployment.md` and runbooks.
+**Detailed documentation**: Integrated into `docs/api_deployment.md`,
+`docs/mlops_maintenance.md`, and future runbooks.
 
 ---
 
@@ -698,7 +705,7 @@ Each phase must pass its gate before proceeding to the next.
 | Gate | Required Evidence | Example Check | Why It Matters |
 |------|-------------------|---------------|----------------|
 | Setup gate | `pyproject.toml`, `CLAUDE.md`, `mypy`/`pytest` pass | `uv run mypy src` → 0 errors | Code quality baseline |
-| Registry gate | `configs/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
+| Registry gate | `configs/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" configs/laws/corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
 | Crawling gate | 52 raw artifact directories | `ls data/raw/ | wc -l` = 52 | Raw data exists before processing |
 | Raw audit gate | `data/reports/raw_corpus_audit.json` zero critical errors | Audit script exits 0 | Detect corrupted/missing artifacts early |
 | Cleaning gate | All texts UTF-8, legal headings intact | Spot-check `Điều`, `Khoản`, `Điểm` readable | Input text quality affects parsing |
@@ -757,11 +764,21 @@ Each phase must pass its gate before proceeding to the next.
 
 ## 10. Changelog
 
+### Version 0.2 (2026-06-01)
+
+- Updated current status after Phase 4 Cleaning & Normalization became
+  gate-ready.
+- Updated the next immediate phase to Legal Hierarchy Parsing.
+- Aligned paths with current repository layout: `configs/`, `scripts/`,
+  `src/services/`, `src/ingestion/`, `data/raw/{law_id}/latest/`,
+  `data/interim/`, and `data/reports/`.
+
 ### Version 0.1 (2026-05-21)
 
 - Added initial end-to-end pipeline overview.
 - Documented current project status: registry 52 laws, crawling 52/52 complete.
-- Defined Phase 3 Raw Corpus Audit & Validation as the next immediate phase.
+- Defined Phase 3 Raw Corpus Audit & Validation as the next immediate phase at
+  that time.
 - Detailed Phase 0–14 with Goal/Inputs/Pipeline Summary/Outputs/Validation Criteria/Status/Documentation.
 - Added Current Implementation Status table (all 14 phases).
 - Added Recommended Branch Roadmap with validation gates per branch.

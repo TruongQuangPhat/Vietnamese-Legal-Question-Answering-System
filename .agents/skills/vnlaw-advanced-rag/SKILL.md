@@ -6,6 +6,9 @@ description: Use when implementing Advanced RAG features such as hybrid dense+sp
 # Advanced RAG Skill
 
 Use this skill only after a working Naive RAG baseline exists.
+Current project status: Advanced RAG is a future phase. Do not implement hybrid
+retrieval, reranking, query decomposition, or Advanced RAG orchestration until
+Naive RAG has a validated baseline.
 
 ## Goal
 

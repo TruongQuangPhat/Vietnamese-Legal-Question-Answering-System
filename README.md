@@ -158,7 +158,7 @@ Implemented and planned pipeline:
 ┌──────────────────────────────┐
 │ Phase 6                      │
 │ Parent-child Chunking        │
-│ data/processed/*.jsonl       │
+│ data/interim/*/chunks.jsonl  │
 │ PLANNED                      │
 └──────────────┬───────────────┘
                │

@@ -90,23 +90,36 @@ Maintain:
 
 ```text
 README.md
-docs/architecture.md
-docs/ingestion.md
-docs/retrieval.md
+PROJECT_CONTEXT.md
+AGENTS.md
+docs/end_to_end_pipeline.md
+docs/project_phase_journal.md
+docs/raw_data_crawling.md
+docs/raw_corpus_audit.md
+docs/cleaning_normalization.md
+docs/legal_parsing.md
+docs/parent_child_chunking.md
+docs/processed_jsonl.md
+docs/naive_rag.md
+docs/advanced_rag.md
+docs/graphrag_agents.md
 docs/evaluation.md
-docs/security.md
-docs/api.md
+docs/api_deployment.md
+docs/mlops_maintenance.md
 ```
 
 Minimum expectations:
 
 - `README.md`: setup, quickstart, commands, API example.
-- `docs/architecture.md`: system architecture and data flow.
-- `docs/ingestion.md`: source registry, crawler, parser, chunking notes.
-- `docs/retrieval.md`: Naive RAG, Advanced RAG, reranking, GraphRAG strategy.
+- `PROJECT_CONTEXT.md`: current phase, completed phases, next tasks.
+- `docs/end_to_end_pipeline.md`: system architecture and data flow.
+- `docs/project_phase_journal.md`: chronological implementation notebook.
+- `docs/raw_data_crawling.md`, `docs/raw_corpus_audit.md`, and
+  `docs/cleaning_normalization.md`: implemented ingestion phases.
+- `docs/legal_parsing.md`: current Phase 5 parser design.
+- `docs/naive_rag.md`, `docs/advanced_rag.md`, and `docs/graphrag_agents.md`: future retrieval strategy.
 - `docs/evaluation.md`: RAGAS, legal metrics, golden datasets.
-- `docs/security.md`: secrets, PII, logging, deployment safety.
-- `docs/api.md`: request/response schemas and endpoint examples.
+- `docs/api_deployment.md`: request/response schemas, deployment, and security.
 
 ## Review Checklist
 

@@ -6,6 +6,9 @@ description: Use for legal prompt design, context packing, query rewriting, evid
 # Context Engineering Skill
 
 Use this skill to design prompts, evidence packets, and answer formats for Vietnamese legal QA.
+Current project status: context engineering for QA is a future phase. Do not
+create generation prompt files or context-packing modules until retrieval and
+generation work begins.
 
 ## Objectives
 
@@ -105,7 +108,7 @@ For low confidence:
 I could not find sufficient legal basis in the current corpus...
 ```
 
-## Expected Components
+## Expected Future Files
 
 ```text
 src/generation/prompts.py

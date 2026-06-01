@@ -7,42 +7,41 @@ description: Use when creating, reorganizing, reviewing, or enforcing the VnLaw-
 
 Use this skill to enforce repository organization and module boundaries.
 
-## Canonical Layout
+## Current Implemented Layout
 
 ```text
-vnlaw_qa/
-├── .github/workflows/
+VnLaw-QA/
+├── .agents/skills/
+├── .codex/context/
 ├── .claude/skills/
 ├── configs/
-│   ├── models.yml
-│   ├── retrieval.yml
-│   ├── chunking.yml
-│   ├── prompts/
 │   └── laws/corpus_registry.yml
 ├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── eval/
-├── deploy/
+│   ├── raw/          # immutable crawl artifacts
+│   ├── interim/      # normalized artifacts and future hierarchy/chunks
+│   ├── reports/      # audit and quality reports
+│   └── processed/    # future validated JSONL chunks
 ├── scripts/
 ├── src/
 │   ├── core/
 │   ├── ingestion/
-│   ├── retrieval/
-│   ├── generation/
-│   ├── agents/
-│   └── api/
+│   └── services/
 ├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── evaluation/
-├── notebooks/
+│   └── unit/ingestion/
 ├── docs/
+├── AGENTS.md
+├── CLAUDE.md
+├── PROJECT_CONTEXT.md
 ├── .env.example
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
 ```
+
+Future phases may add `src/retrieval/`, `src/generation/`, `src/agents/`,
+`src/api/`, `tests/integration/`, `tests/evaluation/`, `deploy/`, and
+additional config files under `configs/`. Add and document them only when their
+phase starts.
 
 ## Module Responsibilities
 
@@ -59,17 +58,28 @@ shared domain types
 
 ```text
 crawler
-HTML/PDF/DOC parser
-normalization
-legal hierarchy parser
-parent-child chunking
-embedding orchestration
-ingestion pipeline
+raw artifact audit
+registry loading
+storage helpers
+HTML cleaning and normalization
+cleaning diagnostics
+future legal hierarchy parser
+future parent-child chunking domain logic
+```
+
+### `src/services/`
+
+```text
+pipeline orchestration
+batch execution
+report building
+cross-module coordination
 ```
 
 ### `src/retrieval/`
 
 ```text
+future phase only
 Qdrant vector store
 dense/sparse retrieval
 RRF fusion
@@ -82,6 +92,7 @@ confidence scoring
 ### `src/generation/`
 
 ```text
+future phase only
 LLM client wrappers
 prompt rendering
 context packing
@@ -93,6 +104,7 @@ fallback behavior
 ### `src/agents/`
 
 ```text
+future phase only
 intent router
 vector explorer
 graph explorer
@@ -103,6 +115,7 @@ optional approved latest-law checker
 ### `src/api/`
 
 ```text
+future phase only
 FastAPI app
 schemas
 dependencies
@@ -114,11 +127,14 @@ routes
 Use `configs/` for non-secret settings:
 
 ```text
+current:
+corpus registry
+
+future:
 model names
 retrieval parameters
 chunking policy
 prompt templates
-corpus registry
 ```
 
 Use `.env` for secrets, with `.env.example` containing placeholders only.
@@ -129,6 +145,7 @@ Tests should mirror source modules:
 
 ```text
 tests/unit/ingestion/
+future:
 tests/unit/retrieval/
 tests/unit/generation/
 tests/unit/api/

@@ -6,8 +6,10 @@ description: Use for FastAPI backend implementation, request/response schemas, s
 # API Backend Skill
 
 Use this skill for FastAPI backend work.
+Current project status: API/backend implementation is a future phase. Do not
+create `src/api/` or QA endpoints until retrieval/generation gates have passed.
 
-## Expected Files
+## Expected Future Files
 
 ```text
 src/api/main.py

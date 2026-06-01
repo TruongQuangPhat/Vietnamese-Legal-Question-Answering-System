@@ -8,6 +8,9 @@ description: Use when implementing GraphRAG, Neo4j schema, cross-reference extra
 Use this skill for graph-based legal retrieval and multi-hop legal evidence discovery.
 
 Use GraphRAG only after Naive RAG and Advanced RAG are working.
+Current project status: GraphRAG and agent orchestration are future phases. Do
+not create graph, agent, or Neo4j modules until Naive RAG and Advanced RAG
+gates have passed.
 
 ## Goal
 
@@ -22,7 +25,7 @@ Support questions that require:
 
 GraphRAG must expand evidence, not replace legal text citation.
 
-## Expected Files
+## Expected Future Files
 
 ```text
 src/retrieval/graph_store.py

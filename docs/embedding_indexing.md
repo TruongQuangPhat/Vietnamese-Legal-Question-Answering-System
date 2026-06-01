@@ -11,7 +11,7 @@ The index enables retrieval of relevant legal provisions based on semantic simil
 **Intended CLI** (design phase, not yet implemented):
 
 ```bash
-uv run python -m src.embedding.index \
+uv run python scripts/build_embedding_index.py \
   --input-dir data/processed \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks \
@@ -115,8 +115,8 @@ uv run python -m src.embedding.index \
 {
     "vector": dense_vector,
     "sparse_vector": sparse_vector,  # optional, for hybrid
-    "law_id": "LDD_2024",
-    "law_name": "Luật Đất đai 2024",
+    "law_id": "LDD_VBHN",
+    "law_name": "Luật Đất đai (VBHN 2025)",
     "law_type": "law",
     "legal_status": "active",
     "article_number": "123",
@@ -124,7 +124,7 @@ uv run python -m src.embedding.index \
     "clause_number": "2",  # nullable
     "point_label": "c",   # nullable
     "hierarchy_path": {...},  # as in chunk
-    "citation": "Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c",
+    "citation": "Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c",
     "source_url": "https://...",
     "source_domain": "thuvienphapluat.vn",
     "source_type": "html",
@@ -176,7 +176,7 @@ uv run python -m src.embedding.index \
 
 ## Pipeline Execution Flow
 
-1. Load all `chunks.jsonl` from `data/processed/` (or specific `--law-ids`).
+1. Load validated `data/processed/{law_id}.jsonl` files (or specific `--law-ids`).
 2. Initialize embedding model (download if needed).
 3. For each chunk in streaming batches:
    - Compute dense vector via model.
@@ -234,13 +234,13 @@ Same as `ProcessedChunk` but without `parent_text` and optionally without `text`
     {
       "query": "đất đai",
       "top_k": 5,
-      "retrieved_chunk_ids": ["LDD_2024__article_1__clause_1", ...],
+      "retrieved_chunk_ids": ["LDD_VBHN__article_1__clause_1", ...],
       "all_have_required_payload": true
     }
   ],
   "metadata_filter_tests": [
     {
-      "filter": {"law_id": "LDD_2024"},
+      "filter": {"law_id": "LDD_VBHN"},
       "expected_min_results": 100,
       "actual": 120,
       "pass": true
@@ -257,7 +257,7 @@ Same as `ProcessedChunk` but without `parent_text` and optionally without `text`
 
 ```bash
 # Full indexing for all laws
-uv run python -m src.embedding.index \
+uv run python scripts/build_embedding_index.py \
   --input-dir data/processed \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks \
@@ -265,19 +265,19 @@ uv run python -m src.embedding.index \
   --batch-size 32
 
 # Specific laws only
-uv run python -m src.embedding.index \
-  --law-ids LDD_2024 BLDS_2015 \
+uv run python scripts/build_embedding_index.py \
+  --law-ids LDD_VBHN BLDS_2015 \
   --input-dir data/processed \
   --output-dir data/reports
 
 # Validate existing index without re-indexing
-uv run python -m src.embedding.index \
+uv run python scripts/build_embedding_index.py \
   --validate-only \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks
 
 # Delete and recreate collection (fresh start)
-uv run python -m src.embedding.index \
+uv run python scripts/build_embedding_index.py \
   --recreate-collection \
   --collection-name vnlaw_qa_chunks
 ```

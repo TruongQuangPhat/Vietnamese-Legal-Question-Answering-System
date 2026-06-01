@@ -77,7 +77,7 @@ Each entry is validated against a Pydantic model with the following fields:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `law_id` | string | Yes | Unique identifier (e.g., `BLDS_2015`, `LDD_2024`). Must be stable across versions. |
+| `law_id` | string | Yes | Unique identifier (e.g., `BLDS_2015`, `LDD_VBHN`). Must be stable across versions. |
 | `name` | string | Yes | Official Vietnamese law name (e.g., "Bộ luật Dân sự 2015"). |
 | `tier` | integer | Yes | Legal hierarchy level: 0=Constitution, 1=Core Codes, 2=Laws, 3=Decrees, etc. |
 | `group` | string | Yes | Logical grouping (e.g., "Bộ luật cốt lõi", "Luật chuyên ngành"). |
@@ -174,8 +174,8 @@ This ensures every retrieved chunk can be traced back to its registry entry.
 ### Registry YAML Structure
 
 ```yaml
-- law_id: "LDD_2024"
-  name: "Luật Đất đai 2024"
+- law_id: "LDD_VBHN"
+  name: "Luật Đất đai (VBHN 2025)"
   tier: 2
   group: "Luật chuyên ngành"
   domain_tags: ["đất đai", "bất động sản", "quy hoạch"]

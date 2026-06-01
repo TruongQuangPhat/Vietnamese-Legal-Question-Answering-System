@@ -84,54 +84,40 @@ The project roadmap is:
 
 ## 4. Expected Repository Layout
 
-Use this as the canonical structure unless a task explicitly changes it:
+Current implemented structure:
 
 ```text
-vnlaw_qa/
-├── .github/workflows/
-│   ├── ci.yml
-│   ├── eval.yml
-│   ├── build.yml
-│   └── deploy.yml
-├── .claude/
-│   ├── settings.example.json
-│   └── skills/
+VnLaw-QA/
+├── .agents/skills/
+├── .codex/context/
+├── .claude/skills/
 ├── configs/
-│   ├── models.yml
-│   ├── retrieval.yml
-│   ├── chunking.yml
-│   ├── prompts/
-│   │   ├── legal_qa.j2
-│   │   ├── intent_classification.j2
-│   │   └── entity_extraction.j2
 │   └── laws/corpus_registry.yml
 ├── data/
 │   ├── raw/
-│   ├── processed/
-│   └── eval/
-├── deploy/
-│   ├── docker/
-│   ├── docker-compose.yml
-│   ├── docker-compose.prod.yml
-│   └── vllm_serve.sh
+│   ├── interim/
+│   ├── reports/
+│   └── processed/
 ├── scripts/
 ├── src/
 │   ├── core/
 │   ├── ingestion/
-│   ├── retrieval/
-│   ├── generation/
-│   ├── agents/
-│   └── api/
+│   └── services/
 ├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── evaluation/
-├── notebooks/
+│   └── unit/ingestion/
+├── docs/
+├── AGENTS.md
+├── CLAUDE.md
+├── PROJECT_CONTEXT.md
 ├── .env.example
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
 ```
+
+Future phase directories such as `src/retrieval/`, `src/generation/`,
+`src/agents/`, `src/api/`, `tests/integration/`, `tests/evaluation/`, and
+`deploy/` should be added only when their implementation phase begins.
 
 ## 5. Python, OOP, and Architecture Standards
 
