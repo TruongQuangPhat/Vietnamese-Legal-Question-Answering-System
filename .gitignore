@@ -19,6 +19,7 @@ venv/
 env/
 
 # --- Data (large files, crawled HTML) ---
+data
 data/raw/
 data/interim/
 data/reports/
