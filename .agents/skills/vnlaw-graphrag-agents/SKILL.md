@@ -30,12 +30,15 @@ GraphRAG must expand evidence, not replace legal text citation.
 ```text
 src/retrieval/graph_store.py
 src/ingestion/graph_extractor.py
-src/agents/router.py
-src/agents/vector_explorer.py
-src/agents/graph_explorer.py
-src/agents/orchestrator.py
+src/retrieval/router.py
+src/retrieval/vector_explorer.py
+src/retrieval/graph_explorer.py
+src/services/retrieval_orchestration_service.py
 tests/unit/retrieval/test_graph_store.py
-tests/unit/agents/
+tests/unit/retrieval/
+artifacts/reports/retrieval/
+artifacts/traces/retrieval/
+artifacts/metrics/retrieval/
 ```
 
 ## Neo4j Node Types

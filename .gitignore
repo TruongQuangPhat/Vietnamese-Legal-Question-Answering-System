@@ -20,8 +20,27 @@ env/
 
 # --- Data (large files, crawled HTML) ---
 data/raw/
-data/processed/
-data/eval/
+data/interim/
+data/reports/
+data/processed/**/*.json
+data/processed/**/*.jsonl
+data/processed/**/*.ndjson
+data/processed/**/*.parquet
+data/processed/**/*.csv
+data/indexes/**/*.bin
+data/indexes/**/*.db
+data/indexes/**/*.faiss
+data/indexes/**/*.idx
+data/indexes/**/*.json
+data/indexes/**/*.npy
+data/indexes/**/*.npz
+data/indexes/**/*.pkl
+data/indexes/**/*.sqlite
+data/eval/**/*.json
+data/eval/**/*.jsonl
+data/eval/**/*.ndjson
+data/eval/**/*.csv
+data/eval/**/*.parquet
 
 # --- Generated artifacts ---
 artifacts/**/*.json
@@ -71,5 +90,3 @@ htmlcov/
 
 # --- Jupyter ---
 .ipynb_checkpoints/
-
-data/

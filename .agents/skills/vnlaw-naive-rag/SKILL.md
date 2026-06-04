@@ -36,9 +36,14 @@ src/api/routes/qa.py
 src/api/schemas.py
 
 data/eval/golden_qa_v1.jsonl
-tests/evaluation/run_ragas.py
+src/evaluation/ragas_evaluator.py
+scripts/run_ragas_evaluation.py
+artifacts/reports/evaluation/
+artifacts/metrics/evaluation/
+artifacts/runs/evaluations/
 tests/unit/generation/
 tests/unit/retrieval/
+tests/unit/evaluation/
 ```
 
 ## Baseline Retrieval

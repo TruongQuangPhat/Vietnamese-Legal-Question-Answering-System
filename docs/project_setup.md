@@ -132,14 +132,23 @@ VnLaw-QA/
 ├── .agents/skills/         # Active Codex repo skills
 ├── .codex/context/         # Codex context and mirrors
 ├── .claude/                # Claude-only settings and skills
-├── configs/                 # YAML configurations
-│   └── laws/
-│       └── corpus_registry.yml
+├── configs/                 # YAML configurations and phase config scaffold
+│   ├── laws/
+│   │   └── corpus_registry.yml
+│   ├── sources/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   └── evaluation/
 ├── data/                   # Data directories (gitignored)
 │   ├── raw/                # Immutable crawl artifacts
 │   ├── interim/            # Normalized artifacts and future hierarchy/chunks
-│   ├── reports/            # Audit and quality reports
-│   └── processed/          # Future validated JSONL chunks
+│   ├── processed/          # Future validated JSONL chunks
+│   ├── indexes/            # Future retrieval indexes
+│   └── eval/               # Future evaluation datasets
+├── artifacts/              # Generated reports, traces, runs, metrics, logs
 ├── docs/                   # Documentation
 ├── scripts/                # CLI entrypoints
 │   ├── crawl_raw_corpus.py
@@ -149,10 +158,27 @@ VnLaw-QA/
 ├── src/                    # Production code
 │   ├── core/
 │   ├── ingestion/
-│   └── services/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   ├── services/
+│   ├── api/
+│   ├── evaluation/
+│   ├── monitoring/
+│   └── security/
 ├── tests/
-│   └── unit/
-│       └── ingestion/
+│   ├── unit/
+│   │   ├── ingestion/
+│   │   ├── processing/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   ├── services/
+│   │   └── evaluation/
+│   ├── integration/
+│   ├── regression/
+│   └── fixtures/
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── PROJECT_CONTEXT.md
@@ -162,10 +188,8 @@ VnLaw-QA/
 └── README.md
 ```
 
-Future phases may add `src/retrieval/`, `src/generation/`, `src/agents/`,
-`src/api/`, `tests/integration/`, `tests/evaluation/`, and deployment
-directories when their phase gates begin. Do not document those directories as
-implemented before they exist.
+Future-phase directories are scaffolded with `.gitkeep` placeholders. Add
+implementation logic to them only when the corresponding phase gate begins.
 
 Target production layout:
 
@@ -186,7 +210,7 @@ VnLaw-QA/
 │   ├── processed/
 │   ├── indexes/
 │   └── eval/
-├── artifacts/              # generated reports, traces, experiment outputs
+├── artifacts/              # generated reports, traces, runs, metrics, logs
 ├── src/
 │   ├── core/
 │   ├── ingestion/
@@ -290,7 +314,9 @@ uv run python scripts/crawl_raw_corpus.py --help
 
 **Unit tests**: `tests/unit/` — test pure functions, Pydantic models, utilities.
 **Integration tests**: `tests/integration/` — test component interactions (crawler → storage, parser → chunker).
-**Evaluation tests**: `tests/evaluation/` — golden QA, retrieval metrics (RAGAS).
+**Evaluation datasets**: `data/eval/` — golden QA and benchmark datasets.
+**Evaluation logic/tests**: `src/evaluation/`, `tests/unit/evaluation/`, and
+`tests/integration/` for evaluator code and pipeline-level checks.
 
 Run all:
 ```bash

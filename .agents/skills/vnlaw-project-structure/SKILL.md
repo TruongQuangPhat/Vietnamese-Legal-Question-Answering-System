@@ -15,11 +15,20 @@ VnLaw-QA/
 ├── .codex/context/
 ├── .claude/skills/
 ├── configs/
-│   └── laws/corpus_registry.yml
+│   ├── laws/corpus_registry.yml
+│   ├── sources/.gitkeep
+│   ├── ingestion/.gitkeep
+│   ├── processing/.gitkeep
+│   ├── indexing/.gitkeep
+│   ├── retrieval/.gitkeep
+│   ├── generation/.gitkeep
+│   └── evaluation/.gitkeep
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
 │   ├── interim/      # normalized artifacts and future hierarchy/chunks
-│   └── processed/    # future validated JSONL chunks
+│   ├── processed/    # future validated JSONL chunks
+│   ├── indexes/      # future retrieval indexes
+│   └── eval/         # future evaluation datasets
 ├── artifacts/
 │   ├── reports/
 │   │   ├── crawling/
@@ -39,9 +48,27 @@ VnLaw-QA/
 ├── src/
 │   ├── core/
 │   ├── ingestion/
-│   └── services/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   ├── services/
+│   ├── api/
+│   ├── evaluation/
+│   ├── monitoring/
+│   └── security/
 ├── tests/
-│   └── unit/ingestion/
+│   ├── unit/
+│   │   ├── ingestion/
+│   │   ├── processing/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   ├── services/
+│   │   └── evaluation/
+│   ├── integration/
+│   ├── regression/
+│   └── fixtures/
 ├── docs/
 ├── AGENTS.md
 ├── CLAUDE.md
@@ -52,16 +79,13 @@ VnLaw-QA/
 └── README.md
 ```
 
-Future phases may add `src/retrieval/`, `src/generation/`, `src/agents/`,
-`src/api/`, `tests/integration/`, `tests/evaluation/`, `deploy/`, and
-additional config files under `configs/`. Add and document them only when their
-phase starts.
+Future-phase directories are scaffolded with `.gitkeep` placeholders. Add
+implementation logic to them only when the corresponding phase starts.
 
 ## Target Production Layout
 
-Use this as the compact roadmap for future phases. The current repository does
-not need to contain every folder yet; add folders when their phase begins and
-keep names consistent with this target.
+Use this as the compact roadmap for future phases. The repository contains this
+scaffold now, but implementation remains phase-gated.
 
 ```text
 VnLaw-QA/
@@ -93,6 +117,7 @@ VnLaw-QA/
 │   │   └── evaluation/
 │   ├── traces/
 │   │   ├── crawling/
+│   │   ├── audit/
 │   │   ├── cleaning/
 │   │   ├── parsing/
 │   │   ├── retrieval/
@@ -102,6 +127,7 @@ VnLaw-QA/
 │   │   ├── benchmarks/
 │   │   └── evaluations/
 │   ├── metrics/
+│   │   ├── indexing/
 │   │   ├── retrieval/
 │   │   ├── generation/
 │   │   └── evaluation/
@@ -132,8 +158,8 @@ VnLaw-QA/
 ```
 
 Prefer this compact target over a deeply nested enterprise layout unless the
-extra separation removes real operational complexity. Do not create empty
-architecture folders just to satisfy the target.
+extra separation removes real operational complexity. Empty scaffold folders
+must contain only `.gitkeep` until their phase begins.
 
 ## Module Responsibilities
 
@@ -164,6 +190,25 @@ future legal hierarchy parser
 future parent-child chunking domain logic after parser gate
 ```
 
+Phase 5 Legal Hierarchy Parsing placement:
+
+```text
+domain logic: src/processing/
+orchestration: src/services/
+CLI: scripts/
+tests: tests/unit/processing/
+output: data/interim/{LAW_ID}/hierarchy.json
+report: artifacts/reports/parsing/legal_parsing_report.json
+```
+
+Phase 6 Parent-child Chunking placement:
+
+```text
+domain logic: src/processing/
+output: data/processed/
+report: artifacts/reports/chunking/
+```
+
 ### `src/services/`
 
 ```text
@@ -186,6 +231,15 @@ time-aware filtering
 confidence scoring
 ```
 
+Retrieval placement:
+
+```text
+domain logic: src/retrieval/
+reports: artifacts/reports/retrieval/
+traces: artifacts/traces/retrieval/
+metrics: artifacts/metrics/retrieval/
+```
+
 ### `src/generation/`
 
 ```text
@@ -198,15 +252,48 @@ citation validation
 fallback behavior
 ```
 
-### `src/agents/`
+Generation/RAG placement:
+
+```text
+domain logic: src/generation/
+reports: artifacts/reports/generation/
+traces: artifacts/traces/generation/
+metrics: artifacts/metrics/generation/
+```
+
+### `src/indexing/`
 
 ```text
 future phase only
-intent router
-vector explorer
-graph explorer
-orchestrator
-optional approved latest-law checker
+embedding/index build orchestration helpers
+index payload validation
+```
+
+Indexing placement:
+
+```text
+domain logic: src/indexing/
+indexes: data/indexes/
+reports: artifacts/reports/indexing/
+metrics: artifacts/metrics/indexing/
+```
+
+### `src/evaluation/`
+
+```text
+future phase only
+golden QA and RAG evaluation logic
+metrics aggregation
+```
+
+Evaluation placement:
+
+```text
+domain logic: src/evaluation/
+datasets: data/eval/
+reports: artifacts/reports/evaluation/
+metrics: artifacts/metrics/evaluation/
+runs: artifacts/runs/evaluations/
 ```
 
 ### `src/api/`
@@ -244,11 +331,14 @@ Tests should mirror source modules:
 tests/unit/ingestion/
 future:
 tests/unit/processing/
+tests/unit/indexing/
 tests/unit/retrieval/
 tests/unit/generation/
-tests/unit/api/
+tests/unit/services/
+tests/unit/evaluation/
 tests/integration/
-tests/evaluation/
+tests/regression/
+tests/fixtures/
 ```
 
 ## Codex Project Boundary

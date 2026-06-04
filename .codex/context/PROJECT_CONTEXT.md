@@ -230,8 +230,9 @@ docs/processed_jsonl.md
 
 ## 8.1 Target Production Layout
 
-The current repository should stay phase-focused, but agents should understand
-the intended production direction:
+The repository now includes the production scaffold with `.gitkeep`
+placeholders. Implementation remains phase-gated; empty future-phase folders do
+not imply that those phases have started.
 
 ```text
 VnLaw-QA/
@@ -239,9 +240,9 @@ VnLaw-QA/
 ├── data/{raw,interim,processed,indexes,eval}/
 ├── artifacts/
 │   ├── reports/{crawling,audit,cleaning,parsing,chunking,indexing,retrieval,generation,evaluation}/
-│   ├── traces/{crawling,cleaning,parsing,retrieval,generation}/
+│   ├── traces/{crawling,audit,cleaning,parsing,retrieval,generation}/
 │   ├── runs/{experiments,benchmarks,evaluations}/
-│   ├── metrics/{retrieval,generation,evaluation}/
+│   ├── metrics/{indexing,retrieval,generation,evaluation}/
 │   └── logs/
 ├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
 ├── scripts/
@@ -253,9 +254,51 @@ VnLaw-QA/
 └── .github/workflows/
 ```
 
-Do not create empty future-phase directories early. Add them only when their
-phase starts and keep the current boundary: CLI in `scripts/`, orchestration in
-`src/services/`, reusable domain logic in focused `src/` modules.
+Keep the current boundary: CLI in `scripts/`, orchestration in `src/services/`,
+and reusable domain logic in focused `src/` modules. Do not add implementation
+logic to scaffolded future-phase directories before their phase starts.
+
+## 8.2 Future Phase Placement
+
+```text
+Phase 5 Legal Hierarchy Parsing:
+  domain logic: src/processing/
+  orchestration: src/services/
+  CLI: scripts/
+  tests: tests/unit/processing/
+  output: data/interim/{LAW_ID}/hierarchy.json
+  report: artifacts/reports/parsing/legal_parsing_report.json
+
+Phase 6 Parent-child Chunking:
+  domain logic: src/processing/
+  output: data/processed/
+  report: artifacts/reports/chunking/
+
+Phase 8 Indexing:
+  domain logic: src/indexing/
+  indexes: data/indexes/
+  reports: artifacts/reports/indexing/
+  metrics: artifacts/metrics/indexing/
+
+Retrieval:
+  domain logic: src/retrieval/
+  reports: artifacts/reports/retrieval/
+  traces: artifacts/traces/retrieval/
+  metrics: artifacts/metrics/retrieval/
+
+Generation/RAG:
+  domain logic: src/generation/
+  reports: artifacts/reports/generation/
+  traces: artifacts/traces/generation/
+  metrics: artifacts/metrics/generation/
+
+Evaluation:
+  domain logic: src/evaluation/
+  datasets: data/eval/
+  reports: artifacts/reports/evaluation/
+  metrics: artifacts/metrics/evaluation/
+  runs: artifacts/runs/evaluations/
+```
 
 ## 9. Official Pipeline Commands
 

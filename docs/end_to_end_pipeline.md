@@ -646,7 +646,7 @@ safe to feed into Cleaning & Normalization.
 - Security: rate limiting, CORS, no sensitive data in logs (PII stripping)
 - Deployment: Docker Compose (Qdrant, Neo4j, API, vLLM), environment variables via `.env`
 
-**Output**: Docker images, `deploy/docker-compose.yml`, running API service.
+**Output**: Docker images, `deployment/docker-compose.yml`, running API service.
 
 **Validation Criteria**:
 - Health endpoint returns 200

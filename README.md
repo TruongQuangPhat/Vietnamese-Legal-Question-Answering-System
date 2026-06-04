@@ -62,17 +62,25 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 
 ## Repository Layout
 
-Current implemented layout:
+Current scaffolded layout:
 
 ```text
 VnLaw-QA/
 ├── configs/
-│   └── laws/
-│       └── corpus_registry.yml
+│   ├── laws/
+│   ├── sources/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   └── evaluation/
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
 │   ├── interim/      # normalized artifacts and future hierarchy outputs
-│   └── processed/    # future JSONL chunks
+│   ├── processed/    # future JSONL chunks
+│   ├── indexes/      # future retrieval indexes
+│   └── eval/         # future evaluation datasets
 ├── artifacts/
 │   ├── reports/
 │   │   ├── crawling/
@@ -100,14 +108,32 @@ VnLaw-QA/
 │   ├── clean_raw_corpus.py
 │   └── audit_cleaning_quality.py
 ├── src/
-│   ├── ingestion/    # domain logic
-│   └── services/     # orchestration/reporting
+│   ├── core/
+│   ├── ingestion/    # implemented ingestion and cleaning domain logic
+│   ├── processing/   # future parser/chunking domain logic
+│   ├── indexing/     # future indexing logic
+│   ├── retrieval/    # future retrieval logic
+│   ├── generation/   # future generation/RAG logic
+│   ├── services/     # orchestration/reporting
+│   ├── api/          # future API
+│   ├── evaluation/   # future evaluation logic
+│   ├── monitoring/   # future monitoring code
+│   └── security/     # future security helpers
 └── tests/
-    └── unit/
-        └── ingestion/
+    ├── unit/
+    │   ├── ingestion/
+    │   ├── processing/
+    │   ├── indexing/
+    │   ├── retrieval/
+    │   ├── generation/
+    │   ├── services/
+    │   └── evaluation/
+    ├── integration/
+    ├── regression/
+    └── fixtures/
 ```
 
-Target production layout, added incrementally by phase:
+Target production layout, scaffolded with `.gitkeep` and implemented incrementally by phase:
 
 ```text
 VnLaw-QA/
@@ -115,9 +141,9 @@ VnLaw-QA/
 ├── data/{raw,interim,processed,indexes,eval}/
 ├── artifacts/
 │   ├── reports/{crawling,audit,cleaning,parsing,chunking,indexing,retrieval,generation,evaluation}/
-│   ├── traces/{crawling,cleaning,parsing,retrieval,generation}/
+│   ├── traces/{crawling,audit,cleaning,parsing,retrieval,generation}/
 │   ├── runs/{experiments,benchmarks,evaluations}/
-│   ├── metrics/{retrieval,generation,evaluation}/
+│   ├── metrics/{indexing,retrieval,generation,evaluation}/
 │   └── logs/
 ├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
 ├── scripts/
@@ -129,8 +155,8 @@ VnLaw-QA/
 └── .github/workflows/
 ```
 
-The target layout is intentionally a roadmap. Do not create empty future-phase
-folders until their phase starts.
+The target layout is scaffolded now so future phases have stable homes. Empty
+directories contain only `.gitkeep`; implementation logic is still phase-gated.
 
 Architecture boundary:
 

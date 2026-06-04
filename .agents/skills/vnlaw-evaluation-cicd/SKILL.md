@@ -31,9 +31,13 @@ release         → Docker build, config validation, deployment readiness
 tests/unit/
 future:
 tests/integration/
-tests/evaluation/run_ragas.py
-tests/evaluation/golden_qa_v1.jsonl
+tests/unit/evaluation/
+src/evaluation/
+scripts/run_ragas_evaluation.py
 data/eval/golden_qa_v1.jsonl
+artifacts/reports/evaluation/
+artifacts/metrics/evaluation/
+artifacts/runs/evaluations/
 .github/workflows/ci.yml
 .github/workflows/eval.yml
 .github/workflows/build.yml
@@ -109,7 +113,7 @@ uv run ruff format src tests
 uv run mypy src
 uv run pytest tests/unit -v
 uv run pytest tests/integration -v
-uv run python tests/evaluation/run_ragas.py \
+uv run python scripts/run_ragas_evaluation.py \
   --dataset data/eval/golden_qa_v1.jsonl \
   --api-url http://localhost:8000
 ```

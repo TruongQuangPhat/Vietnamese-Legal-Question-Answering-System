@@ -115,11 +115,10 @@ VnLaw-QA/
 └── README.md
 ```
 
-Future phase directories such as `src/retrieval/`, `src/generation/`,
-`src/agents/`, `src/api/`, `tests/integration/`, `tests/evaluation/`, and
-`deploy/` should be added only when their implementation phase begins.
+Future phase directories are scaffolded with `.gitkeep` placeholders. Add
+implementation logic to them only when their implementation phase begins.
 
-Target production structure, to be added incrementally:
+Target production structure, scaffolded with `.gitkeep` and implemented incrementally:
 
 ```text
 VnLaw-QA/
@@ -127,9 +126,9 @@ VnLaw-QA/
 ├── data/{raw,interim,processed,indexes,eval}/
 ├── artifacts/
 │   ├── reports/{crawling,audit,cleaning,parsing,chunking,indexing,retrieval,generation,evaluation}/
-│   ├── traces/{crawling,cleaning,parsing,retrieval,generation}/
+│   ├── traces/{crawling,audit,cleaning,parsing,retrieval,generation}/
 │   ├── runs/{experiments,benchmarks,evaluations}/
-│   ├── metrics/{retrieval,generation,evaluation}/
+│   ├── metrics/{indexing,retrieval,generation,evaluation}/
 │   └── logs/
 ├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
 ├── scripts/

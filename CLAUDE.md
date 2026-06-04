@@ -111,6 +111,7 @@ VnLaw-QA/
 │   │   └── evaluation/
 │   ├── traces/
 │   │   ├── crawling/
+│   │   ├── audit/
 │   │   ├── cleaning/
 │   │   ├── parsing/
 │   │   ├── retrieval/
@@ -120,6 +121,7 @@ VnLaw-QA/
 │   │   ├── benchmarks/
 │   │   └── evaluations/
 │   ├── metrics/
+│   │   ├── indexing/
 │   │   ├── retrieval/
 │   │   ├── generation/
 │   │   └── evaluation/
