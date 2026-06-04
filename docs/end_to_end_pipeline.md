@@ -64,13 +64,13 @@ End-to-end pipeline:
            │
            ▼
 ┌─────────────────────────┐
-│ Registry-driven Crawler │ → data/raw/{law_id}/
-│ (thuvienphapluat.vn)    │   (52 raw HTML artifacts)
+│ Registry-driven Crawler │ → data/raw/{law_id}/latest/
+│ (thuvienphapluat.vn)    │   artifacts/reports/crawling/crawl_report.json
 └──────────┬──────────────┘
            │
            ▼
 ┌─────────────────────────┐
-│  Raw Corpus Audit       │ → data/reports/raw_corpus_audit.json
+│  Raw Corpus Audit       │ → artifacts/reports/audit/raw_corpus_audit.json
 │  & Validation           │
 └──────────┬──────────────┘
            │
@@ -236,9 +236,9 @@ safe to feed into Cleaning & Normalization.
 - Scan raw artifact directories
 - Validate `main.html` and `metadata.json`
 - Detect suspiciously small HTML, error pages, and metadata mismatches
-- Write `data/reports/raw_corpus_audit.json`
+- Write `artifacts/reports/audit/raw_corpus_audit.json`
 
-**Output**: `data/reports/raw_corpus_audit.json`.
+**Output**: `artifacts/reports/audit/raw_corpus_audit.json`.
 
 **Validation Criteria**:
 - 52 registry entries are represented in `data/raw/`
@@ -415,9 +415,9 @@ safe to feed into Cleaning & Normalization.
 - Duplicate chunk detection (same `chunk_id` or identical `text`+`citation`)
 - Empty text detection
 - Invalid citation detection (missing article/clause/point)
-- Output: `data/reports/processed_validation.json` (pass/fail, error list)
+- Output: `artifacts/reports/chunking/processed_validation.json` (pass/fail, error list)
 
-**Output**: `data/processed/*.jsonl`, `data/reports/processed_validation.json`.
+**Output**: `data/processed/*.jsonl`, `artifacts/reports/chunking/processed_validation.json`.
 
 **Validation Criteria**:
 - All 52 files exist in `data/processed/`
@@ -707,7 +707,7 @@ Each phase must pass its gate before proceeding to the next.
 | Setup gate | `pyproject.toml`, `CLAUDE.md`, `mypy`/`pytest` pass | `uv run mypy src` → 0 errors | Code quality baseline |
 | Registry gate | `configs/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" configs/laws/corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
 | Crawling gate | 52 raw artifact directories | `ls data/raw/ | wc -l` = 52 | Raw data exists before processing |
-| Raw audit gate | `data/reports/raw_corpus_audit.json` zero critical errors | Audit script exits 0 | Detect corrupted/missing artifacts early |
+| Raw audit gate | `artifacts/reports/audit/raw_corpus_audit.json` zero critical errors | Audit script exits 0 | Detect corrupted/missing artifacts early |
 | Cleaning gate | All texts UTF-8, legal headings intact | Spot-check `Điều`, `Khoản`, `Điểm` readable | Input text quality affects parsing |
 | Parsing gate | Parser tests: >99% Article detection | Unit tests on sample documents | Parser is foundation for chunking and retrieval |
 | Chunking gate | Every chunk has valid `chunk_id` and `citation` | Validate all `chunks.jsonl` files | Citation integrity is mandatory for Legal QA |
@@ -771,7 +771,7 @@ Each phase must pass its gate before proceeding to the next.
 - Updated the next immediate phase to Legal Hierarchy Parsing.
 - Aligned paths with current repository layout: `configs/`, `scripts/`,
   `src/services/`, `src/ingestion/`, `data/raw/{law_id}/latest/`,
-  `data/interim/`, and `data/reports/`.
+  `data/interim/`, and phase-specific `artifacts/reports/<phase>/`.
 
 ### Version 0.1 (2026-05-21)
 

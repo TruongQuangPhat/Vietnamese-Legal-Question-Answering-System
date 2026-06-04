@@ -190,7 +190,7 @@ uv run python scripts/build_embedding_index.py \
    - Get collection info → count check.
    - Execute test queries (with/without filters).
    - Verify sample results have expected payload fields.
-7. Write index report: `data/reports/indexing_validation.json`.
+7. Write index report: `artifacts/reports/indexing/indexing_validation.json`.
 
 ## Data Models / Output Schema
 
@@ -268,7 +268,7 @@ uv run python scripts/build_embedding_index.py \
 uv run python scripts/build_embedding_index.py \
   --law-ids LDD_VBHN BLDS_2015 \
   --input-dir data/processed \
-  --output-dir data/reports
+  --output-dir artifacts/reports/indexing
 
 # Validate existing index without re-indexing
 uv run python scripts/build_embedding_index.py \

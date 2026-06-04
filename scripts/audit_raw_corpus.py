@@ -5,7 +5,7 @@ Usage:
     uv run python scripts/audit_raw_corpus.py \
       --registry configs/laws/corpus_registry.yml \
       --raw-dir data/raw \
-      --output data/reports/raw_corpus_audit.json
+      --output artifacts/reports/audit/raw_corpus_audit.json
 """
 
 from __future__ import annotations
@@ -30,13 +30,13 @@ Examples:
   uv run python scripts/audit_raw_corpus.py \\
     --registry configs/laws/corpus_registry.yml \\
     --raw-dir data/raw \\
-    --output data/reports/raw_corpus_audit.json
+    --output artifacts/reports/audit/raw_corpus_audit.json
 
   # With custom minimum HTML size:
   uv run python scripts/audit_raw_corpus.py \\
     --registry configs/laws/corpus_registry.yml \\
     --raw-dir data/raw \\
-    --output data/reports/audit.json \\
+    --output artifacts/reports/audit/audit.json \\
     --min-html-size 5000
 """
     )
@@ -55,8 +55,8 @@ Examples:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/reports/raw_corpus_audit.json"),
-        help="Output JSON report path (default: data/reports/raw_corpus_audit.json)"
+        default=Path("artifacts/reports/audit/raw_corpus_audit.json"),
+        help="Output JSON report path (default: artifacts/reports/audit/raw_corpus_audit.json)"
     )
     parser.add_argument(
         "--min-html-size",

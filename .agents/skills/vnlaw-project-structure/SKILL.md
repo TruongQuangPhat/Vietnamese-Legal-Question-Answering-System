@@ -19,8 +19,22 @@ VnLaw-QA/
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
 │   ├── interim/      # normalized artifacts and future hierarchy/chunks
-│   ├── reports/      # audit and quality reports
 │   └── processed/    # future validated JSONL chunks
+├── artifacts/
+│   ├── reports/
+│   │   ├── crawling/
+│   │   ├── audit/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── chunking/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   ├── traces/       # parser/retrieval/generation traces
+│   ├── runs/         # experiment and benchmark runs
+│   ├── metrics/      # evaluation metrics
+│   └── logs/         # saved logs when needed
 ├── scripts/
 ├── src/
 │   ├── core/
@@ -67,12 +81,31 @@ VnLaw-QA/
 │   ├── indexes/
 │   └── eval/
 ├── artifacts/
-│   ├── crawling_reports/
-│   ├── audit_reports/
-│   ├── parsing_reports/
-│   ├── chunking_reports/
-│   ├── retrieval_reports/
-│   └── evaluation_reports/
+│   ├── reports/
+│   │   ├── crawling/
+│   │   ├── audit/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── chunking/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   ├── traces/
+│   │   ├── crawling/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── retrieval/
+│   │   └── generation/
+│   ├── runs/
+│   │   ├── experiments/
+│   │   ├── benchmarks/
+│   │   └── evaluations/
+│   ├── metrics/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   └── logs/
 ├── src/
 │   ├── core/
 │   ├── ingestion/
@@ -122,8 +155,13 @@ registry loading
 storage helpers
 HTML cleaning and normalization
 cleaning diagnostics
+```
+
+### `src/processing/`
+
+```text
 future legal hierarchy parser
-future parent-child chunking domain logic
+future parent-child chunking domain logic after parser gate
 ```
 
 ### `src/services/`
@@ -205,6 +243,7 @@ Tests should mirror source modules:
 ```text
 tests/unit/ingestion/
 future:
+tests/unit/processing/
 tests/unit/retrieval/
 tests/unit/generation/
 tests/unit/api/

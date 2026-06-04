@@ -96,7 +96,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     raw_dir: str = "data/raw"
     interim_dir: str = "data/interim"
-    report_dir: str = "data/reports"
+    report_dir: str = "artifacts/reports/cleaning"
     corpus_registry_path: str = "configs/laws/corpus_registry.yml"
 
     class Config:

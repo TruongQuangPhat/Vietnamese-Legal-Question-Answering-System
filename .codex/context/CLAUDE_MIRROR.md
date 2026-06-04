@@ -125,7 +125,12 @@ Target production structure, to be added incrementally:
 VnLaw-QA/
 ├── configs/{laws,sources,ingestion,processing,indexing,retrieval,generation,evaluation}/
 ├── data/{raw,interim,processed,indexes,eval}/
-├── artifacts/{audit_reports,parsing_reports,chunking_reports,retrieval_reports,evaluation_reports,traces}/
+├── artifacts/
+│   ├── reports/{crawling,audit,cleaning,parsing,chunking,indexing,retrieval,generation,evaluation}/
+│   ├── traces/{crawling,cleaning,parsing,retrieval,generation}/
+│   ├── runs/{experiments,benchmarks,evaluations}/
+│   ├── metrics/{retrieval,generation,evaluation}/
+│   └── logs/
 ├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
 ├── scripts/
 ├── tests/{unit,integration,regression,fixtures}/

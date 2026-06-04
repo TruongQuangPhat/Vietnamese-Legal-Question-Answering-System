@@ -5,7 +5,7 @@ Usage:
     uv run python scripts/clean_raw_corpus.py \
       --raw-dir data/raw \
       --output-dir data/interim \
-      --report data/reports/cleaning_report.json
+      --report artifacts/reports/cleaning/cleaning_report.json
 """
 
 from __future__ import annotations
@@ -17,10 +17,11 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from services.cleaning_service import execute_cleaning_pipeline, CleaningPipelineConfig
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
+
+from services.cleaning_service import CleaningPipelineConfig, execute_cleaning_pipeline
 
 console = Console()
 
@@ -44,8 +45,8 @@ def main() -> int:
     parser.add_argument(
         "--report",
         type=Path,
-        default=Path("data/reports/cleaning_report.json"),
-        help="Path to write the cleaning report (default: data/reports/cleaning_report.json)"
+        default=Path("artifacts/reports/cleaning/cleaning_report.json"),
+        help="Path to write the cleaning report (default: artifacts/reports/cleaning/cleaning_report.json)"
     )
     parser.add_argument(
         "--min-text-length",

@@ -261,6 +261,7 @@ class ThuvienPhapLuatCrawler(BaseCrawler):
                 http_status=http_status,
                 content=content,
                 content_hash=content_hash,
+                error_message=error_message,
                 retry_count=retry_count,
                 duration_seconds=duration,
             )

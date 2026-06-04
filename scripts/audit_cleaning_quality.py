@@ -22,7 +22,6 @@ from src.services.cleaning_quality_audit_service import (
     run_selector_candidate_audit,
 )
 
-
 console = Console()
 
 
@@ -46,8 +45,8 @@ def main() -> int:
     parser.add_argument(
         "--report-dir",
         type=Path,
-        default=Path("data/reports"),
-        help="Directory to write audit reports.",
+        default=Path("artifacts/reports/cleaning"),
+        help="Directory to write audit reports (default: artifacts/reports/cleaning).",
     )
     parser.add_argument(
         "--registry",

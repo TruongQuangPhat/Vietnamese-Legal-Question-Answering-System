@@ -102,8 +102,12 @@ Relevant files:
 - `docs/raw_data_crawling.md`
 - `docs/project_phase_journal.md`
 - `data/raw/`
+- `artifacts/reports/crawling/crawl_report.json`
 
-The crawler reads from `configs/laws/corpus_registry.yml`, fetches legal source artifacts from approved sources, and stores raw artifacts under `data/raw/`.
+The crawler reads from `configs/laws/corpus_registry.yml`, fetches legal source
+artifacts from approved sources, stores immutable raw evidence under
+`data/raw/`, and writes the generated batch crawl report to
+`artifacts/reports/crawling/crawl_report.json`.
 
 ### Phase 3 — Raw Corpus Audit & Validation
 
@@ -115,7 +119,7 @@ Relevant files:
 - `scripts/audit_raw_corpus.py`
 - `tests/unit/ingestion/test_audit.py`
 - `docs/raw_corpus_audit.md`
-- `data/reports/raw_corpus_audit.json`
+- `artifacts/reports/audit/raw_corpus_audit.json`
 
 This phase validates that crawled raw artifacts are complete, readable, not blocked/error pages, and suitable for Cleaning & Normalization.
 
@@ -134,8 +138,8 @@ Relevant files:
 - `tests/unit/ingestion/test_cleaning.py`
 - `docs/cleaning_normalization.md`
 - `data/interim/`
-- `data/reports/cleaning_report.json`
-- `data/reports/cleaning_quality_audit.json`
+- `artifacts/reports/cleaning/cleaning_report.json`
+- `artifacts/reports/cleaning/cleaning_quality_audit.json`
 
 The full 52-law corpus cleans successfully with no warning artifacts, failed
 artifacts, suspiciously short outputs, or missing article markers. Cleaning
@@ -162,7 +166,7 @@ Expected outputs:
 
 ```text
 data/interim/{LAW_ID}/hierarchy.json
-data/reports/legal_parsing_report.json
+artifacts/reports/parsing/legal_parsing_report.json
 ```
 
 Key requirements:
@@ -182,6 +186,10 @@ Key requirements:
 - Build a hierarchy tree before chunking.
 - Validate parser output before any embedding or retrieval work.
 - Add focused unit tests.
+- Put parser domain logic under `src/processing/`.
+- Put parser orchestration/report building under `src/services/`.
+- Put parser CLI entrypoint under `scripts/`.
+- Put parser unit tests under `tests/unit/processing/`.
 
 Important Vietnamese legal formatting note:
 
@@ -199,7 +207,7 @@ Vietnamese legal documents often do not literally write the words `Khoản` and 
    - numbered clause lines like `1.`, `2.`, `3.`
    - point labels like `a)`, `b)`, `c)`
 4. Generate `data/interim/{LAW_ID}/hierarchy.json`.
-5. Generate `data/reports/legal_parsing_report.json`.
+5. Generate `artifacts/reports/parsing/legal_parsing_report.json`.
 6. Add parser unit tests before any chunking implementation.
 7. Validate parser correctness on known complex laws such as BLDS_2015,
    BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
@@ -227,10 +235,12 @@ configs/laws/corpus_registry.yml
 data/raw/
 data/interim/
 data/processed/
-data/reports/
+artifacts/reports/<phase>/
 src/ingestion/
+src/processing/
 scripts/
 tests/unit/ingestion/
+tests/unit/processing/
 docs/end_to_end_pipeline.md
 docs/project_phase_journal.md
 docs/raw_data_crawling.md
@@ -250,7 +260,12 @@ the intended production direction:
 VnLaw-QA/
 ├── configs/{laws,sources,ingestion,processing,indexing,retrieval,generation,evaluation}/
 ├── data/{raw,interim,processed,indexes,eval}/
-├── artifacts/{audit_reports,parsing_reports,chunking_reports,retrieval_reports,evaluation_reports,traces}/
+├── artifacts/
+│   ├── reports/{crawling,audit,cleaning,parsing,chunking,indexing,retrieval,generation,evaluation}/
+│   ├── traces/{crawling,cleaning,parsing,retrieval,generation}/
+│   ├── runs/{experiments,benchmarks,evaluations}/
+│   ├── metrics/{retrieval,generation,evaluation}/
+│   └── logs/
 ├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
 ├── scripts/
 ├── tests/{unit,integration,regression,fixtures}/
@@ -271,7 +286,11 @@ Official user-facing commands for the ingestion pipeline:
 
 - Crawl raw legal corpus:
   ```bash
-  uv run python scripts/crawl_raw_corpus.py [OPTIONS]
+  uv run python scripts/crawl_raw_corpus.py \
+    --registry configs/laws/corpus_registry.yml \
+    --output data/raw \
+    --report artifacts/reports/crawling/crawl_report.json \
+    --only-status pending
   ```
 
 - Audit raw corpus:
@@ -279,7 +298,7 @@ Official user-facing commands for the ingestion pipeline:
   uv run python scripts/audit_raw_corpus.py \
     --registry configs/laws/corpus_registry.yml \
     --raw-dir data/raw \
-    --output data/reports/raw_corpus_audit.json
+    --output artifacts/reports/audit/raw_corpus_audit.json
   ```
 
 - Clean and normalize corpus:
@@ -287,7 +306,7 @@ Official user-facing commands for the ingestion pipeline:
   uv run python scripts/clean_raw_corpus.py \
     --raw-dir data/raw \
     --output-dir data/interim \
-    --report data/reports/cleaning_report.json
+    --report artifacts/reports/cleaning/cleaning_report.json
   ```
 
 ## 10. Development Commands
@@ -322,7 +341,7 @@ Run raw corpus audit:
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 Run Cleaning & Normalization:
@@ -331,7 +350,7 @@ Run Cleaning & Normalization:
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json
+  --report artifacts/reports/cleaning/cleaning_report.json
 ```
 
 Optional debug text output:
@@ -340,7 +359,7 @@ Optional debug text output:
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt
 ```
 
@@ -401,7 +420,7 @@ article references and real article headings are separately reported
 numbered clause patterns are preserved when present
 point label patterns are preserved when present
 known encoded TVPL watermark/footer artifacts are removed
-cleaning_report.json is generated with no critical failures
+artifacts/reports/cleaning/cleaning_report.json is generated with no critical failures
 ```
 
 Legal Hierarchy Parsing may start next. Do not proceed to chunking, embedding,

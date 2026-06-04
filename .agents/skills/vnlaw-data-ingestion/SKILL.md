@@ -208,6 +208,7 @@ Crawl all pending laws:
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --concurrency 2 \
   --delay-seconds 2 \
@@ -229,7 +230,7 @@ Run raw corpus audit:
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 Run cleaning & normalization:
@@ -238,7 +239,7 @@ Run cleaning & normalization:
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json
+  --report artifacts/reports/cleaning/cleaning_report.json
 ```
 
 ## Definition of Done
@@ -247,6 +248,7 @@ uv run python scripts/clean_raw_corpus.py \
 - [ ] Batch crawler supports registry-driven crawling.
 - [ ] Single-law crawling still works for debugging.
 - [ ] Every crawled law has `latest/main.html` and `latest/metadata.json`.
+- [ ] Each crawl run writes a batch report to `artifacts/reports/crawling/crawl_report.json` by default.
 - [ ] Every raw artifact has a content hash.
 - [ ] Failed crawls are traceable and actionable.
 - [ ] Attachment-based documents are handled or marked `manual_review`.

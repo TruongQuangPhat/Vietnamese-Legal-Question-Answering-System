@@ -50,8 +50,9 @@ The same engineering rules apply across all phases:
   explicitly approved and documented.
 - Prefer VBHN consolidated documents when available.
 - Preserve traceability from every derived artifact back to raw source data.
-- Never mutate `data/raw/`; write derived outputs to `data/interim/`,
-  `data/processed/`, or `data/reports/`.
+- Never mutate `data/raw/`; write derived corpus outputs to `data/interim/`
+  or `data/processed/`, and generated reports to phase-specific
+  `artifacts/reports/<phase>/` directories.
 - Preserve Vietnamese legal hierarchy:
   `Phần / Chương / Mục / Điều / Khoản / Điểm`.
 - Keep deterministic preprocessing before introducing LLM behavior.
@@ -70,7 +71,7 @@ src/ingestion/  reusable ingestion and cleaning domain logic
 configs/laws/    registry and legal corpus configuration
 data/raw/       immutable crawl artifacts
 data/interim/   derived intermediate artifacts
-data/reports/   audit and validation reports
+artifacts/reports/<phase>/   generated crawl, audit, cleaning, parsing, and validation reports
 docs/           phase notes, design docs, validation criteria
 tests/          focused unit tests
 ```
@@ -222,6 +223,7 @@ corpus_registry.yml
 → rate-limited HTTP fetch
 → raw artifact storage
 → main.html + metadata.json
+→ artifacts/reports/crawling/crawl_report.json
 → Raw Corpus Audit
 ```
 
@@ -267,7 +269,7 @@ non-legal content.
 - `src/ingestion/audit.py`
 - `tests/unit/ingestion/test_audit.py`
 - `docs/raw_corpus_audit.md`
-- `data/reports/raw_corpus_audit.json`
+- `artifacts/reports/audit/raw_corpus_audit.json`
 
 ### User-Facing Command
 
@@ -275,7 +277,7 @@ non-legal content.
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 ### Audit Pipeline
@@ -287,7 +289,7 @@ registry law ids
 → HTML size/readability validator
 → error page detector
 → legal marker checker
-→ raw_corpus_audit.json
+→ artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 ### Checks
@@ -315,7 +317,7 @@ Phase 3 passes when:
 - 52 registry entries are represented in raw artifacts;
 - 52 raw artifacts are valid;
 - no critical missing files or metadata mismatches remain;
-- report output is written to `data/reports/raw_corpus_audit.json`.
+- report output is written to `artifacts/reports/audit/raw_corpus_audit.json`.
 
 ## 8. Phase 4 — Cleaning & Normalization
 
@@ -348,8 +350,8 @@ point labels: a), b), c)
 - `docs/cleaning_normalization.md`
 - `data/interim/{LAW_ID}/normalized.json`
 - `data/interim/{LAW_ID}/cleaned.txt`
-- `data/reports/cleaning_report.json`
-- `data/reports/cleaning_quality_audit.json`
+- `artifacts/reports/cleaning/cleaning_report.json`
+- `artifacts/reports/cleaning/cleaning_quality_audit.json`
 
 ### User-Facing Commands
 
@@ -359,7 +361,7 @@ Clean corpus:
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt \
   --audit
 ```
@@ -370,7 +372,7 @@ Run cleaning diagnostics:
 uv run python scripts/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
-  --report-dir data/reports \
+  --report-dir artifacts/reports/cleaning \
   --registry configs/laws/corpus_registry.yml
 ```
 
@@ -390,7 +392,7 @@ metadata.json
 → quality marker computation
 → normalized.json
 → optional cleaned.txt
-→ cleaning_report.json
+→ artifacts/reports/cleaning/cleaning_report.json
 ```
 
 ### Key Problems Found and Fixed
@@ -590,7 +592,7 @@ The parser should produce:
 
 ```text
 data/interim/{LAW_ID}/hierarchy.json
-data/reports/legal_parsing_report.json
+artifacts/reports/parsing/legal_parsing_report.json
 ```
 
 Parser responsibilities:
@@ -634,14 +636,14 @@ Completed full validation commands:
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt \
   --audit
 
 uv run python scripts/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
-  --report-dir data/reports \
+  --report-dir artifacts/reports/cleaning \
   --registry configs/laws/corpus_registry.yml
 ```
 

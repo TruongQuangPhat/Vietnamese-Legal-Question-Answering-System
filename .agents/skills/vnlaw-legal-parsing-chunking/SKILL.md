@@ -122,8 +122,8 @@ Expected components:
 ```text
 scripts/parse_legal_hierarchy.py
 src/services/legal_parsing_service.py
-src/ingestion/legal_parser.py
-tests/unit/ingestion/test_legal_parser.py
+src/processing/legal_parser.py
+tests/unit/processing/test_legal_parser.py
 
 future after parser gate:
 ParentChildChunker

@@ -82,50 +82,71 @@ The project roadmap is:
 Use this as the canonical structure unless a task explicitly changes it:
 
 ```text
-vnlaw_qa/
-├── .github/workflows/
-│   ├── ci.yml
-│   ├── eval.yml
-│   ├── build.yml
-│   └── deploy.yml
-├── .claude/
-│   ├── settings.example.json
-│   └── skills/
+VnLaw-QA/
 ├── configs/
-│   ├── models.yml
-│   ├── retrieval.yml
-│   ├── chunking.yml
-│   ├── prompts/
-│   │   ├── legal_qa.j2
-│   │   ├── intent_classification.j2
-│   │   └── entity_extraction.j2
-│   └── laws/corpus_registry.yml
+│   ├── laws/
+│   ├── sources/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   └── evaluation/
 ├── data/
-│   ├── raw/
-│   ├── processed/
+│   ├── raw/          # immutable raw legal evidence
+│   ├── interim/      # normalized and parsed intermediate artifacts
+│   ├── processed/    # future chunked/index-ready corpus artifacts
+│   ├── indexes/
 │   └── eval/
-├── deploy/
-│   ├── docker/
-│   ├── docker-compose.yml
-│   ├── docker-compose.prod.yml
-│   └── vllm_serve.sh
-├── scripts/
+├── artifacts/
+│   ├── reports/
+│   │   ├── crawling/
+│   │   ├── audit/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── chunking/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   ├── traces/
+│   │   ├── crawling/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── retrieval/
+│   │   └── generation/
+│   ├── runs/
+│   │   ├── experiments/
+│   │   ├── benchmarks/
+│   │   └── evaluations/
+│   ├── metrics/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   └── logs/
 ├── src/
 │   ├── core/
 │   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
 │   ├── retrieval/
 │   ├── generation/
-│   ├── agents/
-│   └── api/
+│   ├── services/
+│   ├── api/
+│   ├── evaluation/
+│   ├── monitoring/
+│   └── security/
+├── scripts/
 ├── tests/
 │   ├── unit/
 │   ├── integration/
-│   └── evaluation/
-├── notebooks/
-├── .env.example
-├── .gitignore
-├── pyproject.toml
-└── README.md
+│   ├── regression/
+│   └── fixtures/
+├── docs/
+├── docker/
+├── deployment/
+├── monitoring/
+└── .github/workflows/
 ```
 
 ## 5. Python, OOP, and Architecture Standards

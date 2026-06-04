@@ -29,6 +29,7 @@ git checkout -b maintenance/corpus-refresh-YYYYMMDD
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --dry-run
 
@@ -36,6 +37,7 @@ uv run python scripts/crawl_raw_corpus.py \
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --concurrency 2 \
   --delay-seconds 2 \
@@ -45,30 +47,30 @@ uv run python scripts/crawl_raw_corpus.py \
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 
 # 5. Re-run downstream processing after audit passes
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt \
   --audit
 
 uv run python scripts/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --report data/reports/legal_parsing_report.json
+  --report artifacts/reports/parsing/legal_parsing_report.json
 
 uv run python scripts/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --report data/reports/chunking_report.json
+  --report artifacts/reports/chunking/chunking_report.json
 
 uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
-  --report-dir data/reports
+  --report-dir artifacts/reports/chunking
 
 # 6. Rebuild or refresh indexes
 uv run python scripts/build_embedding_index.py \
@@ -414,11 +416,11 @@ uv run pytest tests/unit -v
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
-  --report-dir data/reports \
+  --report-dir artifacts/reports/chunking \
   --validate-only
 uv run python scripts/evaluate_retrieval.py \
   --golden data/eval/golden_qa.jsonl
@@ -651,6 +653,7 @@ uv run python scripts/switch_index_alias.py \
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --dry-run
 
@@ -658,6 +661,7 @@ uv run python scripts/crawl_raw_corpus.py \
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --law-ids LDD_VBHN BLDS_2015 \
   --concurrency 2 \
   --delay-seconds 2 \
@@ -671,13 +675,13 @@ uv run python scripts/crawl_raw_corpus.py \
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 
 # Processed JSONL validation
 uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
-  --report-dir data/reports \
+  --report-dir artifacts/reports/chunking \
   --validate-only
 ```
 

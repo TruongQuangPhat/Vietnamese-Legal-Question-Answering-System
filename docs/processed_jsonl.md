@@ -14,7 +14,7 @@ This phase acts as a quality gate: only chunks that pass all validation rules pr
 uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
-  --report-dir data/reports \
+  --report-dir artifacts/reports/chunking \
   --law-ids LDD_VBHN BLDS_2015
 ```
 
@@ -22,7 +22,7 @@ uv run python scripts/export_processed_jsonl.py \
 1. Input: `data/interim/{law_id}/chunks.jsonl` (raw chunks from chunker)
 2. Validation: schema, duplicates, citations, required fields
 3. Output: `data/processed/{law_id}.jsonl` (validated chunks)
-4. Report: `data/reports/processed_validation.json` (summary + errors)
+4. Report: `artifacts/reports/chunking/processed_validation.json` (summary + errors)
 
 ## Architecture
 
@@ -130,7 +130,7 @@ uv run python scripts/export_processed_jsonl.py \
 
 **Goal**: Produce summary JSON with pass/fail statistics and error details.
 
-**Output**: `data/reports/processed_validation.json`
+**Output**: `artifacts/reports/chunking/processed_validation.json`
 
 Schema:
 ```json
@@ -183,7 +183,7 @@ Schema:
    - Validate citation format (regex).
    - Write valid chunks to `data/processed/{law_id}.jsonl`.
    - Accumulate errors and warnings.
-3. After all files, write aggregate report `data/reports/processed_validation.json`.
+3. After all files, write aggregate report `artifacts/reports/chunking/processed_validation.json`.
 4. Exit code:
    - `0` if all files have zero invalid chunks.
    - `1` if any invalid chunks found.
@@ -269,7 +269,7 @@ See Architecture section above.
 uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
-  --report-dir data/reports
+  --report-dir artifacts/reports/chunking
 
 # Specific laws only
 uv run python scripts/export_processed_jsonl.py \
@@ -286,7 +286,7 @@ uv run python scripts/export_processed_jsonl.py \
 **Arguments**:
 - `--input-dir`: Directory containing `{law_id}/chunks.jsonl` (default: `data/interim`)
 - `--output-dir`: Where to write `{law_id}.jsonl` (default: `data/processed`)
-- `--report-dir`: Where to write `processed_validation.json` (default: `data/reports`)
+- `--report-dir`: Where to write `processed_validation.json` (default: `artifacts/reports/chunking`)
 - `--law-ids`: List of specific laws; if omitted, process all found in input dir.
 - `--validate-only`: Run checks but do not write output files.
 
@@ -323,7 +323,7 @@ Aggregate error count determines exit code; partial success still writes valid c
 | Citation errors for all chunks | Citation builder used English format | Look at citation field in error sample | Switch to Vietnamese format: "Luật ..., Điều ..., Khoản ..., Điểm ..." |
 | Missing `hierarchy_path` field | Chunker did not populate | Schema error says field required | Ensure chunker builds `hierarchy_path` from node ancestry |
 | Output file empty | All chunks invalid or wrong input directory | Check `summary.valid_chunks` count | Fix upstream chunker; verify input dir path |
-| Report not generated | Report directory not writable | Check `data/reports/` exists and is writable | Create directory or change `--report-dir` |
+| Report not generated | Report directory not writable | Check `artifacts/reports/chunking/` exists and is writable | Create directory or change `--report-dir` |
 | Warnings about identical content | Parser produced duplicate clause/point nodes | Inspect warning `chunk_id` pairs | Verify parser hierarchy tree has no duplication |
 
 ## Best Practices

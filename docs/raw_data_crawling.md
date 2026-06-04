@@ -102,6 +102,7 @@ Dry run before any crawl:
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --dry-run
 ```
@@ -112,6 +113,7 @@ Actual batch crawl:
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --concurrency 2
 ```
@@ -578,8 +580,9 @@ Phase 2 hands off raw artifacts to Raw Corpus Audit:
 ```text
 data/raw/{LAW_ID}/latest/main.html
 data/raw/{LAW_ID}/latest/metadata.json
+artifacts/reports/crawling/crawl_report.json
 → scripts/audit_raw_corpus.py
-→ data/reports/raw_corpus_audit.json
+→ artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 The audit phase verifies that raw artifacts are complete, readable, trusted,

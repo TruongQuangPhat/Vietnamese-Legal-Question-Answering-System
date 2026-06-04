@@ -18,7 +18,7 @@ This design ensures that:
 uv run python scripts/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --report data/reports/chunking_report.json \
+  --report artifacts/reports/chunking/chunking_report.json \
   --law-ids LDD_VBHN BLDS_2015
 ```
 
@@ -270,7 +270,7 @@ Parent-child chunking respects legal structure and ensures every retrieved chunk
 uv run python scripts/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --report data/reports/chunking_report.json
+  --report artifacts/reports/chunking/chunking_report.json
 
 # Specific laws with format options
 uv run python scripts/chunk_legal_corpus.py \

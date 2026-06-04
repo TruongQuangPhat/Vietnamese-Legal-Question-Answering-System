@@ -48,7 +48,8 @@ Cleaner version:         v0.8.0
 - Preserve source traceability from raw HTML to final citations.
 - Preserve legal hierarchy: `Phần / Chương / Mục / Điều / Khoản / Điểm`.
 - Do not mutate `data/raw/`; derived artifacts go under `data/interim/`,
-  `data/processed/`, or `data/reports/`.
+  `data/processed/`, while generated reports go under phase-specific
+  `artifacts/reports/<phase>/` directories.
 - Do not use LLMs for deterministic legal preprocessing.
 - Do not let future QA generation invent laws, articles, clauses, points, or
   citations.
@@ -71,8 +72,22 @@ VnLaw-QA/
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
 │   ├── interim/      # normalized artifacts and future hierarchy outputs
-│   ├── processed/    # future JSONL chunks
-│   └── reports/      # audit and quality reports
+│   └── processed/    # future JSONL chunks
+├── artifacts/
+│   ├── reports/
+│   │   ├── crawling/
+│   │   ├── audit/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── chunking/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   ├── traces/       # parser/retrieval/generation traces
+│   ├── runs/         # experiment and benchmark runs
+│   ├── metrics/      # evaluation metrics
+│   └── logs/         # saved logs when needed
 ├── docs/
 │   ├── project_phase_journal.md
 │   ├── corpus_registry.md
@@ -98,7 +113,12 @@ Target production layout, added incrementally by phase:
 VnLaw-QA/
 ├── configs/{laws,sources,ingestion,processing,indexing,retrieval,generation,evaluation}/
 ├── data/{raw,interim,processed,indexes,eval}/
-├── artifacts/{audit_reports,parsing_reports,chunking_reports,retrieval_reports,evaluation_reports,traces}/
+├── artifacts/
+│   ├── reports/{crawling,audit,cleaning,parsing,chunking,indexing,retrieval,generation,evaluation}/
+│   ├── traces/{crawling,cleaning,parsing,retrieval,generation}/
+│   ├── runs/{experiments,benchmarks,evaluations}/
+│   ├── metrics/{retrieval,generation,evaluation}/
+│   └── logs/
 ├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
 ├── scripts/
 ├── tests/{unit,integration,regression,fixtures}/
@@ -152,13 +172,14 @@ Implemented and planned pipeline:
 │ Phase 2                      │
 │ Registry-driven Crawling     │
 │ data/raw/{LAW_ID}/latest/    │
+│ artifacts/reports/crawling/  │
 └──────────────┬───────────────┘
                │
                ▼
 ┌──────────────────────────────┐
 │ Phase 3                      │
 │ Raw Corpus Audit             │
-│ data/reports/raw_*.json      │
+│ artifacts/reports/audit/*.json    │
 └──────────────┬───────────────┘
                │
                ▼
@@ -242,9 +263,9 @@ through Cleaning & Normalization:
                      ▼
 ┌────────────────────────────────────────────┐
 │ 6. Quality Reports                         │
-│ data/reports/cleaning_report.json          │
-│ data/reports/cleaning_quality_audit.json   │
-│ data/reports/raw_vs_cleaning_comparison... │
+│ artifacts/reports/cleaning/cleaning_report.json          │
+│ artifacts/reports/cleaning/cleaning_quality_audit.json   │
+│ artifacts/reports/cleaning/raw_vs_cleaning_comparison... │
 └────────────────────────────────────────────┘
 ```
 
@@ -364,7 +385,7 @@ Phase 5 should parse hierarchy only. It should not chunk or embed yet.
 ┌────────────────────────────────────────────┐
 │ Output                                     │
 │ data/interim/{LAW_ID}/hierarchy.json       │
-│ data/reports/legal_parsing_report.json     │
+│ artifacts/reports/parsing/legal_parsing_report.json     │
 └────────────────────────────────────────────┘
 ```
 
@@ -414,13 +435,23 @@ Inspect crawler:
 uv run python scripts/crawl_raw_corpus.py --help
 ```
 
+Crawl raw corpus:
+
+```bash
+uv run python scripts/crawl_raw_corpus.py \
+  --registry configs/laws/corpus_registry.yml \
+  --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
+  --only-status pending
+```
+
 Audit raw corpus:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 Clean and normalize corpus:
@@ -429,7 +460,7 @@ Clean and normalize corpus:
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt \
   --audit
 ```
@@ -440,7 +471,7 @@ Run cleaning diagnostics:
 uv run python scripts/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
-  --report-dir data/reports \
+  --report-dir artifacts/reports/cleaning \
   --registry configs/laws/corpus_registry.yml
 ```
 
@@ -475,13 +506,14 @@ data/interim/{LAW_ID}/cleaned.txt
 Reports:
 
 ```text
-data/reports/raw_corpus_audit.json
-data/reports/cleaning_report.json
-data/reports/cleaning_quality_audit.json
-data/reports/raw_vs_cleaning_comparison.json
-data/reports/html_pattern_audit.json
-data/reports/selector_candidate_audit.json
-data/reports/pattern_groups.json
+artifacts/reports/crawling/crawl_report.json
+artifacts/reports/audit/raw_corpus_audit.json
+artifacts/reports/cleaning/cleaning_report.json
+artifacts/reports/cleaning/cleaning_quality_audit.json
+artifacts/reports/cleaning/raw_vs_cleaning_comparison.json
+artifacts/reports/cleaning/html_pattern_audit.json
+artifacts/reports/cleaning/selector_candidate_audit.json
+artifacts/reports/cleaning/pattern_groups.json
 ```
 
 ## Documentation Map

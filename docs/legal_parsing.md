@@ -14,7 +14,7 @@ Parsing is the foundation for parent-child chunking. Accurate hierarchy extracti
 uv run python scripts/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --report data/reports/legal_parsing_report.json \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
   --law-ids LDD_VBHN BLDS_2015
 ```
 
@@ -26,8 +26,8 @@ uv run python scripts/parse_legal_hierarchy.py \
 **Expected implementation boundary**:
 - `scripts/parse_legal_hierarchy.py`: CLI, argparse, console summaries, exit codes.
 - `src/services/legal_parsing_service.py`: batch orchestration and report building.
-- `src/ingestion/legal_parser.py`: reusable parser/domain logic.
-- `tests/unit/ingestion/test_legal_parser.py`: focused parser tests.
+- `src/processing/legal_parser.py`: reusable parser/domain logic.
+- `tests/unit/processing/test_legal_parser.py`: focused parser tests.
 
 ## Architecture
 
@@ -262,7 +262,7 @@ This design ensures globally unique IDs within a law.
 uv run python scripts/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --report data/reports/legal_parsing_report.json
+  --report artifacts/reports/parsing/legal_parsing_report.json
 
 # Parse specific laws
 uv run python scripts/parse_legal_hierarchy.py \

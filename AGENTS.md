@@ -35,7 +35,9 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - `src/ingestion/` = reusable ingestion/domain logic such as crawler, audit,
   cleaning, registry, storage, and models.
 - `data/raw/` = immutable raw crawl artifacts unless explicitly asked.
-- `data/interim/` and `data/reports/` = derived outputs.
+- `data/interim/` = derived corpus artifacts.
+- `artifacts/reports/<phase>/` = generated reports and diagnostics grouped by
+  pipeline phase.
 - Preserve Vietnamese legal hierarchy: Phần / Chương / Mục / Điều / Khoản / Điểm.
 
 ## 4. Current Phase Status
@@ -155,7 +157,8 @@ After editing:
 - Do not list `.git`, `.venv`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`,
   `__pycache__`, or huge generated folders.
 - Do not mutate `data/raw/`.
-- Do not modify `data/interim/` or `data/reports/` unless explicitly asked.
+- Do not modify `data/interim/`, historical `data/reports/`, or generated
+  `artifacts/` outputs unless explicitly asked.
 - Do not run full crawl, audit, or cleaning commands unless explicitly requested.
 - Do not proceed to chunking/RAG before the legal hierarchy parser gate is solid.
 - Do not delete `.claude/`, `.claude/skills/`, Claude settings files,
