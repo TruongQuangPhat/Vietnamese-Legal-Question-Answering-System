@@ -1450,9 +1450,9 @@ Exclude:
 
 ## Execution Progress
 
-- [ ] Step 1 — Input contract and cleaned comparison
-- [ ] Step 2 — Canonical schemas and issues
-- [ ] Step 3 — Heading recognizer
+- [x] Step 1 — Input contract and cleaned comparison
+- [x] Step 2 — Canonical schemas and issues
+- [x] Step 3 — Heading recognizer
 - [ ] Step 4 — Clause/Point recognition refinement
 - [ ] Step 5 — Span segmentation
 - [ ] Step 6 — Hierarchy builder and IDs
