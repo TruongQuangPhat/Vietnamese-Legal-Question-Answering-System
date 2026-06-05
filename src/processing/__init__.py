@@ -25,6 +25,7 @@ from src.processing.legal_span_segmenter import (
     SegmentedLegalUnit,
     SpanSegmentationResult,
 )
+from src.processing.legal_tree_validator import LegalTreeValidationResult, LegalTreeValidator
 from src.processing.normalized_input import (
     NormalizedInputLoadResult,
     NormalizedLegalArtifact,
@@ -45,6 +46,8 @@ __all__ = [
     "LegalParsingResult",
     "LegalParsingStatus",
     "LegalSpanSegmenter",
+    "LegalTreeValidationResult",
+    "LegalTreeValidator",
     "HierarchyBuildResult",
     "NormalizedInputLoadResult",
     "NormalizedLegalArtifact",
