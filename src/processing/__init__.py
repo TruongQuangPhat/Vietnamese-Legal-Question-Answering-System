@@ -20,6 +20,11 @@ from src.processing.legal_hierarchy_models import (
     StructuredParsingIssue,
     ValidationSummary,
 )
+from src.processing.legal_parser import (
+    LegalParser,
+    LegalParserExecutionResult,
+    LegalParserRecognitionSummary,
+)
 from src.processing.legal_span_segmenter import (
     LegalSpanSegmenter,
     SegmentedLegalUnit,
@@ -42,6 +47,9 @@ __all__ = [
     "LegalHierarchyMetadata",
     "LegalNode",
     "LegalNodeLevel",
+    "LegalParser",
+    "LegalParserExecutionResult",
+    "LegalParserRecognitionSummary",
     "LegalParsingReport",
     "LegalParsingResult",
     "LegalParsingStatus",

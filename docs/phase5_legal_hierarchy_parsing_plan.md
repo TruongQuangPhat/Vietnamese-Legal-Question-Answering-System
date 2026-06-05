@@ -1457,7 +1457,7 @@ Exclude:
 - [x] Step 5 — Span segmentation
 - [x] Step 6 — Hierarchy builder and IDs
 - [x] Step 7 — Validator
-- [ ] Step 8 — Parser facade
+- [x] Step 8 — Parser facade
 - [ ] Step 9 — Batch service and report
 - [ ] Step 10 — CLI
 - [ ] Step 11 — Priority corpus validation
