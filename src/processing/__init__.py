@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from src.processing.legal_heading_recognizer import LegalHeadingRecognizer, RecognizedHeading
+from src.processing.legal_hierarchy_builder import (
+    HierarchyBuildResult,
+    LegalHierarchyBuilder,
+    LegalHierarchyBuildError,
+)
 from src.processing.legal_hierarchy_models import (
     LegalHierarchyDocument,
     LegalHierarchyMetadata,
@@ -30,6 +35,8 @@ from src.processing.normalized_input import (
 
 __all__ = [
     "LegalHeadingRecognizer",
+    "LegalHierarchyBuildError",
+    "LegalHierarchyBuilder",
     "LegalHierarchyDocument",
     "LegalHierarchyMetadata",
     "LegalNode",
@@ -38,6 +45,7 @@ __all__ = [
     "LegalParsingResult",
     "LegalParsingStatus",
     "LegalSpanSegmenter",
+    "HierarchyBuildResult",
     "NormalizedInputLoadResult",
     "NormalizedLegalArtifact",
     "ParsingIssueCode",

@@ -1455,7 +1455,7 @@ Exclude:
 - [x] Step 3 — Heading recognizer
 - [x] Step 4 — Clause/Point recognition refinement
 - [x] Step 5 — Span segmentation
-- [ ] Step 6 — Hierarchy builder and IDs
+- [x] Step 6 — Hierarchy builder and IDs
 - [ ] Step 7 — Validator
 - [ ] Step 8 — Parser facade
 - [ ] Step 9 — Batch service and report
