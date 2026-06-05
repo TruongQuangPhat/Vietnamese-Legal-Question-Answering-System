@@ -15,6 +15,11 @@ from src.processing.legal_hierarchy_models import (
     StructuredParsingIssue,
     ValidationSummary,
 )
+from src.processing.legal_span_segmenter import (
+    LegalSpanSegmenter,
+    SegmentedLegalUnit,
+    SpanSegmentationResult,
+)
 from src.processing.normalized_input import (
     NormalizedInputLoadResult,
     NormalizedLegalArtifact,
@@ -32,10 +37,13 @@ __all__ = [
     "LegalParsingReport",
     "LegalParsingResult",
     "LegalParsingStatus",
+    "LegalSpanSegmenter",
     "NormalizedInputLoadResult",
     "NormalizedLegalArtifact",
     "ParsingIssueCode",
     "RecognizedHeading",
+    "SegmentedLegalUnit",
+    "SpanSegmentationResult",
     "StructuredParsingIssue",
     "ValidationSummary",
     "compare_cleaned_text",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.processing.legal_heading_recognizer import LegalHeadingRecognizer
+from src.processing.legal_heading_recognizer import CandidateClassification, LegalHeadingRecognizer
 from src.processing.legal_hierarchy_models import LegalNodeLevel, ParsingIssueCode
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "legal_hierarchy"
@@ -100,3 +100,184 @@ def test_exact_heading_offsets_and_source_text_immutability() -> None:
     assert text == original
     assert text[article.start_offset : article.end_offset] == "Điều 1. Phạm vi điều chỉnh"
     assert article.title == "Phạm vi điều chỉnh"
+
+
+def test_standard_and_footnoted_clauses_under_active_article() -> None:
+    """Certain Clause candidates require active Article context."""
+    text = _read_fixture("clause_point_candidates.txt")
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    clauses = [heading for heading in result.headings if heading.level == LegalNodeLevel.CLAUSE]
+
+    assert [clause.number for clause in clauses] == ["1", "2", "1"]
+    assert clauses[0].classification == CandidateClassification.CERTAIN
+    assert clauses[0].active_article_number == "1"
+    assert clauses[0].footnote is None
+    assert clauses[1].number == "2"
+    assert clauses[1].footnote == "3"
+    assert clauses[1].active_article_number == "1"
+    assert clauses[2].active_article_number == "2"
+
+
+def test_numbered_line_before_first_article_is_rejected() -> None:
+    """A numbered line before any Article is not a Clause node."""
+    text = "1. Nội dung trước Điều\nĐiều 1. Phạm vi điều chỉnh\n"
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+
+    assert [heading.level for heading in result.headings] == [LegalNodeLevel.ARTICLE]
+    assert len(result.rejected_candidates) == 1
+    assert result.rejected_candidates[0].classification == CandidateClassification.REJECTED
+    assert result.rejected_candidates[0].metadata["reason"] == "missing_active_article"
+
+
+def test_clause_context_resets_at_next_article() -> None:
+    """A new Article resets active Clause before Point recognition."""
+    text = _read_fixture("clause_point_candidates.txt")
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    rejected_points = [
+        candidate
+        for candidate in result.rejected_candidates
+        if candidate.level == LegalNodeLevel.POINT
+    ]
+    accepted_points = [
+        heading for heading in result.headings if heading.level == LegalNodeLevel.POINT
+    ]
+
+    assert rejected_points[0].heading_text == "a) Điểm trực tiếp dưới điều không hợp lệ"
+    assert rejected_points[0].active_article_number == "2"
+    assert rejected_points[0].active_clause_number is None
+    assert accepted_points[-1].heading_text == "a) Điểm thuộc khoản mới"
+    assert accepted_points[-1].active_article_number == "2"
+    assert accepted_points[-1].active_clause_number == "1"
+
+
+def test_malformed_numeric_clause_candidates_are_ambiguous_not_certain() -> None:
+    """Malformed `N.text` and `N text` lines are preserved as ambiguous only."""
+    text = _read_fixture("clause_point_candidates.txt")
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+
+    assert [candidate.heading_text for candidate in result.ambiguous_candidates] == [
+        "1.Nội dung thiếu khoảng trắng",
+        "2 Nội dung thiếu dấu chấm",
+    ]
+    assert all(
+        candidate.classification == CandidateClassification.AMBIGUOUS
+        for candidate in result.ambiguous_candidates
+    )
+    assert all(
+        candidate.heading_text not in {heading.heading_text for heading in result.headings}
+        for candidate in result.ambiguous_candidates
+    )
+    assert [
+        warning.code
+        for warning in result.warnings
+        if warning.code == ParsingIssueCode.AMBIGUOUS_CLAUSE_CANDIDATE
+    ] == [
+        ParsingIssueCode.AMBIGUOUS_CLAUSE_CANDIDATE,
+        ParsingIssueCode.AMBIGUOUS_CLAUSE_CANDIDATE,
+    ]
+
+
+def test_unrelated_numbered_date_is_rejected_not_promoted() -> None:
+    """Date-like numbered lines inside an Article are not Clause candidates."""
+    text = _read_fixture("clause_point_candidates.txt")
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    rejected = [
+        candidate
+        for candidate in result.rejected_candidates
+        if candidate.heading_text == "01 tháng 01 năm 2026 không phải khoản"
+    ]
+
+    assert len(rejected) == 1
+    assert rejected[0].metadata["reason"] == "date_like_numbered_line"
+    assert rejected[0].heading_text not in {heading.heading_text for heading in result.headings}
+
+
+def test_clause_candidate_inside_source_note_region_is_rejected() -> None:
+    """Source-note regions suppress Clause recognition until the next Article."""
+    text = "\n".join(
+        [
+            "Điều 74 và Điều 75 của Luật Giá số 16/2023/QH15 quy định như sau:",
+            "1. Khoản trong ghi chú nguồn",
+            "Điều 1. Phạm vi điều chỉnh",
+            "1. Khoản chính",
+        ]
+    )
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    clauses = [heading for heading in result.headings if heading.level == LegalNodeLevel.CLAUSE]
+    rejected_clauses = [
+        candidate
+        for candidate in result.rejected_candidates
+        if candidate.level == LegalNodeLevel.CLAUSE
+    ]
+
+    assert [clause.heading_text for clause in clauses] == ["1. Khoản chính"]
+    assert rejected_clauses[0].heading_text == "1. Khoản trong ghi chú nguồn"
+    assert rejected_clauses[0].metadata["reason"] == "source_note_exclusion"
+
+
+def test_clause_candidate_inside_appendix_or_table_region_is_rejected() -> None:
+    """Appendix/table regions suppress Clause recognition."""
+    text = "\n".join(
+        [
+            "Điều 1. Phạm vi điều chỉnh",
+            "PHỤ LỤC",
+            "1. Dòng phụ lục",
+            "STT",
+            "2. Dòng bảng",
+        ]
+    )
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+
+    assert [heading.level for heading in result.headings] == [LegalNodeLevel.ARTICLE]
+    assert [candidate.metadata["reason"] for candidate in result.rejected_candidates] == [
+        "appendix_exclusion",
+        "appendix_exclusion",
+    ]
+
+
+def test_standard_vietnamese_and_footnoted_points_under_active_clause() -> None:
+    """Certain Point candidates require the current active Clause."""
+    text = _read_fixture("clause_point_candidates.txt")
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    points = [heading for heading in result.headings if heading.level == LegalNodeLevel.POINT]
+
+    assert [point.number for point in points[:3]] == ["a", "đ", "c"]
+    assert points[0].classification == CandidateClassification.CERTAIN
+    assert points[0].active_article_number == "1"
+    assert points[0].active_clause_number == "2"
+    assert points[1].number == "đ"
+    assert points[2].footnote == "4"
+
+
+def test_point_outside_clause_and_direct_article_to_point_are_rejected_or_flagged() -> None:
+    """Point-like lines outside active Clause are not accepted."""
+    text = "Điều 1. Phạm vi điều chỉnh\na) Điểm trực tiếp dưới Điều\n"
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+
+    assert [heading.level for heading in result.headings] == [LegalNodeLevel.ARTICLE]
+    assert len(result.rejected_candidates) == 1
+    assert result.rejected_candidates[0].level == LegalNodeLevel.POINT
+    assert result.rejected_candidates[0].classification == CandidateClassification.REJECTED
+    assert result.rejected_candidates[0].metadata["reason"] == "missing_active_clause"
+    assert result.warnings[0].code == ParsingIssueCode.POINT_LIKE_LINE_OUTSIDE_CLAUSE
+
+
+def test_exact_clause_point_offsets_and_source_text_immutability() -> None:
+    """Clause and Point candidate offsets refer to the original source string."""
+    text = _read_fixture("clause_point_candidates.txt")
+    original = text[:]
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    clause = next(
+        heading
+        for heading in result.headings
+        if heading.heading_text == "2.[3] Khoản chắc chắn có chú thích"
+    )
+    point = next(
+        heading
+        for heading in result.headings
+        if heading.heading_text == "đ) Điểm đ thuộc khoản 2"
+    )
+
+    assert text == original
+    assert text[clause.start_offset : clause.end_offset] == clause.heading_text
+    assert text[point.start_offset : point.end_offset] == point.heading_text

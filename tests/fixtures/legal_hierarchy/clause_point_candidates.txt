@@ -1,0 +1,14 @@
+Điều 1. Phạm vi điều chỉnh
+1. Khoản chắc chắn thứ nhất
+2.[3] Khoản chắc chắn có chú thích
+a) Điểm a thuộc khoản 2
+đ) Điểm đ thuộc khoản 2
+c)[4] Điểm c có chú thích
+1.Nội dung thiếu khoảng trắng
+2 Nội dung thiếu dấu chấm
+01 tháng 01 năm 2026 không phải khoản
+
+Điều 2. Điều khoản khác
+a) Điểm trực tiếp dưới điều không hợp lệ
+1. Khoản mới
+a) Điểm thuộc khoản mới
