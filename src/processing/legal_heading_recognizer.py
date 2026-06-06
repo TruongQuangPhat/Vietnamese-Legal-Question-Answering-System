@@ -32,6 +32,7 @@ class _RecognitionState:
     active_article_number: str | None = None
     active_clause_number: str | None = None
     source_note_exclusion: bool = False
+    source_note_quote_open: bool = False
     appendix_exclusion: bool = False
     table_exclusion: bool = False
 
@@ -220,6 +221,7 @@ class LegalHeadingRecognizer:
                 boundaries.append(self._build_boundary(line, RecognitionBoundaryKind.SOURCE_NOTE))
                 warnings.append(self._source_note_warning(line, law_id=law_id))
                 state.source_note_exclusion = True
+                state.source_note_quote_open = False
                 state.active_clause_number = None
                 continue
 
@@ -240,6 +242,10 @@ class LegalHeadingRecognizer:
                     self._build_boundary(line, RecognitionBoundaryKind.SIGNATURE_FOOTER)
                 )
                 state.active_clause_number = None
+                continue
+
+            if self._is_quoted_source_note_line(line.text, state):
+                self._close_source_note_quote_if_needed(line.text, state)
                 continue
 
             part = self._PART_RE.match(line.text)
@@ -571,6 +577,33 @@ class LegalHeadingRecognizer:
     def _is_blank(line_text: str) -> bool:
         """Return whether a source line has no visible text."""
         return line_text.strip() == ""
+
+    def _is_quoted_source_note_line(
+        self,
+        line_text: str,
+        state: _RecognitionState,
+    ) -> bool:
+        """Return whether the line belongs to a quoted source-law note block."""
+        if not state.source_note_exclusion:
+            return False
+        if self._opens_source_note_quote(line_text):
+            state.source_note_quote_open = True
+        return state.source_note_quote_open
+
+    @staticmethod
+    def _opens_source_note_quote(line_text: str) -> bool:
+        """Return whether a source-note content line opens a quote block."""
+        return line_text.strip().startswith(("“", '"'))
+
+    @staticmethod
+    def _close_source_note_quote_if_needed(
+        line_text: str,
+        state: _RecognitionState,
+    ) -> None:
+        """Close quoted source-note state when a line terminates the quote."""
+        stripped = line_text.strip()
+        if state.source_note_quote_open and re.search(r'[”"]\s*\.?\s*$', stripped):
+            state.source_note_quote_open = False
 
     @staticmethod
     def _source_note_warning(line: _LineInfo, *, law_id: str) -> StructuredParsingIssue:

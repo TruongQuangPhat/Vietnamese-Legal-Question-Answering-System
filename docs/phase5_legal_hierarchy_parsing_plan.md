@@ -1460,5 +1460,5 @@ Exclude:
 - [x] Step 8 — Parser facade
 - [x] Step 9 — Batch service and report
 - [x] Step 10 — CLI
-- [ ] Step 11 — Priority corpus validation
+- [x] Step 11 — Priority corpus validation
 - [ ] Step 12 — Full corpus output and documentation

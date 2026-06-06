@@ -221,6 +221,34 @@ def test_recognition_warnings_reach_final_result_without_becoming_nodes(tmp_path
     assert result.recognition_summary.rejected_candidate_count >= 1
 
 
+def test_quoted_source_note_article_does_not_fail_or_become_node(tmp_path: Path) -> None:
+    """Article-like source-note lines remain outside the main hierarchy."""
+    text = "\n".join(
+        [
+            "Điều 1. Phạm vi điều chỉnh",
+            "Nội dung chính.",
+            "Điều 3 và Điều 4 của Luật số 86/2025/QH15 sửa đổi, bổ sung một số điều của Bộ luật Hình sự, có hiệu lực kể từ ngày 01 tháng 7 năm 2025 quy định như sau:",
+            "“Điều 3. Hiệu lực thi hành",
+            "Luật này có hiệu lực thi hành từ ngày 01 tháng 7 năm 2025.",
+            "Điều 4. Điều khoản chuyển tiếp",
+            "1. Nội dung chuyển tiếp trong ghi chú nguồn.\".",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
+    assert result.document is not None
+    assert _issue_codes(result.warnings) == [ParsingIssueCode.SOURCE_NOTE_EXCLUDED]
+    article_headings = [
+        node.metadata.get("heading_text")
+        for node in result.document.nodes
+        if node.level == "article"
+    ]
+    assert article_headings == ["Điều 1. Phạm vi điều chỉnh"]
+    assert "Điều 4. Điều khoản chuyển tiếp" in result.document.nodes[0].text
+
+
 def test_builder_and_validator_warnings_reach_final_result(tmp_path: Path) -> None:
     """Collision and Phase 4 metric warnings are surfaced by the facade."""
     collision_text = "\n".join(

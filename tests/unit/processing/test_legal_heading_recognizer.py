@@ -89,6 +89,29 @@ def test_source_law_note_introduction_returns_exclusion_hint() -> None:
     assert result.warnings[0].start_offset == text.index("Điều 74")
 
 
+def test_article_like_line_inside_quoted_source_note_is_not_promoted() -> None:
+    """Article-like lines inside quoted source-law content stay excluded."""
+    text = "\n".join(
+        [
+            "Điều 1. Phạm vi điều chỉnh",
+            "Nội dung chính.",
+            "Điều 3 và Điều 4 của Luật số 86/2025/QH15 sửa đổi, bổ sung một số điều của Bộ luật Hình sự, có hiệu lực kể từ ngày 01 tháng 7 năm 2025 quy định như sau:",
+            "“Điều 3. Hiệu lực thi hành",
+            "Luật này có hiệu lực thi hành từ ngày 01 tháng 7 năm 2025.",
+            "Điều 4. Điều khoản chuyển tiếp",
+            "1. Nội dung chuyển tiếp trong ghi chú nguồn.\".",
+        ]
+    )
+
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+
+    assert [heading.number for heading in result.headings] == ["1"]
+    assert "Điều 4. Điều khoản chuyển tiếp" not in {
+        heading.heading_text for heading in result.headings
+    }
+    assert result.warnings[0].code == ParsingIssueCode.SOURCE_NOTE_EXCLUDED
+
+
 def test_exact_heading_offsets_and_source_text_immutability() -> None:
     """Heading offsets point into the unchanged source string."""
     text = _read_fixture("heading_patterns.txt")
