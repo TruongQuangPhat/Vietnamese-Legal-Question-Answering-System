@@ -123,7 +123,7 @@ VnLaw-QA/
 ├── src/
 │   ├── core/
 │   ├── ingestion/    # implemented ingestion and cleaning domain logic
-│   ├── processing/   # future parser/chunking domain logic
+│   ├── processing/   # implemented parser and future chunking domain logic
 │   ├── indexing/     # future indexing logic
 │   ├── retrieval/    # future retrieval logic
 │   ├── generation/   # future generation/RAG logic

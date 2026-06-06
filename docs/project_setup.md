@@ -144,7 +144,7 @@ VnLaw-QA/
 │   └── evaluation/
 ├── data/                   # Data directories (gitignored)
 │   ├── raw/                # Immutable crawl artifacts
-│   ├── interim/            # Normalized artifacts and future hierarchy/chunks
+│   ├── interim/            # Normalized artifacts and generated hierarchy outputs
 │   ├── processed/          # Future validated JSONL chunks
 │   ├── indexes/            # Future retrieval indexes
 │   └── eval/               # Future evaluation datasets

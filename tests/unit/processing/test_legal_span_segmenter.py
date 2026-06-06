@@ -200,11 +200,14 @@ def test_ambiguous_and_rejected_candidates_do_not_create_boundaries() -> None:
     units = _segment_text(text)
     article_1 = _unit_with_heading(units, "Điều 1. Phạm vi điều chỉnh")
     clause_2 = _unit_with_heading(units, "2.[3] Khoản chắc chắn có chú thích")
+    compact_clause = _unit_with_heading(units, "1.Nội dung thiếu khoảng trắng")
 
     assert "1.Nội dung thiếu khoảng trắng" in article_1.text
     assert "2 Nội dung thiếu dấu chấm" in article_1.text
     assert "01 tháng 01 năm 2026 không phải khoản" in article_1.text
-    assert "1.Nội dung thiếu khoảng trắng" in clause_2.text
+    assert "1.Nội dung thiếu khoảng trắng" not in clause_2.text
+    assert "2 Nội dung thiếu dấu chấm" in compact_clause.text
+    assert "01 tháng 01 năm 2026 không phải khoản" in compact_clause.text
 
 
 def test_trailing_source_note_ends_final_legal_unit_span() -> None:

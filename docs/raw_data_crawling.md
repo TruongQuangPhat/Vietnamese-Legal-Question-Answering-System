@@ -497,7 +497,8 @@ metadata.json
 → Raw Corpus Audit source validation
 → Cleaning & Normalization traceability
 → normalized.json source fields
-→ future hierarchy/chunk metadata
+→ hierarchy.json metadata
+→ future chunk metadata
 → final legal citation provenance
 ```
 

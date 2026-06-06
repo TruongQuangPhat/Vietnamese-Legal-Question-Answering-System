@@ -25,7 +25,7 @@ VnLaw-QA/
 │   └── evaluation/.gitkeep
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
-│   ├── interim/      # normalized artifacts and future hierarchy/chunks
+│   ├── interim/      # normalized artifacts and generated hierarchy outputs
 │   ├── processed/    # future validated JSONL chunks
 │   ├── indexes/      # future retrieval indexes
 │   └── eval/         # future evaluation datasets

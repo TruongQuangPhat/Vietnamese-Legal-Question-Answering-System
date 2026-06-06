@@ -104,6 +104,7 @@ def test_help_and_argument_parsing(capsys: pytest.CaptureFixture[str]) -> None:
     assert "--overwrite" in output
     assert "--fail-on-warning" in output
     assert "--verbose" in output
+    assert "--no-color" in output
 
 
 def test_argument_defaults_and_flags_parse_correctly() -> None:
@@ -118,6 +119,7 @@ def test_argument_defaults_and_flags_parse_correctly() -> None:
             "--overwrite",
             "--fail-on-warning",
             "--verbose",
+            "--no-color",
         ]
     )
 
@@ -132,6 +134,7 @@ def test_argument_defaults_and_flags_parse_correctly() -> None:
     assert selected.overwrite is True
     assert selected.fail_on_warning is True
     assert selected.verbose is True
+    assert selected.no_color is True
 
 
 def test_successful_cli_run_writes_outputs_and_summary(
@@ -151,9 +154,12 @@ def test_successful_cli_run_writes_outputs_and_summary(
     assert (output_dir / "CLI_LAW" / "hierarchy.json").exists()
     assert report_path.exists()
     assert "Legal hierarchy parsing completed." in captured.out
-    assert f"Input dir: {input_dir}" in captured.out
-    assert "Total: 1" in captured.out
-    assert "Success: 1" in captured.out
+    assert f"Input dir : {input_dir}" in captured.out
+    assert "Summary" in captured.out
+    assert "│ Total                 │ 1" in captured.out
+    assert "│ Success               │ 1" in captured.out
+    assert "Results" not in captured.out
+    assert "No." not in captured.out
     assert "[success] CLI_LAW" not in captured.out
     assert captured.err == ""
 
@@ -183,7 +189,7 @@ def test_warning_exit_code_depends_on_fail_on_warning(
     captured = capsys.readouterr()
     assert default_code == 0
     assert fail_on_warning_code == 2
-    assert "Success with warnings: 1" in captured.out
+    assert "Success with warnings" in captured.out
 
 
 def test_failed_documents_return_one_even_with_warnings(
@@ -206,29 +212,65 @@ def test_failed_documents_return_one_even_with_warnings(
 
     captured = capsys.readouterr()
     assert exit_code == 1
-    assert "Success with warnings: 1" in captured.out
-    assert "Failed: 1" in captured.out
+    assert "Success with warnings" in captured.out
+    assert "Failed" in captured.out
 
 
-def test_verbose_output_prints_per_law_lines(
+def test_verbose_output_prints_result_table(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Verbose mode prints deterministic per-law result lines."""
+    """Verbose mode prints deterministic per-law table rows."""
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
     report_path = tmp_path / "reports" / "legal_parsing_report.json"
     _write_normalized(input_dir, "A_LAW", "Điều 1. Một\nNội dung.")
-    _write_normalized(input_dir, "B_LAW", "Điều 1. Hai\nNội dung.")
+    _write_normalized(input_dir, "B_LAW", "Điều 1. Hai\nNội dung.", article_count=2)
+    bad_path = _write_normalized(input_dir, "BAD_LAW", "Điều 1. Hỏng\nNội dung.")
+    payload = json.loads(bad_path.read_text(encoding="utf-8"))
+    del payload["raw_artifact_path"]
+    bad_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
     exit_code = parse_legal_hierarchy.main(
-        _cli_args(input_dir, output_dir, report_path, "--verbose")
+        _cli_args(input_dir, output_dir, report_path, "--verbose", "--fail-on-warning")
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 1
+    assert "Results" in output
+    assert "│ No. │ Law ID" in output
+    assert "│ Status" in output
+    assert "│ Warnings" in output
+    assert "│ Errors" in output
+    assert "│ Output" in output
+    assert "success" in output
+    assert "success_with_warnings" in output
+    assert "failed" in output
+    assert str(output_dir / "A_LAW" / "hierarchy.json") in output
+    assert "no output" in output
+    assert "[success] A_LAW" not in output
+    assert "->" not in output
+    assert "\x1b[" not in output
+
+
+def test_no_color_disables_ansi_status_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The --no-color flag keeps verbose output free of ANSI escapes."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    report_path = tmp_path / "reports" / "legal_parsing_report.json"
+    _write_normalized(input_dir, "A_LAW", "Điều 1. Một\nNội dung.")
+
+    exit_code = parse_legal_hierarchy.main(
+        _cli_args(input_dir, output_dir, report_path, "--verbose", "--no-color")
     )
 
     output = capsys.readouterr().out
     assert exit_code == 0
-    assert f"[success] A_LAW -> {output_dir / 'A_LAW' / 'hierarchy.json'}" in output
-    assert f"[success] B_LAW -> {output_dir / 'B_LAW' / 'hierarchy.json'}" in output
+    assert "\x1b[" not in output
+    assert "success" in output
 
 
 def test_law_id_selection_and_overwrite_behavior(
@@ -259,7 +301,7 @@ def test_law_id_selection_and_overwrite_behavior(
     assert overwrite_code == 0
     assert existing.read_text(encoding="utf-8") != "existing"
     assert not (output_dir / "B_LAW" / "hierarchy.json").exists()
-    assert "Total: 1" in output
+    assert "│ Total                 │ 1" in output
 
 
 def test_service_level_error_returns_three_and_stderr(

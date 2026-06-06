@@ -228,7 +228,7 @@ def test_cleaned_mismatch_produces_success_with_warnings(tmp_path: Path) -> None
 
 
 def test_recognition_warnings_reach_final_result_without_becoming_nodes(tmp_path: Path) -> None:
-    """Ambiguous and rejected candidates warn but do not become hierarchy nodes."""
+    """Remaining ambiguous/rejected candidates warn but do not become hierarchy nodes."""
     text = _read_fixture("clause_point_candidates.txt")
     result = _parse_text(tmp_path, text, article_count=2, max_article=2)
 
@@ -239,9 +239,10 @@ def test_recognition_warnings_reach_final_result_without_becoming_nodes(tmp_path
     }.issubset(set(_issue_codes(result.warnings)))
     assert result.document is not None
     heading_texts = {node.metadata.get("heading_text") for node in result.document.nodes}
-    assert "1.Nội dung thiếu khoảng trắng" not in heading_texts
+    assert "1.Nội dung thiếu khoảng trắng" in heading_texts
+    assert "2 Nội dung thiếu dấu chấm" not in heading_texts
     assert "a) Điểm trực tiếp dưới điều không hợp lệ" not in heading_texts
-    assert result.recognition_summary.ambiguous_candidate_count == 2
+    assert result.recognition_summary.ambiguous_candidate_count == 1
     assert result.recognition_summary.rejected_candidate_count >= 1
 
 
@@ -302,6 +303,35 @@ def test_unquoted_source_note_tail_articles_do_not_fail_or_become_nodes(
     assert _issue_codes(result.warnings) == [ParsingIssueCode.SOURCE_NOTE_EXCLUDED]
 
 
+def test_source_note_tail_subordinate_headings_remain_root_only(tmp_path: Path) -> None:
+    """Source-law tail Articles, Clauses, and Points are not hierarchy nodes."""
+    text = "\n".join(
+        [
+            "Điều 1. Main Article",
+            "Main body.",
+            "[48] Điều 10 và Điều 11 của Luật số 03/2022/QH15 quy định như sau:",
+            "Điều 10. Hiệu lực thi hành",
+            "1. Source-law clause",
+            "a) Source-law point",
+            "Điều 11. Quy định chuyển tiếp",
+            "1. Another source-law clause",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
+    assert result.document is not None
+    non_root_heading_texts = {
+        node.metadata.get("heading_text")
+        for node in result.document.nodes
+        if node.level != "law"
+    }
+    assert non_root_heading_texts == {"Điều 1. Main Article"}
+    assert "Điều 11. Quy định chuyển tiếp" in result.document.nodes[0].text
+    assert _issue_codes(result.warnings) == [ParsingIssueCode.SOURCE_NOTE_EXCLUDED]
+
+
 def test_quoted_source_note_tail_with_inner_quote_does_not_promote_article(
     tmp_path: Path,
 ) -> None:
@@ -331,6 +361,140 @@ def test_quoted_source_note_tail_with_inner_quote_does_not_promote_article(
     assert article_headings == ["Điều 1. Nội dung chính"]
     assert "Điều 4. Quy định chuyển tiếp" in result.document.nodes[0].text
     assert _issue_codes(result.warnings) == [ParsingIssueCode.SOURCE_NOTE_EXCLUDED]
+
+
+def test_real_articles_after_table_like_amendment_section_are_preserved(
+    tmp_path: Path,
+) -> None:
+    """Main-law tail Articles after table-like amendment content are still parsed."""
+    text = "\n".join(
+        [
+            "Chương VI",
+            "ĐIỀU KHOẢN THI HÀNH",
+            "Điều 84. Sửa đổi, bổ sung một số điều của các luật có liên quan",
+            "1. Sửa đổi bảng phí như sau:",
+            "STT",
+            "TÊN PHÍ",
+            "1.1",
+            "Phí sử dụng đường bộ",
+            "Điều 85. Hiệu lực thi hành",
+            "1. Luật này có hiệu lực thi hành từ ngày 01 tháng 01 năm 2025.",
+            "Điều 86. Quy định chuyển tiếp",
+            "1. Nội dung chuyển tiếp.",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=3, max_article=86)
+
+    assert result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
+    assert result.document is not None
+    article_numbers = [
+        node.number for node in result.document.nodes if node.level == "article"
+    ]
+    assert article_numbers == ["84", "85", "86"]
+    assert result.parsing_result.article_heading_count_matches is True
+    assert result.parsing_result.max_article_number_matches is True
+
+
+def test_safe_malformed_clause_patterns_become_hierarchy_nodes(tmp_path: Path) -> None:
+    """Compact, footnote-glitched, and missing-dot Clauses parse when locally safe."""
+    text = "\n".join(
+        [
+            "Điều 1. Main Article",
+            "1.Nội dung khoản một",
+            "2.3[3]Nội dung khoản hai có chú thích",
+            "3 Nội dung khoản ba có điểm:",
+            "a) Điểm a thuộc khoản ba;",
+            "b) Điểm b thuộc khoản ba.",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS
+    assert result.document is not None
+    clauses = [node for node in result.document.nodes if node.level == "clause"]
+    points = [node for node in result.document.nodes if node.level == "point"]
+    assert [clause.number for clause in clauses] == ["1", "2", "3"]
+    assert clauses[1].metadata.get("footnote") == "3"
+    assert [point.number for point in points] == ["a", "b"]
+    assert result.warnings == []
+
+
+def test_quoted_main_article_clause_points_become_hierarchy_nodes(tmp_path: Path) -> None:
+    """Quoted replacement Clauses inside a main-law Article can parent Points."""
+    text = "\n".join(
+        [
+            "Điều 1. Sửa đổi khoản 3 Điều 29 của luật khác",
+            "Sửa đổi, bổ sung khoản 3 Điều 29 như sau:",
+            "“3. Cơ quan có thẩm quyền thực hiện thủ tục trong các trường hợp sau đây:",
+            "a) Đấu giá quyền sử dụng đất không thành;",
+            "b) Chỉ có một nhà đầu tư đáp ứng điều kiện.”.",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS
+    assert result.document is not None
+    clauses = [node for node in result.document.nodes if node.level == "clause"]
+    points = [node for node in result.document.nodes if node.level == "point"]
+    assert [clause.number for clause in clauses] == ["3"]
+    assert [point.number for point in points] == ["a", "b"]
+    assert result.warnings == []
+
+
+def test_formula_and_decimal_table_codes_remain_non_hierarchy_text(tmp_path: Path) -> None:
+    """Formula/table decimal lines stay inside Article text without warnings."""
+    text = "\n".join(
+        [
+            "Điều 1. Giá tính thuế",
+            "1. Giá tính thuế được quy định như sau:",
+            "Giá chưa có thuế giá trị gia tăng",
+            "=",
+            "Giá thanh toán",
+            "1 + thuế suất của hàng hóa, dịch vụ (%",
+            "STT",
+            "1.1",
+            "Nội dung hàng bảng",
+            "1.1a",
+            "Nội dung hàng bảng khác",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS
+    assert result.document is not None
+    heading_texts = {node.metadata.get("heading_text") for node in result.document.nodes}
+    assert "1 + thuế suất của hàng hóa, dịch vụ (%" not in heading_texts
+    assert "1.1" not in heading_texts
+    assert "1.1a" not in heading_texts
+    assert result.warnings == []
+
+
+def test_remaining_malformed_clause_placeholders_parse_without_warnings(
+    tmp_path: Path,
+) -> None:
+    """Corpus-observed missing-dot and repealed Clause forms become hierarchy nodes."""
+    text = "\n".join(
+        [
+            "Điều 1. Xử lý chi phí",
+            "1 Trường hợp người đã nộp tiền tạm ứng không phải chịu chi phí.",
+            "2. Trường hợp người đã nộp tiền tạm ứng phải chịu chi phí.",
+            "3.[60](được bãi bỏ)",
+            "4 Khoản này được bãi bỏ theo quy định tại khoản 4 Điều 1 của Luật sửa đổi.",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS
+    assert result.document is not None
+    clauses = [node for node in result.document.nodes if node.level == "clause"]
+    assert [clause.number for clause in clauses] == ["1", "2", "3", "4"]
+    assert clauses[2].metadata.get("footnote") == "60"
+    assert result.warnings == []
 
 
 def test_builder_and_validator_warnings_reach_final_result(tmp_path: Path) -> None:

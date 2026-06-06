@@ -771,8 +771,10 @@ known encoded TVPL footer/watermark artifacts are removed
 artifacts/reports/cleaning/cleaning_report.json is generated with no warning or failed artifacts
 ```
 
-The next phase is Legal Hierarchy Parsing. Do not proceed directly to chunking,
-embedding, RAG, Advanced RAG, or GraphRAG before parser correctness is validated.
+Legal Hierarchy Parsing is now complete. The next phase is Parent-child
+Chunking over `data/interim/{LAW_ID}/hierarchy.json`. Do not proceed directly
+to embedding, RAG, Advanced RAG, or GraphRAG before chunk correctness is
+validated.
 
 ## Changelog
 

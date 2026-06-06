@@ -48,10 +48,13 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - Cleaned corpus outputs exist for 52/52 legal documents under `data/interim/`.
 - Encoded TVPL footer/watermark artifacts are removed from cleaned outputs.
 - Article metrics distinguish article references from real article headings.
-- Legal hierarchy parsing is the next phase and has not started.
+- Phase 5 Legal Hierarchy Parsing is complete with 52/52 generated
+  `hierarchy.json` outputs and 0 failed documents.
 - Embedding/RAG/Advanced RAG/GraphRAG has not started.
-- Do not jump ahead to chunking, embedding, RAG, Advanced RAG, or GraphRAG
-  before legal hierarchy parsing is implemented and validated.
+- The next phase is Phase 6 Parent-child Chunking over
+  `data/interim/{LAW_ID}/hierarchy.json`.
+- Do not jump ahead to embedding, RAG, Advanced RAG, or GraphRAG before
+  parent-child chunking and processed JSONL validation pass.
 
 ## 5. Official Commands
 

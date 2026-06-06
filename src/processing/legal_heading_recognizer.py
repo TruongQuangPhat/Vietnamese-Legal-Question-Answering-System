@@ -171,8 +171,20 @@ class LegalHeadingRecognizer:
     _CLAUSE_RE = re.compile(
         r"^\s*(?P<heading>(?P<number>\d+)\.(?:\[(?P<footnote>\d+)\])?\s+\S.*)\s*$"
     )
+    _QUOTED_CLAUSE_RE = re.compile(
+        r"^\s*(?P<heading>[“\"](?P<number>\d+)\.(?:\[(?P<footnote>\d+)\])?\s+\S.*)\s*$"
+    )
+    _FOOTNOTE_GLITCH_CLAUSE_RE = re.compile(
+        r"^\s*(?P<heading>(?P<number>\d+)\.\d+\[(?P<footnote>\d+)\]\s*[^\W\d_].*)\s*$"
+    )
+    _FOOTNOTE_COMPACT_CLAUSE_RE = re.compile(
+        r"^\s*(?P<heading>(?P<number>\d+)\.\[(?P<footnote>\d+)\]\s*\S.*)\s*$"
+    )
+    _COMPACT_CLAUSE_RE = re.compile(
+        r"^\s*(?P<heading>(?P<number>\d+)\.(?:\[(?P<footnote>\d+)\])?[^\W\d_].*)\s*$"
+    )
     _MALFORMED_DOT_CLAUSE_RE = re.compile(
-        r"^\s*(?P<heading>(?P<number>\d+)\.(?!\[\d+\]\s|\s)\S.*)\s*$"
+        r"^\s*(?P<heading>(?P<number>\d+)\.(?!\d|\[\d+\]\s|\s)\S.*)\s*$"
     )
     _MALFORMED_SPACE_CLAUSE_RE = re.compile(
         r"^\s*(?P<heading>(?P<number>\d+)\s+\S.*)\s*$"
@@ -181,10 +193,16 @@ class LegalHeadingRecognizer:
         r"^\s*(?P<heading>(?P<number>[a-zđ])\)(?:\[(?P<footnote>\d+)\])?\s+\S.*)\s*$"
     )
     _SOURCE_NOTE_RE = re.compile(
-        r"^\s*Điều\s+\d+[a-z]?(?:\s+và\s+Điều\s+\d+[a-z]?)*"
-        r"\s+của\s+Luật\b.*quy định như sau:\s*$",
+        r"^\s*(?:\[\d+\]\s*\d*\s*)?"
+        r"(?:"
+        r"Điều\s+\d+[a-z]?(?:\s+và\s+Điều\s+\d+[a-z]?)*"
+        r"|Khoản\s+\d+(?:\s+và\s+khoản\s+\d+)*\s+Điều\s+\d+[a-z]?"
+        r")"
+        r"\s+(?:của\s+)?(?:Bộ\s+luật|Luật|Nghị quyết|Pháp lệnh)\b"
+        r".*(?:có\s+)?quy định\s+như\s+sau:.*$",
         re.IGNORECASE,
     )
+    _FOOTNOTE_SOURCE_NOTE_RE = re.compile(r"^\s*\[\d+\]", re.IGNORECASE)
     _APPENDIX_RE = re.compile(r"^\s*(PHỤ LỤC|Phụ lục)\b", re.IGNORECASE)
     _TABLE_RE = re.compile(r"^\s*STT\b", re.IGNORECASE)
     _DATE_LIKE_NUMBERED_RE = re.compile(
@@ -229,7 +247,7 @@ class LegalHeadingRecognizer:
                 state.source_note_exclusion = True
                 state.source_note_content_started = False
                 state.source_note_quote_open = False
-                state.source_note_tail_mode = False
+                state.source_note_tail_mode = self._is_footnote_source_note_intro(line.text)
                 state.active_clause_number = None
                 continue
 
@@ -291,7 +309,7 @@ class LegalHeadingRecognizer:
                 continue
 
             article = self._ARTICLE_RE.match(line.text)
-            if article and not state.appendix_exclusion and not state.table_exclusion:
+            if article and not state.appendix_exclusion:
                 article_heading = self._build_article_heading(
                     line,
                     article,
@@ -303,6 +321,7 @@ class LegalHeadingRecognizer:
                 state.source_note_content_started = False
                 state.source_note_quote_open = False
                 state.source_note_tail_mode = False
+                state.table_exclusion = False
                 continue
 
             point = self._POINT_RE.match(line.text)
@@ -356,6 +375,31 @@ class LegalHeadingRecognizer:
                 state.active_clause_number = candidate.number
                 continue
 
+            certain_malformed_clause = (
+                self._QUOTED_CLAUSE_RE.match(line.text)
+                or self._FOOTNOTE_GLITCH_CLAUSE_RE.match(line.text)
+                or self._FOOTNOTE_COMPACT_CLAUSE_RE.match(line.text)
+                or self._COMPACT_CLAUSE_RE.match(line.text)
+            )
+            if certain_malformed_clause:
+                candidate = self._build_contextual_heading(
+                    line=line,
+                    match=certain_malformed_clause,
+                    level=LegalNodeLevel.CLAUSE,
+                    state=state,
+                )
+                rejected = self._reject_clause_candidate_if_needed(
+                    candidate=candidate,
+                    state=state,
+                    date_like=self._is_date_like_numbered_line(line.text),
+                )
+                if rejected is not None:
+                    rejected_candidates.append(rejected)
+                    continue
+                headings.append(candidate)
+                state.active_clause_number = candidate.number
+                continue
+
             ambiguous_clause = self._MALFORMED_DOT_CLAUSE_RE.match(
                 line.text
             ) or self._MALFORMED_SPACE_CLAUSE_RE.match(line.text)
@@ -373,6 +417,25 @@ class LegalHeadingRecognizer:
                 )
                 if rejected is not None:
                     rejected_candidates.append(rejected)
+                    continue
+                if self._is_formula_like_numbered_line(line.text):
+                    rejected_candidates.append(
+                        candidate.model_copy(
+                            update={
+                                "classification": CandidateClassification.REJECTED,
+                                "metadata": {"reason": "formula_like_numbered_line"},
+                            }
+                        )
+                    )
+                    continue
+                if self._is_safe_missing_dot_clause_candidate(
+                    line_text=line.text,
+                    lines=lines,
+                    current_index=index,
+                    match=ambiguous_clause,
+                ):
+                    headings.append(candidate)
+                    state.active_clause_number = candidate.number
                     continue
                 ambiguous = candidate.model_copy(
                     update={
@@ -599,6 +662,42 @@ class LegalHeadingRecognizer:
         """Return whether a numbered line is a date, not a Clause."""
         return self._DATE_LIKE_NUMBERED_RE.match(line_text) is not None
 
+    def _is_formula_like_numbered_line(self, line_text: str) -> bool:
+        """Return whether a malformed numeric line is a formula fragment."""
+        return re.match(r"^\s*\d+\s*[+*/=×xX]", line_text) is not None
+
+    def _is_safe_missing_dot_clause_candidate(
+        self,
+        *,
+        line_text: str,
+        lines: list[_LineInfo],
+        current_index: int,
+        match: re.Match[str],
+    ) -> bool:
+        """Promote `N Text` only when immediate local Point structure confirms it."""
+        if "." in match.group("heading").split(maxsplit=1)[0]:
+            return False
+        if self._is_formula_like_numbered_line(line_text):
+            return False
+        if self._is_repealed_missing_dot_clause(line_text):
+            return True
+        candidate_number = int(match.group("number"))
+        for candidate in lines[current_index + 1 :]:
+            if self._is_blank(candidate.text):
+                continue
+            if self._POINT_RE.match(candidate.text):
+                return True
+            next_clause = self._CLAUSE_RE.match(candidate.text)
+            if next_clause is None:
+                return False
+            return int(next_clause.group("number")) == candidate_number + 1
+        return False
+
+    @staticmethod
+    def _is_repealed_missing_dot_clause(line_text: str) -> bool:
+        """Return whether a missing-dot line is a repealed-Clause placeholder."""
+        return re.match(r"^\s*\d+\s+Khoản\s+này\s+được\s+bãi\s+bỏ\b", line_text, re.IGNORECASE) is not None
+
     @staticmethod
     def _is_excluded(state: _RecognitionState) -> bool:
         """Return whether Clause/Point recognition is blocked by an excluded region."""
@@ -642,11 +741,54 @@ class LegalHeadingRecognizer:
         if state.source_note_quote_open:
             return True
 
+        if self._opens_source_note_quote(line_text):
+            state.source_note_tail_mode = True
+            state.source_note_quote_open = True
+            return True
+
+        if self._is_source_note_article_like(line_text):
+            if self._is_safe_main_article_resumption(line_text, state):
+                state.source_note_exclusion = False
+                state.source_note_content_started = False
+                state.source_note_quote_open = False
+                state.source_note_tail_mode = False
+                return False
+            state.source_note_tail_mode = True
+            return True
+
         return False
 
     def _is_source_note_article_like(self, line_text: str) -> bool:
         """Return whether source-note content looks like an Article heading."""
         return self._SOURCE_NOTE_ARTICLE_LIKE_RE.match(line_text) is not None
+
+    def _is_footnote_source_note_intro(self, line_text: str) -> bool:
+        """Return whether a source-note intro appears in a footnote tail."""
+        return self._FOOTNOTE_SOURCE_NOTE_RE.match(line_text) is not None
+
+    def _is_safe_main_article_resumption(
+        self,
+        line_text: str,
+        state: _RecognitionState,
+    ) -> bool:
+        """Allow a non-tail source note to resume at the next main Article.
+
+        This conservative escape hatch preserves the established fixture for
+        short diagnostic source notes inside a body Article. Footnote tails,
+        quoted tails, and non-sequential Article-like lines remain excluded.
+        """
+        article = self._ARTICLE_RE.match(line_text)
+        if article is None:
+            return False
+
+        candidate_number = _numeric_prefix(article.group("number"))
+        if state.active_article_number is None:
+            return candidate_number == 1
+
+        active_number = _numeric_prefix(state.active_article_number)
+        if active_number is None or candidate_number is None:
+            return False
+        return candidate_number == active_number + 1
 
     @staticmethod
     def _is_quoted_source_note_line(
@@ -772,3 +914,11 @@ def _stripped_offsets(line: _LineInfo) -> tuple[int, int]:
     leading = len(line.text) - len(line.text.lstrip())
     trailing = len(line.text.rstrip())
     return line.start_offset + leading, line.start_offset + trailing
+
+
+def _numeric_prefix(value: str) -> int | None:
+    """Return the numeric prefix of a legal Article label, if present."""
+    match = re.match(r"^(\d+)", value)
+    if match is None:
+        return None
+    return int(match.group(1))

@@ -156,7 +156,8 @@ anchors:
 registry entry
 → data/raw/{LAW_ID}/
 → data/interim/{LAW_ID}/normalized.json
-→ future hierarchy/chunk artifacts
+→ data/interim/{LAW_ID}/hierarchy.json
+→ future chunk artifacts
 → future vector/graph payloads
 → final citations
 ```
