@@ -69,6 +69,28 @@ def test_section_same_line_title_and_article_headings() -> None:
     assert footnote_article.title == "Giải thích từ ngữ"
 
 
+def test_titleless_article_headings_are_recognized_without_consuming_body() -> None:
+    """Titleless Article headings such as Constitution Articles are accepted."""
+    text = "\n".join(
+        [
+            "Điều 1.",
+            "Nước Cộng hòa xã hội chủ nghĩa Việt Nam là một nước độc lập.",
+            "Điều 2.",
+            "1. Nhà nước Cộng hòa xã hội chủ nghĩa Việt Nam là nhà nước pháp quyền.",
+            "Điều 120.",
+            "1. Chủ tịch nước có quyền đề nghị làm Hiến pháp.",
+        ]
+    )
+
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    articles = [heading for heading in result.headings if heading.level == LegalNodeLevel.ARTICLE]
+
+    assert [article.number for article in articles] == ["1", "2", "120"]
+    assert [article.title for article in articles] == [None, None, None]
+    assert [article.heading_text for article in articles] == ["Điều 1.", "Điều 2.", "Điều 120."]
+    assert all(article.title_source is None for article in articles)
+
+
 def test_cross_reference_is_rejected() -> None:
     """Inline legal references are not line-anchored Article headings."""
     text = "Theo Điều 3 của Luật này thì nội dung này chỉ là tham chiếu.\n"
@@ -83,7 +105,7 @@ def test_source_law_note_introduction_returns_exclusion_hint() -> None:
     text = _read_fixture("source_note_tail.txt")
     result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
 
-    assert [heading.number for heading in result.headings] == ["1"]
+    assert result.headings == []
     assert len(result.warnings) == 1
     assert result.warnings[0].code == ParsingIssueCode.SOURCE_NOTE_EXCLUDED
     assert result.warnings[0].start_offset == text.index("Điều 74")
@@ -107,6 +129,51 @@ def test_article_like_line_inside_quoted_source_note_is_not_promoted() -> None:
 
     assert [heading.number for heading in result.headings] == ["1"]
     assert "Điều 4. Điều khoản chuyển tiếp" not in {
+        heading.heading_text for heading in result.headings
+    }
+    assert result.warnings[0].code == ParsingIssueCode.SOURCE_NOTE_EXCLUDED
+
+
+def test_unquoted_article_like_lines_inside_source_note_tail_are_not_promoted() -> None:
+    """Unquoted Article-like amendment-law tail content remains excluded."""
+    text = "\n".join(
+        [
+            "Điều 1. Nội dung chính",
+            "Nội dung chính.",
+            "Điều 10 của Luật số 01/2025/QH15 sửa đổi, bổ sung một số điều của Luật Kiểm thử, có hiệu lực kể từ ngày 01 tháng 7 năm 2025 quy định như sau:",
+            "Điều 1. Nội dung trong ghi chú nguồn",
+            "1. Khoản trong ghi chú nguồn",
+            "Điều 2. Nội dung khác trong ghi chú nguồn",
+        ]
+    )
+
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    articles = [heading for heading in result.headings if heading.level == LegalNodeLevel.ARTICLE]
+
+    assert [article.heading_text for article in articles] == ["Điều 1. Nội dung chính"]
+    assert result.warnings[0].code == ParsingIssueCode.SOURCE_NOTE_EXCLUDED
+
+
+def test_quoted_source_note_with_inner_quote_does_not_promote_later_article() -> None:
+    """Inner quoted text must not close a source-law tail before Article 4."""
+    text = "\n".join(
+        [
+            "Điều 1. Nội dung chính",
+            "Nội dung chính.",
+            "Điều 3 và Điều 4 của Luật số 42/2019/QH14 sửa đổi, bổ sung một số điều của Luật Kiểm thử, có hiệu lực kể từ ngày 01 tháng 11 năm 2019 quy định như sau:",
+            "“Điều 3. Hiệu lực thi hành",
+            "1. Luật này có hiệu lực thi hành từ ngày 01 tháng 11 năm 2019.",
+            "“32a. Dịch vụ phụ trợ bao gồm tư vấn, đánh giá rủi ro”.",
+            "Điều 4. Quy định chuyển tiếp",
+            "1. Nội dung chuyển tiếp trong ghi chú nguồn.",
+        ]
+    )
+
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+    articles = [heading for heading in result.headings if heading.level == LegalNodeLevel.ARTICLE]
+
+    assert [article.heading_text for article in articles] == ["Điều 1. Nội dung chính"]
+    assert "Điều 4. Quy định chuyển tiếp" not in {
         heading.heading_text for heading in result.headings
     }
     assert result.warnings[0].code == ParsingIssueCode.SOURCE_NOTE_EXCLUDED

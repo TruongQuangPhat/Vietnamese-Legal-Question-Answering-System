@@ -56,6 +56,28 @@ def test_article_only_document_spans_end_at_next_article_or_document_end() -> No
     _assert_exact_slices(text, units)
 
 
+def test_titleless_article_spans_include_body_without_title() -> None:
+    """Titleless Articles span following body text and keep title null."""
+    text = "\n".join(
+        [
+            "Điều 1.",
+            "Nước Cộng hòa xã hội chủ nghĩa Việt Nam là một nước độc lập.",
+            "Điều 2.",
+            "1. Nhà nước Cộng hòa xã hội chủ nghĩa Việt Nam là nhà nước pháp quyền.",
+        ]
+    )
+    units = _segment_text(text)
+    articles = _units_by_level(units, LegalNodeLevel.ARTICLE)
+
+    assert [article.number for article in articles] == ["1", "2"]
+    assert [article.title for article in articles] == [None, None]
+    assert "Nước Cộng hòa" in articles[0].text
+    assert "Nhà nước Cộng hòa" in articles[1].text
+    assert articles[0].end_offset == articles[1].start_offset
+    assert articles[1].end_offset == len(text)
+    _assert_exact_slices(text, units)
+
+
 def test_chapter_contains_articles_and_ends_before_next_chapter() -> None:
     """Chapter spans include descendant Articles but end before sibling Chapter."""
     text = _read_fixture("part_chapter_titles.txt")

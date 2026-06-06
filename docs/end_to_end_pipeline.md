@@ -10,9 +10,10 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **Phase 4 Cleaning & Normalization is complete/gate-ready**.
-The corpus has 52/52 raw artifacts and 52/52 normalized outputs. The next
-engineering phase is **Phase 5 — Legal Hierarchy Parsing**.
+Current status: **Phase 5 Legal Hierarchy Parsing is complete**.
+The corpus has 52/52 raw artifacts, 52/52 normalized outputs, and 52/52
+hierarchy outputs. The next engineering phase is **Phase 6 — Parent-child
+Chunking**.
 
 ## 2. Quick Start
 
@@ -48,9 +49,9 @@ Evaluation (RAGAS, golden QA)
 API / Deployment
 ```
 
-**Important**: The next phase is not RAG. It is **Legal Hierarchy Parsing** over
-`data/interim/{law_id}/normalized.json`. Parent-child chunking, embedding, RAG,
-Advanced RAG, and GraphRAG remain blocked until the parser passes its gate.
+**Important**: The next phase is not RAG. It is **Parent-child Chunking** over
+`data/interim/{law_id}/hierarchy.json`. Embedding, RAG, Advanced RAG, and
+GraphRAG remain blocked until chunk validation passes.
 
 ## 3. Full Architecture
 
@@ -831,9 +832,23 @@ and 52/52 optional cleaned text artifacts. The cleaner removes known TVPL
 encoded footer/watermark artifacts and reports article references separately
 from real article headings.
 
-### Phase 5 — Legal Hierarchy Parsing — Current next phase
+### Phase 5 — Legal Hierarchy Parsing — Implemented
 
-### Phase 6 — Parent-child Chunking — Planned
+Full-corpus run:
+
+```text
+Total documents:       52
+Success:               7
+Success with warnings: 45
+Failed:                0
+Output:                data/interim/{LAW_ID}/hierarchy.json
+Report:                artifacts/reports/parsing/legal_parsing_report.json
+```
+
+Remaining parser warnings are non-fatal and are retained in the parsing report
+for Phase 6 review.
+
+### Phase 6 — Parent-child Chunking — Current next phase
 
 ### Phase 7 — Processed JSONL Export & Validation — Planned
 

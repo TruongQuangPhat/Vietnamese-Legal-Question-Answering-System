@@ -2,32 +2,69 @@
 
 ## Overview
 
-The Legal Hierarchy Parsing phase analyzes cleaned Vietnamese legal text and extracts the structured hierarchy: Phần → Chương → Mục → Điều → Khoản → Điểm. The output is a tree of legal nodes, each representing a distinct legal unit with its text, numbering, and positional offsets.
+The Legal Hierarchy Parsing phase analyzes normalized Vietnamese legal text and extracts the structured hierarchy: Phần → Chương → Mục → Điều → Khoản → Điểm. The output is a validated hierarchy document with a root Law node and flat legal nodes, each preserving text, numbering, parent/child links, and exact offsets into `normalized_text`.
 
 Parsing is the foundation for parent-child chunking. Accurate hierarchy extraction ensures citations remain traceable and legal structure is preserved throughout the RAG pipeline.
 
+Status: **Implemented and validated for the 52-law corpus.**
+
+Official Phase 5 result:
+
+```text
+Total documents:         52
+Success:                 7
+Success with warnings:   45
+Failed:                  0
+Generated hierarchies:   52
+Parser version:          v0.1.0
+Report:                  artifacts/reports/parsing/legal_parsing_report.json
+```
+
+Remaining warnings are non-fatal and preserved for downstream review:
+`SOURCE_NOTE_EXCLUDED`, `EMPTY_ARTICLE_NODE`, `NODE_ID_COLLISION_RESOLVED`,
+`ARTICLE_COUNT_MISMATCH`, `AMBIGUOUS_CLAUSE_CANDIDATE`,
+`POINT_LIKE_LINE_OUTSIDE_CLAUSE`, and `MAX_ARTICLE_NUMBER_MISMATCH`.
+
 ## Quick Start
 
-**Intended CLI** (design phase, not yet implemented):
+Official full-corpus command:
 
 ```bash
 uv run python scripts/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json \
-  --law-ids LDD_VBHN BLDS_2015
+  --overwrite \
+  --verbose
 ```
 
-**Expected workflow**:
-1. Input: `data/interim/{law_id}/normalized.json`
-2. Output: `data/interim/{law_id}/hierarchy.json` (tree structure)
-3. The hierarchy JSON feeds into the chunker.
+Selected-law validation:
 
-**Expected implementation boundary**:
+```bash
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --law-ids BLDS_2015 LDD_VBHN \
+  --overwrite \
+  --verbose
+```
+
+Workflow:
+1. Input: `data/interim/{law_id}/normalized.json`
+2. Output: `data/interim/{law_id}/hierarchy.json`
+3. Batch report: `artifacts/reports/parsing/legal_parsing_report.json`
+4. The hierarchy JSON feeds into Phase 6 parent-child chunking.
+
+Implementation boundary:
 - `scripts/parse_legal_hierarchy.py`: CLI, argparse, console summaries, exit codes.
 - `src/services/legal_parsing_service.py`: batch orchestration and report building.
 - `src/processing/legal_parser.py`: reusable parser/domain logic.
-- `tests/unit/processing/test_legal_parser.py`: focused parser tests.
+- `src/processing/legal_heading_recognizer.py`: deterministic legal heading recognition.
+- `src/processing/legal_span_segmenter.py`: exact source span segmentation.
+- `src/processing/legal_hierarchy_builder.py`: root/node construction, parent links, deterministic IDs.
+- `src/processing/legal_tree_validator.py`: read-only structural and offset validation.
+- `tests/unit/processing/` and `tests/unit/services/`: parser, service, and CLI tests.
 
 ## Architecture
 
@@ -246,33 +283,34 @@ class LegalNode(BaseModel):
 
 ### Node ID Convention
 
-`{law_id}__{level}_{number}` where:
-- For article: `__article_{article_number}`
-- For clause: `__clause_{article_number}_{clause_number}` (article prefix ensures uniqueness)
-- For point: `__point_{article_number}_{clause_number}_{point_label}`
+Node IDs are deterministic hierarchy-path IDs:
 
-This design ensures globally unique IDs within a law.
+```text
+{law_id}__root
+{parent_node_id}__{level}_{normalized_number}
+```
+
+Sibling base-ID collisions are resolved by appending
+`__occurrence_2`, `__occurrence_3`, and so on in source order. Collision
+resolution emits `NODE_ID_COLLISION_RESOLVED` warnings.
 
 ## CLI Reference
-
-### Intended Commands
 
 ```bash
 # Parse all laws
 uv run python scripts/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
-  --report artifacts/reports/parsing/legal_parsing_report.json
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --overwrite
 
 # Parse specific laws
 uv run python scripts/parse_legal_hierarchy.py \
-  --law-ids BLDS_2015 LDD_VBHN \
   --input-dir data/interim \
-  --output-dir data/interim
-
-# Validate existing hierarchy file
-uv run python scripts/parse_legal_hierarchy.py \
-  --validate data/interim/LDD_VBHN/hierarchy.json
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --law-ids BLDS_2015 LDD_VBHN \
+  --overwrite
 ```
 
 ## Testing

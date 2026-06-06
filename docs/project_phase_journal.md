@@ -39,7 +39,8 @@ Phase 1: Legal corpus registry              complete
 Phase 2: Registry-driven crawling           complete
 Phase 3: Raw corpus audit and validation    complete
 Phase 4: Cleaning & Normalization           complete / gate-ready
-Phase 5: Legal hierarchy parsing            next
+Phase 5: Legal hierarchy parsing            complete
+Phase 6: Parent-child chunking              next
 ```
 
 ## 2. Cross-Phase Principles
@@ -580,45 +581,70 @@ Final decision:
 Phase 4 Cleaning & Normalization is complete/gate-ready.
 ```
 
-## 9. Current Next Phase — Legal Hierarchy Parsing
+## 9. Phase 5 — Legal Hierarchy Parsing
 
-The next phase should consume:
+Phase 5 is complete. The parser consumes:
 
 ```text
 data/interim/{LAW_ID}/normalized.json
 ```
 
-The parser should produce:
+and produces:
 
 ```text
 data/interim/{LAW_ID}/hierarchy.json
 artifacts/reports/parsing/legal_parsing_report.json
 ```
 
-Parser responsibilities:
+Official full-corpus result:
+
+```text
+Total documents:       52
+Success:               7
+Success with warnings: 45
+Failed:                0
+Generated hierarchies: 52
+Parser version:        v0.1.0
+```
+
+Parser responsibilities implemented:
 
 - detect `Phần`, `Chương`, `Mục`, `Điều`;
 - map numbered lines to clauses when they belong under an Article;
 - map lettered labels to points when they belong under a Clause;
-- preserve offsets/source traceability where possible;
+- preserve exact offsets/source traceability into `normalized_text`;
 - avoid arbitrary token or character chunking;
-- validate hierarchy before any chunking work starts.
+- validate hierarchy before any chunking work starts;
+- exclude source-law note tails from the main hierarchy;
+- support titleless Article headings such as `Điều 1.`.
 
-Recommended first validation laws:
+Remaining non-fatal warning categories include:
 
 ```text
-BLDS_2015
-BLHS_VBHN
-LDD_VBHN
-LTTHC
-LVL_2025
-LANM_2025
+SOURCE_NOTE_EXCLUDED
+EMPTY_ARTICLE_NODE
+NODE_ID_COLLISION_RESOLVED
+ARTICLE_COUNT_MISMATCH
+AMBIGUOUS_CLAUSE_CANDIDATE
+POINT_LIKE_LINE_OUTSIDE_CLAUSE
+MAX_ARTICLE_NUMBER_MISMATCH
 ```
 
-Do not proceed to Parent-child Chunking, embedding, RAG, Advanced RAG, or
-GraphRAG until legal hierarchy parsing has its own validation gate.
+These warnings are preserved in the parsing report and should be considered
+during Phase 6 chunking validation, but they did not block Phase 5 completion.
 
-## 10. Commands Reference
+## 10. Current Next Phase — Parent-child Chunking
+
+The next phase should consume:
+
+```text
+data/interim/{LAW_ID}/hierarchy.json
+```
+
+It should produce validated processed chunks without starting embedding,
+retrieval, RAG, Advanced RAG, or GraphRAG.
+
+## 11. Commands Reference
 
 Official commands used through the completed phases:
 
@@ -628,6 +654,7 @@ uv run python scripts/audit_raw_corpus.py --help
 uv run python scripts/clean_raw_corpus.py --help
 uv run python scripts/audit_cleaning_quality.py --help
 uv run pytest tests/unit/ingestion -q
+uv run python scripts/parse_legal_hierarchy.py --help
 ```
 
 Completed full validation commands:

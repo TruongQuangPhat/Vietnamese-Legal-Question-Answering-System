@@ -64,7 +64,15 @@ Corpus Registry
   describe real article headings.
 - Remaining duplicate-style flags such as BLHS_VBHN are diagnostic/semantic
   concerns, not cleaning blockers unless extraction duplication is proven.
-- The next engineering phase is **Phase 5 — Legal Hierarchy Parsing**.
+- **Phase 5 — Legal Hierarchy Parsing is complete.**
+- The parser generated 52/52 official hierarchy artifacts under
+  `data/interim/{LAW_ID}/hierarchy.json`.
+- The official parsing report is
+  `artifacts/reports/parsing/legal_parsing_report.json`.
+- The full-corpus Phase 5 run completed with 7 successes, 45 successes with
+  warnings, and 0 failures. Remaining warnings are non-fatal parser caveats
+  for Phase 6 review.
+- The next engineering phase is **Phase 6 — Parent-child Chunking**.
 
 ## 4. Implemented Phases
 
@@ -146,50 +154,71 @@ artifacts, suspiciously short outputs, or missing article markers. Cleaning
 preserves legal text structure for the Legal Hierarchy Parser and removes known
 TVPL encoded footer/watermark artifacts.
 
+### Phase 5 — Legal Hierarchy Parsing
+
+Implemented and validated.
+
+Relevant files:
+
+- `src/processing/normalized_input.py`
+- `src/processing/legal_hierarchy_models.py`
+- `src/processing/legal_heading_recognizer.py`
+- `src/processing/legal_span_segmenter.py`
+- `src/processing/legal_hierarchy_builder.py`
+- `src/processing/legal_tree_validator.py`
+- `src/processing/legal_parser.py`
+- `src/services/legal_parsing_service.py`
+- `scripts/parse_legal_hierarchy.py`
+- `tests/unit/processing/`
+- `tests/unit/services/`
+- `docs/legal_parsing.md`
+- `data/interim/{LAW_ID}/hierarchy.json`
+- `artifacts/reports/parsing/legal_parsing_report.json`
+
+The parser consumes `data/interim/{LAW_ID}/normalized.json`, preserves exact
+offsets into `normalized_text`, creates a root Law node plus flat hierarchy
+nodes for Part, Chapter, Section, Article, Clause, and Point, and validates the
+tree before writing generated artifacts. It supports titleless Article headings
+such as `Điều 1.` and excludes source-law note tails from the main hierarchy.
+
 ## 5. Current Phase
 
 Current phase:
 
 ```text
-Phase 5 — Legal Hierarchy Parsing
+Phase 6 — Parent-child Chunking
 ```
 
 Goal:
 
-Extract deterministic Vietnamese legal hierarchy from the normalized corpus:
-Phần → Chương → Mục → Điều → Khoản → Điểm.
+Create validated parent-child chunks from the parsed legal hierarchy. Child
+units should be Clause or Point where available, with Article text preserved as
+parent context for downstream retrieval and generation.
 
-This phase should consume `data/interim/{LAW_ID}/normalized.json`. It should
-not jump directly to embedding, RAG, Advanced RAG, or GraphRAG.
+This phase should consume `data/interim/{LAW_ID}/hierarchy.json`. It should not
+jump directly to embedding, RAG, Advanced RAG, or GraphRAG.
 
 Expected outputs:
 
 ```text
-data/interim/{LAW_ID}/hierarchy.json
-artifacts/reports/parsing/legal_parsing_report.json
+data/processed/legal_chunks.jsonl
+artifacts/reports/chunking/
 ```
 
 Key requirements:
 
-- Read normalized artifacts from `data/interim/`.
+- Read hierarchy artifacts from `data/interim/`.
 - Do not mutate `data/raw/`.
-- Do not rewrite cleaning behavior unless a parser-blocking cleaning defect is
+- Do not rewrite Phase 5 parsing unless a chunking-blocking parser defect is
   proven.
-- Preserve source traceability from normalized artifact metadata.
-- Preserve legal markers and numbering patterns:
-  - Phần
-  - Chương
-  - Mục
-  - Điều
-  - numbered clause lines such as `1.`, `2.`, `3.`
-  - point labels such as `a)`, `b)`, `c)`
-- Build a hierarchy tree before chunking.
-- Validate parser output before any embedding or retrieval work.
+- Preserve source traceability from hierarchy node metadata and offsets.
+- Use legal hierarchy instead of arbitrary token/character windows.
+- Validate chunks before any embedding or retrieval work.
 - Add focused unit tests.
 - Put parser domain logic under `src/processing/`.
-- Put parser orchestration/report building under `src/services/`.
-- Put parser CLI entrypoint under `scripts/`.
-- Put parser unit tests under `tests/unit/processing/`.
+- Put chunking orchestration/report building under `src/services/`.
+- Put chunking CLI entrypoint under `scripts/`.
+- Put chunking unit tests under `tests/unit/processing/`.
 
 Important Vietnamese legal formatting note:
 
@@ -198,18 +227,12 @@ Vietnamese legal documents often do not literally write the words `Khoản` and 
 ## 6. Next Immediate Tasks
 
 1. Create or use the branch `feature/legal-parser-chunking`.
-2. Design the legal hierarchy parser over `normalized.json` inputs.
-3. Preserve hierarchy levels:
-   - Phần
-   - Chương
-   - Mục
-   - Điều
-   - numbered clause lines like `1.`, `2.`, `3.`
-   - point labels like `a)`, `b)`, `c)`
-4. Generate `data/interim/{LAW_ID}/hierarchy.json`.
-5. Generate `artifacts/reports/parsing/legal_parsing_report.json`.
-6. Add parser unit tests before any chunking implementation.
-7. Validate parser correctness on known complex laws such as BLDS_2015,
+2. Design parent-child chunking over `hierarchy.json` inputs.
+3. Use Clause or Point as child units where available.
+4. Preserve Article text as parent context.
+5. Generate processed JSONL only after chunk schema tests pass.
+6. Add chunking unit tests before any indexing implementation.
+7. Validate chunk correctness on known complex laws such as BLDS_2015,
    BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
 
 ## 7. Do Not Do Yet

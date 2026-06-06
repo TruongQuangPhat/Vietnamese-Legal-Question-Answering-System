@@ -32,7 +32,9 @@ class _RecognitionState:
     active_article_number: str | None = None
     active_clause_number: str | None = None
     source_note_exclusion: bool = False
+    source_note_content_started: bool = False
     source_note_quote_open: bool = False
+    source_note_tail_mode: bool = False
     appendix_exclusion: bool = False
     table_exclusion: bool = False
 
@@ -160,7 +162,11 @@ class LegalHeadingRecognizer:
     )
     _ARTICLE_RE = re.compile(
         r"^\s*(?P<heading>Điều\s+(?P<number>\d+[a-z]?)\."
-        r"(?:\[(?P<footnote>\d+)\])?\s+(?P<title>.+?))\s*$",
+        r"(?:\[(?P<footnote>\d+)\])?(?:\s+(?P<title>.+?))?)\s*$",
+    )
+    _SOURCE_NOTE_ARTICLE_LIKE_RE = re.compile(
+        r"^\s*[“\"]?Điều\s+\d+[a-z]?\.(?:\[\d+\])?(?:\s+\S.*)?\s*$",
+        re.IGNORECASE,
     )
     _CLAUSE_RE = re.compile(
         r"^\s*(?P<heading>(?P<number>\d+)\.(?:\[(?P<footnote>\d+)\])?\s+\S.*)\s*$"
@@ -221,7 +227,9 @@ class LegalHeadingRecognizer:
                 boundaries.append(self._build_boundary(line, RecognitionBoundaryKind.SOURCE_NOTE))
                 warnings.append(self._source_note_warning(line, law_id=law_id))
                 state.source_note_exclusion = True
+                state.source_note_content_started = False
                 state.source_note_quote_open = False
+                state.source_note_tail_mode = False
                 state.active_clause_number = None
                 continue
 
@@ -244,8 +252,7 @@ class LegalHeadingRecognizer:
                 state.active_clause_number = None
                 continue
 
-            if self._is_quoted_source_note_line(line.text, state):
-                self._close_source_note_quote_if_needed(line.text, state)
+            if self._should_suppress_source_note_content(line.text, state):
                 continue
 
             part = self._PART_RE.match(line.text)
@@ -285,15 +292,17 @@ class LegalHeadingRecognizer:
 
             article = self._ARTICLE_RE.match(line.text)
             if article and not state.appendix_exclusion and not state.table_exclusion:
-                article_heading = self._build_same_line_heading(
+                article_heading = self._build_article_heading(
                     line,
                     article,
-                    LegalNodeLevel.ARTICLE,
                 )
                 headings.append(article_heading)
                 state.active_article_number = article_heading.number
                 state.active_clause_number = None
                 state.source_note_exclusion = False
+                state.source_note_content_started = False
+                state.source_note_quote_open = False
+                state.source_note_tail_mode = False
                 continue
 
             point = self._POINT_RE.match(line.text)
@@ -438,6 +447,37 @@ class LegalHeadingRecognizer:
             footnote=match.groupdict().get("footnote"),
         )
 
+    def _build_article_heading(
+        self,
+        line: _LineInfo,
+        match: re.Match[str],
+    ) -> RecognizedHeading:
+        """Build an Article heading with optional same-line semantic title."""
+        heading_start = line.start_offset + match.start("heading")
+        heading_end = line.start_offset + match.end("heading")
+        title = match.groupdict().get("title")
+        title_start: int | None = None
+        title_end: int | None = None
+        title_source: str | None = None
+        if title is not None:
+            title_start = line.start_offset + match.start("title")
+            title_end = line.start_offset + match.end("title")
+            title_source = "same_line"
+
+        return RecognizedHeading(
+            level=LegalNodeLevel.ARTICLE,
+            number=match.group("number"),
+            title=title.strip() if title is not None else None,
+            heading_text=line.text[match.start("heading") : match.end("heading")],
+            start_offset=heading_start,
+            end_offset=heading_end,
+            line_number=line.line_number,
+            title_start_offset=title_start,
+            title_end_offset=title_end,
+            title_source=title_source,
+            footnote=match.groupdict().get("footnote"),
+        )
+
     def _build_contextual_heading(
         self,
         *,
@@ -578,15 +618,45 @@ class LegalHeadingRecognizer:
         """Return whether a source line has no visible text."""
         return line_text.strip() == ""
 
-    def _is_quoted_source_note_line(
+    def _should_suppress_source_note_content(
         self,
+        line_text: str,
+        state: _RecognitionState,
+    ) -> bool:
+        """Return whether a source-note content line must not be recognized."""
+        if not state.source_note_exclusion:
+            return False
+        if state.source_note_tail_mode:
+            return True
+
+        if not state.source_note_content_started:
+            state.source_note_content_started = True
+            if self._opens_source_note_quote(line_text) or self._is_source_note_article_like(
+                line_text
+            ):
+                state.source_note_tail_mode = True
+                state.source_note_quote_open = self._opens_source_note_quote(line_text)
+                return True
+            return False
+
+        if state.source_note_quote_open:
+            return True
+
+        return False
+
+    def _is_source_note_article_like(self, line_text: str) -> bool:
+        """Return whether source-note content looks like an Article heading."""
+        return self._SOURCE_NOTE_ARTICLE_LIKE_RE.match(line_text) is not None
+
+    @staticmethod
+    def _is_quoted_source_note_line(
         line_text: str,
         state: _RecognitionState,
     ) -> bool:
         """Return whether the line belongs to a quoted source-law note block."""
         if not state.source_note_exclusion:
             return False
-        if self._opens_source_note_quote(line_text):
+        if LegalHeadingRecognizer._opens_source_note_quote(line_text):
             state.source_note_quote_open = True
         return state.source_note_quote_open
 

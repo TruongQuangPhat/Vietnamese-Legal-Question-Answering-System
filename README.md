@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 5 — Legal Hierarchy Parsing
+Current phase: Phase 6 — Parent-child Chunking
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -19,11 +19,12 @@ Completed:
   Phase 2 — Registry-driven Crawling
   Phase 3 — Raw Corpus Audit and Validation
   Phase 4 — Cleaning & Normalization
+  Phase 5 — Legal Hierarchy Parsing
 
 Next:
-  Implement parser over data/interim/{LAW_ID}/normalized.json
-  Preserve Phần / Chương / Mục / Điều / Khoản / Điểm
-  Do not implement chunking or RAG before parser validation passes
+  Build parent-child chunks from data/interim/{LAW_ID}/hierarchy.json
+  Preserve Article parent context for Clause/Point child chunks
+  Do not implement indexing or RAG before chunk validation passes
 ```
 
 Phase 4 is gate-ready:
@@ -39,6 +40,18 @@ Warning artifacts:       0
 Suspiciously short:      0
 Missing article marker:  0
 Cleaner version:         v0.8.0
+```
+
+Phase 5 is complete:
+
+```text
+Parsed documents:        52
+Hierarchy outputs:       52
+Parsing failures:        0
+Parser version:          v0.1.0
+Hierarchy output:        data/interim/{LAW_ID}/hierarchy.json
+Parsing report:          artifacts/reports/parsing/legal_parsing_report.json
+Remaining caveats:       non-fatal parser warnings documented in the report
 ```
 
 ## Legal Accuracy Rules
@@ -77,7 +90,7 @@ VnLaw-QA/
 │   └── evaluation/
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
-│   ├── interim/      # normalized artifacts and future hierarchy outputs
+│   ├── interim/      # normalized artifacts and hierarchy outputs
 │   ├── processed/    # future JSONL chunks
 │   ├── indexes/      # future retrieval indexes
 │   └── eval/         # future evaluation datasets
@@ -243,7 +256,7 @@ Implemented and planned pipeline:
 ## Current Executable Pipeline
 
 The currently implemented executable path runs from registry and raw artifacts
-through Cleaning & Normalization:
+through Legal Hierarchy Parsing:
 
 ```text
 ┌────────────────────────────────────────────┐
@@ -288,7 +301,14 @@ through Cleaning & Normalization:
                      │
                      ▼
 ┌────────────────────────────────────────────┐
-│ 6. Quality Reports                         │
+│ 6. Legal Hierarchy Parsing                 │
+│ data/interim/{LAW_ID}/hierarchy.json       │
+│ artifacts/reports/parsing/legal_parsing_report.json │
+└────────────────────┬───────────────────────┘
+                     │
+                     ▼
+┌────────────────────────────────────────────┐
+│ 7. Quality Reports                         │
 │ artifacts/reports/cleaning/cleaning_report.json          │
 │ artifacts/reports/cleaning/cleaning_quality_audit.json   │
 │ artifacts/reports/cleaning/raw_vs_cleaning_comparison... │
@@ -365,9 +385,9 @@ BLDS_2015:
 This means BLDS has 689 real article headings. The larger reference count is
 expected because the law references other articles internally.
 
-## Phase 5 Target Pipeline
+## Phase 5 Legal Hierarchy Parsing
 
-Phase 5 should parse hierarchy only. It should not chunk or embed yet.
+Phase 5 parses hierarchy only. It does not chunk or embed.
 
 ```text
 ┌────────────────────────────────────────────┐
@@ -415,18 +435,20 @@ Phase 5 should parse hierarchy only. It should not chunk or embed yet.
 └────────────────────────────────────────────┘
 ```
 
-Recommended first validation laws:
+Official command:
 
-```text
-BLDS_2015
-BLHS_VBHN
-LDD_VBHN
-LTTHC
-LVL_2025
-LANM_2025
-LHNGD_VBHN
-LTATGT_VBHN
+```bash
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --overwrite \
+  --verbose
 ```
+
+The full corpus run completed with 52 total documents, 7 successes, 45
+successes with warnings, and 0 failures. Remaining warnings are non-fatal and
+are preserved in the parsing report for Phase 6 review.
 
 ## Setup
 

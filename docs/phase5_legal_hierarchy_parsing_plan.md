@@ -6,6 +6,13 @@ This document is the approved implementation plan for Phase 5 of VnLaw-QA:
 Legal Hierarchy Parsing. It is self-contained so a fresh Codex session can
 continue implementation without relying on prior conversation context.
 
+Implementation status: Phase 5 is complete. The full 52-law corpus was parsed
+with 7 successes, 45 successes with warnings, and 0 failures. Official
+hierarchy artifacts are generated at `data/interim/{LAW_ID}/hierarchy.json`,
+and the official parsing report is
+`artifacts/reports/parsing/legal_parsing_report.json`. Remaining warning
+categories are non-fatal caveats for Phase 6 chunking review.
+
 Phase 5 must convert normalized Vietnamese legal text into a deterministic,
 validated, traceable hierarchy:
 
@@ -44,10 +51,12 @@ Phase 4 - Cleaning & Normalization           completed / gate-ready
 Production structure scaffold                completed
 Artifact/report migration                    completed
 Docs/skills/context synchronization          completed
-Phase 5 - Legal Hierarchy Parsing            current next phase
+Phase 5 - Legal Hierarchy Parsing            completed
 ```
 
-Phase 5 has not been implemented yet.
+Phase 5 was implemented and validated after this plan was approved. The
+historical plan below remains the source of record for architecture and design
+decisions.
 
 The intended pipeline remains:
 
@@ -1461,4 +1470,4 @@ Exclude:
 - [x] Step 9 — Batch service and report
 - [x] Step 10 — CLI
 - [x] Step 11 — Priority corpus validation
-- [ ] Step 12 — Full corpus output and documentation
+- [x] Step 12 — Full corpus output and documentation

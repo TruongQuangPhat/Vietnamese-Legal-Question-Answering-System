@@ -136,6 +136,30 @@ def test_article_only_document_parses_successfully_and_maps_metadata(tmp_path: P
     assert result.parsing_result.has_article_1 is True
 
 
+def test_titleless_article_document_parses_successfully_without_body_title(
+    tmp_path: Path,
+) -> None:
+    """Titleless Constitution-style Articles become hierarchy nodes."""
+    text = "\n".join(
+        [
+            "Điều 1.",
+            "Nước Cộng hòa xã hội chủ nghĩa Việt Nam là một nước độc lập.",
+            "Điều 2.",
+            "1. Nhà nước Cộng hòa xã hội chủ nghĩa Việt Nam là nhà nước pháp quyền.",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=2, max_article=2)
+
+    assert result.status == LegalParsingStatus.SUCCESS
+    assert result.document is not None
+    articles = [node for node in result.document.nodes if node.level == "article"]
+    assert [article.number for article in articles] == ["1", "2"]
+    assert [article.title for article in articles] == [None, None]
+    assert "Nước Cộng hòa" in articles[0].text
+    assert "Nhà nước Cộng hòa" in articles[1].text
+
+
 def test_full_and_missing_intermediate_hierarchies_parse_successfully(tmp_path: Path) -> None:
     """Full and omitted-level legal structures are accepted by the facade."""
     full_text = "\n".join(
@@ -247,6 +271,66 @@ def test_quoted_source_note_article_does_not_fail_or_become_node(tmp_path: Path)
     ]
     assert article_headings == ["Điều 1. Phạm vi điều chỉnh"]
     assert "Điều 4. Điều khoản chuyển tiếp" in result.document.nodes[0].text
+
+
+def test_unquoted_source_note_tail_articles_do_not_fail_or_become_nodes(
+    tmp_path: Path,
+) -> None:
+    """Unquoted amendment-law tail Articles remain root-only source-note text."""
+    text = "\n".join(
+        [
+            "Điều 1. Nội dung chính",
+            "Nội dung chính.",
+            "Điều 10 của Luật số 01/2025/QH15 sửa đổi, bổ sung một số điều của Luật Kiểm thử, có hiệu lực kể từ ngày 01 tháng 7 năm 2025 quy định như sau:",
+            "Điều 1. Nội dung trong ghi chú nguồn",
+            "1. Khoản trong ghi chú nguồn",
+            "Điều 2. Nội dung khác trong ghi chú nguồn",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
+    assert result.document is not None
+    article_headings = [
+        node.metadata.get("heading_text")
+        for node in result.document.nodes
+        if node.level == "article"
+    ]
+    assert article_headings == ["Điều 1. Nội dung chính"]
+    assert "Điều 2. Nội dung khác trong ghi chú nguồn" in result.document.nodes[0].text
+    assert _issue_codes(result.warnings) == [ParsingIssueCode.SOURCE_NOTE_EXCLUDED]
+
+
+def test_quoted_source_note_tail_with_inner_quote_does_not_promote_article(
+    tmp_path: Path,
+) -> None:
+    """Inner quote closures do not expose later source-law Articles as main law."""
+    text = "\n".join(
+        [
+            "Điều 1. Nội dung chính",
+            "Nội dung chính.",
+            "Điều 3 và Điều 4 của Luật số 42/2019/QH14 sửa đổi, bổ sung một số điều của Luật Kiểm thử, có hiệu lực kể từ ngày 01 tháng 11 năm 2019 quy định như sau:",
+            "“Điều 3. Hiệu lực thi hành",
+            "1. Luật này có hiệu lực thi hành từ ngày 01 tháng 11 năm 2019.",
+            "“32a. Dịch vụ phụ trợ bao gồm tư vấn, đánh giá rủi ro”.",
+            "Điều 4. Quy định chuyển tiếp",
+            "1. Nội dung chuyển tiếp trong ghi chú nguồn.",
+        ]
+    )
+
+    result = _parse_text(tmp_path, text, article_count=1, max_article=1)
+
+    assert result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
+    assert result.document is not None
+    article_headings = [
+        node.metadata.get("heading_text")
+        for node in result.document.nodes
+        if node.level == "article"
+    ]
+    assert article_headings == ["Điều 1. Nội dung chính"]
+    assert "Điều 4. Quy định chuyển tiếp" in result.document.nodes[0].text
+    assert _issue_codes(result.warnings) == [ParsingIssueCode.SOURCE_NOTE_EXCLUDED]
 
 
 def test_builder_and_validator_warnings_reach_final_result(tmp_path: Path) -> None:
