@@ -6,7 +6,9 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 # Naive RAG Baseline Skill
 
-Use this skill to build the first working legal QA baseline before Advanced RAG or GraphRAG.
+Use this skill to build the first working legal QA baseline (Phase 9) before Advanced RAG or GraphRAG.
+
+**Prerequisites**: Phases 0-8 must be complete. Processed JSONL must validate. Embeddings must be indexed in Qdrant.
 
 ## Goal
 
@@ -14,29 +16,13 @@ Build the simplest reliable legal QA pipeline.
 
 ```text
 query
-  → simple retrieval
-  → parent context packing
-  → legal QA prompt
-  → strict citation answer
-  → citation validation
-  → fallback if unsupported
-```
-
-## Expected Files
-
-```text
-src/retrieval/vector_store.py
-src/generation/llm_client.py
-src/generation/prompts.py
-src/generation/context_packer.py
-src/generation/citation_validator.py
-src/api/routes/qa.py
-src/api/schemas.py
-
-data/eval/golden_qa_v1.jsonl
-tests/evaluation/run_ragas.py
-tests/unit/generation/
-tests/unit/retrieval/
+→ dense retrieval (or BM25)
+→ top-k candidates
+→ parent context packing
+→ legal QA prompt
+→ strict citation answer
+→ citation validation
+→ fallback if unsupported
 ```
 
 ## Baseline Retrieval
@@ -45,12 +31,30 @@ Start simple:
 
 ```text
 dense vector search OR BM25
-top-k candidates
-parent article context
+top-k candidates (5-10)
+parent article context (from parent_text)
 strict citation prompt
 ```
 
 Avoid complex query rewriting, graph traversal, multi-agent orchestration, or fine-tuning at this stage.
+
+## Expected Files
+
+```text
+src/retrieval/vector_store.py        # Qdrant hybrid search
+src/generation/llm_client.py         # LLM provider wrapper
+src/generation/prompts.py            # Legal QA prompt templates
+src/generation/context_packer.py     # Evidence packet assembly
+src/generation/citation_validator.py # Citation integrity checks
+src/generation/fallback_policy.py    # Low-confidence fallback
+src/api/routes/qa.py                 # QA endpoint
+src/api/schemas.py                   # Request/response models
+
+data/eval/golden_qa_v1.jsonl
+tests/evaluation/
+tests/unit/generation/
+tests/unit/retrieval/
+```
 
 ## Prompt Requirements
 
@@ -66,11 +70,12 @@ The LLM must be instructed to:
 ## Baseline Answer Format
 
 ```text
-Legal issue:
-Applicable regulation:
-Answer:
-Sources:
-Limitations:
+Vấn đề pháp lý:
+Quy định áp dụng:
+Phân tích:
+Kết luận:
+Nguồn:
+Hạn chế:
 ```
 
 ## Minimum Fallback Behavior
@@ -79,7 +84,7 @@ Use fallback when:
 
 ```text
 retrieval returns no useful context
-top evidence is below confidence threshold
+top evidence is below confidence threshold (0.75)
 citation validation fails
 question is outside the current corpus
 ```
@@ -89,13 +94,13 @@ question is outside the current corpus
 Expected components:
 
 ```text
-NaiveRetriever
-ContextPacker
-LegalPromptBuilder
-BaseLLMClient
-CitationValidator
-FallbackPolicy
-QAService
+NaiveRetriever           # simple dense/sparse search
+ContextPacker            # parent + child text assembly
+LegalPromptBuilder       # prompt rendering with citation rules
+BaseLLMClient            # provider abstraction
+CitationValidator        # citation integrity checks
+FallbackPolicy           # confidence-based fallback
+QAService                # end-to-end QA orchestration
 ```
 
 Rules:
@@ -108,7 +113,7 @@ Rules:
 ## Definition of Done
 
 - [ ] `/api/v1/qa` can answer from ingested corpus.
-- [ ] Strict citation format is present.
+- [ ] Strict citation format is present in every answer.
 - [ ] Unsupported questions trigger fallback.
 - [ ] Golden QA evaluation can run.
 - [ ] Empty retrieval is tested.

@@ -6,9 +6,9 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 # GraphRAG and Agent Orchestration Skill
 
-Use this skill for graph-based legal retrieval and multi-hop legal evidence discovery.
+Use this skill for graph-based legal retrieval and multi-hop legal evidence discovery (Phase 11).
 
-Use GraphRAG only after Naive RAG and Advanced RAG are working.
+**Prerequisites**: Phase 9 (Naive RAG) and Phase 10 (Advanced RAG) must be stable.
 
 ## Goal
 
@@ -26,49 +26,36 @@ GraphRAG must expand evidence, not replace legal text citation.
 ## Expected Files
 
 ```text
-src/retrieval/graph_store.py
-src/ingestion/graph_extractor.py
-src/agents/router.py
-src/agents/vector_explorer.py
-src/agents/graph_explorer.py
-src/agents/orchestrator.py
+src/retrieval/graph_store.py        # Neo4j operations
+src/ingestion/graph_extractor.py    # cross-reference extraction from chunks
+src/agents/router.py                # intent classification
+src/agents/vector_explorer.py       # Qdrant evidence retrieval
+src/agents/graph_explorer.py        # Neo4j traversal
+src/agents/orchestrator.py          # multi-agent evidence merging
 tests/unit/retrieval/test_graph_store.py
 tests/unit/agents/
 ```
 
 ## Neo4j Node Types
 
-Use at least:
+Use at minimum:
 
 ```text
-Law
-Article
-Clause
-Entity
+Law, Article, Clause, Entity
 ```
 
 Optional:
 
 ```text
-Point
-Procedure
-Penalty
-Organization
-Concept
+Point, Procedure, Penalty, Organization, Concept
 ```
 
 ## Edge Types
 
-Use at least:
+Use at minimum:
 
 ```text
-BELONGS_TO
-REFERENCES
-AMENDS
-SUPERSEDES
-RELATED_TO
-DEFINES
-MENTIONS
+BELONGS_TO, REFERENCES, AMENDS, SUPERSEDES, RELATED_TO, DEFINES, MENTIONS
 ```
 
 ## Constraints
@@ -87,24 +74,20 @@ Never build unsafe Cypher strings from raw user input.
 
 ## Cross-Reference Extraction
 
-Extract references such as:
+Extract references from parsed legal text:
 
 ```text
-Điều 79 của Luật này
-Khoản 2 Điều này
-Điều 145 của Bộ luật Tố tụng hình sự
+"theo Điều 79 của Luật này"
+"Khoản 2 Điều này"
+"Điều 145 của Bộ luật Tố tụng hình sự"
 ```
 
 Each reference must preserve:
 
 ```text
-anchor_text
-context_snippet
-source_article_id
-target_article_id if resolved
-ref_type
-ref_relation
-confidence
+anchor_text, context_snippet
+source_article_id, target_article_id (if resolved)
+ref_type, ref_relation, confidence
 ```
 
 Unresolved references must be stored as unresolved, not hallucinated.
@@ -141,13 +124,13 @@ Merges vector and graph evidence, removes duplicates, preserves citation anchors
 Expected components:
 
 ```text
-GraphStore
-Neo4jGraphStore
-CrossReferenceExtractor
-IntentRouter
-VectorExplorer
-GraphExplorer
-AgentOrchestrator
+GraphStore              # Protocol for graph operations
+Neo4jGraphStore         # Neo4j implementation
+CrossReferenceExtractor # reference extraction from chunks
+IntentRouter            # query intent classification
+VectorExplorer          # Qdrant retrieval agent
+GraphExplorer           # Neo4j traversal agent
+AgentOrchestrator       # multi-agent evidence merging
 ```
 
 Rules:

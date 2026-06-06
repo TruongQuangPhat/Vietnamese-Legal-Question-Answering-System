@@ -10,10 +10,11 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **Phase 5 Legal Hierarchy Parsing is complete**.
+Current status: **Phase 6 Parent-child Chunking is in progress**.
 The corpus has 52/52 raw artifacts, 52/52 normalized outputs, and 52/52
-hierarchy outputs. The next engineering phase is **Phase 6 — Parent-child
-Chunking**.
+hierarchy outputs. Phase 6 chunking code has been implemented and is being
+validated across the full corpus. The next engineering phase after the Phase 6
+gate is **Phase 7 — Processed JSONL Validation**.
 
 ## 2. Quick Start
 
@@ -312,9 +313,9 @@ safe to feed into Cleaning & Normalization.
 - All Articles are detected
 - Clause/Point hierarchy is correct for each Article
 - No overlapping spans
-- Valid tree structure (each node has 1 parent, root is Part/Law)
+- Valid tree structure (each node has 1 parent, root is Law)
 
-**Status**: Planned
+**Status**: Implemented (52/52 hierarchies; 7 success, 45 warnings, 0 failures)
 
 **Detailed documentation**: `docs/legal_parsing.md`
 
@@ -340,7 +341,7 @@ safe to feed into Cleaning & Normalization.
 - **Traceability**: `text_hash` for duplicate detection, `source_url` and `source_domain` for provenance
 - Reason for not using arbitrary character chunking: would break legal clauses, invalidate citations, destroy hierarchy.
 
-**Output**: `data/interim/{law_id}/chunks.jsonl` (each line is 1 child chunk).
+**Output**: `data/processed/{law_id}.jsonl` (one child chunk per line, Phase 6 output).
 
 **Validation Criteria**:
 - Each chunk has unique `chunk_id` and valid Vietnamese citation format
@@ -353,7 +354,7 @@ safe to feed into Cleaning & Normalization.
 - `text_hash` computed and present
 - No empty `text` fields
 
-**Status**: Planned
+**Status**: In Progress (chunking code implemented; full-corpus validation in progress)
 
 **Detailed documentation**: `docs/parent_child_chunking.md`
 
@@ -431,7 +432,7 @@ safe to feed into Cleaning & Normalization.
 - `issued_date`, `effective_date`, `expiry_date` properly formatted
 - Zero empty `text` fields
 
-**Status**: Planned
+**Status**: In Progress (chunking code implemented; full-corpus validation running)
 
 **Detailed documentation**: `docs/processed_jsonl.md`
 
@@ -800,8 +801,8 @@ Each phase must pass its gate before proceeding to the next.
 | `docs/corpus_registry.md` | Existing | Corpus registry schema and maintenance |
 | `docs/raw_corpus_audit.md` | Existing | Raw artifact audit procedure |
 | `docs/cleaning_normalization.md` | Existing | HTML-to-text, Unicode, whitespace handling |
-| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm and edge cases |
-| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design and citation construction |
+| `docs/legal_parsing.md` | Implemented | Legal hierarchy parsing algorithm and edge cases |
+| `docs/parent_child_chunking.md` | In Progress | Parent-child chunking design, chunk schema, and citation construction |
 | `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding model choice, vector store setup, indexing strategy |
 | `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
@@ -848,7 +849,7 @@ Report:                artifacts/reports/parsing/legal_parsing_report.json
 Remaining parser warnings are non-fatal and are retained in the parsing report
 for Phase 6 review.
 
-### Phase 6 — Parent-child Chunking — Current next phase
+### Phase 6 — Parent-child Chunking — In Progress (chunking code implemented; full-corpus validation running)
 
 ### Phase 7 — Processed JSONL Export & Validation — Planned
 

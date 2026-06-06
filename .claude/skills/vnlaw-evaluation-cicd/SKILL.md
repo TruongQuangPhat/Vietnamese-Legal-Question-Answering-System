@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 # Evaluation and CI/CD Skill
 
-Use this skill to evaluate system quality and enforce merge/release gates.
+Use this skill to evaluate system quality and enforce merge/release gates (Phase 12+).
 
 ## Goal
 
@@ -15,24 +15,11 @@ Ensure the system is not only functional, but legally grounded, testable, reprod
 ## Test Categories
 
 ```text
-unit tests       → parser, chunker, normalizer, embedder, reranker, services
-integration     → ingestion pipeline, vector store, graph store, API flow
+unit tests       → parser, chunker, normalizer, services
+integration     → ingestion pipeline, API flow
 evaluation      → RAGAS, golden QA, citation checks, hallucination checks
 security        → secret scan, unsafe logs, injection risks
 release         → Docker build, config validation, deployment readiness
-```
-
-## Expected Files
-
-```text
-tests/unit/
-tests/integration/
-tests/evaluation/run_ragas.py
-tests/evaluation/golden_qa_v1.jsonl
-data/eval/golden_qa_v1.jsonl
-.github/workflows/ci.yml
-.github/workflows/eval.yml
-.github/workflows/build.yml
 ```
 
 ## RAGAS Metrics
@@ -40,10 +27,10 @@ data/eval/golden_qa_v1.jsonl
 Target gates:
 
 ```text
-context_precision ≥ 0.85
-faithfulness ≥ 0.80
-answer_relevancy tracked
-context_recall tracked
+context_precision >= 0.85
+faithfulness >= 0.80
+answer_relevancy    tracked
+context_recall      tracked
 ```
 
 RAGAS is useful but not sufficient for legal QA. Track legal-specific metrics separately.
@@ -56,6 +43,7 @@ Track:
 citation_exact_match
 article_recall
 clause_recall
+point_recall
 effective_date_correctness
 unsupported_claim_rate
 fallback_precision
@@ -71,7 +59,9 @@ Citation validation failures should block release candidates.
   "question": "Vietnamese legal question",
   "ground_truth": "Grounded answer with citation",
   "contexts": ["Relevant law text"],
-  "reference_articles": ["LDD_VBHN/Dieu17"]
+  "reference_articles": ["LDD_VBHN/Dieu17"],
+  "query_date": "2025-01-01",
+  "domain": "land"
 }
 ```
 
@@ -81,7 +71,7 @@ Golden datasets must include:
 - semantic questions;
 - date-sensitive questions;
 - insufficient-evidence questions;
-- cross-reference questions when GraphRAG is enabled.
+- cross-reference questions (when GraphRAG is enabled).
 
 ## CI Gates
 
@@ -100,11 +90,20 @@ Block merge when:
 ## Commands
 
 ```bash
+# Full test suite
+uv run pytest tests/unit -v
+
+# Linting
 uv run ruff check src tests
 uv run ruff format src tests
+
+# Type checking
 uv run mypy src
-uv run pytest tests/unit -v
+
+# Integration tests
 uv run pytest tests/integration -v
+
+# Evaluation
 uv run python tests/evaluation/run_ragas.py \
   --dataset data/eval/golden_qa_v1.jsonl \
   --api-url http://localhost:8000
@@ -115,11 +114,11 @@ uv run python tests/evaluation/run_ragas.py \
 Expected components:
 
 ```text
-EvaluationRunner
-RagasEvaluator
-CitationEvaluator
-GoldenDatasetLoader
-RegressionReport
+EvaluationRunner        # orchestrates evaluation runs
+RagasEvaluator          # RAGAS metric computation
+CitationEvaluator       # legal citation accuracy metrics
+GoldenDatasetLoader     # loads golden QA datasets
+RegressionReport        # test result aggregation
 ```
 
 Rules:
@@ -138,7 +137,7 @@ Rules:
 - [ ] Legal answers include citations.
 - [ ] Citation validator passes.
 - [ ] RAGAS gates pass.
-- [ ] API endpoint returns `request_id`.
+- [ ] API endpoint returns request_id.
 - [ ] No secret appears in logs or reports.
 
 ## Do Not

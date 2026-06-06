@@ -6,22 +6,24 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 # API Backend Skill
 
-Use this skill for FastAPI backend work.
+Use this skill for FastAPI backend work (Phase 13).
+
+**Prerequisites**: Phases 0-12 must be stable. Retrieval and generation pipelines must work.
 
 ## Expected Files
 
 ```text
-src/api/main.py
-src/api/dependencies.py
-src/api/schemas.py
-src/api/routes/qa.py
-src/api/routes/health.py
-src/api/routes/admin.py
+src/api/main.py              # FastAPI app factory
+src/api/dependencies.py      # DI container
+src/api/schemas.py           # Pydantic request/response models
+src/api/routes/qa.py         # POST /api/v1/qa
+src/api/routes/health.py     # GET /health
+src/api/routes/admin.py      # admin endpoints (optional)
 
-src/services/qa_service.py
-src/core/config.py
-src/core/exceptions.py
-src/core/logger.py
+src/services/qa_service.py   # end-to-end QA orchestration
+src/core/config.py           # settings
+src/core/exceptions.py       # custom exceptions
+src/core/logger.py           # structured logging
 
 tests/unit/api/
 tests/integration/api/
@@ -29,7 +31,7 @@ tests/integration/api/
 
 ## API Principles
 
-- Keep route handlers thin.
+- Keep route handlers thin — no business logic in routes.
 - Put business logic in services/use-cases.
 - Use dependency injection for retrievers, generators, stores, and settings.
 - Use Pydantic V2 request/response models.
@@ -48,28 +50,29 @@ Expected endpoint:
 POST /api/v1/qa
 ```
 
-Request model should include:
+Request model:
 
 ```text
-question
-query_date optional
-user_context optional
-domain optional
-jurisdiction optional
-max_contexts optional
+question: str
+query_date: date | None
+user_context: str | None
+domain: str | None
+jurisdiction: str | None
+max_contexts: int | None
+confidence_threshold: float | None
 ```
 
-Response model should include:
+Response model:
 
 ```text
-request_id
-answer
-citations
-confidence_score
-retrieved_context_summary
-fallback_used
-warnings
-processing_time_ms
+request_id: str
+answer: str
+citations: list[Citation]
+confidence_score: float
+retrieved_context_summary: list[str]
+fallback_used: bool
+warnings: list[str]
+processing_time_ms: float
 ```
 
 ## Error Handling
@@ -78,11 +81,11 @@ Use custom exceptions and consistent error responses.
 
 Expected behavior:
 
-- validation error → 422;
-- low confidence fallback → 200 with `fallback_used=true`;
-- retriever timeout → 503;
-- LLM timeout → 503;
-- unauthorized admin request → 401/403.
+- validation error -> 422;
+- low confidence fallback -> 200 with `fallback_used=true`;
+- retriever timeout -> 503;
+- LLM timeout -> 503;
+- unauthorized admin request -> 401/403.
 
 Do not return raw internal exceptions.
 
@@ -91,31 +94,19 @@ Do not return raw internal exceptions.
 Expected components:
 
 ```text
-QAService
-RetrievalService
-GenerationService
-CitationValidationService
-HealthService
+QAService                 # end-to-end QA orchestration
+RetrievalService          # retrieval + reranking
+GenerationService         # LLM call + prompt rendering
+CitationValidationService # citation integrity checks
+HealthService             # health checks
 ```
 
 Rules:
 
 - FastAPI routes should call services, not implement retrieval logic.
-- Services should depend on typed interfaces, not concrete infrastructure clients when possible.
+- Services should depend on typed interfaces, not concrete infrastructure clients.
 - Public API schemas, services, and route handlers must have Google-style docstrings.
 - API docstrings must explain request/response behavior and failure modes.
-
-## Tests
-
-Add tests for:
-
-- request validation;
-- fallback behavior;
-- timeout handling;
-- request_id propagation;
-- citation response format;
-- auth/rate-limit behavior for protected endpoints;
-- route handler not exposing stack traces.
 
 ## Do Not
 

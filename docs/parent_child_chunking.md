@@ -12,20 +12,20 @@ This design ensures that:
 
 ## Quick Start
 
-**Intended CLI** (design phase, not yet implemented):
+**CLI** (implemented):
 
 ```bash
 uv run python scripts/chunk_legal_corpus.py \
   --input-dir data/interim \
-  --output-dir data/interim \
+  --output-dir data/processed \
   --report artifacts/reports/chunking/chunking_report.json \
   --law-ids LDD_VBHN BLDS_2015
 ```
 
-**Expected workflow**:
+**Workflow**:
 1. Input: `data/interim/{law_id}/hierarchy.json`
-2. Output: `data/interim/{law_id}/chunks.jsonl` (one child chunk per line)
-3. Chunks feed into JSONL validation and embedding.
+2. Output: `data/processed/{law_id}.jsonl` (one child chunk per line)
+3. Chunks feed into Phase 7 JSONL validation and embedding.
 
 ## Architecture
 

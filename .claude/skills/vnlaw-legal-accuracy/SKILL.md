@@ -4,119 +4,91 @@ description: Use for any task involving legal answers, citations, legal document
 allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 ---
 
-# Legal Accuracy and Citation Skill
+# Legal Accuracy Skill
 
-This is the highest-priority VnLaw-QA skill.
+Use this skill whenever correctness of legal output matters more than speed or convenience.
 
-Use it whenever a task affects legal answers, citations, retrieval evidence, legal validity, fallback behavior, or user-facing legal QA.
+## Grounding Rules
 
-## Non-Negotiable Rules
+- Answer only from the trusted corpus (`thuvienphapluat.vn`).
+- Cite legal sources at the level of **Point → Clause → Article → Law → Year / consolidated version**.
+- Resolve the legally effective version of a document based on the query date.
+- Clearly state that the system supports legal research and **does not replace professional legal counsel**.
+- Never fabricate laws, articles, clauses, points, penalties, procedures, or citations.
 
-- Never let the LLM invent laws, articles, clauses, points, penalties, procedures, or citations.
-- Every answer must be grounded in retrieved legal documents.
-- Every legal claim must have a citation.
-- If confidence is below the threshold, default `0.75`, use fallback instead of guessing.
-- Do not provide professional legal advice.
-- Always preserve source traceability.
+## Citation Format
 
-## Required Citation Format
-
-Clause-level citation:
+Required citation style in generated answers:
 
 ```text
-According to Clause {X}, Article {Y}, {Law Name} {Year or VBHN Version}: "{quoted legal content}"
+Theo Khoản {X}, Điều {Y}, {Law Name} {Year or Consolidated Version}:
+"{quoted legal content}"
 ```
 
-Point-level citation:
+For parent-child chunking context:
 
 ```text
-According to Point {A}, Clause {X}, Article {Y}, {Law Name} {Year or VBHN Version}: "{quoted legal content}"
+Luật {law_name}, Điều {article_number}, Khoản {clause_number}, Điểm {point_label}
 ```
 
-If the answer paraphrases instead of quotes, do not present the paraphrase as a direct quote.
+Omit `Khoản`/`Điểm` when the level does not apply. Always use Vietnamese legal terminology, never English "Article/Clause/Point".
 
-## Fallback Response
+## Confidence and Fallback
 
-If the answer is unsupported or confidence is too low:
+If confidence is below the configured threshold (default `0.75`), the system must fall back:
 
 ```text
-I could not find a specific regulation for this issue in the current legal corpus. Please check thuvienphapluat.vn directly or consult a qualified lawyer.
+Tôi không tìm thấy quy định cụ thể về vấn đề này trong kho văn bản pháp luật hiện tại.
+Vui lòng kiểm tra trực tiếp trên thuvienphapluat.vn hoặc tham khảo ý kiến luật sư.
 ```
 
-## Required Legal Metadata
+The system must never guess or extrapolate legal provisions when evidence is insufficient.
 
-Every cited document must preserve:
+## Hierarchy Preservation
 
-```text
-law_id
-law_name
-year
-effective_date
-expiry_date
-status
-hierarchy
-source_url
-crawled_at
-parser_version
-```
-
-Use query date when available. If no query date is provided, use the current date or a documented default.
-
-## Conflict Resolution
-
-If retrieved documents conflict:
-
-1. Prefer higher legal tier.
-2. Prefer the effective version at query date.
-3. Prefer VBHN where applicable.
-4. Report uncertainty instead of forcing an answer.
-
-## Answer Structure
-
-Use this structure in generation prompts:
+Legal chunks must preserve Vietnamese legal hierarchy:
 
 ```text
-Legal issue identified:
-Applicable provisions:
-Analysis based only on retrieved law:
-Conclusion:
-Sources:
-Safety note:
-```
-
-## OOP and Docstring Rules
-
-Expected components:
-
-```text
-CitationValidator
-LegalValidityResolver
-ConfidencePolicy
-FallbackPolicy
-LegalAnswerVerifier
+Phần → Chương → Mục → Điều → Khoản → Điểm
 ```
 
 Rules:
 
-- Keep citation validation separate from answer generation.
-- Use typed citation models.
-- Public classes/functions must have Google-style docstrings.
-- Docstrings must explain legal validity assumptions and failure behavior.
+- Never split a legal clause or point across chunks.
+- Never merge separate clauses or points into one chunk.
+- Parent context must be the full Article text.
+- Offsets must trace back to `normalized_text` in `normalized.json`.
+
+## Validity and Versioning
+
+- Prefer VBHN consolidated documents when available.
+- If no VBHN exists, represent original document and amendments in chronological order with accurate `effective_date`, `expiry_date`, and `status` metadata.
+- Time-aware retrieval must filter by `effective_date` at query time.
+- Never mix expired and active law versions without explaining validity.
+
+## Anti-Hallucination Rules
+
+- Do not let the LLM invent citations.
+- Do not let the LLM infer legal provisions not present in retrieved context.
+- Do not let the LLM paraphrase as if it were quoting.
+- Distinguish quoted legal text from analytical text in answers.
+- Validate every citation against retrieved evidence before presenting to user.
 
 ## Review Checklist
 
 - [ ] Every legal claim has a citation.
-- [ ] Citation exists in retrieved context.
-- [ ] Law version is valid for query date.
-- [ ] Unsupported claims are removed or fallback is used.
-- [ ] The answer does not claim to be legal advice.
-- [ ] Source URL and hierarchy are preserved.
+- [ ] Citations match retrieved evidence.
+- [ ] Hierarchy is preserved (no broken clauses/points).
+- [ ] Source URL and law version are traceable.
+- [ ] Fallback is triggered when evidence is below threshold.
+- [ ] No fabricated provisions, penalties, or procedures.
+- [ ] Query date is respected for law version resolution.
+- [ ] Vietnamese terminology is used throughout.
 
 ## Do Not
 
-- Do not cite a document not present in context.
-- Do not paraphrase a law as if it were an exact quote.
-- Do not hide missing evidence.
-- Do not use general web content as legal truth unless explicitly approved.
-- Do not answer based on memory.
-- Do not let confidence scoring be ignored.
+- Do not answer legal questions without retrieved evidence.
+- Do not present paraphrased text as quoted law.
+- Do not mix law versions without validity explanation.
+- Do not skip citation validation.
+- Do not hide low confidence from the user.

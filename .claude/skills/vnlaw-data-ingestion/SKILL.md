@@ -6,23 +6,23 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 # Data Ingestion Skill
 
-Use this skill when implementing, reviewing, or debugging legal data ingestion.
+Use this skill when implementing, reviewing, or debugging legal data ingestion (Phases 1-4).
 
 The preferred ingestion workflow is registry-driven:
 
 ```text
 configs/laws/corpus_registry.yml
-  → async crawler
-  → raw artifact storage
-  → metadata.json
-  → cleaning/normalization
-  → legal parsing
-  → parent-child chunking
-  → processed JSONL
-  → verification
+→ async crawler (Phase 2)
+→ raw artifact storage (data/raw/)
+→ metadata.json
+→ cleaning/normalization (Phase 4)
+→ legal parsing (Phase 5)
+→ parent-child chunking (Phase 6)
+→ processed JSONL (Phase 7)
+→ verification
 ```
 
-For Phase 1, focus only on reliable corpus acquisition, raw storage, parsing, chunking, and JSONL validation.
+For Phase 1-4, focus only on reliable corpus acquisition, raw storage, cleaning, and normalization.
 
 Do not jump into embedding, Qdrant, Neo4j, Advanced RAG, or GraphRAG until the parsed corpus is reliable.
 
@@ -38,30 +38,43 @@ Do not crawl other domains unless explicitly approved.
 
 Prefer VBHN documents when available. If no VBHN exists, preserve original law and amendment chronology with effective-date metadata.
 
-## Expected Files
+## Expected Files (Current Project Layout)
 
 ```text
 configs/laws/corpus_registry.yml
 
 src/ingestion/crawler.py
-src/ingestion/parsers/html_parser.py
-src/ingestion/parsers/attachment_parser.py
-src/ingestion/parsers/legal_parser.py
-src/ingestion/chunkers.py
-src/ingestion/pipeline.py
+src/ingestion/audit.py
+src/ingestion/cleaning.py
+src/ingestion/cleaning_diagnostics.py
+src/ingestion/models.py
+src/ingestion/registry.py
+src/ingestion/selector.py
+src/ingestion/storage.py
+src/ingestion/rate_limiter.py
+src/services/crawl_service.py
+src/services/raw_audit_service.py
+src/services/cleaning_service.py
+src/services/cleaning_quality_audit_service.py
 
-data/raw/{law_id}/main.html
-data/raw/{law_id}/metadata.json
-data/raw/{law_id}/attachments/
-data/processed/{law_id}.jsonl
+data/raw/{law_id}/latest/main.html
+data/raw/{law_id}/latest/metadata.json
+data/interim/{law_id}/normalized.json
+data/interim/{law_id}/cleaned.txt
+
+scripts/crawl_raw_corpus.py
+scripts/audit_raw_corpus.py
+scripts/clean_raw_corpus.py
+scripts/audit_cleaning_quality.py
 
 tests/unit/ingestion/
-tests/integration/test_ingestion_pipeline.py
+tests/unit/services/test_legal_parsing_service.py
+tests/unit/processing/
 ```
 
 ## Corpus Registry
 
-The crawler must read crawl targets from:
+The crawler reads crawl targets from:
 
 ```text
 configs/laws/corpus_registry.yml
@@ -75,12 +88,16 @@ corpus:
     name: "Luật Đất đai (VBHN 2025)"
     tier: 2
     group: "Đất đai, BĐS, Xây dựng & Môi trường"
+    domain_tags: ["đất đai", "bất động sản"]
+    status: "active"
     source_domain: "thuvienphapluat.vn"
-    source_type: "html"   # html | pdf | doc | docx | mixed | unknown
+    source_type: "html"          # html | pdf | doc | docx | mixed | unknown
     url: "https://thuvienphapluat.vn/..."
-    status: "pending"    # pending | crawling | crawled | parsed | ingested | failed | manual_review
-    priority: "high"
-    notes: null
+    effective_date: "YYYY-MM-DD"
+    expiry_date: null
+    crawl_status: "pending"      # pending | crawling | crawled | parsed | ingested | failed | manual_review
+    priority: "high"             # critical | high | medium | low
+    notes: ""
 ```
 
 The crawler must support:
@@ -89,26 +106,16 @@ The crawler must support:
 - crawl by tier;
 - crawl by group;
 - crawl by explicit `law_id`;
-- crawl from a temporary approved URL list;
 - continue after individual target failures;
 - report a final crawl summary.
 
 ## Raw Storage Contract
 
-Every crawled law must be stored under:
+Every crawled law is stored under:
 
 ```text
-data/raw/{law_id}/
-```
-
-Recommended layout:
-
-```text
-data/raw/{law_id}/
-├── main.html
-├── metadata.json
-├── pages/
-└── attachments/
+data/raw/{law_id}/latest/main.html
+data/raw/{law_id}/latest/metadata.json
 ```
 
 Always save the raw artifact before parsing.
@@ -120,42 +127,41 @@ If the legal content is embedded in PDF/DOC/DOCX, save both the landing HTML and
 Every law must have:
 
 ```text
-data/raw/{law_id}/metadata.json
+data/raw/{law_id}/latest/metadata.json
 ```
 
-Metadata must include at least:
+Metadata must include:
 
 ```text
-law_id
-name
-tier
-source_domain
-source_type
-url
-crawl_status
-http_status
-crawled_at
-content_hash
-crawler_version
-parser_hint
-attachment_paths
-error_message
+law_id, name, tier, source_domain, source_type, url
+crawl_status, http_status, crawled_at, content_hash
+crawler_version, parser_hint, effective_date, expiry_date
+attachment_paths, error_message
 ```
 
 Do not overwrite raw artifacts without traceability or content-hash history.
 
+## Cleaning Output Contract
+
+Every cleaned law produces:
+
+```text
+data/interim/{law_id}/normalized.json   # Required: cleaned text + metadata + markers
+data/interim/{law_id}/cleaned.txt       # Optional: human-readable debug artifact
+```
+
+The `normalized.json` contains: `law_id`, `law_name`, `source_url`, `source_domain`, `source_type`, `raw_artifact_path`, `normalized_text`, `text_stats`, `markers` (article counts, heading metrics), `warnings`, `metadata` (cleaner_version), `candidate_info`.
+
 ## Crawler Rules
 
-- Use async I/O.
-- Use conservative rate limiting.
-- Default delay: 2 seconds per host.
-- Default batch concurrency: 2.
-- Absolute max concurrency: 3 unless explicitly approved.
-- Use retries with exponential backoff.
-- Use a valid User-Agent.
+- Use async I/O (aiohttp or httpx).
+- Use conservative rate limiting (default 2 seconds per host).
+- Default batch concurrency: 2. Absolute max: 3 unless explicitly approved.
+- Use retries with exponential backoff (capped at 30s).
+- Use a valid User-Agent (`VnLaw-QA-Crawler/1.0.0`).
 - Validate source domain before crawling.
-- Store raw HTML/PDF/DOC/DOCX before parsing.
-- Compute content hash for every raw artifact.
+- Store raw HTML before parsing.
+- Compute SHA-256 content hash for every raw artifact.
 - Record actionable failure metadata.
 - Never use `except Exception: pass`.
 
@@ -166,19 +172,23 @@ Use clear object-oriented boundaries.
 Recommended components:
 
 ```text
-CrawlTarget
-CrawlResult
-BaseCrawler
-ThuvienPhapLuatCrawler
-CorpusRegistryLoader
-RawArtifactStore
-CrawlStatusWriter
+CrawlTarget                # Pydantic model for registry entries
+CrawlResult                # dataclass for crawl outcomes
+CrawlSelection             # dataclass for filtered target sets
+BaseCrawler                # abstract base crawler
+ThuvienPhapLuatCrawler    # TVPL-specific crawler implementation
+CorpusRegistryLoader       # YAML registry loader
+RawArtifactStore           # file-based raw artifact storage
+CrawlTargetSelector        # target filtering logic
+RateLimiter                # per-host rate limiting
+NormalizedArtifact         # Pydantic model for cleaned output
+LegalMarkersSummary        # dataclass for article/clause detection metrics
 ```
 
 Rules:
 
 - Use Pydantic models at data boundaries.
-- Keep crawler, parser, chunker, embedder, vector store, and graph store separate.
+- Keep crawler, cleaner, parser, chunker, embedder, vector store, and graph store separate.
 - Do not create a god class that performs crawling, parsing, embedding, and ingestion together.
 - Public classes and functions must have Google-style docstrings.
 - Docstrings must explain purpose, args, returns, raises, side effects, and traceability assumptions.
@@ -191,7 +201,7 @@ Crawl one law for debugging:
 uv run python scripts/crawl_raw_corpus.py \
   --url "https://thuvienphapluat.vn/..." \
   --law-id "LDD_VBHN" \
-  --output data/raw/
+  --output data/raw
 ```
 
 Crawl all pending laws:
@@ -200,6 +210,7 @@ Crawl all pending laws:
 uv run python scripts/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --concurrency 2 \
   --delay-seconds 2 \
@@ -215,22 +226,40 @@ uv run python scripts/crawl_raw_corpus.py \
   --output data/raw
 ```
 
-Run raw corpus audit:
+Audit raw corpus:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
-Run cleaning & normalization:
+Clean and normalize corpus:
 
 ```bash
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json
+  --report artifacts/reports/cleaning/cleaning_report.json
+```
+
+Optional debug text output:
+
+```bash
+uv run python scripts/clean_raw_corpus.py \
+  --raw-dir data/raw \
+  --output-dir data/interim \
+  --report artifacts/reports/cleaning/cleaning_report.json \
+  --write-txt
+```
+
+Cleaning quality audit:
+
+```bash
+uv run python scripts/audit_cleaning_quality.py \
+  --interim-dir data/interim \
+  --report artifacts/reports/cleaning/cleaning_quality_audit.json
 ```
 
 ## Definition of Done
@@ -242,10 +271,11 @@ uv run python scripts/clean_raw_corpus.py \
 - [ ] Every raw artifact has a content hash.
 - [ ] Failed crawls are traceable and actionable.
 - [ ] Attachment-based documents are handled or marked `manual_review`.
-- [ ] Processed JSONL validates against `LegalChunkNode`.
+- [ ] 52/52 laws cleaned to `normalized.json` with no critical failures.
+- [ ] Article markers and legal hierarchy are preserved.
+- [ ] Known encoded artifacts (TVPL watermarks) are removed.
 - [ ] No arbitrary character splitting is used.
-- [ ] Article count matches source within ±2%.
-- [ ] Parser/chunker tests cover at least three law templates.
+- [ ] Cleaner output is UTF-8 valid.
 
 ## Do Not
 
@@ -254,5 +284,6 @@ uv run python scripts/clean_raw_corpus.py \
 - Do not parse directly from network responses.
 - Do not skip raw source storage.
 - Do not suppress crawler/parser errors.
-- Do not overwrite raw or processed artifacts without traceability.
+- Do not overwrite raw or interim artifacts without traceability.
 - Do not mix crawler, parser, embedding, vector DB, and graph DB logic in one class.
+- Do not jump to Phase 6+ before Phase 4 output is stable.
