@@ -20,6 +20,12 @@ VnLaw-QA is a Vietnamese Legal QA/RAG system. It is not a generic chatbot.
 - `src/api/` = Phase 13 domain logic (FastAPI)
 - `src/monitoring/` / `src/security/` = Phase 14 domain logic
 
+Test layout:
+
+- `tests/unit/ingestion/` covers `src/ingestion/*` low-level domain modules.
+- `tests/unit/processing/` covers `src/processing/*` parser and future chunking modules.
+- `tests/unit/services/` covers `src/services/*` orchestration services and CLI wrappers.
+
 The system must retrieve, process, and answer questions based on Vietnamese legal documents while preserving legal structure, source traceability, and citation integrity.
 
 The project pipeline is organized as:

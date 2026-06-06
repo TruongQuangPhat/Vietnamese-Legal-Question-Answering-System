@@ -72,8 +72,10 @@ scripts/clean_raw_corpus.py
 scripts/audit_cleaning_quality.py
 
 tests/unit/ingestion/
-tests/unit/services/test_legal_parsing_service.py
-tests/unit/processing/
+tests/unit/services/test_crawl_service.py
+tests/unit/services/test_raw_audit_service.py
+tests/unit/services/test_cleaning_service.py
+tests/unit/services/test_cleaning_quality_audit_service.py
 ```
 
 ## Corpus Registry

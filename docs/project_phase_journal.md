@@ -81,6 +81,14 @@ This separation matters because the CLI should stay thin. Business logic lives
 in `src/services/` or `src/ingestion/`, and tests should target the reusable
 logic rather than terminal formatting.
 
+Unit test layout follows module ownership:
+
+```text
+tests/unit/ingestion/   low-level src/ingestion/* domain modules
+tests/unit/processing/  src/processing/* parser and future chunking modules
+tests/unit/services/    src/services/* orchestration services and CLI wrappers
+```
+
 ## 4. Phase 0 — Project Setup and Principles
 
 ### Goal
