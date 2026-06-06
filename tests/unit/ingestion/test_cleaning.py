@@ -2,23 +2,17 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from typing import Dict, Any
-
 import pytest
 
 import src.ingestion.cleaning as cleaning
 from src.ingestion.cleaning import (
+    detect_legal_markers,
     extract_legal_text_from_html,
-    remove_safe_boilerplate,
     normalize_unicode,
     normalize_whitespace,
-    detect_legal_markers,
-    LegalMarkersSummary,
+    remove_safe_boilerplate,
     trim_to_legal_body,
 )
-from src.services.cleaning_service import clean_raw_artifact
 
 # --- Fixtures ---
 
@@ -48,42 +42,6 @@ def simple_html_page() -> str:
 </body>
 </html>
 """
-
-@pytest.fixture
-def valid_artifact_dir(tmp_path: Path) -> Path:
-    """Create a valid artifact directory with main.html and metadata.json."""
-    artifact = tmp_path / "BLDS_2015" / "latest"
-    artifact.mkdir(parents=True)
-
-    html = """
-    <!DOCTYPE html>
-    <html><body>
-    Điều 1. Nội dung luật.\n
-    Điều 2. Nội dung khác.\n
-    1. Khoản một.\n
-    a) Điểm a.\n
-    </body></html>
-    """
-    (artifact / "main.html").write_text(html, encoding="utf-8")
-
-    metadata = {
-        "law_id": "BLDS_2015",
-        "name": "Bộ luật Dân sự 2015",
-        "tier": 1,
-        "group": "Bộ luật cốt lõi",
-        "source_domain": "thuvienphapluat.vn",
-        "source_type": "html",
-        "url": "https://thuvienphapluat.vn/van-ban/Bo-luat-dan-su-2015-296215.aspx",
-        "crawl_status": "success",
-        "http_status": 200,
-        "crawled_at": "2026-05-22T10:00:00Z",
-        "content_hash": "sha256:" + "a" * 64,
-        "crawler_version": "v1.0.0",
-        "parser_hint": "tvpl_html"
-    }
-    (artifact / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
-
-    return artifact
 
 # --- Tests ---
 
@@ -664,89 +622,6 @@ class TestLegalMarkersDetection:
         assert markers.contains_part
         assert markers.contains_chapter
         assert markers.contains_section
-
-class TestFullArtifactCleaning:
-    """Tests for cleaning a single raw artifact."""
-
-    def test_generate_normalized_json(self, valid_artifact_dir: Path, tmp_path: Path) -> None:
-        output_dir = tmp_path / "out"
-        main_html = valid_artifact_dir / "main.html"
-        meta_json = valid_artifact_dir / "metadata.json"
-
-        artifact, errors = clean_raw_artifact(
-            (main_html, meta_json),
-            output_dir,
-            min_text_length=1,
-            write_txt=False
-        )
-        assert errors == []
-        assert artifact is not None
-        assert artifact.law_id == "BLDS_2015"
-        assert artifact.normalized_text
-        assert (output_dir / "BLDS_2015" / "normalized.json").exists()
-
-    def test_metadata_fallback_logic(self, tmp_path: Path) -> None:
-        output_dir = tmp_path / "out"
-        artifact_dir = tmp_path / "art" / "latest"
-        artifact_dir.mkdir(parents=True)
-        (artifact_dir / "main.html").write_text("Điều 1. Nội dung")
-        # Use 'name' instead of 'law_name', 'url' instead of 'source_url'
-        meta = {
-            "law_id": "FALLBACK_TEST",
-            "name": "Fallback Law Name",
-            "url": "https://example.com/law",
-            "source_domain": "example.com",
-            "source_type": "html"
-        }
-        (artifact_dir / "metadata.json").write_text(json.dumps(meta))
-
-        artifact, _ = clean_raw_artifact(
-            (artifact_dir / "main.html", artifact_dir / "metadata.json"),
-            output_dir,
-            min_text_length=1,
-            write_txt=False
-        )
-        assert artifact is not None
-        assert artifact.law_name == "Fallback Law Name"
-        assert artifact.source_url == "https://example.com/law"
-
-    def test_warn_when_text_is_suspiciously_short(self, tmp_path: Path) -> None:
-        output_dir = tmp_path / "out"
-        artifact_dir = tmp_path / "art" / "latest"
-        artifact_dir.mkdir(parents=True)
-        (artifact_dir / "main.html").write_text("Điều 1. Chỉ.")
-        meta = {
-            "law_id": "SHORT",
-            "name": "Short Law",
-            "source_domain": "thuvienphapluat.vn",
-            "source_type": "html",
-            "url": "https://thuvienphapluat.vn/short",
-        }
-        (artifact_dir / "metadata.json").write_text(json.dumps(meta))
-
-        artifact, _ = clean_raw_artifact(
-            (artifact_dir / "main.html", artifact_dir / "metadata.json"),
-            output_dir,
-            min_text_length=1000,
-            write_txt=False
-        )
-        assert artifact is not None
-        assert "text_suspiciously_short" in artifact.warnings
-
-    def test_handle_missing_main_html_gracefully(self, tmp_path: Path) -> None:
-        output_dir = tmp_path / "out"
-        artifact_dir = tmp_path / "art" / "latest"
-        artifact_dir.mkdir(parents=True)
-        (artifact_dir / "metadata.json").write_text("{}")
-
-        artifact, errors = clean_raw_artifact(
-            (artifact_dir / "main.html", artifact_dir / "metadata.json"),
-            output_dir,
-            min_text_length=1,
-            write_txt=False
-        )
-        assert artifact is None
-        assert errors
 
 class TestCorpusWideRegression:
     """Regression tests for corpus-wide cleaning failure modes."""

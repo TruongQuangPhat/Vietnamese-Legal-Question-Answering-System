@@ -63,6 +63,8 @@ data/raw/{law_id}/attachments/
 tests/unit/ingestion/
 tests/unit/ingestion/test_crawler.py
 tests/unit/ingestion/test_audit.py
+tests/unit/services/test_crawl_service.py
+tests/unit/services/test_raw_audit_service.py
 ```
 
 ## Corpus Registry
