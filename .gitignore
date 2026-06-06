@@ -1,11 +1,3 @@
-.claude
-CLAUDE.md
-MANIFEST.json
-PROJECT_CONTEXT.md
-.agents
-.codex
-AGENTS.md
-
 # --- Environment ---
 .env
 .env.local
@@ -27,9 +19,43 @@ venv/
 env/
 
 # --- Data (large files, crawled HTML) ---
+data
 data/raw/
-data/processed/
-data/eval/
+data/interim/
+data/reports/
+data/processed/**/*.json
+data/processed/**/*.jsonl
+data/processed/**/*.ndjson
+data/processed/**/*.parquet
+data/processed/**/*.csv
+data/indexes/**/*.bin
+data/indexes/**/*.db
+data/indexes/**/*.faiss
+data/indexes/**/*.idx
+data/indexes/**/*.json
+data/indexes/**/*.npy
+data/indexes/**/*.npz
+data/indexes/**/*.pkl
+data/indexes/**/*.sqlite
+data/eval/**/*.json
+data/eval/**/*.jsonl
+data/eval/**/*.ndjson
+data/eval/**/*.csv
+data/eval/**/*.parquet
+
+# --- Generated artifacts ---
+artifacts/**/*.json
+artifacts/**/*.jsonl
+artifacts/**/*.ndjson
+artifacts/**/*.log
+artifacts/**/*.txt
+artifacts/**/*.csv
+artifacts/**/*.html
+artifacts/**/*.parquet
+artifacts/**/*.zip
+artifacts/**/*.tmp
+artifacts/**/*.out
+artifacts/**/*.trace
 
 # --- Models (large, downloaded) ---
 models/
@@ -50,7 +76,7 @@ docker-compose.override.yml
 
 # --- Logs ---
 *.log
-logs/
+/logs/
 
 # --- Pytest ---
 .pytest_cache/
@@ -66,4 +92,4 @@ htmlcov/
 # --- Jupyter ---
 .ipynb_checkpoints/
 
-data/
+.claude/*.json

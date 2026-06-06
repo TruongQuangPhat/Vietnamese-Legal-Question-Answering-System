@@ -19,13 +19,13 @@ If these artifacts pass undetected, they will cause parsing failures, broken cit
 
 ## Quick Start
 
-**Intended CLI** (design phase, not yet implemented):
+**Implemented CLI**:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 The script reads the registry, scans `data/raw/{law_id}/latest/`, validates `main.html` and `metadata.json`, and produces an audit report.
@@ -84,7 +84,7 @@ The script reads the registry, scans `data/raw/{law_id}/latest/`, validates `mai
 
 ### 1. Registry Law ID Loader
 
-Loads all `law_id` values from `config/laws/corpus_registry.yml`. This is the authoritative list of expected artifacts.
+Loads all `law_id` values from `configs/laws/corpus_registry.yml`. This is the authoritative list of expected artifacts.
 
 **Output**: Set of 52 law identifiers.
 
@@ -163,7 +163,7 @@ This helps catch completely non-legal HTML that somehow passed crawling.
 
 ### 7. Audit Report Writer
 
-Produces `data/reports/raw_corpus_audit.json` with structured results.
+Produces `artifacts/reports/audit/raw_corpus_audit.json` with structured results.
 
 ## Pipeline Execution Flow
 
@@ -264,19 +264,19 @@ Any `invalid` items block progression to cleaning/normalization. `warning` items
 
 ### `scripts/audit_raw_corpus.py`
 
-**Intended interface** (to be implemented):
+**Implemented interface**:
 
 ```bash
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
 **Arguments**:
-- `--registry`: Path to corpus registry YAML (default: `config/laws/corpus_registry.yml`)
+- `--registry`: Path to corpus registry YAML (default: `configs/laws/corpus_registry.yml`)
 - `--raw-dir`: Root directory containing `{law_id}` folders (default: `data/raw`)
-- `--output`: Output JSON report path (default: `data/reports/raw_corpus_audit.json`)
+- `--output`: Output JSON report path (default: `artifacts/reports/audit/raw_corpus_audit.json`)
 
 **Exit codes**:
 - `0`: Audit passed (zero invalid, zero missing).
@@ -320,7 +320,7 @@ All errors are captured in the JSON report's `items[].issues` list.
 - **Never skip audit** — treat it as a mandatory gate; do not proceed to cleaning if any `invalid` items exist.
 - **Run audit immediately after crawling** — catch issues while crawl context is fresh.
 - **Review warnings** — while not blocking, warnings indicate potential quality issues that deserve human review.
-- **Keep audit report in version control?** No — `data/reports/` should be gitignored; regenerate after each crawl.
+- **Keep audit report in version control?** No — generated files under `artifacts/reports/audit/` should be gitignored; regenerate after each crawl.
 - **Idempotency** — running audit twice on same raw corpus should produce identical reports (deterministic checks).
 - **Fail fast on missing registry** — if registry file is missing, abort immediately; do not guess.
 
@@ -339,8 +339,8 @@ All errors are captured in the JSON report's `items[].issues` list.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |

@@ -11,18 +11,18 @@ This phase acts as a quality gate: only chunks that pass all validation rules pr
 **Intended CLI** (design phase, not yet implemented):
 
 ```bash
-uv run python -m src.processing.export_jsonl \
+uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
-  --report-dir data/reports \
-  --law-ids LDD_2024 BLDS_2015
+  --report-dir artifacts/reports/chunking \
+  --law-ids LDD_VBHN BLDS_2015
 ```
 
 **Expected workflow**:
 1. Input: `data/interim/{law_id}/chunks.jsonl` (raw chunks from chunker)
 2. Validation: schema, duplicates, citations, required fields
 3. Output: `data/processed/{law_id}.jsonl` (validated chunks)
-4. Report: `data/reports/processed_validation.json` (summary + errors)
+4. Report: `artifacts/reports/chunking/processed_validation.json` (summary + errors)
 
 ## Architecture
 
@@ -130,15 +130,15 @@ uv run python -m src.processing.export_jsonl \
 
 **Goal**: Produce summary JSON with pass/fail statistics and error details.
 
-**Output**: `data/reports/processed_validation.json`
+**Output**: `artifacts/reports/chunking/processed_validation.json`
 
 Schema:
 ```json
 {
-  "law_id": "LDD_2024",
+  "law_id": "LDD_VBHN",
   "timestamp": "2025-01-01T12:00:00Z",
-  "input_file": "data/interim/LDD_2024/chunks.jsonl",
-  "output_file": "data/processed/LDD_2024.jsonl",
+  "input_file": "data/interim/LDD_VBHN/chunks.jsonl",
+  "output_file": "data/processed/LDD_VBHN.jsonl",
   "summary": {
     "total_input_chunks": 1500,
     "valid_chunks": 1498,
@@ -151,13 +151,13 @@ Schema:
   "errors": [
     {
       "line": 42,
-      "chunk_id": "LDD_2024__article_5__clause_2",
+      "chunk_id": "LDD_VBHN__article_5__clause_2",
       "error_type": "schema_validation",
       "message": "field required: 'point_label'"
     },
     {
       "line": 150,
-      "chunk_id": "LDD_2024__article_10__clause_1__point_a",
+      "chunk_id": "LDD_VBHN__article_10__clause_1__point_a",
       "error_type": "citation_format",
       "message": "Citation must match Vietnamese format"
     }
@@ -165,9 +165,9 @@ Schema:
   "warnings": [
     {
       "line": 999,
-      "chunk_id": "LDD_2024__article_20__clause_1",
+      "chunk_id": "LDD_VBHN__article_20__clause_1",
       "warning_type": "identical_content",
-      "message": "Chunk text and citation identical to chunk LDD_2024__article_20__clause_2"
+      "message": "Chunk text and citation identical to chunk LDD_VBHN__article_20__clause_2"
     }
   ]
 }
@@ -183,7 +183,7 @@ Schema:
    - Validate citation format (regex).
    - Write valid chunks to `data/processed/{law_id}.jsonl`.
    - Accumulate errors and warnings.
-3. After all files, write aggregate report `data/reports/processed_validation.json`.
+3. After all files, write aggregate report `artifacts/reports/chunking/processed_validation.json`.
 4. Exit code:
    - `0` if all files have zero invalid chunks.
    - `1` if any invalid chunks found.
@@ -252,8 +252,8 @@ class ProcessedChunk(BaseModel):
 `data/processed/{law_id}.jsonl` contains one compact JSON object per line, UTF-8 encoded. Example:
 
 ```json
-{"chunk_id":"LDD_2024__article_123__clause_2__point_c","law_id":"LDD_2024","law_name":"Luật Đất đai 2024","law_type":"law","legal_status":"active","level":"point","article_number":"123","article_title":"Điều 123. Tên điều luật","clause_number":"2","point_label":"c","hierarchy_path":{"part":null,"chapter":"Chương I","section":null,"article":"Điều 123","clause":"Khoản 2","point":"Điểm c"},"text":"Nội dung của Điểm c...","parent_id":"LDD_2024__article_123","parent_text":"Toàn bộ nội dung Điều 123...","citation":"Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c","source_url":"https://thuvienphapluat.vn/...","source_domain":"thuvienphapluat.vn","source_type":"html","issued_date":"2024-01-18","effective_date":"2025-01-01","expiry_date":null,"text_hash":"sha256:abcd1234...","metadata":{"parser_version":"v0.1","chunker_version":"v0.1","raw_artifact_path":"data/raw/LDD_2024/latest/main.html"}}
-{"chunk_id":"LDD_2024__article_123__clause_2","law_id":"LDD_2024",...}
+{"chunk_id":"LDD_VBHN__article_123__clause_2__point_c","law_id":"LDD_VBHN","law_name":"Luật Đất đai (VBHN)","law_type":"law","legal_status":"active","level":"point","article_number":"123","article_title":"Điều 123. Tên điều luật","clause_number":"2","point_label":"c","hierarchy_path":{"part":null,"chapter":"Chương I","section":null,"article":"Điều 123","clause":"Khoản 2","point":"Điểm c"},"text":"Nội dung của Điểm c...","parent_id":"LDD_VBHN__article_123","parent_text":"Toàn bộ nội dung Điều 123...","citation":"Luật Đất đai, Điều 123, Khoản 2, Điểm c","source_url":"https://thuvienphapluat.vn/...","source_domain":"thuvienphapluat.vn","source_type":"html","issued_date":"2024-01-18","effective_date":"2025-01-01","expiry_date":null,"text_hash":"sha256:abcd1234...","metadata":{"parser_version":"v0.1","chunker_version":"v0.1","raw_artifact_path":"data/raw/LDD_VBHN/latest/main.html"}}
+{"chunk_id":"LDD_VBHN__article_123__clause_2","law_id":"LDD_VBHN",...}
 ```
 
 ### Validation Report Schema
@@ -266,19 +266,19 @@ See Architecture section above.
 
 ```bash
 # Export and validate all laws
-uv run python -m src.processing.export_jsonl \
+uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
-  --report-dir data/reports
+  --report-dir artifacts/reports/chunking
 
 # Specific laws only
-uv run python -m src.processing.export_jsonl \
-  --law-ids LDD_2024 BLDS_2015 \
+uv run python scripts/export_processed_jsonl.py \
+  --law-ids LDD_VBHN BLDS_2015 \
   --input-dir data/interim \
   --output-dir data/processed
 
 # Check only (dry-run validation without writing)
-uv run python -m src.processing.export_jsonl \
+uv run python scripts/export_processed_jsonl.py \
   --validate-only \
   --input-dir data/interim
 ```
@@ -286,7 +286,7 @@ uv run python -m src.processing.export_jsonl \
 **Arguments**:
 - `--input-dir`: Directory containing `{law_id}/chunks.jsonl` (default: `data/interim`)
 - `--output-dir`: Where to write `{law_id}.jsonl` (default: `data/processed`)
-- `--report-dir`: Where to write `processed_validation.json` (default: `data/reports`)
+- `--report-dir`: Where to write `processed_validation.json` (default: `artifacts/reports/chunking`)
 - `--law-ids`: List of specific laws; if omitted, process all found in input dir.
 - `--validate-only`: Run checks but do not write output files.
 
@@ -323,7 +323,7 @@ Aggregate error count determines exit code; partial success still writes valid c
 | Citation errors for all chunks | Citation builder used English format | Look at citation field in error sample | Switch to Vietnamese format: "Luật ..., Điều ..., Khoản ..., Điểm ..." |
 | Missing `hierarchy_path` field | Chunker did not populate | Schema error says field required | Ensure chunker builds `hierarchy_path` from node ancestry |
 | Output file empty | All chunks invalid or wrong input directory | Check `summary.valid_chunks` count | Fix upstream chunker; verify input dir path |
-| Report not generated | Report directory not writable | Check `data/reports/` exists and is writable | Create directory or change `--report-dir` |
+| Report not generated | Report directory not writable | Check `artifacts/reports/chunking/` exists and is writable | Create directory or change `--report-dir` |
 | Warnings about identical content | Parser produced duplicate clause/point nodes | Inspect warning `chunk_id` pairs | Verify parser hierarchy tree has no duplication |
 
 ## Best Practices
@@ -350,11 +350,11 @@ Aggregate error count determines exit code; partial success still writes valid c
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
 | `docs/embedding_indexing.md` | Planned | Embedding model and Qdrant indexing |

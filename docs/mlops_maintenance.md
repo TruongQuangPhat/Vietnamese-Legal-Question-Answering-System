@@ -27,15 +27,17 @@ git checkout -b maintenance/corpus-refresh-YYYYMMDD
 
 # 2. Dry-run the crawl selection
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --dry-run
 
 # 3. Recrawl selected legal documents
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --concurrency 2 \
   --delay-seconds 2 \
@@ -43,20 +45,37 @@ uv run python scripts/crawl_raw_corpus.py \
 
 # 4. Run raw corpus audit
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 
 # 5. Re-run downstream processing after audit passes
-uv run python scripts/process_legal_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
-  --processed-dir data/processed
+  --output-dir data/interim \
+  --report artifacts/reports/cleaning/cleaning_report.json \
+  --write-txt \
+  --audit
+
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json
+
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/chunking/chunking_report.json
+
+uv run python scripts/export_processed_jsonl.py \
+  --input-dir data/interim \
+  --output-dir data/processed \
+  --report-dir artifacts/reports/chunking
 
 # 6. Rebuild or refresh indexes
-uv run python scripts/build_index.py \
-  --processed-dir data/processed \
-  --collection vnlaw_qa_chunks
+uv run python scripts/build_embedding_index.py \
+  --input-dir data/processed \
+  --collection-name vnlaw_qa_chunks
 
 # 7. Run regression evaluation
 uv run python scripts/evaluate_rag.py \
@@ -66,7 +85,7 @@ uv run python scripts/evaluate_rag.py \
 
 **Expected maintenance outputs**:
 
-- updated `config/laws/corpus_registry.yml`;
+- updated `configs/laws/corpus_registry.yml`;
 - versioned raw artifacts;
 - versioned processed JSONL;
 - refreshed vector index;
@@ -79,7 +98,7 @@ uv run python scripts/evaluate_rag.py \
 ```
 ┌────────────────────────────────────────────┐
 │        Registry Update / Source Review     │
-│        config/laws/corpus_registry.yml     │
+│        configs/laws/corpus_registry.yml     │
 └───────────────┬────────────────────────────┘
                 │
                 ▼
@@ -147,7 +166,7 @@ uv run python scripts/evaluate_rag.py \
 **Responsibilities**:
 
 - review legal sources before changing the registry;
-- add or update entries in `config/laws/corpus_registry.yml`;
+- add or update entries in `configs/laws/corpus_registry.yml`;
 - preserve `law_id` stability unless the legal document truly represents a new source;
 - update lifecycle fields such as `status`, `crawl_status`, `effective_date`, `expiry_date`, and `notes`;
 - document why a corpus change was made.
@@ -179,7 +198,7 @@ uv run python scripts/evaluate_rag.py \
 
 | Mode | Purpose | Example |
 |------|---------|---------|
-| Targeted recrawl | Refresh one law | `--law-ids LDD_2024` |
+| Targeted recrawl | Refresh one law | `--law-ids LDD_VBHN` |
 | Status-based recrawl | Crawl pending entries | `--only-status pending` |
 | Priority refresh | Refresh high-value laws | `--priority critical` |
 | Forced recrawl | Replace latest artifact with backup | `--force` |
@@ -241,12 +260,12 @@ Processed data is the input to embedding/indexing. If the chunk schema changes, 
 data/processed/
 ├── latest/
 │   ├── BLDS_2015.jsonl
-│   ├── LDD_2024.jsonl
+│   ├── LDD_VBHN.jsonl
 │   └── manifest.json
 └── versions/
     └── v2026-05-21/
         ├── BLDS_2015.jsonl
-        ├── LDD_2024.jsonl
+        ├── LDD_VBHN.jsonl
         └── manifest.json
 ```
 
@@ -395,11 +414,14 @@ Regression evaluation should run before promoting a new corpus or index version.
 uv run ruff check .
 uv run pytest tests/unit -v
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
-uv run python scripts/validate_processed_jsonl.py \
-  --processed-dir data/processed
+  --output artifacts/reports/audit/raw_corpus_audit.json
+uv run python scripts/export_processed_jsonl.py \
+  --input-dir data/interim \
+  --output-dir data/processed \
+  --report-dir artifacts/reports/chunking \
+  --validate-only
 uv run python scripts/evaluate_retrieval.py \
   --golden data/eval/golden_qa.jsonl
 ```
@@ -566,7 +588,7 @@ uv run python scripts/switch_index_alias.py \
   "reason": "scheduled monthly corpus refresh",
   "registry_hash_before": "sha256...",
   "registry_hash_after": "sha256...",
-  "affected_law_ids": ["LDD_2024", "BLDS_2015"],
+  "affected_law_ids": ["LDD_VBHN", "BLDS_2015"],
   "raw_snapshot_id": "raw-2026-05-21",
   "processed_version": "processed-v2026-05-21",
   "index_version": "qdrant-v2026-05-21",
@@ -616,7 +638,7 @@ uv run python scripts/switch_index_alias.py \
   "query_id": "query-abc123",
   "index_version": "qdrant-v2026-05-21",
   "processed_version": "processed-v2026-05-21",
-  "retrieved_chunk_ids": ["LDD_2024__article_123__clause_2"],
+  "retrieved_chunk_ids": ["LDD_VBHN__article_123__clause_2"],
   "severity": "warning",
   "action": "sample_for_review"
 }
@@ -629,16 +651,18 @@ uv run python scripts/switch_index_alias.py \
 ```bash
 # Dry-run recrawl selection
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
+  --report artifacts/reports/crawling/crawl_report.json \
   --only-status pending \
   --dry-run
 
 # Recrawl selected laws
 uv run python scripts/crawl_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --output data/raw \
-  --law-ids LDD_2024 BLDS_2015 \
+  --report artifacts/reports/crawling/crawl_report.json \
+  --law-ids LDD_VBHN BLDS_2015 \
   --concurrency 2 \
   --delay-seconds 2 \
   --retry 3
@@ -649,23 +673,25 @@ uv run python scripts/crawl_raw_corpus.py \
 ```bash
 # Raw corpus audit
 uv run python scripts/audit_raw_corpus.py \
-  --registry config/laws/corpus_registry.yml \
+  --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
-  --output data/reports/raw_corpus_audit.json
+  --output artifacts/reports/audit/raw_corpus_audit.json
 
 # Processed JSONL validation
-uv run python scripts/validate_processed_jsonl.py \
-  --processed-dir data/processed \
-  --output data/reports/processed_validation.json
+uv run python scripts/export_processed_jsonl.py \
+  --input-dir data/interim \
+  --output-dir data/processed \
+  --report-dir artifacts/reports/chunking \
+  --validate-only
 ```
 
 ### Index and Evaluation
 
 ```bash
 # Build or refresh index
-uv run python scripts/build_index.py \
-  --processed-dir data/processed \
-  --collection vnlaw_qa_chunks_candidate
+uv run python scripts/build_embedding_index.py \
+  --input-dir data/processed \
+  --collection-name vnlaw_qa_chunks_candidate
 
 # Run regression evaluation
 uv run python scripts/evaluate_rag.py \
@@ -773,14 +799,14 @@ All maintenance actions should write structured logs with `maintenance_id`, `cor
 | Document | Status | Description |
 |----------|--------|-------------|
 | `docs/end_to_end_pipeline.md` | Existing | High-level project pipeline and phase roadmap |
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Existing | Environment setup and development principles |
 | `docs/corpus_registry.md` | Existing | Corpus registry schema and lifecycle |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit and validation |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text extraction and normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing into Phần/Chương/Mục/Điều/Khoản/Điểm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking and citation construction |
-| `docs/processed_jsonl.md` | Planned | Processed JSONL schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text extraction and normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing into Phần/Chương/Mục/Điều/Khoản/Điểm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking and citation construction |
+| `docs/processed_jsonl.md` | Existing | Processed JSONL schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding generation and vector indexing |
 | `docs/naive_rag.md` | Future extension | Baseline RAG pipeline |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, and time-aware filtering |

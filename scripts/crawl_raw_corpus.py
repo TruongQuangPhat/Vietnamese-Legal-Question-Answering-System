@@ -3,8 +3,9 @@
 
 Usage:
     uv run python scripts/crawl_raw_corpus.py \
-      --registry config/laws/corpus_registry.yml \
+      --registry configs/laws/corpus_registry.yml \
       --output data/raw \
+      --report artifacts/reports/crawling/crawl_report.json \
       --only-status pending
 """
 
@@ -20,7 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import structlog
 from rich.console import Console
-from src.services.crawl_service import run_crawl_pipeline, CrawlPipelineConfig
+
+from src.services.crawl_service import CrawlPipelineConfig, run_crawl_pipeline
 
 console = Console()
 
@@ -32,22 +34,22 @@ def main() -> int:
         epilog="""
 Examples:
   # Batch crawl all pending
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --output data/raw --only-status pending
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --output data/raw --report artifacts/reports/crawling/crawl_report.json --only-status pending
 
   # Crawl specific laws
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --law-ids BLDS_2015 HP_2013 --output data/raw
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids BLDS_2015 HP_2013 --output data/raw
 
   # Crawl by tier
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --tier 1 --output data/raw
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --tier 1 --output data/raw
 
   # Debug single URL
   uv run python scripts/crawl_raw_corpus.py --url "https://thuvienphapluat.vn/..." --law-id "BLDS_2015" --output data/raw
 
   # Dry run
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --only-status pending --dry-run
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --only-status pending --dry-run
 
   # Force refresh
-  uv run python scripts/crawl_raw_corpus.py --registry config/laws/corpus_registry.yml --law-ids LDD_VBHN --force --output data/raw
+  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids LDD_VBHN --force --output data/raw
         """
     )
 
@@ -158,6 +160,12 @@ Examples:
         help="Output directory for raw artifacts (default: data/raw)",
     )
     parser.add_argument(
+        "--report",
+        type=str,
+        default="artifacts/reports/crawling/crawl_report.json",
+        help="Path to write the batch crawl report (default: artifacts/reports/crawling/crawl_report.json)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -194,6 +202,7 @@ Examples:
         # Construct pipeline config from args
         config = CrawlPipelineConfig(
             output_dir=Path(args.output),
+            report_path=Path(args.report),
             registry_path=Path(args.registry) if args.registry else None,
             url=args.url,
             law_id=args.law_id,

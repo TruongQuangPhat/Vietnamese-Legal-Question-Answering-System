@@ -15,7 +15,7 @@ Registry and raw artifacts maintain a strict 1:1 correspondence: 52 `law_id` ent
 
 ## Quick Start
 
-The registry is a YAML file at `config/laws/corpus_registry.yml`.
+The registry is a YAML file at `configs/laws/corpus_registry.yml`.
 
 ```yaml
 # Example entry
@@ -77,7 +77,7 @@ Each entry is validated against a Pydantic model with the following fields:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `law_id` | string | Yes | Unique identifier (e.g., `BLDS_2015`, `LDD_2024`). Must be stable across versions. |
+| `law_id` | string | Yes | Unique identifier (e.g., `BLDS_2015`, `LDD_VBHN`). Must be stable across versions. |
 | `name` | string | Yes | Official Vietnamese law name (e.g., "Bộ luật Dân sự 2015"). |
 | `tier` | integer | Yes | Legal hierarchy level: 0=Constitution, 1=Core Codes, 2=Laws, 3=Decrees, etc. |
 | `group` | string | Yes | Logical grouping (e.g., "Bộ luật cốt lõi", "Luật chuyên ngành"). |
@@ -174,8 +174,8 @@ This ensures every retrieved chunk can be traced back to its registry entry.
 ### Registry YAML Structure
 
 ```yaml
-- law_id: "LDD_2024"
-  name: "Luật Đất đai 2024"
+- law_id: "LDD_VBHN"
+  name: "Luật Đất đai (VBHN 2025)"
   tier: 2
   group: "Luật chuyên ngành"
   domain_tags: ["đất đai", "bất động sản", "quy hoạch"]
@@ -256,7 +256,7 @@ The following module-based commands are deprecated. Registry validation now occu
 
 - **Invalid YAML syntax**: `yaml.YAMLError` raised; fix YAML formatting.
 - **Pydantic validation failure**: `ValidationError` with field-level errors; correct entry fields.
-- **Missing registry file**: `FileNotFoundError`; ensure `config/laws/corpus_registry.yml` exists.
+- **Missing registry file**: `FileNotFoundError`; ensure `configs/laws/corpus_registry.yml` exists.
 - **Duplicate law_id**: Raise `DuplicateLawIdError` with conflicting IDs listed.
 - **source_domain mismatch**: Raise `TrustedDomainError` if any entry lacks `thuvienphapluat.vn`.
 
@@ -271,7 +271,7 @@ All errors are logged with structured context.
 | Duplicate `law_id` error | Two entries share same ID | Check error message | Assign unique `law_id` |
 | `url` field missing for pending entry | Registry incomplete | Look for `url: null` | Add valid `thuvienphapluat.vn` URL |
 | Crawler rejects source_domain | Domain not trusted | Verify `source_domain` value | Must contain `thuvienphapluat.vn` exactly |
-| Registry loads 0 entries | Wrong file path or empty YAML | Check `config/laws/corpus_registry.yml` exists and has content | Fix path or add entries |
+| Registry loads 0 entries | Wrong file path or empty YAML | Check `configs/laws/corpus_registry.yml` exists and has content | Fix path or add entries |
 
 ## Best Practices
 
@@ -298,8 +298,8 @@ All errors are logged with structured context.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |

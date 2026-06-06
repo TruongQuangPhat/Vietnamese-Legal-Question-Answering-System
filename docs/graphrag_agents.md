@@ -13,7 +13,7 @@ GraphRAG is not a replacement for vector retrieval; it augments it with explicit
 ```bash
 # Start Neo4j and load legal graph
 docker-compose up neo4j
-uv run python -m src.graphrag.build --input data/processed --output neo4j_import/
+uv run python scripts/build_legal_graph.py --input data/processed --output neo4j_import/
 
 # Run agent-based QA
 curl -X POST "http://localhost:8000/api/v1/graph_qa" \
@@ -264,7 +264,7 @@ For debugging, log agent decisions:
 ### Graph Build Command
 
 ```bash
-uv run python -m src.graphrag.build \
+uv run python scripts/build_legal_graph.py \
   --input data/processed \
   --neo4j-uri bolt://localhost:7687 \
   --user neo4j \
@@ -274,7 +274,7 @@ uv run python -m src.graphrag.build \
 ### Graph QA Command
 
 ```bash
-uv run python -m src.graphrag.qa \
+uv run python scripts/run_graph_qa.py \
   --query "Quan hệ giữa Điều 123 và Điều 124?" \
   --qdrant-url http://localhost:6333 \
   --neo4j-uri bolt://localhost:7687
@@ -338,14 +338,14 @@ All errors structured with `query_id` for tracing.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding model and Qdrant indexing |
 | `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, time-aware filtering |

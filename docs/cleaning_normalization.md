@@ -38,7 +38,7 @@ This phase is deterministic and stateless. The same input should always produce 
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json
+  --report artifacts/reports/cleaning/cleaning_report.json
 ```
 
 ### Optional Development Run
@@ -47,7 +47,7 @@ uv run python scripts/clean_raw_corpus.py \
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --min-text-length 10000 \
   --write-txt \
   --verbose
@@ -86,7 +86,7 @@ data/interim/{LAW_ID}/cleaned.txt
 Corpus-level report:
 
 ```text
-data/reports/cleaning_report.json
+artifacts/reports/cleaning/cleaning_report.json
 ```
 
 ## Architecture
@@ -155,7 +155,7 @@ data/reports/cleaning_report.json
                ▼
 ┌──────────────────────────────┐
 │  Cleaning Report Writer      │
-│  data/reports/               │
+│  artifacts/reports/cleaning/      │
 │  cleaning_report.json        │
 └──────────────────────────────┘
 ```
@@ -478,7 +478,7 @@ The normalized JSON must preserve:
 Output:
 
 ```text
-data/reports/cleaning_report.json
+artifacts/reports/cleaning/cleaning_report.json
 ```
 
 This report is the validation gate for moving into Legal Hierarchy Parsing.
@@ -516,7 +516,7 @@ Failed artifacts:         0
 Suspiciously short texts: 0
 Missing article markers:  0
 Output directory:         data/interim
-Report:                   data/reports/cleaning_report.json
+Report:                   artifacts/reports/cleaning/cleaning_report.json
 ```
 
 ## Data Models / Output Schema
@@ -567,7 +567,7 @@ Schema:
 Output:
 
 ```text
-data/reports/cleaning_report.json
+artifacts/reports/cleaning/cleaning_report.json
 ```
 
 Schema:
@@ -616,7 +616,7 @@ This file should contain only normalized legal text. It is useful for manual ins
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json
+  --report artifacts/reports/cleaning/cleaning_report.json
 ```
 
 ### Optional Arguments
@@ -645,7 +645,7 @@ Print item-level details.
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt
 ```
 
@@ -655,7 +655,7 @@ uv run python scripts/clean_raw_corpus.py \
 uv run python scripts/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
-  --report data/reports/cleaning_report.json \
+  --report artifacts/reports/cleaning/cleaning_report.json \
   --min-text-length 10000 \
   --verbose
 ```
@@ -768,11 +768,13 @@ numbered clause patterns are preserved when present
 point label patterns are preserved when present
 no obvious HTML tags remain
 known encoded TVPL footer/watermark artifacts are removed
-cleaning_report.json is generated with no warning or failed artifacts
+artifacts/reports/cleaning/cleaning_report.json is generated with no warning or failed artifacts
 ```
 
-The next phase is Legal Hierarchy Parsing. Do not proceed directly to chunking,
-embedding, RAG, Advanced RAG, or GraphRAG before parser correctness is validated.
+Legal Hierarchy Parsing is now complete. The next phase is Parent-child
+Chunking over `data/interim/{LAW_ID}/hierarchy.json`. Do not proceed directly
+to embedding, RAG, Advanced RAG, or GraphRAG before chunk correctness is
+validated.
 
 ## Changelog
 
@@ -807,10 +809,10 @@ embedding, RAG, Advanced RAG, or GraphRAG before parser correctness is validated
 | Document | Status | Description |
 |----------|--------|-------------|
 | `docs/end_to_end_pipeline.md` | Existing | High-level project pipeline overview |
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Existing | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Existing | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Existing | Raw artifact audit and validation |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |

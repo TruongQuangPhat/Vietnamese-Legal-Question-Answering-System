@@ -12,15 +12,15 @@ This phase is designed early to ensure that all downstream components have measu
 
 ```bash
 # Run full evaluation suite
-uv run python -m src.evaluation.run \
+uv run python scripts/evaluate_rag.py \
   --dataset data/eval/golden_qa.jsonl \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks \
   --output-dir data/eval/reports
 
 # Run specific test category
-uv run python -m src.evaluation.run --test retrieval
-uv run python -m src.evaluation.run --test generation
+uv run python scripts/evaluate_rag.py --test retrieval
+uv run python scripts/evaluate_rag.py --test generation
 ```
 
 **Expected outputs**:
@@ -90,8 +90,8 @@ uv run python -m src.evaluation.run --test generation
   "query_id": "qa_001",
   "query": "Quyền sử dụng đất của hộ gia đình?",
   "expected_answer": "Hộ gia đình có quyền sử dụng đất để xây dựng nhà ở...",
-  "expected_citation": "Luật Đất đai 2024, Điều 98, Khoản 1",
-  "expected_articles": ["LDD_2024__article_98"],
+  "expected_citation": "Luật Đất đai (VBHN 2025), Điều 98, Khoản 1",
+  "expected_articles": ["LDD_VBHN__article_98"],
   "difficulty": "easy|medium|hard",
   "category": "đất đai|hôn nhân|lao động"
 }
@@ -248,7 +248,7 @@ See Components section above.
 
 ```bash
 # Full evaluation
-uv run python -m src.evaluation.run \
+uv run python scripts/evaluate_rag.py \
   --dataset data/eval/golden_qa.jsonl \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks \
@@ -256,12 +256,12 @@ uv run python -m src.evaluation.run \
   --compare-baseline data/eval/baseline/latest.json
 
 # Component-specific
-uv run python -m src.evaluation.run --test retrieval --k 5 10 20
-uv run python -m src.evaluation.run --test generation --judge-model claude-3-haiku
-uv run python -m src.evaluation.run --test latency --num-queries 100
+uv run python scripts/evaluate_rag.py --test retrieval --k 5 10 20
+uv run python scripts/evaluate_rag.py --test generation --judge-model claude-3-haiku
+uv run python scripts/evaluate_rag.py --test latency --num-queries 100
 
 # Generate regression report (CI)
-uv run python -m src.evaluation.run --ci-check --threshold 0.05
+uv run python scripts/evaluate_rag.py --ci-check --threshold 0.05
 ```
 
 **Arguments**:
@@ -331,14 +331,14 @@ Partial results are still written; CI should consider overall pass/fail based on
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding model and Qdrant indexing |
 | `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, time-aware filtering |

@@ -12,19 +12,20 @@ This design ensures that:
 
 ## Quick Start
 
-**Intended CLI** (design phase, not yet implemented):
+**CLI** (implemented):
 
 ```bash
-uv run python -m src.processing.chunker \
+uv run python scripts/chunk_legal_corpus.py \
   --input-dir data/interim \
-  --output-dir data/interim \
-  --law-ids LDD_2024 BLDS_2015
+  --output-dir data/processed \
+  --report artifacts/reports/chunking/chunking_report.json \
+  --law-ids LDD_VBHN BLDS_2015
 ```
 
-**Expected workflow**:
+**Workflow**:
 1. Input: `data/interim/{law_id}/hierarchy.json`
-2. Output: `data/interim/{law_id}/chunks.jsonl` (one child chunk per line)
-3. Chunks feed into JSONL validation and embedding.
+2. Output: `data/processed/{law_id}.jsonl` (one child chunk per line)
+3. Chunks feed into Phase 7 JSONL validation and embedding.
 
 ## Architecture
 
@@ -126,9 +127,9 @@ Components:
 - Always include `Luật {law_name}` and `Điều {article_number}`.
 
 **Examples**:
-- `"Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c"`
-- `"Luật Đất đai 2024, Điều 123, Khoản 2"` (no point)
-- `"Luật Đất đai 2024, Điều 123"` (article-level only)
+- `"Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c"`
+- `"Luật Đất đai (VBHN 2025), Điều 123, Khoản 2"` (no point)
+- `"Luật Đất đai (VBHN 2025), Điều 123"` (article-level only)
 
 **Important**: Do NOT use English "Article/Clause/Point".
 
@@ -199,17 +200,17 @@ Pattern: `{law_id}__article_{article_number}__clause_{clause_number}__point_{poi
 - For article-level chunk (no clauses): `{law_id}__article_{article_number}`
 
 Examples:
-- `LDD_2024__article_123__clause_2__point_c`
-- `LDD_2024__article_123__clause_2`
-- `LDD_2024__article_123`
+- `LDD_VBHN__article_123__clause_2__point_c`
+- `LDD_VBHN__article_123__clause_2`
+- `LDD_VBHN__article_123`
 
 ### Canonical Chunk Schema
 
 ```json
 {
-  "chunk_id": "LDD_2024__article_123__clause_2__point_c",
-  "law_id": "LDD_2024",
-  "law_name": "Luật Đất đai 2024",
+  "chunk_id": "LDD_VBHN__article_123__clause_2__point_c",
+  "law_id": "LDD_VBHN",
+  "law_name": "Luật Đất đai (VBHN 2025)",
   "law_type": "law",
   "legal_status": "active",
 
@@ -229,10 +230,10 @@ Examples:
   },
 
   "text": "Nội dung của Điểm c...",
-  "parent_id": "LDD_2024__article_123",
+  "parent_id": "LDD_VBHN__article_123",
   "parent_text": "Toàn bộ nội dung Điều 123...",
 
-  "citation": "Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c",
+  "citation": "Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c",
   "source_url": "https://thuvienphapluat.vn/...",
   "source_domain": "thuvienphapluat.vn",
   "source_type": "html",
@@ -245,7 +246,7 @@ Examples:
   "metadata": {
     "parser_version": "v0.1",
     "chunker_version": "v0.1",
-    "raw_artifact_path": "data/raw/LDD_2024/latest/main.html"
+    "raw_artifact_path": "data/raw/LDD_VBHN/latest/main.html"
   }
 }
 ```
@@ -266,13 +267,21 @@ Parent-child chunking respects legal structure and ensures every retrieved chunk
 
 ```bash
 # Generate chunks for all laws
-uv run python -m src.processing.chunker --input-dir data/interim --output-dir data/interim
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/chunking/chunking_report.json
 
 # Specific laws with format options
-uv run python -m src.processing.chunker --law-ids LDD_2024 --output-format jsonl
+uv run python scripts/chunk_legal_corpus.py \
+  --law-ids LDD_VBHN \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --output-format jsonl
 
 # Validate existing chunks.jsonl
-uv run python -m src.processing.chunker --validate data/interim/LDD_2024/chunks.jsonl
+uv run python scripts/chunk_legal_corpus.py \
+  --validate data/interim/LDD_VBHN/chunks.jsonl
 ```
 
 ## Testing
@@ -335,10 +344,10 @@ All errors include `law_id` and node identifier.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |

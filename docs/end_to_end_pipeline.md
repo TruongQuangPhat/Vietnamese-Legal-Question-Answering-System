@@ -10,7 +10,12 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **52/52** legal documents successfully crawled from corpus registry, ready for audit phase.
+Current status: **Phase 5 Legal Hierarchy Parsing is complete and hardened**.
+The corpus has 52/52 raw artifacts, 52/52 normalized outputs, and 52/52
+hierarchy outputs with 0 parser failures and 0 validator failures. The next
+engineering phase is **Phase 6 — Parent-child Chunking**, which is not yet
+implemented. Phase 7 — Processed JSONL Validation must wait until the Phase 6
+gate passes.
 
 ## 2. Quick Start
 
@@ -19,7 +24,7 @@ Recommended development flow:
 ```
 uv sync
   ↓
-Registry & Corpus check (config/laws/corpus_registry.yml)
+Registry & Corpus check (configs/laws/corpus_registry.yml)
   ↓
 Crawling → data/raw/ (52 laws)
   ↓
@@ -46,7 +51,9 @@ Evaluation (RAGAS, golden QA)
 API / Deployment
 ```
 
-**Important**: The following phase is not RAG — it is **Raw Corpus Audit & Validation** — verifying integrity of 52 raw artifacts before processing.
+**Important**: The next phase is not RAG. It is **Parent-child Chunking** over
+`data/interim/{law_id}/hierarchy.json`. Embedding, RAG, Advanced RAG, and
+GraphRAG remain blocked until chunk validation passes.
 
 ## 3. Full Architecture
 
@@ -54,19 +61,19 @@ End-to-end pipeline:
 
 ```
 ┌─────────────────────┐
-│  Corpus Registry    │ config/laws/corpus_registry.yml
+│  Corpus Registry    │ configs/laws/corpus_registry.yml
 │  (52 law_id entries)│
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────────┐
-│ Registry-driven Crawler │ → data/raw/{law_id}/
-│ (thuvienphapluat.vn)    │   (52 raw HTML artifacts)
+│ Registry-driven Crawler │ → data/raw/{law_id}/latest/
+│ (thuvienphapluat.vn)    │   artifacts/reports/crawling/crawl_report.json
 └──────────┬──────────────┘
            │
            ▼
 ┌─────────────────────────┐
-│  Raw Corpus Audit       │ → data/reports/raw_corpus_audit.json
+│  Raw Corpus Audit       │ → artifacts/reports/audit/raw_corpus_audit.json
 │  & Validation           │
 └──────────┬──────────────┘
            │
@@ -155,7 +162,9 @@ End-to-end pipeline:
 
 **Pipeline Summary**: Defines Python 3.11+, OOP standards, type hints, Pydantic V2, async I/O, Google-style docstrings, logging, security policies, and directory structure.
 
-**Output**: CLAUDE.md, pyproject.toml, `vnlaw_qa/` directory structure.
+**Output**: `AGENTS.md`, `CLAUDE.md`, `PROJECT_CONTEXT.md`,
+`pyproject.toml`, `.agents/skills/`, `.codex/context/`, and the repository
+layout used by `scripts/`, `src/`, `tests/`, `configs/`, and `docs/`.
 
 **Validation Criteria**:
 - Code follows PEP8 + type hints
@@ -177,7 +186,7 @@ End-to-end pipeline:
 
 **Pipeline Summary**: Build YAML registry with fields: `law_id`, `title`, `url`, `effective_date`, `expiry_date`, `status`, `vbhn_id` (if available). Each `law_id` is unique.
 
-**Output**: `config/laws/corpus_registry.yml` (52 entries).
+**Output**: `configs/laws/corpus_registry.yml` (52 entries).
 
 **Validation Criteria**:
 - All entries have the 7 required fields
@@ -187,7 +196,7 @@ End-to-end pipeline:
 
 **Status**: Implemented
 
-**Detailed documentation**: See `config/laws/corpus_registry.yml`, `docs/crawling.md` (registry design).
+**Detailed documentation**: See `configs/laws/corpus_registry.yml` and `docs/corpus_registry.md`.
 
 ---
 
@@ -195,21 +204,54 @@ End-to-end pipeline:
 
 **Goal**: Download all 52 HTML artifacts from thuvienphapluat.vn based on the registry.
 
-**Input**: `config/laws/corpus_registry.yml`.
+**Input**: `configs/laws/corpus_registry.yml`.
 
-**Pipeline Summary**: Registry Crawler reads the registry, iterates through each `law_id`, fetches HTML, saves to `data/raw/{law_id}/index.html` with metadata JSON. Includes retry, rate-limiting, and error logging.
+**Pipeline Summary**: Registry Crawler reads the registry, selects eligible
+targets, fetches HTML, saves to `data/raw/{law_id}/latest/main.html` with
+metadata JSON, and preserves previous snapshots under `crawls/{timestamp}/`
+when force refresh is used. Includes retry, rate-limiting, and error logging.
 
-**Output**: `data/raw/{law_id}/` (52 directories, each containing HTML + metadata).
+**Output**: `data/raw/{law_id}/latest/` (52 directories, each containing
+`main.html` and `metadata.json`).
 
 **Validation Criteria**:
 - 52/52 directories exist in `data/raw/`
-- Each `index.html` > 10KB (non-empty)
+- Each `latest/main.html` is present and non-empty
 - Metadata matches registry entry
 - No unresolved HTTP 4xx/5xx errors
 
 **Status**: Implemented (52/52 laws crawled successfully)
 
-**Detailed documentation**: `docs/raw_corpus_audit.md` (to be created)
+**Detailed documentation**: `docs/raw_data_crawling.md`
+
+---
+
+### Phase 3 — Raw Corpus Audit & Validation
+
+**Goal**: Verify that crawled artifacts are complete, readable, trusted, and
+safe to feed into Cleaning & Normalization.
+
+**Input**: `data/raw/{law_id}/latest/main.html` and
+`data/raw/{law_id}/latest/metadata.json`.
+
+**Pipeline Summary**:
+- Load registry law IDs
+- Scan raw artifact directories
+- Validate `main.html` and `metadata.json`
+- Detect suspiciously small HTML, error pages, and metadata mismatches
+- Write `artifacts/reports/audit/raw_corpus_audit.json`
+
+**Output**: `artifacts/reports/audit/raw_corpus_audit.json`.
+
+**Validation Criteria**:
+- 52 registry entries are represented in `data/raw/`
+- 52 raw artifacts are valid
+- No missing raw HTML or metadata files
+- No critical metadata mismatches
+
+**Status**: Implemented
+
+**Detailed documentation**: `docs/raw_corpus_audit.md`
 
 ---
 
@@ -217,62 +259,60 @@ End-to-end pipeline:
 
 **Goal**: Convert raw HTML into clean Vietnamese legal text, normalize Unicode and whitespace, preserve legal heading structure.
 
-**Input**: `data/raw/{law_id}/index.html`.
+**Input**: `data/raw/{law_id}/latest/main.html` plus
+`data/raw/{law_id}/latest/metadata.json`.
 
 **Pipeline Summary**:
-- HTML-to-text extraction (remove script, style, navigation, ads)
-- Unicode normalization (NFC, encoding error handling, Vietnamese diacritic standardization)
-- Whitespace cleanup (collapse multiple spaces, normalize newlines, remove zero-width chars)
-- Preserve legal headings (`Điều`, `Khoản`, `Điểm`) and boundaries
-- Remove HTML artifacts (entities, leftover tags) while retaining legal content
-- Output: cleaned text or normalized intermediate JSON (with metadata position offsets)
+- Preferred TVPL legal body selection
+- Block-aware HTML extraction that keeps block boundaries but avoids inline
+  node fragmentation
+- Start trimming that preserves early Article 1 and skips source-law/amendment
+  pre-body notes
+- Unicode and conservative whitespace normalization
+- Safe line-fragment repair without merging clause or point boundaries
+- Encoded TVPL footer/watermark artifact cleanup
+- Article metric generation with references separated from real headings
 
-**Output**: `data/interim/{law_id}/cleaned.txt` or `cleaned.json`.
+**Output**: `data/interim/{law_id}/normalized.json` and optional
+`data/interim/{law_id}/cleaned.txt`.
 
 **Validation Criteria**:
-- Text is readable, no broken characters
-- Legal headings (Điều/Khoản/Điểm) are preserved and clearly separated
-- No content loss from over-aggressive cleaning
-- Valid UTF-8 encoding
+- 52/52 valid audited artifacts produce `normalized.json`
+- Article markers and Article 1 headings are preserved
+- Article references and real article headings are reported separately
+- No suspiciously short outputs
+- No missing article markers
+- Known encoded TVPL watermark/footer artifacts are removed
 
-**Status**: Planned
+**Status**: Implemented and gate-ready
 
 **Detailed documentation**: `docs/cleaning_normalization.md`
 
 ---
 
-### Phase 5 — Legal Hierarchy Parsing
+### Phase 5 — Legal Hierarchy Parsing — Complete and Hardened
 
-**Goal**: Parse the hierarchy Part → Chapter → Section → Article → Clause → Point from cleaned text.
+Full-corpus run:
 
-**Input**: `data/interim/{law_id}/cleaned.txt` (or JSON).
+```text
+Total documents: 52
+Success: 6
+Success with warnings: 46
+Failed: 0
+Validator failures: 0
+RED: 0
+ORANGE: 0
+Source-tail leakage: 0
+AMBIGUOUS_CLAUSE_CANDIDATE: 0
+POINT_LIKE_LINE_OUTSIDE_CLAUSE: 0
+Output: data/interim/{LAW_ID}/hierarchy.json
+Report: artifacts/reports/parsing/legal_parsing_report.json
+```
 
-**Pipeline Summary**:
-- Use regex as recognizer for hierarchy levels (not the main parser)
-- Build tree representation with nodes: `Part`, `Chapter`, `Section`, `Article`, `Clause`, `Point`
-- Each node has: `text`, `number`, `level`, `start_offset`, `end_offset`, `parent_id`
-- Handle edge cases:
-  - Documents without Section level
-  - Articles without Clauses (direct content)
-  - Non-standard numbering (LaTeX-style, Roman numerals, unusual patterns)
-  - Footnotes and references outside body
-  - VBHN formatting (consolidated documents)
-- Output: hierarchical JSON tree
-
-**Output**: `data/interim/{law_id}/hierarchy.json`.
-
-**Validation Criteria**:
-- All Articles are detected
-- Clause/Point hierarchy is correct for each Article
-- No overlapping spans
-- Valid tree structure (each node has 1 parent, root is Part/Law)
-
-**Status**: Planned
-
-**Detailed documentation**: `docs/legal_parsing.md`
-
----
-
+Remaining warnings are accepted non-blocking caveats for Phase 6 chunk
+validation: SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE,
+NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH,
+MAX_ARTICLE_NUMBER_MISMATCH.
 ### Phase 6 — Parent-child Chunking
 
 **Goal**: Create chunks for embedding (child) and LLM context (parent) using parent-child model to preserve citation integrity.
@@ -293,7 +333,7 @@ End-to-end pipeline:
 - **Traceability**: `text_hash` for duplicate detection, `source_url` and `source_domain` for provenance
 - Reason for not using arbitrary character chunking: would break legal clauses, invalidate citations, destroy hierarchy.
 
-**Output**: `data/interim/{law_id}/chunks.jsonl` (each line is 1 child chunk).
+**Output**: `data/processed/{law_id}.jsonl` (one child chunk per line, Phase 6 output).
 
 **Validation Criteria**:
 - Each chunk has unique `chunk_id` and valid Vietnamese citation format
@@ -306,9 +346,9 @@ End-to-end pipeline:
 - `text_hash` computed and present
 - No empty `text` fields
 
-**Status**: Planned
+**Status**: Next phase (not implemented yet)
 
-**Detailed documentation**: `docs/chunking.md`
+**Detailed documentation**: `docs/parent_child_chunking.md`
 
 ---
 
@@ -323,9 +363,9 @@ End-to-end pipeline:
 - Required fields per line (canonical schema):
   ```json
   {
-    "chunk_id": "LDD_2024__article_123__clause_2__point_c",
-    "law_id": "LDD_2024",
-    "law_name": "Luật Đất đai 2024",
+    "chunk_id": "LDD_VBHN__article_123__clause_2__point_c",
+    "law_id": "LDD_VBHN",
+    "law_name": "Luật Đất đai (VBHN 2025)",
     "law_type": "law",
     "legal_status": "active",
 
@@ -345,10 +385,10 @@ End-to-end pipeline:
     },
 
     "text": "Nội dung của Điểm c...",
-    "parent_id": "LDD_2024__article_123",
+    "parent_id": "LDD_VBHN__article_123",
     "parent_text": "Toàn bộ nội dung Điều 123...",
 
-    "citation": "Luật Đất đai 2024, Điều 123, Khoản 2, Điểm c",
+    "citation": "Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c",
     "source_url": "https://thuvienphapluat.vn/...",
     "source_domain": "thuvienphapluat.vn",
     "source_type": "html",
@@ -361,7 +401,7 @@ End-to-end pipeline:
     "metadata": {
       "parser_version": "v0.1",
       "chunker_version": "v0.1",
-      "raw_artifact_path": "data/raw/LDD_2024/latest/main.html"
+      "raw_artifact_path": "data/raw/LDD_VBHN/latest/main.html"
     }
   }
   ```
@@ -369,9 +409,9 @@ End-to-end pipeline:
 - Duplicate chunk detection (same `chunk_id` or identical `text`+`citation`)
 - Empty text detection
 - Invalid citation detection (missing article/clause/point)
-- Output: `data/reports/processed_validation.json` (pass/fail, error list)
+- Output: `artifacts/reports/chunking/processed_validation.json` (pass/fail, error list)
 
-**Output**: `data/processed/*.jsonl`, `data/reports/processed_validation.json`.
+**Output**: `data/processed/*.jsonl`, `artifacts/reports/chunking/processed_validation.json`.
 
 **Validation Criteria**:
 - All 52 files exist in `data/processed/`
@@ -384,7 +424,7 @@ End-to-end pipeline:
 - `issued_date`, `effective_date`, `expiry_date` properly formatted
 - Zero empty `text` fields
 
-**Status**: Planned
+**Status**: Blocked on Phase 6 gate (not started)
 
 **Detailed documentation**: `docs/processed_jsonl.md`
 
@@ -600,7 +640,7 @@ End-to-end pipeline:
 - Security: rate limiting, CORS, no sensitive data in logs (PII stripping)
 - Deployment: Docker Compose (Qdrant, Neo4j, API, vLLM), environment variables via `.env`
 
-**Output**: Docker images, `deploy/docker-compose.yml`, running API service.
+**Output**: Docker images, `deployment/docker-compose.yml`, running API service.
 
 **Validation Criteria**:
 - Health endpoint returns 200
@@ -610,7 +650,7 @@ End-to-end pipeline:
 
 **Status**: Future extension
 
-**Detailed documentation**: `docs/deployment.md`
+**Detailed documentation**: `docs/api_deployment.md`
 
 ---
 
@@ -647,7 +687,8 @@ End-to-end pipeline:
 
 **Status**: Future extension
 
-**Detailed documentation**: Integrated into `docs/deployment.md` and runbooks.
+**Detailed documentation**: Integrated into `docs/api_deployment.md`,
+`docs/mlops_maintenance.md`, and future runbooks.
 
 ---
 
@@ -658,9 +699,9 @@ Each phase must pass its gate before proceeding to the next.
 | Gate | Required Evidence | Example Check | Why It Matters |
 |------|-------------------|---------------|----------------|
 | Setup gate | `pyproject.toml`, `CLAUDE.md`, `mypy`/`pytest` pass | `uv run mypy src` → 0 errors | Code quality baseline |
-| Registry gate | `config/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
+| Registry gate | `configs/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" configs/laws/corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
 | Crawling gate | 52 raw artifact directories | `ls data/raw/ | wc -l` = 52 | Raw data exists before processing |
-| Raw audit gate | `data/reports/raw_corpus_audit.json` zero critical errors | Audit script exits 0 | Detect corrupted/missing artifacts early |
+| Raw audit gate | `artifacts/reports/audit/raw_corpus_audit.json` zero critical errors | Audit script exits 0 | Detect corrupted/missing artifacts early |
 | Cleaning gate | All texts UTF-8, legal headings intact | Spot-check `Điều`, `Khoản`, `Điểm` readable | Input text quality affects parsing |
 | Parsing gate | Parser tests: >99% Article detection | Unit tests on sample documents | Parser is foundation for chunking and retrieval |
 | Chunking gate | Every chunk has valid `chunk_id` and `citation` | Validate all `chunks.jsonl` files | Citation integrity is mandatory for Legal QA |
@@ -682,13 +723,13 @@ Each phase must pass its gate before proceeding to the next.
 
 | Issue | Possible Cause | How to Check | Recommended Fix |
 |-------|----------------|--------------|-----------------|
-| `corpus_registry.yml` count mismatch (≠52) | Registry not finalized, extra/missing entries | `grep -c "law_id:" config/laws/corpus_registry.yml` | Reconcile with intended corpus list, ensure exactly 52 |
+| `corpus_registry.yml` count mismatch (≠52) | Registry not finalized, extra/missing entries | `grep -c "law_id:" configs/laws/corpus_registry.yml` | Reconcile with intended corpus list, ensure exactly 52 |
 | Missing raw artifact directory | Crawl failed, network error, skipped law | `ls data/raw/` vs registry `law_id` list | Rerun crawler for missing `law_id`, check logs |
 | Extra raw artifact directory | Stale data from previous crawl | `ls data/raw/` shows dirs not in registry | Remove dirs not in registry, or update registry if intended |
-| `index.html` very small (<1KB) | Blocked page, captcha, login required, error page | `du -h data/raw/{law_id}/index.html` | Inspect HTML manually (but do not read per restrictions), fix crawler headers/retry |
-| Metadata `law_id` mismatch | Crawler saved wrong metadata | Check `data/raw/{law_id}/metadata.json` vs registry | Fix crawler to use correct `law_id` from registry |
+| `main.html` very small (<1KB) | Blocked page, captcha, login required, error page | `du -h data/raw/{law_id}/latest/main.html` | Inspect only targeted snippets, fix crawler headers/retry |
+| Metadata `law_id` mismatch | Crawler saved wrong metadata | Check `data/raw/{law_id}/latest/metadata.json` vs registry | Fix crawler to use correct `law_id` from registry |
 | Missing `source_url` in metadata | Crawler bug | Inspect metadata file | Ensure crawler populates all required fields from registry |
-| Vietnamese text shows garbled characters | Wrong encoding, encoding not normalized | `file -I data/raw/{law_id}/index.html` | Ensure crawler saves as UTF-8, cleaner normalizes Unicode |
+| Vietnamese text shows garbled characters | Wrong encoding, encoding not normalized | `file -I data/raw/{law_id}/latest/main.html` | Ensure crawler saves as UTF-8, cleaner normalizes Unicode |
 | Parser fails to detect `Article` | Unusual numbering, regex too strict | Run parser on sample, check logs | Loosen regex patterns, handle edge cases (Roman, LaTeX-style) |
 | Chunk has no `citation` field | Chunker didn't build citation properly | Inspect `chunks.jsonl` | Ensure chunker constructs citation from article/clause/point numbers |
 | Duplicate `chunk_id` within same law | Chunker logic error, same clause parsed twice | Validate `chunk_id` uniqueness | Fix chunker to generate unique IDs, deduplicate |
@@ -717,11 +758,21 @@ Each phase must pass its gate before proceeding to the next.
 
 ## 10. Changelog
 
+### Version 0.2 (2026-06-01)
+
+- Updated current status after Phase 4 Cleaning & Normalization became
+  gate-ready.
+- Updated the next immediate phase to Legal Hierarchy Parsing.
+- Aligned paths with current repository layout: `configs/`, `scripts/`,
+  `src/services/`, `src/ingestion/`, `data/raw/{law_id}/latest/`,
+  `data/interim/`, and phase-specific `artifacts/reports/<phase>/`.
+
 ### Version 0.1 (2026-05-21)
 
 - Added initial end-to-end pipeline overview.
 - Documented current project status: registry 52 laws, crawling 52/52 complete.
-- Defined Phase 3 Raw Corpus Audit & Validation as the next immediate phase.
+- Defined Phase 3 Raw Corpus Audit & Validation as the next immediate phase at
+  that time.
 - Detailed Phase 0–14 with Goal/Inputs/Pipeline Summary/Outputs/Validation Criteria/Status/Documentation.
 - Added Current Implementation Status table (all 14 phases).
 - Added Recommended Branch Roadmap with validation gates per branch.
@@ -736,14 +787,15 @@ Each phase must pass its gate before proceeding to the next.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation details |
-| `docs/project_setup.md` | Planned | Project setup, tooling, standards |
-| `docs/corpus_registry.md` | Planned | Corpus registry schema and maintenance |
-| `docs/raw_corpus_audit.md` | Planned | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text, Unicode, whitespace handling |
-| `docs/legal_parsing.md` | Planned | Legal hierarchy parsing algorithm and edge cases |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design and citation construction |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
+| `docs/raw_data_crawling.md` | Existing | Raw data crawling phase details |
+| `docs/project_setup.md` | Existing | Project setup, tooling, standards |
+| `docs/corpus_registry.md` | Existing | Corpus registry schema and maintenance |
+| `docs/raw_corpus_audit.md` | Existing | Raw artifact audit procedure |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text, Unicode, whitespace handling |
+| `docs/legal_parsing.md` | Implemented | Legal hierarchy parsing algorithm and edge cases |
+| `docs/parent_child_chunking.md` | In Progress | Parent-child chunking design, chunk schema, and citation construction |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding model choice, vector store setup, indexing strategy |
 | `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, RRF, reranking, time-aware filtering |
@@ -773,9 +825,30 @@ and 52/52 optional cleaned text artifacts. The cleaner removes known TVPL
 encoded footer/watermark artifacts and reports article references separately
 from real article headings.
 
-### Phase 5 — Legal Hierarchy Parsing — Current next phase
+### Phase 5 — Legal Hierarchy Parsing — Complete and Hardened
 
-### Phase 6 — Parent-child Chunking — Planned
+Full-corpus run:
+
+```text
+Total documents: 52
+Success: 6
+Success with warnings: 46
+Failed: 0
+Validator failures: 0
+RED: 0
+ORANGE: 0
+Source-tail leakage: 0
+AMBIGUOUS_CLAUSE_CANDIDATE: 0
+POINT_LIKE_LINE_OUTSIDE_CLAUSE: 0
+Output: data/interim/{LAW_ID}/hierarchy.json
+Report: artifacts/reports/parsing/legal_parsing_report.json
+```
+
+Remaining warnings are accepted non-blocking caveats for Phase 6 chunk
+validation: SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE,
+NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH,
+MAX_ARTICLE_NUMBER_MISMATCH.
+### Phase 6 — Parent-child Chunking — Next (not implemented)
 
 ### Phase 7 — Processed JSONL Export & Validation — Planned
 

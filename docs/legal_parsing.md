@@ -2,25 +2,75 @@
 
 ## Overview
 
-The Legal Hierarchy Parsing phase analyzes cleaned Vietnamese legal text and extracts the structured hierarchy: Phần → Chương → Mục → Điều → Khoản → Điểm. The output is a tree of legal nodes, each representing a distinct legal unit with its text, numbering, and positional offsets.
+The Legal Hierarchy Parsing phase analyzes normalized Vietnamese legal text and extracts the structured hierarchy: Phần → Chương → Mục → Điều → Khoản → Điểm. The output is a validated hierarchy document with a root Law node and flat legal nodes, each preserving text, numbering, parent/child links, and exact offsets into `normalized_text`.
 
 Parsing is the foundation for parent-child chunking. Accurate hierarchy extraction ensures citations remain traceable and legal structure is preserved throughout the RAG pipeline.
 
-## Quick Start
+Status: **Implemented and hardened for the 52-law corpus.**
 
-**Intended CLI** (design phase, not yet implemented):
+Official Phase 5 result:
 
-```bash
-uv run python -m src.processing.parser \
-  --input-dir data/interim \
-  --output-dir data/interim \
-  --law-ids LDD_2024 BLDS_2015
+```text
+Total laws: 52
+Hierarchy files generated: 52
+Failed parser documents: 0
+Validator failures: 0
+RED audit cases: 0
+ORANGE audit cases: 0
+Source-tail leakage nodes: 0
+POINT_LIKE_LINE_OUTSIDE_CLAUSE: 0
+AMBIGUOUS_CLAUSE_CANDIDATE: 0
+Parser version: v0.1.0
+Report: artifacts/reports/parsing/legal_parsing_report.json
 ```
 
-**Expected workflow**:
-1. Input: `data/interim/{law_id}/cleaned.txt`
-2. Output: `data/interim/{law_id}/hierarchy.json` (tree structure)
-3. The hierarchy JSON feeds into the chunker.
+Remaining warnings are accepted non-blocking caveats preserved for Phase 6
+chunk validation: `SOURCE_NOTE_EXCLUDED`, `EMPTY_ARTICLE_NODE`,
+`NODE_ID_COLLISION_RESOLVED`, `ARTICLE_COUNT_MISMATCH`,
+`MAX_ARTICLE_NUMBER_MISMATCH`. The following warning types have zero
+occurrences in the full corpus: `AMBIGUOUS_CLAUSE_CANDIDATE`,
+`POINT_LIKE_LINE_OUTSIDE_CLAUSE`.
+
+## Quick Start
+
+Official full-corpus command:
+
+```bash
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --overwrite \
+  --verbose
+```
+
+Selected-law validation:
+
+```bash
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --law-ids BLDS_2015 LDD_VBHN \
+  --overwrite \
+  --verbose
+```
+
+Workflow:
+1. Input: `data/interim/{law_id}/normalized.json`
+2. Output: `data/interim/{law_id}/hierarchy.json`
+3. Batch report: `artifacts/reports/parsing/legal_parsing_report.json`
+4. The hierarchy JSON feeds into Phase 6 parent-child chunking.
+
+Implementation boundary:
+- `scripts/parse_legal_hierarchy.py`: CLI, argparse, console summaries, exit codes.
+- `src/services/legal_parsing_service.py`: batch orchestration and report building.
+- `src/processing/legal_parser.py`: reusable parser/domain logic.
+- `src/processing/legal_heading_recognizer.py`: deterministic legal heading recognition.
+- `src/processing/legal_span_segmenter.py`: exact source span segmentation.
+- `src/processing/legal_hierarchy_builder.py`: root/node construction, parent links, deterministic IDs.
+- `src/processing/legal_tree_validator.py`: read-only structural and offset validation.
+- `tests/unit/processing/` and `tests/unit/services/`: parser, service, and CLI tests.
 
 ## Architecture
 
@@ -59,8 +109,8 @@ uv run python -m src.processing.parser \
            │
            ▼
 ┌──────────────────────┐
-│  LegalDocumentNode    │
-│  Tree (JSON)          │
+│  LegalHierarchyDocument │
+│  Flat nodes + links  │
 └──────────────────────┘
 ```
 
@@ -71,12 +121,13 @@ uv run python -m src.processing.parser \
 **Goal**: Detect legal hierarchy markers using regex patterns.
 
 **Patterns** (Vietnamese):
-- `^(Phần\s+[IVXLCDM0-9]+)` → Part
-- `^(Chương\s+[IVXLCDM0-9]+)` → Chapter
-- `^(Mục\s+[IVXLCDM0-9]+)` → Section
-- `^(Điều\s+\d+)(\s*\.\s*.*)?` → Article (optional title after number)
-- `^(Khoản\s+(\d+|[a-z]|\(.*?\))\b` → Clause
-- `^(Điểm\s+([a-z]|\(.*?\))\b` → Point
+- `Phần thứ ...` → Part
+- `Chương <Roman>` → Chapter
+- `Mục N. ...` → Section
+- `Điều N. ...`, `Điều N.`, `Điều 217a.` → Article
+- numbered legal lines such as `1. ...`, `1.Nội dung`, and selected corpus-safe
+  malformed forms → Clause
+- point labels such as `a) ...`, `đ) ...` → Point
 
 **Process**:
 - Iterate through text line by line.
@@ -100,7 +151,7 @@ uv run python -m src.processing.parser \
   - `number`: extracted number (e.g., "1", "I", "a")
   - `title`: for Articles, the title text after "Điều N."
   - `text`: full text content of the span
-  - `start_offset`, `end_offset`: character positions in original cleaned text
+  - `start_offset`, `end_offset`: character positions in normalized text
   - `parent_id`: to be filled by Hierarchy Builder
 
 ### 3. Hierarchy Builder
@@ -108,10 +159,14 @@ uv run python -m src.processing.parser \
 **Goal**: Construct parent-child relationships to form a tree.
 
 **Rules**:
-- Root is either the whole document or the first "Part" if present.
-- Each node's parent is the nearest preceding node with a higher level in the hierarchy order: part > chapter > section > article > clause > point.
-- Example: a "clause" node's parent is the most recent "article" node that precedes it.
-- An "article" with no preceding "section" or "chapter" attaches to the nearest "part" or root.
+- Root is always a real Law node spanning the full `normalized_text`.
+- Non-root parent assignment follows the legal hierarchy order:
+  Law → Part → Chapter → Section → Article → Clause → Point.
+- Missing intermediate levels are allowed; for example, an Article may attach
+  directly to a Chapter, Part, or Law root.
+- Clause nodes attach only to an Article. Point nodes attach only to a Clause.
+- Parent spans are inclusive of descendant text, and sibling spans must not
+  overlap.
 
 **Data structure**:
 ```python
@@ -147,7 +202,7 @@ class LegalNode:
 
 ## Pipeline Execution Flow
 
-1. Load `cleaned.txt` for a given `law_id`.
+1. Load `normalized.json` for a given `law_id`.
 2. Run Heading Recognizer → produce list of heading matches.
 3. Run Span Segmenter → assign text spans and levels.
 4. Run Hierarchy Builder → link nodes into tree.
@@ -164,12 +219,12 @@ from typing import Literal, Optional
 Level = Literal["part", "chapter", "section", "article", "clause", "point"]
 
 class LegalNode(BaseModel):
-    node_id: str  # e.g., "LDD_2024__article_123"
+    node_id: str  # e.g., "LDD_VBHN__article_123"
     level: Level
     number: str  # e.g., "123", "I", "a"
     title: Optional[str] = None  # only for article level
     text: str  # full text content of this node's span
-    start_offset: int  # char offset in cleaned.txt
+    start_offset: int  # char offset in normalized_text
     end_offset: int  # exclusive
     parent_id: Optional[str] = None
     children: list[str] = []  # child node_ids
@@ -180,13 +235,13 @@ class LegalNode(BaseModel):
 
 ```json
 {
-  "law_id": "LDD_2024",
-  "source_file": "data/interim/LDD_2024/cleaned.txt",
-  "parser_version": "v0.1",
-  "root_node_id": "LDD_2024__root",
+  "law_id": "LDD_VBHN",
+  "source_file": "data/interim/LDD_VBHN/normalized.json",
+  "parser_version": "v0.1.0",
+  "root_node_id": "LDD_VBHN__root",
   "nodes": [
     {
-      "node_id": "LDD_2024__part_1",
+      "node_id": "LDD_VBHN__part_1",
       "level": "part",
       "number": "I",
       "title": null,
@@ -194,42 +249,42 @@ class LegalNode(BaseModel):
       "start_offset": 0,
       "end_offset": 5432,
       "parent_id": null,
-      "children": ["LDD_2024__chapter_1", "LDD_2024__article_5"],
+      "children": ["LDD_VBHN__chapter_1", "LDD_VBHN__article_5"],
       "metadata": {}
     },
     {
-      "node_id": "LDD_2024__article_1",
+      "node_id": "LDD_VBHN__article_1",
       "level": "article",
       "number": "1",
-      "title": "Điều 1. Tên điều luật",
+      "title": "Tên điều luật",
       "text": "Điều 1. Tên điều luật\nNội dung của điều luật...",
       "start_offset": 120,
       "end_offset": 456,
-      "parent_id": "LDD_2024__part_1",
-      "children": ["LDD_2024__clause_1_1", "LDD_2024__clause_1_2"],
+      "parent_id": "LDD_VBHN__part_1",
+      "children": ["LDD_VBHN__clause_1_1", "LDD_VBHN__clause_1_2"],
       "metadata": {}
     },
     {
-      "node_id": "LDD_2024__clause_1_1",
+      "node_id": "LDD_VBHN__clause_1_1",
       "level": "clause",
       "number": "1",
       "title": null,
       "text": "1. Nội dung của khoản 1...",
       "start_offset": 200,
       "end_offset": 300,
-      "parent_id": "LDD_2024__article_1",
-      "children": ["LDD_2024__point_1_1_a"],
+      "parent_id": "LDD_VBHN__article_1",
+      "children": ["LDD_VBHN__point_1_1_a"],
       "metadata": {}
     },
     {
-      "node_id": "LDD_2024__point_1_1_a",
+      "node_id": "LDD_VBHN__point_1_1_a",
       "level": "point",
       "number": "a",
       "title": null,
       "text": "a) Nội dung của điểm a...",
       "start_offset": 220,
       "end_offset": 280,
-      "parent_id": "LDD_2024__clause_1_1",
+      "parent_id": "LDD_VBHN__clause_1_1",
       "children": [],
       "metadata": {}
     }
@@ -239,26 +294,34 @@ class LegalNode(BaseModel):
 
 ### Node ID Convention
 
-`{law_id}__{level}_{number}` where:
-- For article: `__article_{article_number}`
-- For clause: `__clause_{article_number}_{clause_number}` (article prefix ensures uniqueness)
-- For point: `__point_{article_number}_{clause_number}_{point_label}`
+Node IDs are deterministic hierarchy-path IDs:
 
-This design ensures globally unique IDs within a law.
+```text
+{law_id}__root
+{parent_node_id}__{level}_{normalized_number}
+```
+
+Sibling base-ID collisions are resolved by appending
+`__occurrence_2`, `__occurrence_3`, and so on in source order. Collision
+resolution emits `NODE_ID_COLLISION_RESOLVED` warnings.
 
 ## CLI Reference
 
-### Intended Commands
-
 ```bash
 # Parse all laws
-uv run python -m src.processing.parser --input-dir data/interim --output-dir data/interim
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --overwrite
 
 # Parse specific laws
-uv run python -m src.processing.parser --law-ids BLDS_2015 LDD_2024
-
-# Validate existing hierarchy file
-uv run python -m src.processing.parser --validate data/interim/LDD_2024/hierarchy.json
+uv run python scripts/parse_legal_hierarchy.py \
+  --input-dir data/interim \
+  --output-dir data/interim \
+  --report artifacts/reports/parsing/legal_parsing_report.json \
+  --law-ids BLDS_2015 LDD_VBHN \
+  --overwrite
 ```
 
 ## Testing
@@ -272,13 +335,13 @@ uv run python -m src.processing.parser --validate data/interim/LDD_2024/hierarch
 - `test_node_id_generation()`: IDs follow convention and are unique.
 
 **Integration tests**:
-- Parse a cleaned.txt from a known law → hierarchy.json with >99% Điều detection.
+- Parse a normalized artifact from a known law → hierarchy.json with >99% Điều detection.
 - Validate tree: no cycles, all nodes have parent (except root), no overlapping spans.
 - Output schema matches Pydantic model.
 
 ## Error Handling
 
-- **No articles found**: raise `ParsingError("No Điều detected")` — likely cleaned.txt is empty or malformed.
+- **No articles found**: raise `ParsingError("No Điều detected")` — likely `normalized.json` is empty or malformed.
 - **Invalid hierarchy**: orphan node or cycle detected → `ValidationError` with node IDs.
 - **Overlapping spans**: `ParsingError` with span details; indicates regex matched overlapping headings.
 - **File errors**: `FileNotFoundError`, `IOError` logged per law; continue to next if batch processing.
@@ -289,18 +352,18 @@ All errors include `law_id` and context in structured logs.
 
 | Issue | Possible Cause | How to Check | Recommended Fix |
 |-------|----------------|--------------|-----------------|
-| Zero articles detected | Cleaned text lost "Điều" markers OR regex too strict | Search "Điều" in cleaned.txt; test regex manually | Loosen regex, ensure cleaned.txt preserves headings |
+| Zero articles detected | Normalized text lost "Điều" markers OR regex too strict | Search "Điều" in `normalized.json`; test regex manually | Loosen regex, ensure normalization preserves headings |
 | Duplicate article numbers | Same number used twice (amendment artifact) | Inspect hierarchy JSON for duplicate numbers | Keep as-is (legal reality) but flag for downstream handling |
 | Orphan node (missing parent) | Hierarchy builder failed to link | Check node's `parent_id` in JSON | Review parent-linking logic; ensure levels ordered correctly |
 | Overlapping spans | Regex matched heading inside previous span | Compare `start_offset`/`end_offset` of adjacent nodes | Refine regex to be more precise; anchor to line start |
-| Parser fails on VBHN document | Consolidated documents have special formatting | Inspect cleaned.txt structure | Add VBHN-specific patterns (e.g., "Nghị định số.../2025/NĐ-CP") |
+| Parser fails on VBHN document | Consolidated documents have special formatting | Inspect normalized text structure | Add VBHN-specific patterns only when observed in real corpus output |
 | Article title missing | Regex did not capture title after number | Look at article node `title` field | Adjust regex to capture optional title text |
 | Huge article node (MBs) | Article contains hundreds of Khoản without subdivision | Check `text` length of article node | Verify parser correctly split clauses; if law truly has single massive article, accept |
 
 ## Best Practices
 
 - **Regex is a recognizer, not a parser** — use it to find heading boundaries; hierarchy builder creates the tree.
-- **Preserve offsets** — `start_offset`/`end_offset` enable traceability to cleaned.txt for citation.
+- **Preserve offsets** — `start_offset`/`end_offset` enable traceability to normalized text for citation.
 - **Validate aggressively** — fail fast on tree integrity issues; downstream depends on correct hierarchy.
 - **Handle missing levels** — documents may lack "Mục" or have articles without "Khoản"; design is flexible.
 - **Log statistics** — count of nodes per level, parsing time, validation errors.
@@ -321,10 +384,10 @@ All errors include `law_id` and context in structured logs.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| `docs/crawling.md` | Existing | Registry-driven crawling implementation |
+| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
 | `docs/project_setup.md` | Implemented | Environment setup and coding standards |
 | `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
 | `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Planned | HTML-to-text and Unicode normalization |
-| `docs/parent_child_chunking.md` | Planned | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Planned | JSONL export schema and validation |
+| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
+| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
+| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |

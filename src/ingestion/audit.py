@@ -7,7 +7,7 @@ and detects common error pages or blocks.
 Typical usage:
     >>> from pathlib import Path
     >>> report = audit_raw_corpus(
-    ...     registry_path=Path("config/laws/corpus_registry.yml"),
+    ...     registry_path=Path("configs/laws/corpus_registry.yml"),
     ...     raw_dir=Path("data/raw"),
     ...     min_html_size=10000
     ... )
@@ -56,7 +56,7 @@ def load_registry_law_ids(registry_path: Path) -> Set[str]:
     """Load all law_id values from the corpus registry YAML.
 
     Args:
-        registry_path: Path to config/laws/corpus_registry.yml
+        registry_path: Path to configs/laws/corpus_registry.yml
 
     Returns:
         Set of law_id strings.
