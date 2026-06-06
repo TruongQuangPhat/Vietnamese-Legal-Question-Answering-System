@@ -1,4 +1,4 @@
-# VnLaw-QA Codex Skills
+pull # VnLaw-QA Codex Skills
 
 These are the primary Codex-discovered repo skills for VnLaw-QA. They are
 mirrored from the Claude skill set and adapted only where needed for Codex
