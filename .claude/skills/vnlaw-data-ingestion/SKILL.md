@@ -22,9 +22,13 @@ configs/laws/corpus_registry.yml
 → verification
 ```
 
-For Phase 1-4, focus only on reliable corpus acquisition, raw storage, cleaning, and normalization.
+For Phase 1-4, focus only on reliable corpus acquisition, raw storage,
+cleaning, and normalization. Phases 1-5 are complete; Phase 6 Parent-child
+Chunking is next and consumes `data/interim/{LAW_ID}/hierarchy.json`.
 
-Do not jump into embedding, Qdrant, Neo4j, Advanced RAG, or GraphRAG until the parsed corpus is reliable.
+Do not rerun crawling or cleaning unless explicitly requested. Do not jump into
+embedding, Qdrant, Neo4j, Advanced RAG, or GraphRAG until Phase 6 chunking and
+processed JSONL validation pass.
 
 ## Trusted Source
 
@@ -286,4 +290,5 @@ uv run python scripts/audit_cleaning_quality.py \
 - Do not suppress crawler/parser errors.
 - Do not overwrite raw or interim artifacts without traceability.
 - Do not mix crawler, parser, embedding, vector DB, and graph DB logic in one class.
-- Do not jump to Phase 6+ before Phase 4 output is stable.
+- Do not redo ingestion phases when working on Phase 6 unless a proven
+  chunking-blocking source artifact defect is identified.

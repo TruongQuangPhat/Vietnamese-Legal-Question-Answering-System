@@ -8,6 +8,11 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 Use this skill before legal parsing or chunking.
 
+Current status: Phase 4 Cleaning & Normalization and Phase 5 Legal Hierarchy
+Parsing are complete and hardened. Phase 6 Parent-child Chunking is next and
+not yet implemented. Do not expand cleaning work unless a chunking-blocking
+defect is proven.
+
 ## Purpose
 
 Vietnamese legal text may contain encoding issues, non-breaking spaces, zero-width characters, inconsistent punctuation, HTML artifacts, and OCR-like spacing errors.
@@ -60,12 +65,16 @@ import unicodedata
 text = unicodedata.normalize("NFC", text)
 ```
 
-## Expected Components
+## Implemented Components
 
 ```text
-src/ingestion/normalization.py
-src/ingestion/parsers/html_parser.py
-tests/unit/ingestion/test_normalization.py
+src/ingestion/cleaning.py
+src/ingestion/cleaning_diagnostics.py
+src/services/cleaning_service.py
+src/services/cleaning_quality_audit_service.py
+scripts/clean_raw_corpus.py
+scripts/audit_cleaning_quality.py
+tests/unit/ingestion/test_cleaning.py
 ```
 
 Recommended functions/classes:

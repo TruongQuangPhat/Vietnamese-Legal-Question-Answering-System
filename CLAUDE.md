@@ -77,6 +77,25 @@ The project roadmap is:
    - RAGAS evaluation gates,
    - CI/CD, Docker, monitoring, safety, and release workflows.
 
+Current project state:
+
+```text
+Phases 0-5 are complete.
+Phase 5 Legal Hierarchy Parsing is complete and hardened:
+  52 hierarchy.json outputs
+  0 parser failures
+  0 validator failures
+  0 RED/ORANGE audit cases
+  0 source-tail leakage nodes
+
+Next phase:
+  Phase 6 — Parent-child Chunking over data/interim/{LAW_ID}/hierarchy.json
+```
+
+Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker
+exists. Do not jump to embedding, indexing, retrieval, RAG, Advanced RAG,
+GraphRAG, API, or deployment before Phase 6 chunk quality is validated.
+
 ## 4. Expected Repository Layout
 
 Use this as the canonical structure unless a task explicitly changes it:

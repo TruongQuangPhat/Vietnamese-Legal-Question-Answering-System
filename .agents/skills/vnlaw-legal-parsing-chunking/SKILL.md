@@ -8,19 +8,20 @@ description: Use when implementing legal hierarchy parsing, Regex/AST extraction
 Use this skill for Vietnamese legal hierarchy extraction and chunk creation.
 
 This skill should run after cleaning/normalization and before embedding/indexing.
-Current project status: Phase 5 is Legal Hierarchy Parsing. Implement and
-validate hierarchy parsing before starting parent-child chunking.
+Current project status: Phase 5 Legal Hierarchy Parsing is complete and
+hardened. Phase 6 Parent-child Chunking is next and not yet implemented.
+Use `data/interim/{LAW_ID}/hierarchy.json` as the Phase 6 input. Do not start
+embedding, indexing, retrieval, RAG, Advanced RAG, or GraphRAG before chunking
+output quality is validated.
 
 ## Goal
 
-Convert normalized legal text into deterministic legal hierarchy first, then
-schema-valid legal chunks after the parser gate passes.
+Use the completed deterministic legal hierarchy to create schema-valid legal
+chunks after the parser gate has passed.
 
 ```text
-data/interim/{LAW_ID}/normalized.json
-  → hierarchy recognition
-  → AST-like legal structure
-  → hierarchy.json validation
+data/interim/{LAW_ID}/hierarchy.json
+  → load validated hierarchy
   → parent-child chunks
   → cross-reference extraction
   → LegalChunkNode JSONL
@@ -125,7 +126,7 @@ src/services/legal_parsing_service.py
 src/processing/legal_parser.py
 tests/unit/processing/test_legal_parser.py
 
-future after parser gate:
+Phase 6 next:
 ParentChildChunker
 CrossReferenceExtractor
 LegalChunkValidator

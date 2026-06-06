@@ -6,24 +6,30 @@ The Legal Hierarchy Parsing phase analyzes normalized Vietnamese legal text and 
 
 Parsing is the foundation for parent-child chunking. Accurate hierarchy extraction ensures citations remain traceable and legal structure is preserved throughout the RAG pipeline.
 
-Status: **Implemented and validated for the 52-law corpus.**
+Status: **Implemented and hardened for the 52-law corpus.**
 
 Official Phase 5 result:
 
 ```text
-Total documents:         52
-Success:                 7
-Success with warnings:   45
-Failed:                  0
-Generated hierarchies:   52
-Parser version:          v0.1.0
-Report:                  artifacts/reports/parsing/legal_parsing_report.json
+Total laws: 52
+Hierarchy files generated: 52
+Failed parser documents: 0
+Validator failures: 0
+RED audit cases: 0
+ORANGE audit cases: 0
+Source-tail leakage nodes: 0
+POINT_LIKE_LINE_OUTSIDE_CLAUSE: 0
+AMBIGUOUS_CLAUSE_CANDIDATE: 0
+Parser version: v0.1.0
+Report: artifacts/reports/parsing/legal_parsing_report.json
 ```
 
-Remaining warnings are non-fatal and preserved for downstream review:
-`SOURCE_NOTE_EXCLUDED`, `EMPTY_ARTICLE_NODE`, `NODE_ID_COLLISION_RESOLVED`,
-`ARTICLE_COUNT_MISMATCH`, `AMBIGUOUS_CLAUSE_CANDIDATE`,
-`POINT_LIKE_LINE_OUTSIDE_CLAUSE`, and `MAX_ARTICLE_NUMBER_MISMATCH`.
+Remaining warnings are accepted non-blocking caveats preserved for Phase 6
+chunk validation: `SOURCE_NOTE_EXCLUDED`, `EMPTY_ARTICLE_NODE`,
+`NODE_ID_COLLISION_RESOLVED`, `ARTICLE_COUNT_MISMATCH`,
+`MAX_ARTICLE_NUMBER_MISMATCH`. The following warning types have zero
+occurrences in the full corpus: `AMBIGUOUS_CLAUSE_CANDIDATE`,
+`POINT_LIKE_LINE_OUTSIDE_CLAUSE`.
 
 ## Quick Start
 
@@ -103,8 +109,8 @@ Implementation boundary:
            │
            ▼
 ┌──────────────────────┐
-│  LegalDocumentNode    │
-│  Tree (JSON)          │
+│  LegalHierarchyDocument │
+│  Flat nodes + links  │
 └──────────────────────┘
 ```
 
@@ -115,12 +121,13 @@ Implementation boundary:
 **Goal**: Detect legal hierarchy markers using regex patterns.
 
 **Patterns** (Vietnamese):
-- `^(Phần\s+[IVXLCDM0-9]+)` → Part
-- `^(Chương\s+[IVXLCDM0-9]+)` → Chapter
-- `^(Mục\s+[IVXLCDM0-9]+)` → Section
-- `^(Điều\s+\d+)(\s*\.\s*.*)?` → Article (optional title after number)
-- `^(Khoản\s+(\d+|[a-z]|\(.*?\))\b` → Clause
-- `^(Điểm\s+([a-z]|\(.*?\))\b` → Point
+- `Phần thứ ...` → Part
+- `Chương <Roman>` → Chapter
+- `Mục N. ...` → Section
+- `Điều N. ...`, `Điều N.`, `Điều 217a.` → Article
+- numbered legal lines such as `1. ...`, `1.Nội dung`, and selected corpus-safe
+  malformed forms → Clause
+- point labels such as `a) ...`, `đ) ...` → Point
 
 **Process**:
 - Iterate through text line by line.
@@ -152,10 +159,14 @@ Implementation boundary:
 **Goal**: Construct parent-child relationships to form a tree.
 
 **Rules**:
-- Root is either the whole document or the first "Part" if present.
-- Each node's parent is the nearest preceding node with a higher level in the hierarchy order: part > chapter > section > article > clause > point.
-- Example: a "clause" node's parent is the most recent "article" node that precedes it.
-- An "article" with no preceding "section" or "chapter" attaches to the nearest "part" or root.
+- Root is always a real Law node spanning the full `normalized_text`.
+- Non-root parent assignment follows the legal hierarchy order:
+  Law → Part → Chapter → Section → Article → Clause → Point.
+- Missing intermediate levels are allowed; for example, an Article may attach
+  directly to a Chapter, Part, or Law root.
+- Clause nodes attach only to an Article. Point nodes attach only to a Clause.
+- Parent spans are inclusive of descendant text, and sibling spans must not
+  overlap.
 
 **Data structure**:
 ```python
@@ -226,7 +237,7 @@ class LegalNode(BaseModel):
 {
   "law_id": "LDD_VBHN",
   "source_file": "data/interim/LDD_VBHN/normalized.json",
-  "parser_version": "v0.1",
+  "parser_version": "v0.1.0",
   "root_node_id": "LDD_VBHN__root",
   "nodes": [
     {
@@ -245,7 +256,7 @@ class LegalNode(BaseModel):
       "node_id": "LDD_VBHN__article_1",
       "level": "article",
       "number": "1",
-      "title": "Điều 1. Tên điều luật",
+      "title": "Tên điều luật",
       "text": "Điều 1. Tên điều luật\nNội dung của điều luật...",
       "start_offset": 120,
       "end_offset": 456,

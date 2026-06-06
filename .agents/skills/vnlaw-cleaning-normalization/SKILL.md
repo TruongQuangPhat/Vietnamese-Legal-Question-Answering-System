@@ -15,9 +15,9 @@ debug artifacts. Cleaner outputs use `cleaner_version` `v0.8.0`, remove known
 encoded TVPL footer/watermark artifacts, and report article references
 separately from real article headings.
 
-Use this skill for maintenance or regression fixes in cleaning. The next
-pipeline phase is Legal Hierarchy Parsing; do not expand cleaning work unless a
-parser-blocking defect is proven.
+Use this skill for maintenance or regression fixes in cleaning. Phase 5 Legal
+Hierarchy Parsing is complete and hardened; Phase 6 Parent-child Chunking is
+next. Do not expand cleaning work unless a chunking-blocking defect is proven.
 
 ## Purpose
 

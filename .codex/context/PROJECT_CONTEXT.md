@@ -14,7 +14,15 @@ VnLaw-QA is a Vietnamese Legal QA/RAG system. It is not a generic chatbot.
 
 - `scripts/` = CLI entrypoints (parse arguments, call services, print results)
 - `src/services/` = pipeline orchestration (coordinate phase execution, build reports)
-- `src/ingestion/` = reusable domain logic (crawler, audit, cleaning, storage)
+- `src/ingestion/` = Phase 1-4 domain logic (crawler, audit, cleaning, storage)
+- `src/processing/` = Phase 5-7 domain logic (parsing, chunking, JSONL validation)
+- `src/indexing/` = Phase 8 domain logic (embedding, Qdrant)
+- `src/retrieval/` = Phase 9-10 domain logic (search, reranking)
+- `src/generation/` = Phase 9-11 domain logic (LLM, prompts, answers)
+- `src/agents/` = Phase 11 domain logic (GraphRAG, orchestration)
+- `src/evaluation/` = Phase 12 domain logic (RAGAS, metrics)
+- `src/api/` = Phase 13 domain logic (FastAPI)
+- `src/monitoring/` / `src/security/` = Phase 14 domain logic
 
 The system must retrieve, process, and answer questions based on Vietnamese legal documents while preserving legal structure, source traceability, and citation integrity.
 
@@ -54,7 +62,21 @@ Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning /
 - Encoded TVPL footer/watermark artifacts are removed from cleaned outputs.
 - Article metrics are explicit: `article_reference_count` counts all `Điều N` mentions, while `article_heading_count` and `max_heading_article_number` describe real article headings.
 - Remaining duplicate-style flags such as BLHS_VBHN are diagnostic/semantic concerns, not cleaning blockers unless extraction duplication is proven.
-- The next engineering phase is **Phase 5 — Legal Hierarchy Parsing**.
+- **Phase 5 — Legal Hierarchy Parsing is complete and hardened.**
+- 52/52 `hierarchy.json` artifacts exist under `data/interim/{LAW_ID}/`.
+- Official parsing report: `artifacts/reports/parsing/legal_parsing_report.json`.
+- Full-corpus result: 6 successes, 46 successes with warnings, 0 failures.
+- Hardened validation: 0 validator failures, 0 RED audit cases, 0 ORANGE
+  audit cases, 0 source-tail leakage nodes.
+- Zero `AMBIGUOUS_CLAUSE_CANDIDATE` and zero
+  `POINT_LIKE_LINE_OUTSIDE_CLAUSE` warnings.
+- Remaining accepted non-blocking warnings: `SOURCE_NOTE_EXCLUDED`,
+  `EMPTY_ARTICLE_NODE`, `NODE_ID_COLLISION_RESOLVED`,
+  `ARTICLE_COUNT_MISMATCH`, `MAX_ARTICLE_NUMBER_MISMATCH`.
+- The next engineering phase is **Phase 6 — Parent-child Chunking** over
+  `data/interim/{LAW_ID}/hierarchy.json`.
+- Phase 6 chunking logic, service orchestration, CLI, and tests have not been
+  implemented yet.
 
 ## 4. Implemented Phases
 
@@ -126,75 +148,77 @@ The full 52-law corpus cleans successfully with no warning artifacts, failed art
 
 ## 5. Current Phase
 
-Current phase:
+Completed phase:
 
 ```text
-Phase 5 — Legal Hierarchy Parsing
+Phase 5 — Legal Hierarchy Parsing (complete and hardened)
 ```
 
-Goal: Extract deterministic Vietnamese legal hierarchy from the normalized corpus:
+Current next phase:
 
 ```text
-Phần → Chương → Mục → Điều → Khoản → Điểm
+Phase 6 — Parent-child Chunking (not implemented)
 ```
 
-This phase should consume `data/interim/{LAW_ID}/normalized.json`.
+Goal: Create validated parent-child chunks from the parsed legal hierarchy.
+Child units are Clause or Point where available, with Article text preserved as
+parent context for downstream retrieval and generation.
 
-It should not jump directly to embedding, RAG, Advanced RAG, or GraphRAG.
+This phase consumes `data/interim/{LAW_ID}/hierarchy.json`. It does not jump
+to embedding, RAG, Advanced RAG, or GraphRAG.
 
 Expected outputs:
 
 ```text
-data/interim/{LAW_ID}/hierarchy.json
-artifacts/reports/parsing/legal_parsing_report.json
+data/processed/legal_chunks.jsonl
+artifacts/reports/chunking/
 ```
 
 Key requirements:
 
-- Read normalized artifacts from `data/interim/`.
+- Read hierarchy artifacts from `data/interim/`.
 - Do not mutate `data/raw/`.
-- Do not rewrite cleaning behavior unless a parser-blocking cleaning defect is proven.
-- Preserve source traceability from normalized artifact metadata.
-- Preserve legal markers and numbering patterns:
-  - Phần
-  - Chương
-  - Mục
-  - Điều
-  - numbered clause lines such as `1.`, `2.`, `3.`
-  - point labels such as `a)`, `b)`, `c)`
-- Build a hierarchy tree before chunking.
-- Validate parser output before any embedding or retrieval work.
+- Do not rewrite Phase 5 parsing unless a chunking-blocking parser defect is proven.
+- Preserve source traceability from hierarchy node metadata and offsets.
+- Use legal hierarchy instead of arbitrary token/character windows.
+- Validate chunks before any embedding or retrieval work.
 - Add focused unit tests.
-- Put parser domain logic under `src/processing/`.
-- Put parser orchestration/report building under `src/services/`.
-- Put parser CLI entrypoint under `scripts/`.
-- Put parser unit tests under `tests/unit/processing/`.
-
-Important Vietnamese legal formatting note:
-
-Vietnamese legal documents often do not literally write the words `Khoản` and `Điểm` in the body. Clauses are commonly represented by numbered lines such as `1.`, `2.`, `3.`, and points are commonly represented by lettered labels such as `a)`, `b)`, `c)`. Cleaning must preserve these patterns for the parser.
+- Domain logic under `src/processing/`.
+- Orchestration/report building under `src/services/`.
+- CLI entrypoint under `scripts/`.
+- Unit tests under `tests/unit/processing/`.
 
 ## 6. Next Immediate Tasks
 
-1. Create or use the branch `feature/legal-parser-chunking`.
-2. Design the legal hierarchy parser over `normalized.json` inputs.
-3. Preserve hierarchy levels:
-   - Phần
-   - Chương
-   - Mục
-   - Điều
-   - numbered clause lines like `1.`, `2.`, `3.`
-   - point labels like `a)`, `b)`, `c)`
-4. Generate `data/interim/{LAW_ID}/hierarchy.json`.
-5. Generate `artifacts/reports/parsing/legal_parsing_report.json`.
-6. Add parser unit tests before any chunking implementation.
-7. Validate parser correctness on known complex laws such as BLDS_2015, BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
+1. Design and implement Phase 6 parent-child chunking over
+   `data/interim/{LAW_ID}/hierarchy.json`.
+2. Add deterministic chunk IDs, Article parent context, and Clause/Point child
+   chunk rules.
+3. Validate chunk schema and citation format on priority laws such as
+   BLDS_2015, BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
+4. Write the future Phase 6 chunking report to
+   `artifacts/reports/chunking/chunking_report.json`.
+5. Validate the Phase 6 gate before proceeding to Phase 7.
 
-## 7. Do Not Do Yet
+## 7. Next Phase: Phase 6 Parent-child Chunking
 
-- Do not implement Parent-child Chunking until hierarchy parsing passes its validation gate.
-- Do not implement Processed JSONL export yet.
-- Do not implement embedding/indexing yet.
+Phase 6 is the next engineering focus and is not implemented yet. It consumes
+`data/interim/{LAW_ID}/hierarchy.json`.
+
+Key requirements:
+
+- Read hierarchy artifacts from `data/interim/`.
+- Do not mutate `data/raw/`.
+- Do not rewrite Phase 5 parsing unless a chunking-blocking parser defect is proven.
+- Preserve source traceability from hierarchy node metadata and offsets.
+- Use legal hierarchy instead of arbitrary token/character windows.
+- Validate chunks before any embedding or retrieval work.
+- Handle repealed/empty articles (EMPTY_ARTICLE_NODE): emit placeholder chunks or skip.
+- Do not chunk source-note excluded regions as main legal content.
+
+## 8. Do Not Do Yet
+
+- Do not implement embedding/indexing until Phase 6 gate passes.
 - Do not implement Naive RAG yet.
 - Do not implement Advanced RAG yet.
 - Do not implement GraphRAG or agents yet.
@@ -205,7 +229,7 @@ Vietnamese legal documents often do not literally write the words `Khoản` and 
 - Do not use LLM-based cleaning.
 - Do not mutate `data/raw/`.
 
-## 8. Important Paths
+## 9. Important Paths
 
 ```text
 configs/laws/corpus_registry.yml
@@ -300,7 +324,7 @@ Evaluation:
   runs: artifacts/runs/evaluations/
 ```
 
-## 9. Official Pipeline Commands
+## 10. Official Pipeline Commands
 
 Official user-facing commands for the ingestion pipeline:
 
@@ -381,21 +405,22 @@ Prefer **VBHN** consolidated documents when available. If no VBHN exists, crawl 
 
 ## 12. Next Phase Preparation
 
-Phase 5 — Legal Hierarchy Parsing is the active engineering focus.
+Phase 6 — Parent-child Chunking is the next engineering focus.
 
 Key design constraints:
 
-- Must consume `data/interim/{LAW_ID}/normalized.json` only.
+- Must consume `data/interim/{LAW_ID}/hierarchy.json` only.
 - Must not mutate `data/raw/`.
 - Must preserve `Phần / Chương / Mục / Điều / Khoản / Điểm` hierarchy.
-- Must validate hierarchy before any chunking or embedding work.
-- Must add focused parser unit tests covering at least three law templates and edge cases (Roman numerals, Vietnamese `đ`, mixed clause styles).
+- Must preserve Article parent context for Clause/Point child chunks.
+- Must validate chunks before any embedding or retrieval work.
+- Must add focused chunker unit tests covering priority laws and edge cases
+  such as repealed/empty Articles and collision-resolved node IDs.
 
 ## 13. Out-of-Scope Reminders
 
 These are explicitly deferred until their respective phase gates are met:
 
-- Parent-child chunking
 - Processed JSONL export
 - Embedding / indexing (Qdrant)
 - Neo4j graph construction

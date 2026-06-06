@@ -48,8 +48,9 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - Cleaned corpus outputs exist for 52/52 legal documents under `data/interim/`.
 - Encoded TVPL footer/watermark artifacts are removed from cleaned outputs.
 - Article metrics distinguish article references from real article headings.
-- Phase 5 Legal Hierarchy Parsing is complete with 52/52 generated
-  `hierarchy.json` outputs and 0 failed documents.
+- Phase 5 Legal Hierarchy Parsing is complete and hardened with 52/52
+  generated `hierarchy.json` outputs, 0 failed documents, 0 validator
+  failures, 0 RED/ORANGE audit cases, and 0 source-tail leakage nodes.
 - Embedding/RAG/Advanced RAG/GraphRAG has not started.
 - The next phase is Phase 6 Parent-child Chunking over
   `data/interim/{LAW_ID}/hierarchy.json`.
@@ -160,8 +161,9 @@ After editing:
 - Do not list `.git`, `.venv`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`,
   `__pycache__`, or huge generated folders.
 - Do not mutate `data/raw/`.
-- Do not modify `data/interim/`, historical `data/reports/`, or generated
-  `artifacts/` outputs unless explicitly asked.
+- Do not modify `data/interim/` or generated `artifacts/` outputs unless explicitly asked.
+- `data/reports/` is a historical/protected path only; active reports belong under
+  `artifacts/reports/{phase}/`.
 - Do not run full crawl, audit, or cleaning commands unless explicitly requested.
 - Do not proceed to chunking/RAG before the legal hierarchy parser gate is solid.
 - Do not delete `.claude/`, `.claude/skills/`, Claude settings files,

@@ -61,15 +61,19 @@ Corpus Registry
 - 52/52 legal documents have been crawled successfully under `data/raw/`.
 - 52/52 raw artifacts passed audit.
 - 52/52 documents cleaned to `data/interim/{LAW_ID}/normalized.json`.
-- **Phase 4 — Cleaning & Normalization is complete/gate-ready.** Cleaner version: `v0.8.0`.
-- **Phase 5 — Legal Hierarchy Parsing is complete.**
+- **Phase 5 — Legal Hierarchy Parsing is complete and hardened.**
 - 52/52 `hierarchy.json` artifacts generated under `data/interim/{LAW_ID}/`.
 - Official parsing report: `artifacts/reports/parsing/legal_parsing_report.json`.
-- Phase 5 result: 7 successes, 45 successes with warnings, 0 failures.
-- Remaining Phase 5 warnings are non-fatal: `SOURCE_NOTE_EXCLUDED`, `EMPTY_ARTICLE_NODE`, `NODE_ID_COLLISION_RESOLVED`, `ARTICLE_COUNT_MISMATCH`, `AMBIGUOUS_CLAUSE_CANDIDATE`, `POINT_LIKE_LINE_OUTSIDE_CLAUSE`, `MAX_ARTICLE_NUMBER_MISMATCH`.
-- **Phase 6 — Parent-child Chunking is in progress (current active phase).**
-- Chunking logic (`src/processing/legal_chunker.py`), chunking service (`src/services/chunking_service.py`), CLI script (`scripts/chunk_legal_corpus.py`), and unit tests have been implemented.
-- The next engineering phase after Phase 6 gate is **Phase 7 — Processed JSONL Validation**.
+- Full-corpus result: 6 successes, 46 successes with warnings, 0 failures.
+- Hardened validation: 0 orphan nodes, 0 invalid parent chains, 0 invalid offsets, 0 invalid sibling overlaps, 0 duplicate node IDs.
+- Zero RED audit cases, zero ORANGE audit cases, zero source-tail leakage nodes.
+- Zero `AMBIGUOUS_CLAUSE_CANDIDATE` and zero `POINT_LIKE_LINE_OUTSIDE_CLAUSE` warnings.
+- Remaining accepted non-blocking warnings: `SOURCE_NOTE_EXCLUDED`, `EMPTY_ARTICLE_NODE`, `NODE_ID_COLLISION_RESOLVED`, `ARTICLE_COUNT_MISMATCH`, `MAX_ARTICLE_NUMBER_MISMATCH`.
+- **Phase 6 — Parent-child Chunking is the next phase (not yet implemented).**
+- Phase 6 chunking logic, service orchestration, CLI, and tests have **not**
+  been implemented yet.
+- The next engineering phase after the Phase 6 gate is **Phase 7 — Processed
+  JSONL Validation**.
 - Current branch: `feature/legal-parser-chunking`.
 
 ## 4. Implemented Phases
@@ -212,18 +216,21 @@ Key requirements:
 
 ## 6. Next Immediate Tasks
 
-1. Run full-corpus Phase 6 chunking validation across all 52 laws.
-2. Ensure chunk schema validation passes on BLDS_2015, BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
-3. Verify chunk_id determinism (same hierarchy input produces identical IDs).
-4. Verify citation format is correct Vietnamese (no English "Article/Clause/Point").
-5. Write Phase 6 chunking report to `artifacts/reports/chunking/chunking_report.json`.
-6. Validate Phase 6 gate before proceeding to Phase 7.
+1. Design and implement Phase 6 parent-child chunking over
+   `data/interim/{LAW_ID}/hierarchy.json`.
+2. Add deterministic chunk IDs, Article parent context, and Clause/Point child
+   chunk rules.
+3. Validate chunk schema and citation format on priority laws such as
+   BLDS_2015, BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
+4. Write the future Phase 6 chunking report to
+   `artifacts/reports/chunking/chunking_report.json`.
+5. Validate the Phase 6 gate before proceeding to Phase 7.
 
 ## 7. Upcoming Phases
 
 | Phase | Name | Status |
 | --- | --- | --- |
-| 6 | Parent-child Chunking | **Current / In Progress** |
+| 6 | Parent-child Chunking | **Next / Not Implemented** |
 | 7 | Processed JSONL Validation | Planned |
 | 8 | Embedding & Indexing | Future |
 | 9 | Naive RAG | Future |

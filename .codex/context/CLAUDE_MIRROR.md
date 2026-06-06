@@ -82,41 +82,98 @@ The project roadmap is:
    - RAGAS evaluation gates,
    - CI/CD, Docker, monitoring, safety, and release workflows.
 
+Current project state:
+
+```text
+Phases 0-5 are complete.
+Phase 5 Legal Hierarchy Parsing is complete and hardened:
+  52 hierarchy.json outputs
+  0 parser failures
+  0 validator failures
+  0 RED/ORANGE audit cases
+  0 source-tail leakage nodes
+
+Next phase:
+  Phase 6 — Parent-child Chunking over data/interim/{LAW_ID}/hierarchy.json
+```
+
+Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker
+exists. Do not jump to embedding, indexing, retrieval, RAG, Advanced RAG,
+GraphRAG, API, or deployment before Phase 6 chunk quality is validated.
+
 ## 4. Expected Repository Layout
 
-Current implemented structure:
+Use this as the canonical structure unless a task explicitly changes it:
 
 ```text
 VnLaw-QA/
-├── .agents/skills/
-├── .codex/context/
-├── .claude/skills/
 ├── configs/
-│   └── laws/corpus_registry.yml
+│   ├── laws/
+│   ├── sources/
+│   ├── ingestion/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   └── evaluation/
 ├── data/
-│   ├── raw/
-│   ├── interim/
+│   ├── raw/          # immutable raw legal evidence
+│   ├── interim/      # normalized and parsed intermediate artifacts
+│   ├── processed/    # future chunked/index-ready corpus artifacts
+│   ├── indexes/
+│   └── eval/
+├── artifacts/
 │   ├── reports/
-│   └── processed/
+│   │   ├── crawling/
+│   │   ├── audit/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── chunking/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   ├── traces/
+│   │   ├── crawling/
+│   │   ├── audit/
+│   │   ├── cleaning/
+│   │   ├── parsing/
+│   │   ├── retrieval/
+│   │   └── generation/
+│   ├── runs/
+│   │   ├── experiments/
+│   │   ├── benchmarks/
+│   │   └── evaluations/
+│   ├── metrics/
+│   │   ├── indexing/
+│   │   ├── retrieval/
+│   │   ├── generation/
+│   │   └── evaluation/
+│   └── logs/
 ├── scripts/
 ├── src/
 │   ├── core/
 │   ├── ingestion/
-│   └── services/
+│   ├── processing/
+│   ├── indexing/
+│   ├── retrieval/
+│   ├── generation/
+│   ├── services/
+│   ├── api/
+│   ├── evaluation/
+│   ├── monitoring/
+│   └── security/
 ├── tests/
-│   └── unit/ingestion/
+│   ├── unit/
+│   ├── integration/
+│   ├── regression/
+│   └── fixtures/
 ├── docs/
-├── AGENTS.md
-├── CLAUDE.md
-├── PROJECT_CONTEXT.md
-├── .env.example
-├── .gitignore
-├── pyproject.toml
-└── README.md
+├── docker/
+├── deployment/
+├── monitoring/
+└── .github/workflows/
 ```
-
-Future phase directories are scaffolded with `.gitkeep` placeholders. Add
-implementation logic to them only when their implementation phase begins.
 
 Target production structure, scaffolded with `.gitkeep` and implemented incrementally:
 

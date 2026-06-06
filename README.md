@@ -42,7 +42,7 @@ Missing article marker:  0
 Cleaner version:         v0.8.0
 ```
 
-Phase 5 is complete:
+Phase 5 is complete and hardened:
 
 ```text
 Parsed documents:        52
@@ -233,15 +233,15 @@ Implemented and planned pipeline:
 │ Phase 5                      │
 │ Legal Hierarchy Parsing      │
 │ data/interim/*/hierarchy.json│
-│ CURRENT NEXT PHASE           │
+│ COMPLETE AND HARDENED        │
 └──────────────┬───────────────┘
                │
                ▼
 ┌──────────────────────────────┐
 │ Phase 6                      │
 │ Parent-child Chunking        │
-│ data/interim/*/chunks.jsonl  │
-│ PLANNED                      │
+│ input: hierarchy.json        │
+│ NEXT / NOT IMPLEMENTED       │
 └──────────────┬───────────────┘
                │
                ▼
@@ -446,9 +446,13 @@ uv run python scripts/parse_legal_hierarchy.py \
   --verbose
 ```
 
-The full corpus run completed with 52 total documents, 7 successes, 45
-successes with warnings, and 0 failures. Remaining warnings are non-fatal and
-are preserved in the parsing report for Phase 6 review.
+The full corpus run completed with 52 total documents, 6 successes, 46
+successes with warnings, and 0 failures. No validator failures, no RED audit
+cases, no ORANGE audit cases, no source-tail leakage, no
+AMBIGUOUS_CLAUSE_CANDIDATE warnings, and no POINT_LIKE_LINE_OUTSIDE_CLAUSE
+warnings. Remaining non-fatal warnings (SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE,
+NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH, MAX_ARTICLE_NUMBER_MISMATCH)
+are preserved in the parsing report for Phase 6 reference.
 
 ## Setup
 

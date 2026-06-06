@@ -10,6 +10,12 @@ Use this skill for Vietnamese legal hierarchy extraction (Phase 5) and parent-ch
 
 This skill runs after cleaning/normalization (Phase 4) and before embedding/indexing (Phase 8).
 
+Current project status: Phase 5 Legal Hierarchy Parsing is complete and
+hardened with 52/52 hierarchy outputs, 0 parser failures, 0 validator failures,
+0 RED/ORANGE audit cases, and 0 source-tail leakage nodes. Phase 6
+Parent-child Chunking is next and not yet implemented. Use
+`data/interim/{LAW_ID}/hierarchy.json` as the Phase 6 input.
+
 ## Phase 5 — Legal Hierarchy Parsing
 
 ### Goal
@@ -135,6 +141,8 @@ LegalParser               → per-document parser facade
 ```
 
 ## Phase 6 — Parent-Child Chunking
+
+Status: Next phase, not implemented yet.
 
 ### Goal
 

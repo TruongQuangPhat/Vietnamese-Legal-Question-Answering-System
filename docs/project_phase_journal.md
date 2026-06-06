@@ -39,7 +39,7 @@ Phase 1: Legal corpus registry              complete
 Phase 2: Registry-driven crawling           complete
 Phase 3: Raw corpus audit and validation    complete
 Phase 4: Cleaning & Normalization           complete / gate-ready
-Phase 5: Legal hierarchy parsing            complete
+Phase 5: Legal hierarchy parsing            complete and hardened
 Phase 6: Parent-child chunking              next
 ```
 
@@ -584,7 +584,7 @@ Phase 4 Cleaning & Normalization is complete/gate-ready.
 
 ## 9. Phase 5 — Legal Hierarchy Parsing
 
-Phase 5 is complete. The parser consumes:
+Phase 5 is complete and hardened. The parser consumes:
 
 ```text
 data/interim/{LAW_ID}/normalized.json
@@ -601,10 +601,16 @@ Official full-corpus result:
 
 ```text
 Total documents:       52
-Success:               7
-Success with warnings: 45
+Success:               6
+Success with warnings: 46
 Failed:                0
 Generated hierarchies: 52
+Validator failures: 0
+RED: 0
+ORANGE: 0
+Source-tail leakage: 0
+AMBIGUOUS_CLAUSE_CANDIDATE: 0
+POINT_LIKE_LINE_OUTSIDE_CLAUSE: 0
 Parser version:        v0.1.0
 ```
 
@@ -619,20 +625,19 @@ Parser responsibilities implemented:
 - exclude source-law note tails from the main hierarchy;
 - support titleless Article headings such as `Điều 1.`.
 
-Remaining non-fatal warning categories include:
+Remaining warning categories (accepted non-blocking caveats):
 
 ```text
 SOURCE_NOTE_EXCLUDED
 EMPTY_ARTICLE_NODE
 NODE_ID_COLLISION_RESOLVED
 ARTICLE_COUNT_MISMATCH
-AMBIGUOUS_CLAUSE_CANDIDATE
-POINT_LIKE_LINE_OUTSIDE_CLAUSE
 MAX_ARTICLE_NUMBER_MISMATCH
 ```
 
-These warnings are preserved in the parsing report and should be considered
-during Phase 6 chunking validation, but they did not block Phase 5 completion.
+These warnings are preserved in the parsing report for Phase 6 chunk
+validation. Note: AMBIGUOUS_CLAUSE_CANDIDATE and POINT_LIKE_LINE_OUTSIDE_CLAUSE
+have zero occurrences in the full 52-law corpus.
 
 ## 10. Current Next Phase — Parent-child Chunking
 

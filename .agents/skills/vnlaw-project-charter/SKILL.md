@@ -9,6 +9,12 @@ Use this skill to orient major work in the repository.
 
 This skill defines the mission, architecture direction, trusted corpus policy, and implementation priority.
 
+Current project status: Phases 0-5 are complete. Phase 5 Legal Hierarchy
+Parsing is complete and hardened with 52/52 hierarchy outputs and 0 failures.
+Phase 6 Parent-child Chunking is next and not yet implemented. Embedding,
+indexing, retrieval, RAG, Advanced RAG, and GraphRAG must wait until Phase 6
+chunk quality and processed JSONL validation pass.
+
 ## Mission
 
 VnLaw-QA is a Vietnamese legal question-answering system.

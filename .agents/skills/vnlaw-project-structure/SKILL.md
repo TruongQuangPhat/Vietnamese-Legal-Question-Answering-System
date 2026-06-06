@@ -186,7 +186,7 @@ cleaning diagnostics
 ### `src/processing/`
 
 ```text
-future legal hierarchy parser
+implemented legal hierarchy parser
 future parent-child chunking domain logic after parser gate
 ```
 

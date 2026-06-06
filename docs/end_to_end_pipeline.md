@@ -10,11 +10,12 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **Phase 6 Parent-child Chunking is in progress**.
+Current status: **Phase 5 Legal Hierarchy Parsing is complete and hardened**.
 The corpus has 52/52 raw artifacts, 52/52 normalized outputs, and 52/52
-hierarchy outputs. Phase 6 chunking code has been implemented and is being
-validated across the full corpus. The next engineering phase after the Phase 6
-gate is **Phase 7 — Processed JSONL Validation**.
+hierarchy outputs with 0 parser failures and 0 validator failures. The next
+engineering phase is **Phase 6 — Parent-child Chunking**, which is not yet
+implemented. Phase 7 — Processed JSONL Validation must wait until the Phase 6
+gate passes.
 
 ## 2. Quick Start
 
@@ -289,38 +290,29 @@ safe to feed into Cleaning & Normalization.
 
 ---
 
-### Phase 5 — Legal Hierarchy Parsing
+### Phase 5 — Legal Hierarchy Parsing — Complete and Hardened
 
-**Goal**: Parse the hierarchy Part → Chapter → Section → Article → Clause → Point from normalized legal text.
+Full-corpus run:
 
-**Input**: `data/interim/{law_id}/normalized.json`.
+```text
+Total documents: 52
+Success: 6
+Success with warnings: 46
+Failed: 0
+Validator failures: 0
+RED: 0
+ORANGE: 0
+Source-tail leakage: 0
+AMBIGUOUS_CLAUSE_CANDIDATE: 0
+POINT_LIKE_LINE_OUTSIDE_CLAUSE: 0
+Output: data/interim/{LAW_ID}/hierarchy.json
+Report: artifacts/reports/parsing/legal_parsing_report.json
+```
 
-**Pipeline Summary**:
-- Use regex as recognizer for hierarchy levels (not the main parser)
-- Build tree representation with nodes: `Part`, `Chapter`, `Section`, `Article`, `Clause`, `Point`
-- Each node has: `text`, `number`, `level`, `start_offset`, `end_offset`, `parent_id`
-- Handle edge cases:
-  - Documents without Section level
-  - Articles without Clauses (direct content)
-  - Non-standard numbering (LaTeX-style, Roman numerals, unusual patterns)
-  - Footnotes and references outside body
-  - VBHN formatting (consolidated documents)
-- Output: hierarchical JSON tree
-
-**Output**: `data/interim/{law_id}/hierarchy.json`.
-
-**Validation Criteria**:
-- All Articles are detected
-- Clause/Point hierarchy is correct for each Article
-- No overlapping spans
-- Valid tree structure (each node has 1 parent, root is Law)
-
-**Status**: Implemented (52/52 hierarchies; 7 success, 45 warnings, 0 failures)
-
-**Detailed documentation**: `docs/legal_parsing.md`
-
----
-
+Remaining warnings are accepted non-blocking caveats for Phase 6 chunk
+validation: SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE,
+NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH,
+MAX_ARTICLE_NUMBER_MISMATCH.
 ### Phase 6 — Parent-child Chunking
 
 **Goal**: Create chunks for embedding (child) and LLM context (parent) using parent-child model to preserve citation integrity.
@@ -354,7 +346,7 @@ safe to feed into Cleaning & Normalization.
 - `text_hash` computed and present
 - No empty `text` fields
 
-**Status**: In Progress (chunking code implemented; full-corpus validation in progress)
+**Status**: Next phase (not implemented yet)
 
 **Detailed documentation**: `docs/parent_child_chunking.md`
 
@@ -432,7 +424,7 @@ safe to feed into Cleaning & Normalization.
 - `issued_date`, `effective_date`, `expiry_date` properly formatted
 - Zero empty `text` fields
 
-**Status**: In Progress (chunking code implemented; full-corpus validation running)
+**Status**: Blocked on Phase 6 gate (not started)
 
 **Detailed documentation**: `docs/processed_jsonl.md`
 
@@ -833,23 +825,30 @@ and 52/52 optional cleaned text artifacts. The cleaner removes known TVPL
 encoded footer/watermark artifacts and reports article references separately
 from real article headings.
 
-### Phase 5 — Legal Hierarchy Parsing — Implemented
+### Phase 5 — Legal Hierarchy Parsing — Complete and Hardened
 
 Full-corpus run:
 
 ```text
-Total documents:       52
-Success:               7
-Success with warnings: 45
-Failed:                0
-Output:                data/interim/{LAW_ID}/hierarchy.json
-Report:                artifacts/reports/parsing/legal_parsing_report.json
+Total documents: 52
+Success: 6
+Success with warnings: 46
+Failed: 0
+Validator failures: 0
+RED: 0
+ORANGE: 0
+Source-tail leakage: 0
+AMBIGUOUS_CLAUSE_CANDIDATE: 0
+POINT_LIKE_LINE_OUTSIDE_CLAUSE: 0
+Output: data/interim/{LAW_ID}/hierarchy.json
+Report: artifacts/reports/parsing/legal_parsing_report.json
 ```
 
-Remaining parser warnings are non-fatal and are retained in the parsing report
-for Phase 6 review.
-
-### Phase 6 — Parent-child Chunking — In Progress (chunking code implemented; full-corpus validation running)
+Remaining warnings are accepted non-blocking caveats for Phase 6 chunk
+validation: SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE,
+NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH,
+MAX_ARTICLE_NUMBER_MISMATCH.
+### Phase 6 — Parent-child Chunking — Next (not implemented)
 
 ### Phase 7 — Processed JSONL Export & Validation — Planned
 
