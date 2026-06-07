@@ -483,7 +483,7 @@ Khong implement trong Phase 6:
 - [x] Step 3 - Citation va hierarchy path
 - [x] Step 4 - Offset va hash
 - [x] Step 5 - Chunk validator
-- [ ] Step 6 - Service va JSONL writer
+- [x] Step 6 - Service va JSONL writer
 - [ ] Step 7 - CLI
 - [ ] Step 8 - Priority audit
 - [ ] Step 9 - Full corpus run
