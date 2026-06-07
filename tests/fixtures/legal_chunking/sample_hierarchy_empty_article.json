@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "parser_version": "v0.1.0",
+  "cleaner_version": "v0.8.0",
+  "law_id": "TEST_LAW",
+  "source_file": "data/interim/TEST_LAW/normalized.json",
+  "root_node_id": "TEST_LAW__root",
+  "metadata": {
+    "law_name": "Luật Kiểm thử",
+    "source_url": "https://thuvienphapluat.vn/test.aspx",
+    "source_domain": "thuvienphapluat.vn",
+    "source_type": "html",
+    "raw_artifact_path": "data/raw/TEST_LAW/latest/main.html",
+    "article_heading_count": 1,
+    "max_heading_article_number": 1,
+    "has_heading_article_1": true,
+    "heading_sequence_score": 1.0
+  },
+  "warnings": [
+    {
+      "code": "EMPTY_ARTICLE_NODE",
+      "message": "Article node contains no substantive text.",
+      "law_id": "TEST_LAW",
+      "node_id": "TEST_LAW__root__article_1",
+      "start_offset": 14,
+      "end_offset": 15,
+      "context": {}
+    }
+  ],
+  "nodes": [
+    {
+      "node_id": "TEST_LAW__root",
+      "level": "law",
+      "number": null,
+      "title": "Luật Kiểm thử",
+      "text": "Luật Kiểm thử\n",
+      "start_offset": 0,
+      "end_offset": 14,
+      "parent_id": null,
+      "children": ["TEST_LAW__root__article_1"],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_1",
+      "level": "article",
+      "number": "1",
+      "title": "Điều bị bãi bỏ",
+      "text": "\n",
+      "start_offset": 14,
+      "end_offset": 15,
+      "parent_id": "TEST_LAW__root",
+      "children": [],
+      "metadata": {
+        "is_empty": true
+      }
+    }
+  ]
+}
