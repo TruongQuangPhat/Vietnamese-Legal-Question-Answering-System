@@ -484,7 +484,7 @@ Khong implement trong Phase 6:
 - [x] Step 4 - Offset va hash
 - [x] Step 5 - Chunk validator
 - [x] Step 6 - Service va JSONL writer
-- [ ] Step 7 - CLI
+- [x] Step 7 - CLI
 - [ ] Step 8 - Priority audit
 - [ ] Step 9 - Full corpus run
 - [ ] Step 10 - Documentation
