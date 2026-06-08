@@ -79,10 +79,19 @@ Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning /
 - Remaining accepted non-blocking warnings: `SOURCE_NOTE_EXCLUDED`,
   `EMPTY_ARTICLE_NODE`, `NODE_ID_COLLISION_RESOLVED`,
   `ARTICLE_COUNT_MISMATCH`, `MAX_ARTICLE_NUMBER_MISMATCH`.
-- The next engineering phase is **Phase 6 — Parent-child Chunking** over
-  `data/interim/{LAW_ID}/hierarchy.json`.
-- Phase 6 chunking logic, service orchestration, CLI, and tests have not been
-  implemented yet.
+- **Phase 6 — Parent-child Chunking is complete and validated.**
+- Output JSONL: `data/processed/legal_chunks.jsonl`.
+- Chunking report: `artifacts/reports/chunking/chunking_report.json`.
+- Full-corpus result: 34 successes, 18 successes with warnings, 0 failures,
+  40,389 chunks.
+- Chunk breakdown: 1,322 article chunks, 20,643 clause chunks, 18,424 point chunks.
+- Full-corpus validation: 0 bad JSON lines, 0 duplicate `chunk_id`, 0
+  selection-rule issues, 0 chunk invariant issues.
+- Phase 6 hardening result: 0 source-tail markers in chunk `text`, 0
+  source-tail markers in `parent_text`, 180 empty/repealed chunks flagged, and
+  max `parent_text` length reduced to 14,481 characters.
+- The next engineering phase is **Phase 7 — Processed JSONL Validation /
+  embedding-readiness checks** over `data/processed/legal_chunks.jsonl`.
 
 ## 4. Implemented Phases
 
@@ -160,24 +169,24 @@ Completed phase:
 Phase 5 — Legal Hierarchy Parsing (complete and hardened)
 ```
 
-Current next phase:
+Completed phase:
 
 ```text
-Phase 6 — Parent-child Chunking (not implemented)
+Phase 6 — Parent-child Chunking
 ```
 
 Goal: Create validated parent-child chunks from the parsed legal hierarchy.
 Child units are Clause or Point where available, with Article text preserved as
 parent context for downstream retrieval and generation.
 
-This phase consumes `data/interim/{LAW_ID}/hierarchy.json`. It does not jump
-to embedding, RAG, Advanced RAG, or GraphRAG.
+This phase consumes `data/interim/{LAW_ID}/hierarchy.json`. It does not embed,
+index, retrieve, generate answers, or implement RAG.
 
-Expected outputs:
+Implemented outputs:
 
 ```text
 data/processed/legal_chunks.jsonl
-artifacts/reports/chunking/
+artifacts/reports/chunking/chunking_report.json
 ```
 
 Key requirements:
@@ -194,37 +203,38 @@ Key requirements:
 - CLI entrypoint under `scripts/`.
 - Unit tests under `tests/unit/processing/`.
 
+Current next phase:
+
+```text
+Phase 7 — Processed JSONL Validation / embedding-readiness checks
+```
+
 ## 6. Next Immediate Tasks
 
-1. Design and implement Phase 6 parent-child chunking over
-   `data/interim/{LAW_ID}/hierarchy.json`.
-2. Add deterministic chunk IDs, Article parent context, and Clause/Point child
-   chunk rules.
-3. Validate chunk schema and citation format on priority laws such as
-   BLDS_2015, BLHS_VBHN, LDD_VBHN, LTTHC, and LVL_2025.
-4. Write the future Phase 6 chunking report to
-   `artifacts/reports/chunking/chunking_report.json`.
-5. Validate the Phase 6 gate before proceeding to Phase 7.
+1. Define Phase 7 validation checks over `data/processed/legal_chunks.jsonl`.
+2. Confirm embedding-readiness fields, payload strategy, and long parent-text
+   handling before Phase 8 indexing.
+3. Do not claim RAG readiness until retrieval, generation, and evaluation gates
+   are implemented and validated.
 
-## 7. Next Phase: Phase 6 Parent-child Chunking
+## 7. Next Phase: Phase 7 Processed JSONL Validation
 
-Phase 6 is the next engineering focus and is not implemented yet. It consumes
-`data/interim/{LAW_ID}/hierarchy.json`.
+Phase 7 is the next engineering focus. It consumes
+`data/processed/legal_chunks.jsonl`.
 
 Key requirements:
 
-- Read hierarchy artifacts from `data/interim/`.
-- Do not mutate `data/raw/`.
-- Do not rewrite Phase 5 parsing unless a chunking-blocking parser defect is proven.
-- Preserve source traceability from hierarchy node metadata and offsets.
-- Use legal hierarchy instead of arbitrary token/character windows.
-- Validate chunks before any embedding or retrieval work.
-- Handle repealed/empty articles (EMPTY_ARTICLE_NODE): emit placeholder chunks or skip.
-- Do not chunk source-note excluded regions as main legal content.
+- Parse every JSONL line.
+- Validate every row against `LegalChunk`.
+- Check globally unique `chunk_id`.
+- Recompute `text_hash` and `parent_text_hash`.
+- Confirm report counts match JSONL counts.
+- Classify long `parent_text` rows for downstream context packing.
+- Preserve `text` as the embedding unit and `parent_text` as Article context.
 
 ## 8. Do Not Do Yet
 
-- Do not implement embedding/indexing until Phase 6 gate passes.
+- Do not implement embedding/indexing until the processed JSONL validation gate passes.
 - Do not implement Naive RAG yet.
 - Do not implement Advanced RAG yet.
 - Do not implement GraphRAG or agents yet.
@@ -301,8 +311,10 @@ Phase 5 Legal Hierarchy Parsing:
 
 Phase 6 Parent-child Chunking:
   domain logic: src/processing/
-  output: data/processed/
-  report: artifacts/reports/chunking/
+  orchestration: src/services/
+  CLI: scripts/chunk_legal_corpus.py
+  output: data/processed/legal_chunks.jsonl
+  report: artifacts/reports/chunking/chunking_report.json
 
 Phase 8 Indexing:
   domain logic: src/indexing/
@@ -374,6 +386,18 @@ uv run python scripts/audit_cleaning_quality.py \
   --registry configs/laws/corpus_registry.yml
 ```
 
+- Chunk legal corpus:
+
+```bash
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output data/processed/legal_chunks.jsonl \
+  --report artifacts/reports/chunking/chunking_report.json \
+  --overwrite \
+  --verbose \
+  --no-color
+```
+
 - Run unit tests:
 
 ```bash
@@ -411,23 +435,22 @@ Prefer **VBHN** consolidated documents when available. If no VBHN exists, crawl 
 
 ## 12. Next Phase Preparation
 
-Phase 6 — Parent-child Chunking is the next engineering focus.
+Phase 7 — Processed JSONL Validation / embedding-readiness checks is the next
+engineering focus.
 
 Key design constraints:
 
-- Must consume `data/interim/{LAW_ID}/hierarchy.json` only.
+- Must consume `data/processed/legal_chunks.jsonl`.
 - Must not mutate `data/raw/`.
-- Must preserve `Phần / Chương / Mục / Điều / Khoản / Điểm` hierarchy.
-- Must preserve Article parent context for Clause/Point child chunks.
+- Must preserve `Phần / Chương / Mục / Điều / Khoản / Điểm` traceability.
+- Must preserve Article parent context from `parent_text`.
+- Must classify long Article parent contexts before indexing/RAG.
 - Must validate chunks before any embedding or retrieval work.
-- Must add focused chunker unit tests covering priority laws and edge cases
-  such as repealed/empty Articles and collision-resolved node IDs.
 
 ## 13. Out-of-Scope Reminders
 
 These are explicitly deferred until their respective phase gates are met:
 
-- Processed JSONL export
 - Embedding / indexing (Qdrant)
 - Neo4j graph construction
 - Naive RAG baseline

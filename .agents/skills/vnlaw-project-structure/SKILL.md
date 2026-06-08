@@ -26,7 +26,7 @@ VnLaw-QA/
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
 │   ├── interim/      # normalized artifacts and generated hierarchy outputs
-│   ├── processed/    # future validated JSONL chunks
+│   ├── processed/    # validated Phase 6 legal_chunks.jsonl
 │   ├── indexes/      # future retrieval indexes
 │   └── eval/         # future evaluation datasets
 ├── artifacts/
@@ -187,7 +187,8 @@ cleaning diagnostics
 
 ```text
 implemented legal hierarchy parser
-future parent-child chunking domain logic after parser gate
+implemented parent-child chunking domain logic
+future processed JSONL validation logic
 ```
 
 Phase 5 Legal Hierarchy Parsing placement:
@@ -205,7 +206,10 @@ Phase 6 Parent-child Chunking placement:
 
 ```text
 domain logic: src/processing/
-output: data/processed/
+orchestration: src/services/
+CLI: scripts/
+tests: tests/unit/processing/ and tests/unit/services/
+output: data/processed/legal_chunks.jsonl
 report: artifacts/reports/chunking/
 ```
 

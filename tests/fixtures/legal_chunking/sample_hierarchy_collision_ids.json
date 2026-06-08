@@ -1,0 +1,119 @@
+{
+  "schema_version": "1.0",
+  "parser_version": "v0.1.0",
+  "cleaner_version": "v0.8.0",
+  "law_id": "TEST_LAW",
+  "source_file": "data/interim/TEST_LAW/normalized.json",
+  "root_node_id": "TEST_LAW__root",
+  "metadata": {
+    "law_name": "Luật Kiểm thử",
+    "source_url": "https://thuvienphapluat.vn/test.aspx",
+    "source_domain": "thuvienphapluat.vn",
+    "source_type": "html",
+    "raw_artifact_path": "data/raw/TEST_LAW/latest/main.html",
+    "article_heading_count": 2,
+    "max_heading_article_number": 2,
+    "has_heading_article_1": true,
+    "heading_sequence_score": 1.0
+  },
+  "warnings": [
+    {
+      "code": "NODE_ID_COLLISION_RESOLVED",
+      "message": "Sibling node ID collision resolved with deterministic occurrence suffix.",
+      "law_id": "TEST_LAW",
+      "node_id": "TEST_LAW__root__article_1__clause_1__point_a__occurrence_2",
+      "start_offset": 100,
+      "end_offset": 140,
+      "context": {
+        "base_node_id": "TEST_LAW__root__article_1__clause_1__point_a",
+        "resolved_node_id": "TEST_LAW__root__article_1__clause_1__point_a__occurrence_2",
+        "occurrence": 2,
+        "level": "point",
+        "number": "a",
+        "parent_id": "TEST_LAW__root__article_1__clause_1"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "node_id": "TEST_LAW__root",
+      "level": "law",
+      "number": null,
+      "title": "Luật Kiểm thử",
+      "text": "Luật Kiểm thử\n",
+      "start_offset": 0,
+      "end_offset": 14,
+      "parent_id": null,
+      "children": [
+        "TEST_LAW__root__article_1",
+        "TEST_LAW__root__article_2"
+      ],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_1",
+      "level": "article",
+      "number": "1",
+      "title": "Điều có khoản",
+      "text": "Điều 1. Điều có khoản\nKhoản 1. Nội dung.\nĐiểm a. Chi tiết a.\nĐiểm a. Chi tiết a lặp lại.\n",
+      "start_offset": 14,
+      "end_offset": 120,
+      "parent_id": "TEST_LAW__root",
+      "children": [
+        "TEST_LAW__root__article_1__clause_1"
+      ],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_1__clause_1",
+      "level": "clause",
+      "number": "1",
+      "title": null,
+      "text": "Khoản 1. Nội dung.\nĐiểm a. Chi tiết a.\nĐiểm a. Chi tiết a lặp lại.\n",
+      "start_offset": 38,
+      "end_offset": 120,
+      "parent_id": "TEST_LAW__root__article_1",
+      "children": [
+        "TEST_LAW__root__article_1__clause_1__point_a",
+        "TEST_LAW__root__article_1__clause_1__point_a__occurrence_2"
+      ],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_1__clause_1__point_a",
+      "level": "point",
+      "number": "a",
+      "title": null,
+      "text": "Điểm a. Chi tiết a.\n",
+      "start_offset": 56,
+      "end_offset": 88,
+      "parent_id": "TEST_LAW__root__article_1__clause_1",
+      "children": [],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_1__clause_1__point_a__occurrence_2",
+      "level": "point",
+      "number": "a",
+      "title": null,
+      "text": "Điểm a. Chi tiết a lặp lại.\n",
+      "start_offset": 88,
+      "end_offset": 120,
+      "parent_id": "TEST_LAW__root__article_1__clause_1",
+      "children": [],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_2",
+      "level": "article",
+      "number": "2",
+      "title": "Điều không có khoản",
+      "text": "Điều 2. Điều không có khoản\nNội dung trực tiếp.\n",
+      "start_offset": 120,
+      "end_offset": 160,
+      "parent_id": "TEST_LAW__root",
+      "children": [],
+      "metadata": {}
+    }
+  ]
+}

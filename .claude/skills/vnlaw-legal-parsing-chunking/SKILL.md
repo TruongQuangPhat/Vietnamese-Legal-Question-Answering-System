@@ -13,8 +13,11 @@ This skill runs after cleaning/normalization (Phase 4) and before embedding/inde
 Current project status: Phase 5 Legal Hierarchy Parsing is complete and
 hardened with 52/52 hierarchy outputs, 0 parser failures, 0 validator failures,
 0 RED/ORANGE audit cases, and 0 source-tail leakage nodes. Phase 6
-Parent-child Chunking is next and not yet implemented. Use
-`data/interim/{LAW_ID}/hierarchy.json` as the Phase 6 input.
+Parent-child Chunking is complete and hardened with
+`data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
+0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
+and 180 empty/repealed chunks flagged. Phase 7 Processed JSONL Validation /
+embedding-readiness checks is next.
 
 ## Phase 5 — Legal Hierarchy Parsing
 
@@ -142,7 +145,7 @@ LegalParser               → per-document parser facade
 
 ## Phase 6 — Parent-Child Chunking
 
-Status: Next phase, not implemented yet.
+Status: Complete and validated.
 
 ### Goal
 
@@ -152,19 +155,48 @@ Convert the validated hierarchy tree into citation-traceable child chunks for em
 hierarchy.json
 → load hierarchy document
 → index nodes by node_id
-→ for each article: create parent chunk
-→ for each clause/point under article: create child chunk
-→ write chunks.jsonl
+→ create Article/Clause/Point chunks by hierarchy rules
+→ write data/processed/legal_chunks.jsonl
 → validate
 → write chunking_report.json
+```
+
+Validated result:
+
+```text
+34 laws successful
+18 laws successful with warnings
+0 failed laws
+40,389 chunks
+1,322 article chunks
+20,643 clause chunks
+18,424 point chunks
+180 empty/repealed chunks flagged
+0 source-tail markers in text
+0 source-tail markers in parent_text
+0 duplicate chunk IDs
+0 bad JSONL lines
+0 selection-rule issues
+0 chunk invariant issues
+```
+
+Official command:
+
+```bash
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output data/processed/legal_chunks.jsonl \
+  --report artifacts/reports/chunking/chunking_report.json \
+  --overwrite \
+  --verbose \
+  --no-color
 ```
 
 ### Chunk ID Convention
 
 ```text
-{law_id}__article_{N}__clause_{M}__point_{X}    # Point-level chunk
-{law_id}__article_{N}__clause_{M}                # Clause-level chunk (no points)
-{law_id}__article_{N}                             # Article-level chunk (no clauses)
+{source_node_id}__chunk       # chunk_id
+{article_node_id}__parent     # parent_chunk_id
 ```
 
 ### Citation Format
@@ -192,31 +224,35 @@ class LegalChunk(BaseModel):
     chunk_id: str
     law_id: str
     law_name: str
-    law_type: str                   # "vbhn" | "original"
-    legal_status: str               # "active" | "amended" | "replaced"
+    source_url: str
+    source_domain: str
+    source_type: str
+    source_file: str
     level: str                      # "article" | "clause" | "point"
+    chunk_kind: str
+    source_node_id: str
+    parent_article_node_id: str
+    parent_chunk_id: str
     article_number: str
     article_title: str | None
     clause_number: str | None
     point_label: str | None
-    hierarchy_path: HierarchyPath
+    hierarchy_path: str
     text: str                       # Child text (clause or point body)
-    parent_id: str                  # e.g. "{law_id}__article_{N}"
     parent_text: str                # Full article text (from parent node)
     citation: str                   # Vietnamese citation
-    source_url: str
-    source_domain: str
-    source_type: str
-    issued_date: str | None
-    effective_date: str | None
-    expiry_date: str | None
+    start_offset: int
+    end_offset: int
+    article_start_offset: int
+    article_end_offset: int
     text_hash: str                  # SHA-256 of `text`
+    parent_text_hash: str           # SHA-256 of `parent_text`
     metadata: dict[str, Any]        # parser_version, chunker_version, raw_artifact_path
 ```
 
 ### Parent-Child Rules
 
-- **Child unit** = leaf node (`level="clause"` or `"point"`).
+- **Child unit** = Article, Clause, or Point according to hierarchy rules.
 - **Parent context** = the full Article node `text` (includes all descendants).
 - **Article with no clauses**: the article itself becomes a child chunk at `level="article"`.
 - **Article with clauses**: each clause becomes a child chunk; if clauses have points, each point becomes a child chunk (not the clause).
@@ -255,11 +291,12 @@ parser_version, chunker_version, raw_artifact_path
 
 1. `chunk_id` is unique across all chunks.
 2. `text` is non-empty after stripping.
-3. `parent_id` references an existing article node in the hierarchy.
-4. `citation` matches `r"^Luật .+, Điều \d+(, Khoản \d+(, Điểm [a-z])?)?$"`.
-5. `hierarchy_path.article` is non-empty.
+3. `parent_article_node_id` references an existing Article node.
+4. `text` equals source node text.
+5. `parent_text` equals parent Article node text.
 6. `text_hash` matches `sha256(text)`.
-7. `source_url` is a valid URL.
+7. `parent_text_hash` matches `sha256(parent_text)`.
+8. source offsets match hierarchy offsets and fit inside Article offsets.
 
 ### OOP and Code Quality Rules
 
@@ -269,7 +306,7 @@ Expected components:
 LegalChunker           → hierarchy-to-chunk conversion
 LegalChunkValidator    → chunk schema + invariant validation
 ChunkingService        → batch orchestration + report building
-ProcessedChunk         → Pydantic model for validated chunks (Phase 7)
+LegalChunk             → Pydantic model for validated chunks
 ```
 
 Rules:
@@ -284,6 +321,7 @@ Rules:
 - Article count in chunks matches hierarchy within tolerance.
 - Every chunk has law metadata, hierarchy metadata, source URL.
 - Parent-child relationship is deterministic (same input → same chunk IDs).
+- JSONL rerun is deterministic for `data/processed/legal_chunks.jsonl`.
 - Parser/chunker tests cover at least three law templates.
 - Edge cases include: titleless articles, articles without clauses, Vietnamese `đ`, Roman numerals.
 

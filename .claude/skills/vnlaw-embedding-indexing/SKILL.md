@@ -8,18 +8,22 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 Use this skill for embedding legal chunks and indexing them into Qdrant (Phase 8).
 
-**Prerequisites**: Phases 0-7 must be complete. Processed JSONL must validate.
+**Prerequisites**: Phases 0-6 are complete. Phase 7 processed JSONL validation
+/ embedding-readiness checks must pass before indexing starts. The current
+Phase 6 corpus is `data/processed/legal_chunks.jsonl` with 40,389 chunks,
+0 source-tail markers in `text`/`parent_text`, and 180 empty/repealed chunks
+flagged.
 
 ## Goal
 
 Convert validated legal chunks into searchable dense and sparse vector representations while preserving all legal metadata required for citation, filtering, and retrieval.
 
 ```text
-processed JSONL
-→ validate chunk schema
-→ embed child content (dense + sparse)
+data/processed/legal_chunks.jsonl
+→ validate LegalChunk schema
+→ embed chunk.text (dense + sparse)
 → upsert to Qdrant
-→ store metadata payload
+→ store legal metadata and parent_text payload
 → verify point count and filters
 ```
 
@@ -35,7 +39,7 @@ Requirements:
 - deterministic configuration;
 - metadata-preserving payload.
 
-Do not embed arbitrary raw HTML or unvalidated text.
+Do not embed arbitrary raw HTML, `parent_text`, or unvalidated text.
 
 ## Qdrant Collection
 
@@ -58,7 +62,8 @@ Every indexed point must preserve:
 chunk_id, law_id, law_name, law_type, legal_status
 article_number, article_title, clause_number, point_label
 hierarchy_path, citation
-text (child content only, NOT parent_text)
+text (child content only)
+parent_text (Article context payload, not the embedding input)
 source_url, source_domain, source_type
 effective_date, expiry_date, issued_date
 text_hash, metadata
@@ -70,7 +75,9 @@ Payloads must support filtering by:
 law_id, legal_status, effective_date, law_type
 ```
 
-Do NOT include `parent_text` in the vector payload (too large for storage).
+Do not embed `parent_text` as the primary vector text. If payload storage keeps
+`parent_text`, design long-context handling deliberately because Phase 6
+preserves full Article context.
 
 ## OOP and Docstring Rules
 
@@ -106,8 +113,8 @@ After indexing, verify:
 
 ## Do Not
 
-- Do not embed only `parent_content`.
-- Do not drop `parent_content` from the retrieval context.
+- Do not embed `parent_text` as the primary vector text.
+- Do not drop `parent_text` from the retrieval context.
 - Do not index chunks without hierarchy metadata.
 - Do not hardcode collection settings in multiple files.
 - Do not upsert invalid chunk records.

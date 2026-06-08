@@ -85,21 +85,33 @@ The project roadmap is:
 Current project state:
 
 ```text
-Phases 0-5 are complete.
+Phases 0-6 are complete.
 Phase 5 Legal Hierarchy Parsing is complete and hardened:
   52 hierarchy.json outputs
   0 parser failures
   0 validator failures
   0 RED/ORANGE audit cases
   0 source-tail leakage nodes
+Phase 6 Parent-child Chunking is complete and validated:
+  output: data/processed/legal_chunks.jsonl
+  report: artifacts/reports/chunking/chunking_report.json
+  34 laws successful
+  18 laws successful with warnings
+  0 failed laws
+  40,389 chunks
+  180 empty/repealed chunks flagged
+  0 source-tail markers in text
+  0 source-tail markers in parent_text
+  0 duplicate chunk IDs
+  0 bad JSONL lines
 
 Next phase:
-  Phase 6 — Parent-child Chunking over data/interim/{LAW_ID}/hierarchy.json
+  Phase 7 — Processed JSONL Validation / embedding-readiness checks
 ```
 
 Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker
 exists. Do not jump to embedding, indexing, retrieval, RAG, Advanced RAG,
-GraphRAG, API, or deployment before Phase 6 chunk quality is validated.
+GraphRAG, API, or deployment before the processed JSONL validation gate passes.
 
 ## 4. Expected Repository Layout
 
@@ -119,7 +131,7 @@ VnLaw-QA/
 ├── data/
 │   ├── raw/          # immutable raw legal evidence
 │   ├── interim/      # normalized and parsed intermediate artifacts
-│   ├── processed/    # future chunked/index-ready corpus artifacts
+│   ├── processed/    # validated legal chunk JSONL
 │   ├── indexes/
 │   └── eval/
 ├── artifacts/
@@ -267,6 +279,16 @@ Use parent-child chunking:
 - parent unit: Article,
 - embedding content: child content,
 - LLM context: parent article content.
+
+The validated Phase 6 corpus is a single JSONL file:
+
+```text
+data/processed/legal_chunks.jsonl
+```
+
+Future embedding/indexing should embed `text` only and keep `parent_text` as
+Article context payload for retrieval/generation. Some Article parent contexts
+are very long; do not split them with arbitrary character or token windows.
 
 Never split legal documents by arbitrary character count or token windows if that breaks legal clauses or points.
 

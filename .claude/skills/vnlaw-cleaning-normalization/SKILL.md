@@ -8,10 +8,10 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 Use this skill before legal parsing or chunking.
 
-Current status: Phase 4 Cleaning & Normalization and Phase 5 Legal Hierarchy
-Parsing are complete and hardened. Phase 6 Parent-child Chunking is next and
-not yet implemented. Do not expand cleaning work unless a chunking-blocking
-defect is proven.
+Current status: Phase 4 Cleaning & Normalization, Phase 5 Legal Hierarchy
+Parsing, and Phase 6 Parent-child Chunking are complete and hardened. Phase 7
+Processed JSONL Validation is next. Do not expand cleaning work unless a
+downstream-blocking defect is proven.
 
 ## Purpose
 

@@ -203,6 +203,14 @@ class LegalHeadingRecognizer:
         re.IGNORECASE,
     )
     _FOOTNOTE_SOURCE_NOTE_RE = re.compile(r"^\s*\[\d+\]", re.IGNORECASE)
+    _VBHN_CERTIFICATION_RE = re.compile(
+        r"^\s*XÁC\s+THỰC\s+VĂN\s+BẢN\s+HỢP\s+NHẤT\b",
+        re.IGNORECASE,
+    )
+    _SOURCE_LAW_PREAMBLE_TAIL_RE = re.compile(
+        r"^\s*(?:[^.?!]*\s+)?có\s+căn\s+cứ\s+ban\s+hành\s+như\s+sau\s*:?\s*$",
+        re.IGNORECASE,
+    )
     _APPENDIX_RE = re.compile(r"^\s*(PHỤ LỤC|Phụ lục)\b", re.IGNORECASE)
     _TABLE_RE = re.compile(r"^\s*STT\b", re.IGNORECASE)
     _DATE_LIKE_NUMBERED_RE = re.compile(
@@ -210,7 +218,7 @@ class LegalHeadingRecognizer:
         re.IGNORECASE,
     )
     _SIGNATURE_OR_FOOTER_RE = re.compile(
-        r"^\s*(Nơi nhận|CHỦ TỊCH|TM\.|KT\.|Văn bản liên quan)\b",
+        r"^\s*(Nơi nhận|CHỦ TỊCH|CHỦ NHIỆM|TM\.|KT\.|Văn bản liên quan)\b",
         re.IGNORECASE,
     )
 
@@ -248,6 +256,16 @@ class LegalHeadingRecognizer:
                 state.source_note_content_started = False
                 state.source_note_quote_open = False
                 state.source_note_tail_mode = self._is_footnote_source_note_intro(line.text)
+                state.active_clause_number = None
+                continue
+
+            if self._is_source_tail_boundary(line.text, state):
+                boundaries.append(self._build_boundary(line, RecognitionBoundaryKind.SOURCE_NOTE))
+                warnings.append(self._source_note_warning(line, law_id=law_id))
+                state.source_note_exclusion = True
+                state.source_note_content_started = False
+                state.source_note_quote_open = False
+                state.source_note_tail_mode = True
                 state.active_clause_number = None
                 continue
 
@@ -645,6 +663,19 @@ class LegalHeadingRecognizer:
     def _is_source_note_intro(self, line_text: str) -> bool:
         """Detect source-law note introductions that resemble legal headings."""
         return self._SOURCE_NOTE_RE.match(line_text) is not None
+
+    def _is_source_tail_boundary(
+        self,
+        line_text: str,
+        state: _RecognitionState,
+    ) -> bool:
+        """Detect trailing VBHN/source-law content after a main Article."""
+        if state.active_article_number is None:
+            return False
+        return (
+            self._VBHN_CERTIFICATION_RE.match(line_text) is not None
+            or self._SOURCE_LAW_PREAMBLE_TAIL_RE.match(line_text) is not None
+        )
 
     def _is_appendix_heading(self, line_text: str) -> bool:
         """Detect appendix headings that start non-hierarchy regions."""

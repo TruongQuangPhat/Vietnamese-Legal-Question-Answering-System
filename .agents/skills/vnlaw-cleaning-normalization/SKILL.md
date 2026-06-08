@@ -16,8 +16,9 @@ encoded TVPL footer/watermark artifacts, and report article references
 separately from real article headings.
 
 Use this skill for maintenance or regression fixes in cleaning. Phase 5 Legal
-Hierarchy Parsing is complete and hardened; Phase 6 Parent-child Chunking is
-next. Do not expand cleaning work unless a chunking-blocking defect is proven.
+Hierarchy Parsing and Phase 6 Parent-child Chunking are complete and hardened;
+Phase 7 Processed JSONL Validation is next. Do not expand cleaning work unless
+a downstream-blocking defect is proven.
 
 ## Purpose
 

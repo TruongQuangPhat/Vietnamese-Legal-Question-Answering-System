@@ -25,9 +25,10 @@ For the crawling/audit phase, focus only on reliable corpus acquisition, raw
 storage, and raw artifact validation. Parsing, chunking, JSONL validation,
 embedding, Qdrant, Neo4j, Advanced RAG, and GraphRAG belong to later gates.
 
-Phase 4 Cleaning & Normalization and Phase 5 Legal Hierarchy Parsing are
-complete and hardened. The current next engineering phase is Phase 6
-Parent-child Chunking over `data/interim/{LAW_ID}/hierarchy.json`.
+Phase 4 Cleaning & Normalization, Phase 5 Legal Hierarchy Parsing, and Phase 6
+Parent-child Chunking are complete and hardened. The current next engineering
+phase is Phase 7 Processed JSONL Validation over
+`data/processed/legal_chunks.jsonl`.
 
 ## Trusted Source
 

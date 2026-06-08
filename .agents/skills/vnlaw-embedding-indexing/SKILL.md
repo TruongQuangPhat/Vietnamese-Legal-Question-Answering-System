@@ -7,36 +7,40 @@ description: Use for embedding legal chunks, BGE-M3 dense/sparse representations
 
 Use this skill for embedding legal chunks and indexing them into Qdrant.
 
-This skill should be used only after processed JSONL chunks already validate against the `LegalChunkNode` schema.
-Current project status: this is a future phase. Do not create `src/retrieval/`,
-`configs/models.yml`, `configs/retrieval.yml`, or embedding/indexing code until
-Legal Hierarchy Parsing, Parent-child Chunking, and Processed JSONL validation
-have passed their gates.
+This skill should be used only after processed JSONL chunks already validate
+against the Phase 6 `LegalChunk` schema.
+
+Current project status: Phase 6 Parent-child Chunking is complete and validated
+with `data/processed/legal_chunks.jsonl` containing 40,389 chunks, 0 failed
+laws, 0 source-tail markers in `text`/`parent_text`, and 180 empty/repealed
+chunks flagged. Phase 7 Processed JSONL Validation / embedding-readiness checks
+is next. Do not create embedding/indexing code until the Phase 7 validation
+gate passes.
 
 ## Goal
 
 Convert validated legal chunks into searchable dense and sparse vector representations while preserving all legal metadata required for citation, filtering, and retrieval.
 
 ```text
-processed JSONL
-  → validate LegalChunkNode
-  → embed child content
+data/processed/legal_chunks.jsonl
+  → validate LegalChunk rows
+  → embed chunk.text
   → upsert dense/sparse vectors
-  → store metadata payload
+  → store legal metadata and parent_text payload
   → verify point count and filters
 ```
 
 ## Expected Future Files
 
 ```text
-src/ingestion/embedder.py
-src/retrieval/vector_store.py
+src/indexing/embedder.py
+src/indexing/vector_store.py
 src/core/config.py
 configs/models.yml
 configs/retrieval.yml
-data/processed/{law_id}.jsonl
-tests/unit/ingestion/test_embedder.py
-tests/unit/retrieval/test_vector_store.py
+data/processed/legal_chunks.jsonl
+tests/unit/indexing/test_embedder.py
+tests/unit/indexing/test_vector_store.py
 ```
 
 ## Embedding Strategy
@@ -52,7 +56,7 @@ Requirements:
 - metadata-preserving payload;
 - reproducible model config in `configs/models.yml`.
 
-Do not embed arbitrary raw HTML or unvalidated text.
+Do not embed arbitrary raw HTML, `parent_text`, or unvalidated text.
 
 ## Qdrant Collection
 
@@ -90,8 +94,8 @@ article_id
 clause_id
 point_id
 hierarchy_text
-content
-parent_content
+text
+parent_text
 cross_references
 source_url
 crawled_at
@@ -140,9 +144,9 @@ After indexing, verify:
 
 ## Do Not
 
-- Do not embed only `parent_content`.
-- Do not drop `parent_content` from payload.
+- Do not embed `parent_text` as the primary vector text.
+- Do not drop `parent_text` from retrieval/generation context payload.
 - Do not index chunks without hierarchy metadata.
 - Do not hardcode collection settings in multiple files.
-- Do not upsert invalid `LegalChunkNode` records.
+- Do not upsert invalid `LegalChunk` records.
 - Do not lose source traceability during indexing.

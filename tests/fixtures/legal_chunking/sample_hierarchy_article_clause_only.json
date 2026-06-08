@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "parser_version": "v0.1.0",
+  "cleaner_version": "v0.8.0",
+  "law_id": "TEST_LAW",
+  "source_file": "data/interim/TEST_LAW/normalized.json",
+  "root_node_id": "TEST_LAW__root",
+  "metadata": {
+    "law_name": "Luật Kiểm thử",
+    "source_url": "https://thuvienphapluat.vn/test.aspx",
+    "source_domain": "thuvienphapluat.vn",
+    "source_type": "html",
+    "raw_artifact_path": "data/raw/TEST_LAW/latest/main.html",
+    "article_heading_count": 1,
+    "max_heading_article_number": 1,
+    "has_heading_article_1": true,
+    "heading_sequence_score": 1.0
+  },
+  "warnings": [],
+  "nodes": [
+    {
+      "node_id": "TEST_LAW__root",
+      "level": "law",
+      "number": null,
+      "title": "Luật Kiểm thử",
+      "text": "Luật Kiểm thử\n",
+      "start_offset": 0,
+      "end_offset": 14,
+      "parent_id": null,
+      "children": ["TEST_LAW__root__article_1"],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_1",
+      "level": "article",
+      "number": "1",
+      "title": "Phạm vi điều chỉnh",
+      "text": "Điều 1. Phạm vi điều chỉnh\nKhoản 1. Nội dung điều chỉnh.\n",
+      "start_offset": 14,
+      "end_offset": 64,
+      "parent_id": "TEST_LAW__root",
+      "children": ["TEST_LAW__root__article_1__clause_1"],
+      "metadata": {}
+    },
+    {
+      "node_id": "TEST_LAW__root__article_1__clause_1",
+      "level": "clause",
+      "number": "1",
+      "title": null,
+      "text": "Khoản 1. Nội dung điều chỉnh.\n",
+      "start_offset": 38,
+      "end_offset": 64,
+      "parent_id": "TEST_LAW__root__article_1",
+      "children": [],
+      "metadata": {}
+    }
+  ]
+}
