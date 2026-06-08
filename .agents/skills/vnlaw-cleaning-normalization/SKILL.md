@@ -17,7 +17,7 @@ separately from real article headings.
 
 Use this skill for maintenance or regression fixes in cleaning. Phase 5 Legal
 Hierarchy Parsing and Phase 6 Parent-child Chunking are complete and hardened;
-Phase 7 Processed JSONL Validation is next. Do not expand cleaning work unless
+Phase 7 Processed Chunk Validation & Embedding Readiness is next. Do not expand cleaning work unless
 a downstream-blocking defect is proven.
 
 ## Purpose

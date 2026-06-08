@@ -47,7 +47,7 @@ The system provides legal research support, not professional legal representatio
 
 Implement in this order:
 
-### 0. Processed JSONL Validation
+### 0. Processed Chunk Validation & Embedding Readiness
 
 ```text
 validate data/processed/legal_chunks.jsonl

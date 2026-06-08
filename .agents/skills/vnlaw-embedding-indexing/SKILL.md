@@ -13,7 +13,7 @@ against the Phase 6 `LegalChunk` schema.
 Current project status: Phase 6 Parent-child Chunking is complete and validated
 with `data/processed/legal_chunks.jsonl` containing 40,389 chunks, 0 failed
 laws, 0 source-tail markers in `text`/`parent_text`, and 180 empty/repealed
-chunks flagged. Phase 7 Processed JSONL Validation / embedding-readiness checks
+chunks flagged. Phase 7 Processed Chunk Validation & Embedding Readiness checks
 is next. Do not create embedding/indexing code until the Phase 7 validation
 gate passes.
 

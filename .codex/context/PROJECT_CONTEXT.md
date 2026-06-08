@@ -37,7 +37,7 @@ The long-term goal is to build a reliable Legal RAG pipeline that can answer Vie
 The project pipeline is organized as:
 
 ```text
-Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning / Normalization → Legal Hierarchy Parsing → Parent-child Chunking → Processed JSONL Validation → Embedding / Indexing → Naive RAG → Advanced RAG → GraphRAG → Evaluation → API / Deployment → MLOps / Maintenance
+Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning / Normalization → Legal Hierarchy Parsing → Parent-child Chunking → Processed Chunk Validation & Embedding Readiness → Embedding / Indexing → Naive RAG → Advanced RAG → GraphRAG → Evaluation → API / Deployment → MLOps / Maintenance
 ```
 
 ## 2. Core Legal RAG Principles
@@ -90,7 +90,7 @@ Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning /
 - Phase 6 hardening result: 0 source-tail markers in chunk `text`, 0
   source-tail markers in `parent_text`, 180 empty/repealed chunks flagged, and
   max `parent_text` length reduced to 14,481 characters.
-- The next engineering phase is **Phase 7 — Processed JSONL Validation /
+- The next engineering phase is **Phase 7 — Processed Chunk Validation & Embedding Readiness /
   embedding-readiness checks** over `data/processed/legal_chunks.jsonl`.
 
 ## 4. Implemented Phases
@@ -206,7 +206,7 @@ Key requirements:
 Current next phase:
 
 ```text
-Phase 7 — Processed JSONL Validation / embedding-readiness checks
+Phase 7 — Processed Chunk Validation & Embedding Readiness / embedding-readiness checks
 ```
 
 ## 6. Next Immediate Tasks
@@ -217,7 +217,7 @@ Phase 7 — Processed JSONL Validation / embedding-readiness checks
 3. Do not claim RAG readiness until retrieval, generation, and evaluation gates
    are implemented and validated.
 
-## 7. Next Phase: Phase 7 Processed JSONL Validation
+## 7. Next Phase: Phase 7 Processed Chunk Validation & Embedding Readiness
 
 Phase 7 is the next engineering focus. It consumes
 `data/processed/legal_chunks.jsonl`.
@@ -435,7 +435,7 @@ Prefer **VBHN** consolidated documents when available. If no VBHN exists, crawl 
 
 ## 12. Next Phase Preparation
 
-Phase 7 — Processed JSONL Validation / embedding-readiness checks is the next
+Phase 7 — Processed Chunk Validation & Embedding Readiness / embedding-readiness checks is the next
 engineering focus.
 
 Key design constraints:

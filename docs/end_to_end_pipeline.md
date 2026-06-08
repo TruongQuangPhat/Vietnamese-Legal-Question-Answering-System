@@ -13,8 +13,7 @@ Unlike general chatbots, Legal QA requires:
 Current status: **Phase 6 Parent-child Chunking is complete and hardened**.
 The corpus has 52/52 raw artifacts, 52/52 normalized outputs, 52/52 hierarchy
 outputs, and `data/processed/legal_chunks.jsonl` with 40,389 validated chunks.
-The next engineering phase is **Phase 7 — Processed JSONL Validation /
-embedding-readiness checks**. Embedding, indexing, retrieval, and RAG have not
+The next engineering phase is **Phase 7 — Processed Chunk Validation & Embedding Readiness**. Embedding, indexing, retrieval, and RAG have not
 started.
 
 ## 2. Quick Start
@@ -36,7 +35,7 @@ Legal Hierarchy Parsing
   ↓
 Parent-child Chunking
   ↓
-Processed JSONL Validation
+Processed Chunk Validation & Embedding Readiness
   ↓
 Embedding & Indexing
   ↓
@@ -97,7 +96,7 @@ End-to-end pipeline:
            │
            ▼
 ┌─────────────────────────┐
-│  Processed JSONL Valid. │ → data/processed/*.jsonl
+│  Processed Chunk Valid. │ → data/processed/*.jsonl
 │  (citation integrity)   │
 └──────────┬──────────────┘
            │
@@ -362,7 +361,7 @@ chunks flagged, and 0 source-tail markers in `text`/`parent_text`.
 
 ---
 
-### Phase 7 — Processed JSONL Export & Validation
+### Phase 7 — Processed Chunk Validation & Embedding Readiness
 
 **Goal**: Export validated chunks to standard JSONL format, check schema, duplicates, and integrity before embedding.
 
@@ -715,7 +714,7 @@ Each phase must pass its gate before proceeding to the next.
 | Cleaning gate | All texts UTF-8, legal headings intact | Spot-check `Điều`, `Khoản`, `Điểm` readable | Input text quality affects parsing |
 | Parsing gate | Parser tests: >99% Article detection | Unit tests on sample documents | Parser is foundation for chunking and retrieval |
 | Chunking gate | Every chunk has valid `chunk_id` and `citation` | Validate all `chunks.jsonl` files | Citation integrity is mandatory for Legal QA |
-| Processed JSONL gate | 52 files, schema valid, zero duplicates | `pydantic` validation pass, duplicate check | Input stability for embedding |
+| Processed Chunk Validation gate | 52 files, schema valid, zero duplicates | `pydantic` validation pass, duplicate check | Input stability for embedding |
 | Indexing gate | Qdrant collection size matches chunks | Count vectors = total chunks | No data loss in embedding |
 | Naive RAG gate | 100% citations traceable, fallback works | Eval: no hallucinated citations | Legal QA requires source grounding |
 | Advanced RAG gate | Precision@k > Naive RAG baseline | Retrieval eval metrics improve | Actual quality improvement? |
@@ -860,7 +859,7 @@ NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH,
 MAX_ARTICLE_NUMBER_MISMATCH.
 ### Phase 6 — Parent-child Chunking — Complete and hardened
 
-### Phase 7 — Processed JSONL Export & Validation — Next
+### Phase 7 — Processed Chunk Validation & Embedding Readiness — Next
 
 ### Phase 8 — Embedding & Indexing — Future extension
 

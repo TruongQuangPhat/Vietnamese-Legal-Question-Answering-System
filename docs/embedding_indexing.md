@@ -29,7 +29,7 @@ uv run python scripts/build_embedding_index.py \
 
 ```
 ┌──────────────────────┐
-│  Processed JSONL     │
+│  Processed Chunk Validation     │
 │  legal_chunks.jsonl  │
 └──────────┬───────────┘
            │

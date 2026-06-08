@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 7 — Processed JSONL Validation / embedding-readiness checks
+Current phase: Phase 7 — Processed Chunk Validation & Embedding Readiness
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -23,7 +23,7 @@ Completed:
   Phase 6 — Parent-child Chunking
 
 Next:
-  Validate processed JSONL embedding-readiness
+  Validate processed JSONL for embedding readiness (validation gate only)
   Design embedding/indexing payloads
   Do not claim RAG-ready before retrieval/generation/evaluation pass
 ```
@@ -81,7 +81,7 @@ Phase 6 preserves Article parent context in `parent_text` and uses
 Article/Clause/Point hierarchy units instead of arbitrary token or character
 windows. Phase 6 hardening removed VBHN/source-tail leakage from chunk
 `text` and `parent_text`, and flags repealed placeholder chunks in metadata.
-Phase 7/8 should embed only `text`, not `parent_text`.
+Phase 7 validates embedding-readiness. Phase 8 embeds only `text`; `parent_text` is stored as retrieval/LLM context payload.
 
 ## Legal Accuracy Rules
 
@@ -662,7 +662,7 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/cleaning_normalization.md` | Cleaning pipeline and validation details |
 | `docs/legal_parsing.md` | Phase 5 parser design |
 | `docs/parent_child_chunking.md` | Implemented Phase 6 parent-child chunking design and command |
-| `docs/processed_jsonl.md` | Phase 7 processed JSONL validation / embedding-readiness notes |
+| `docs/processed_jsonl.md` | Phase 7 processed chunk validation & embedding-readiness notes |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries

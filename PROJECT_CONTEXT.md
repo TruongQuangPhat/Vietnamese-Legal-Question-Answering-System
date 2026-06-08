@@ -37,7 +37,7 @@ Corpus Registry
 → Cleaning / Normalization
 → Legal Hierarchy Parsing
 → Parent-child Chunking
-→ Processed JSONL Validation
+→ Processed Chunk Validation & Embedding Readiness
 → Embedding / Indexing
 → Naive RAG
 → Advanced RAG
@@ -90,8 +90,7 @@ Corpus Registry
   `artifacts/reports/chunking/full_corpus_validation_report.json`.
 - Do not arbitrarily split Article parent context in Phase 6. Phase 7/8 should
   embed only `text` and handle `parent_text` as Article context payload.
-- The next engineering phase is **Phase 7 — Processed JSONL Validation /
-  Embedding-readiness checks**, followed by embedding/indexing only after the
+**Phase 7 â Processed Chunk Validation & Embedding Readiness**, a validation gate over `data/processed/legal_chunks.jsonl` before embedding/indexing begins. Phase 7 does not implement embedding or indexing.
   processed chunk output remains validated.
 - Current branch: `feature/legal-parser-chunking`.
 
@@ -238,17 +237,18 @@ Implemented Phase 6 components:
 Current next phase:
 
 ```text
-Phase 7 — Processed JSONL Validation / embedding-readiness checks
+Phase 7 — Processed Chunk Validation & Embedding Readiness
 ```
 
-Phase 7 should validate `data/processed/legal_chunks.jsonl` as the stable
-input to embedding/indexing. Phase 8 embedding/indexing should embed only
+Phase 7 validates `data/processed/legal_chunks.jsonl` as the safe
+input to Phase 8 embedding/indexing. Phase 7 is a validation gate only;
+it does not implement embedding or indexing. Phase 8 should embed only
 `text`; keep `parent_text` as retrieval/LLM context payload.
 
 ## 6. Next Immediate Tasks
 
 1. Run any final documentation/context review for Phase 6 handoff.
-2. Define Phase 7 validation checks over `data/processed/legal_chunks.jsonl`.
+2. Define and implement Phase 7 validation checks over `data/processed/legal_chunks.jsonl`.
 3. Confirm embedding-readiness fields, payload strategy, and long parent-text
    handling before Phase 8 indexing.
 4. Do not claim RAG readiness until retrieval, generation, and evaluation gates
@@ -259,7 +259,7 @@ input to embedding/indexing. Phase 8 embedding/indexing should embed only
 | Phase | Name | Status |
 | --- | --- | --- |
 | 6 | Parent-child Chunking | **Complete / Validated** |
-| 7 | Processed JSONL Validation | **Next** |
+| 7 | Processed Chunk Validation & Embedding Readiness | **Next** |
 | 8 | Embedding & Indexing | Planned |
 | 9 | Naive RAG | Future |
 | 10 | Advanced RAG | Future |

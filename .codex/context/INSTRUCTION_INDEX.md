@@ -27,7 +27,7 @@ Codex should look first at `AGENTS.md`, then at the repo-scoped skills under
 - Current phase status: Phase 6 Parent-child Chunking is complete and
   hardened; `data/processed/legal_chunks.jsonl` has 40,389 chunks, 0 failed
   laws, 0 source-tail markers in `text`/`parent_text`, and 180
-  empty/repealed chunks flagged. Phase 7 Processed JSONL Validation /
+  empty/repealed chunks flagged. Phase 7 Processed Chunk Validation & Embedding Readiness /
   embedding-readiness checks is next.
 
 ## Source-to-Codex Mapping

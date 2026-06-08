@@ -22,7 +22,7 @@ Project setup
 → Cleaning & Normalization
 → Legal hierarchy parsing
 → Parent-child chunking
-→ Processed JSONL validation
+→ Processed Chunk Validation & Embedding Readiness
 → Embedding / indexing
 → Naive RAG
 → Advanced RAG
@@ -41,7 +41,7 @@ Phase 3: Raw corpus audit and validation    complete
 Phase 4: Cleaning & Normalization           complete / gate-ready
 Phase 5: Legal hierarchy parsing            complete and hardened
 Phase 6: Parent-child chunking              complete and hardened
-Phase 7: Processed JSONL validation         next
+Phase 7: Processed Chunk Validation & Embedding Readiness nextnext
 ```
 
 ## 2. Cross-Phase Principles
@@ -690,7 +690,7 @@ Hardening fixed VBHN/source-law tail leakage at the Phase 5 span boundary,
 then regenerated hierarchy and chunk outputs. Phase 6 did not start embedding,
 retrieval, RAG, Advanced RAG, or GraphRAG.
 
-## 11. Current Next Phase — Processed JSONL Validation
+## 11. Current Next Phase — Processed Chunk Validation & Embedding Readiness
 
 The next phase should validate:
 

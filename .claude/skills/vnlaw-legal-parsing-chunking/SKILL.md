@@ -16,7 +16,7 @@ hardened with 52/52 hierarchy outputs, 0 parser failures, 0 validator failures,
 Parent-child Chunking is complete and hardened with
 `data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
 0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
-and 180 empty/repealed chunks flagged. Phase 7 Processed JSONL Validation /
+and 180 empty/repealed chunks flagged. Phase 7 Processed Chunk Validation & Embedding Readiness /
 embedding-readiness checks is next.
 
 ## Phase 5 — Legal Hierarchy Parsing

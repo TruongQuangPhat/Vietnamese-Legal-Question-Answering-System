@@ -9,7 +9,7 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 Use this skill to enforce repository organization and module boundaries.
 
 Current status: Phases 0-6 are complete and hardened. Phase 6 Parent-child
-Chunking produced `data/processed/legal_chunks.jsonl`; Phase 7 Processed JSONL
+Chunking produced `data/processed/legal_chunks.jsonl`; Phase 7 Processed Chunk Validation & Embedding Readiness
 Validation is next. Phase 8+ files listed below are placement guidance unless
 they already exist in the repository.
 

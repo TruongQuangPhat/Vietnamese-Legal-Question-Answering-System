@@ -101,7 +101,7 @@ Phase 6 Parent-child Chunking is complete and validated:
   0 bad JSONL lines
 
 Next phase:
-  Phase 7 — Processed JSONL Validation / embedding-readiness checks
+  Phase 7 — Processed Chunk Validation & Embedding Readiness
 ```
 
 Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker

@@ -24,7 +24,7 @@ configs/laws/corpus_registry.yml
 
 For Phase 1-4, focus only on reliable corpus acquisition, raw storage,
 cleaning, and normalization. Phases 1-6 are complete and hardened; Phase 7
-Processed JSONL Validation is next and consumes
+Processed Chunk Validation & Embedding Readiness is next and consumes
 `data/processed/legal_chunks.jsonl`.
 
 Do not rerun crawling or cleaning unless explicitly requested. Do not jump into

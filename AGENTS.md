@@ -59,7 +59,7 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
   lines, 0 source-tail markers in `text`, 0 source-tail markers in
   `parent_text`, and 180 empty/repealed chunks flagged.
 - Embedding/RAG/Advanced RAG/GraphRAG has not started.
-- The next phase is Phase 7 Processed JSONL Validation / embedding-readiness
+- The next phase is Phase 7 Processed Chunk Validation & Embedding Readiness
   checks over `data/processed/legal_chunks.jsonl`.
 - Do not jump ahead to embedding, RAG, Advanced RAG, or GraphRAG before the
   processed JSONL validation gate passes.
@@ -182,6 +182,7 @@ After editing:
 - `data/reports/` is a historical/protected path only; active reports belong under
   `artifacts/reports/{phase}/`.
 - Do not run full crawl, audit, or cleaning commands unless explicitly requested.
-- Do not proceed to embedding/RAG before the processed JSONL validation gate is solid.
+- Do not proceed to embedding/RAG before the processed chunk validation
+gate is solid.
 - Do not delete `.claude/`, `.claude/skills/`, Claude settings files,
   `CLAUDE.md`, or `PROJECT_CONTEXT.md`.

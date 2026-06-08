@@ -1,17 +1,18 @@
-# Processed JSONL Validation
+# Phase 7 — Processed Chunk Validation & Embedding Readiness
 
 ## Overview
 
-Phase 7 validates the Phase 6 corpus-level JSONL output before embedding and
-indexing. Phase 6 already writes the processed chunk file:
+Phase 7 validates the Phase 6 corpus-level JSONL output as a safe input for
+Phase 8 embedding/indexing. Phase 6 already writes the processed chunk file:
 
 ```text
 data/processed/legal_chunks.jsonl
 ```
 
-Phase 7 should treat that file as the canonical chunk corpus and verify that it
-is safe for embedding/indexing. It should not recrawl, reclean, reparse, or
+Phase 7 treats that file as the canonical chunk corpus and verifies that it
+is safe for embedding/indexing. It does not recrawl, reclean, reparse, or
 rechunk legal text unless a proven upstream blocker is separately approved.
+Phase 7 does not implement embedding or indexing — it is a validation gate.
 
 ## Current Input
 
@@ -26,36 +27,42 @@ artifacts/reports/chunking/full_corpus_validation_report.json
 Phase 6 validation result:
 
 ```text
-Laws:                    52
-Chunks:                  40,389
-Success with warnings:   18
-Failed laws:             0
-Empty/repealed chunks:   180
-Source-tail markers:     0 in text, 0 in parent_text
-Max parent_text length:  14,481 chars
-Bad JSONL lines:         0
-Duplicate chunk_id:      0
-Selection-rule issues:   0
-Chunk invariant issues:  0
+Laws: 52
+Chunks: 40,389
+Success with warnings: 18
+Failed laws: 0
+Empty/repealed chunks: 180
+Source-tail markers: 0 in text, 0 in parent_text
+Max parent_text length: 14,481 chars
+Bad JSONL lines: 0
+Duplicate chunk_id: 0
+Selection-rule issues: 0
+Chunk invariant issues: 0
+```
+
+Chunk breakdown:
+
+```text
+Article chunks:    1,322
+Clause chunks:    20,643
+Point chunks:     18,424
+Total:            40,389
 ```
 
 ## Validation Goals
 
-Phase 7 should confirm:
+Phase 7 confirms the following across the full corpus:
 
-- every JSONL line parses;
-- every row validates as `LegalChunk`;
-- all required fields are present;
-- `chunk_id` is globally unique;
-- report counts match JSONL counts;
-- `text_hash` and `parent_text_hash` are correct;
-- citations are non-empty and Vietnamese;
-- `source_node_id` and `parent_article_node_id` remain traceable;
-- `text` is the intended embedding content;
-- `parent_text` is retained as Article context;
-- long Article parent contexts are measured and classified for downstream
-  context packing;
-- no raw HTML, source-note tail, or generated legal content is introduced.
+1. Every JSONL line parses as valid JSON.
+2. Every row validates as a `LegalChunk` Pydantic model.
+3. All required fields are present and non-empty.
+4. `chunk_id` is globally unique across the corpus.
+5. Report counts reconcile with JSONL row counts.
+6. `text_hash` and `parent_text_hash` match SHA-256 of the respective fields.
+7. Citations are structurally consistent by chunk level.
+8. `source_node_id` and `parent_article_node_id` remain traceable to hierarchy.
+9. `text` is the intended embedding content; `parent_text` is retained as Article context.
+10. No hard-fail contamination markers are present in `text` or `parent_text`.
 
 ## Expected Phase 7 Output
 
@@ -74,6 +81,7 @@ finished_at
 duration_seconds
 input_path
 chunking_report_path
+hierarchy_dir
 total_lines
 valid_chunks
 invalid_chunks
@@ -83,7 +91,10 @@ chunks_by_law
 required_field_failures
 hash_mismatches
 citation_failures
+contamination_failures
+contamination_warnings
 long_parent_text_summary
+repealed_metadata_summary
 warnings
 errors
 ```
@@ -91,53 +102,187 @@ errors
 Phase 7 may also write diagnostic artifacts under:
 
 ```text
-artifacts/runs/phase7_processed_jsonl_validation/
+artifacts/runs/phase7_processed_chunk_validation/
 ```
 
-## Embedding-readiness Rules
+## Embedding-Readiness Contract
 
-Phase 8 embedding/indexing should use:
+Phase 8 embedding/indexing must use:
 
 ```text
-embedding input: text
-retrieval payload/context: parent_text
+embedding input:  chunk.text
+retrieval payload: chunk.parent_text
 ```
 
-Do not embed `parent_text` as the primary vector text. `parent_text` can be very
-long and is meant for downstream LLM context once a child chunk has been
-retrieved.
+- Embed only `chunk.text`. Do not embed `parent_text` as the primary vector text.
+- `parent_text` can be very long (max 14,481 chars in current corpus) and is
+  meant for downstream LLM context once a child chunk has been retrieved.
+- Do not apply generic text splitters or LangChain splitters to
+  `legal_chunks.jsonl`. If LangChain is used later, wrap each JSONL row as a
+  Document; do not split it again.
 
-The current Phase 6 hardening audit has:
+## Payload-Readiness Contract
+
+Phase 8 vector index payload should carry at minimum:
 
 ```text
-source-tail markers in text:        0
-source-tail markers in parent_text: 0
-max parent_text:                    14,481 chars
-parent_text > 20,000 chars:         0 chunks
+chunk_id
+law_id
+law_name
+level
+article_number
+clause_number (nullable)
+point_label (nullable)
+citation
+hierarchy_path
+source_node_id
+parent_article_node_id
+parent_chunk_id
+text_hash
+parent_text_hash
+metadata.is_empty_or_repealed
+metadata.is_source_unit_repealed
+metadata.source_warnings
+metadata.caveat_references
 ```
 
-Phase 6 preserves whole Article context. Phase 7/8 should design payload
-storage and context packing deliberately instead of splitting legal text
-arbitrarily.
+Preserve `metadata.is_empty_or_repealed` and `metadata.is_source_unit_repealed`
+through indexing so retrieval can filter or annotate repealed content.
+
+## Citation Validation Rules
+
+Phase 7 validates **structural citation consistency by level**, not a fixed
+law-name/year ordering pattern. The existing Phase 6 citation format is
+law-name-first and may vary for VBHN/consolidated texts.
+
+Validation rules:
+
+- **Article chunks** (`level == "article"`): citation must contain
+  `Điều {article_number}`.
+- **Clause chunks** (`level == "clause"`): citation must contain
+  `Khoản {clause_number}` and `Điều {article_number}`.
+- **Point chunks** (`level == "point"`): citation must contain
+  `Điểm {point_label}`, `Khoản {clause_number}`, and `Điều {article_number}`.
+
+Do not require a fixed law-name/year ordering. Do not fail citations that use
+VBHN/consolidated naming conventions.
+
+## Contamination Marker Policy
+
+Split contamination markers into two severity classes:
+
+### Hard-fail markers (validation fails if found in `text` or `parent_text`)
+
+- `XÁC THỰC VĂN BẢN HỢP NHẤT`
+- `Nơi nhận:`
+- `Lưu:`
+- `Văn bản này được hợp nhất`
+
+### Warning-only markers (emitted as warnings, do not fail validation)
+
+- `BỘ TRƯỞNG`
+- `CHỦ NHIỆM`
+- `CHỦ TỊCH QUỐC HỘI`
+- `TM. QUỐC HỘI`
+- `KT. BỘ TRƯỞNG`
+
+Warning-only markers must not fail validation automatically because they may
+appear in valid legal content (e.g., signature blocks in law texts).
+
+## Long `parent_text` Policy
+
+Phase 6 preserves whole Article context in `parent_text`. Phase 7 measures
+and classifies `parent_text` length for downstream context packing:
+
+- **Short** (`parent_text` <= 4,000 chars): no special handling needed.
+- **Medium** (4,001–10,000 chars): standard LLM context window.
+- **Long** (10,001–20,000 chars): may require truncation or summarization at
+  retrieval time depending on the LLM context window.
+- **Very long** (> 20,000 chars): flag for manual review; current corpus has
+  0 such chunks.
+
+Do not split `parent_text` arbitrarily. Context packing decisions belong to
+Phase 9–10 retrieval/generation, not Phase 7.
+
+## Repealed/Empty Metadata Policy
+
+Phase 6 flags chunks with:
+
+- `metadata.is_empty_or_repealed`: the source Article is empty, repealed, or a
+  placeholder.
+- `metadata.is_source_unit_repealed`: the selected source unit (Article, Clause,
+  or Point) itself contains a repealed placeholder.
+
+Phase 7 must:
+
+- Count and report the distribution of these flags.
+- Verify that all 180 empty/repealed chunks from Phase 6 are accounted for.
+- Ensure these flags are preserved in the validation report for Phase 8
+  filtering decisions.
 
 ## Non-goals
 
 Phase 7 should not implement:
 
-- embedding;
-- Qdrant collections;
+- embedding or vector generation;
+- Qdrant collection setup or indexing;
 - BM25 or sparse retrieval;
 - reranking;
-- Naive RAG;
-- Advanced RAG;
-- GraphRAG;
-- API/backend;
-- LLM generation.
+- Naive RAG, Advanced RAG, or GraphRAG;
+- API endpoints or backend services;
+- LLM generation or prompt engineering;
+- legal text splitting or chunking.
 
-## Useful Commands
+## Proposed Files
 
-Run the official Phase 6 chunking command before validating if outputs need to
-be regenerated:
+Files to be created during Phase 7 implementation:
+
+- `src/processing/processed_jsonl_validation_models.py` — Pydantic models for
+  Phase 7 validation report and issue codes.
+- `src/processing/processed_jsonl_validator.py` — Core validator: reads JSONL,
+  validates each chunk, checks hashes, citations, contamination, uniqueness.
+- `src/services/processed_jsonl_validation_service.py` — Orchestration service:
+  runs validator, reconciles with Phase 6 report, writes validation report.
+- `scripts/validate_processed_jsonl.py` — CLI entrypoint.
+- `tests/unit/processing/test_processed_jsonl_validator.py` — Unit tests.
+- `tests/unit/services/test_processed_jsonl_validation_service.py` — Service tests.
+- `configs/processing/processed_jsonl_validation.yml` — Config: thresholds,
+  paths, long-text limits, contamination markers.
+- `docs/processed_jsonl.md` — This document.
+
+## Implementation Slices
+
+1. **Validation models/config** — Define `ProcessedJsonlValidationReport`,
+   `ValidationIssueCode`, and config schema.
+2. **Core JSONL validator** — Stream-parse JSONL, validate each row as
+   `LegalChunk`, check required fields, uniqueness, hashes, offsets.
+3. **Citation and contamination checks** — Structural citation validation by
+   level; hard-fail and warning-only contamination marker detection.
+4. **Report reconciliation** — Cross-check counts, level distribution, and
+   law distribution against `chunking_report.json`.
+5. **Embedding-readiness checks** — Verify `text`/`parent_text` contract,
+   measure `parent_text` length distribution, flag very-long contexts.
+6. **Service and report writer** — Orchestrate all checks, write
+   `processed_jsonl_validation_report.json`.
+7. **CLI** — argparse entrypoint with `--verbose`, `--no-color`, configurable
+   paths.
+8. **Full corpus validation run** — Execute against 40,389 chunks, review
+   report, update docs.
+
+## Execution Progress
+
+- [ ] Step 1 - Documentation/context update
+- [ ] Step 2 - Validation models/config
+- [ ] Step 3 - Core JSONL validator
+- [ ] Step 4 - Report reconciliation and embedding-readiness checks
+- [ ] Step 5 - Service and report writer
+- [ ] Step 6 - CLI
+- [ ] Step 7 - Full corpus validation run
+- [ ] Step 8 - Docs/context final update
+
+## Commands
+
+Run Phase 6 chunking first if outputs need to be regenerated:
 
 ```bash
 uv run python scripts/chunk_legal_corpus.py \
@@ -149,8 +294,63 @@ uv run python scripts/chunk_legal_corpus.py \
   --no-color
 ```
 
+Run Phase 7 validation:
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --chunking-report artifacts/reports/chunking/chunking_report.json \
+  --hierarchy-dir data/interim \
+  --report artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --verbose \
+  --no-color
+```
+
 Basic quantity check:
 
 ```bash
 uv run python -c "import json; from pathlib import Path; p=Path('data/processed/legal_chunks.jsonl'); print(sum(1 for _ in p.open(encoding='utf-8')))"
 ```
+
+## Acceptance Criteria
+
+Phase 7 passes when:
+
+- `processed_jsonl_validation_report.json` exists and is valid JSON.
+- `invalid_chunks == 0`.
+- `duplicate_chunk_ids == 0`.
+- `hash_mismatches == 0`.
+- `required_field_failures == 0`.
+- `contamination_failures == 0` (warnings are acceptable).
+- `chunks_by_level` totals reconcile with Phase 6 `chunking_report.json`.
+- `chunks_by_law` totals reconcile with Phase 6 `chunking_report.json`.
+- `repealed_metadata_summary` accounts for all 180 empty/repealed chunks.
+- `long_parent_text_summary` shows 0 chunks exceeding 20,000 chars.
+- All 52 laws are represented in `chunks_by_law`.
+
+## Reviewer Checklist
+
+- [ ] All 40,389 JSONL rows parse and validate as `LegalChunk`.
+- [ ] No duplicate `chunk_id` values.
+- [ ] All `text_hash` values match SHA-256 of `text`.
+- [ ] All `parent_text_hash` values match SHA-256 of `parent_text`.
+- [ ] Citation structural checks pass for all levels.
+- [ ] No hard-fail contamination markers in any `text` or `parent_text`.
+- [ ] Warning-only contamination markers are logged but do not cause failures.
+- [ ] `chunks_by_level` and `chunks_by_law` match Phase 6 report.
+- [ ] `parent_text` length distribution is documented.
+- [ ] Repealed/empty metadata flags are preserved and counted.
+- [ ] Report schema is documented and versioned.
+- [ ] No Phase 7 code implements embedding, indexing, retrieval, or generation.
+
+## Phase 8 Handoff Notes
+
+After Phase 7 passes:
+
+- Phase 8 should embed only `chunk.text`.
+- Phase 8 should store `chunk.parent_text` as the retrieval/LLM context payload.
+- Phase 8 should preserve `metadata.is_empty_or_repealed` and
+  `metadata.is_source_unit_repealed` in the vector index payload for filtering.
+- Phase 8 should not apply generic text splitters to `legal_chunks.jsonl`.
+- Phase 8 should design context packing for long `parent_text` deliberately,
+  using the `long_parent_text_summary` from the Phase 7 report.
