@@ -1,0 +1,29 @@
+schema_version: "1.0"
+validator_version: "v0.1.0"
+input_path: "data/processed/legal_chunks.jsonl"
+chunking_report_path: "artifacts/reports/chunking/chunking_report.json"
+hierarchy_dir: "data/interim"
+report_path: "artifacts/reports/chunking/processed_jsonl_validation_report.json"
+require_hierarchy_traceability: true
+max_sample_failures: 50
+max_sample_warnings: 50
+parent_text_short_chars: 4000
+parent_text_medium_chars: 10000
+parent_text_long_chars: 15000
+parent_text_very_long_chars: 20000
+hard_contamination_markers:
+  - "XÁC THỰC VĂN BẢN HỢP NHẤT"
+  - "Nơi nhận:"
+  - "Lưu:"
+  - "Văn bản này được hợp nhất"
+warning_contamination_markers:
+  - "BỘ TRƯỞNG"
+  - "CHỦ NHIỆM"
+  - "CHỦ TỊCH QUỐC HỘI"
+  - "TM. QUỐC HỘI"
+  - "KT. BỘ TRƯỞNG"
+repealed_placeholder_patterns:
+  - "(được bãi bỏ)"
+  - "Điều này được bãi bỏ"
+  - "Khoản này được bãi bỏ"
+  - "Điểm này được bãi bỏ"
