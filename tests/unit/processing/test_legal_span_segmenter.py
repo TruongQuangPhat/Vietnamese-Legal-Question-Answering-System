@@ -227,6 +227,28 @@ def test_trailing_source_note_ends_final_legal_unit_span() -> None:
     assert "Nội dung ghi chú nguồn" not in article.text
 
 
+def test_vbhn_certification_boundary_ends_final_article_span() -> None:
+    """VBHN certification and amendment-law tail stay outside final Article."""
+    text = "\n".join(
+        [
+            "Điều 1. Hiệu lực thi hành",
+            "Nội dung Điều 1.",
+            "XÁC THỰC VĂN BẢN HỢP NHẤT",
+            "CHỦ NHIỆM",
+            "Luật sửa đổi, bổ sung một số điều của Luật Kiểm thử có căn cứ ban hành như sau:",
+            "Điều 1. Nội dung trong luật sửa đổi",
+            "1. Nội dung nguồn.",
+        ]
+    )
+    units = _segment_text(text)
+    article = _unit_with_heading(units, "Điều 1. Hiệu lực thi hành")
+
+    assert article.end_offset == text.index("XÁC THỰC")
+    assert "XÁC THỰC VĂN BẢN HỢP NHẤT" not in article.text
+    assert "có căn cứ ban hành như sau" not in article.text
+    assert "Nội dung trong luật sửa đổi" not in article.text
+
+
 def test_source_note_followed_by_valid_article_keeps_later_article() -> None:
     """Source-note exclusion does not remove a later validated Article."""
     text = _read_fixture("source_note_boundaries.txt")

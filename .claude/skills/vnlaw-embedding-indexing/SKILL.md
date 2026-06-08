@@ -10,7 +10,9 @@ Use this skill for embedding legal chunks and indexing them into Qdrant (Phase 8
 
 **Prerequisites**: Phases 0-6 are complete. Phase 7 processed JSONL validation
 / embedding-readiness checks must pass before indexing starts. The current
-Phase 6 corpus is `data/processed/legal_chunks.jsonl` with 40,389 chunks.
+Phase 6 corpus is `data/processed/legal_chunks.jsonl` with 40,389 chunks,
+0 source-tail markers in `text`/`parent_text`, and 180 empty/repealed chunks
+flagged.
 
 ## Goal
 

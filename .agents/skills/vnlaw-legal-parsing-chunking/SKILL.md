@@ -10,10 +10,11 @@ Use this skill for Vietnamese legal hierarchy extraction and parent-child chunk 
 This skill should run after cleaning/normalization and before embedding/indexing.
 Current project status: Phase 5 Legal Hierarchy Parsing is complete and
 hardened. Phase 6 Parent-child Chunking is complete and validated with
-`data/processed/legal_chunks.jsonl`, 52/52 successful laws, 0 failed laws, and
-40,389 chunks. Do not start embedding, indexing, retrieval, RAG, Advanced RAG,
-or GraphRAG until the Phase 7 processed JSONL validation / embedding-readiness
-gate passes.
+`data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
+0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
+and 180 empty/repealed chunks flagged. Do not start embedding, indexing,
+retrieval, RAG, Advanced RAG, or GraphRAG until the Phase 7 processed JSONL
+validation / embedding-readiness gate passes.
 
 ## Goal
 
@@ -74,12 +75,16 @@ artifacts/reports/chunking/full_corpus_validation_report.json
 Validated result:
 
 ```text
-52/52 laws successful
+34 laws successful
+18 laws successful with warnings
 0 failed laws
 40,389 chunks
 1,322 article chunks
 20,643 clause chunks
 18,424 point chunks
+180 empty/repealed chunks flagged
+0 source-tail markers in text
+0 source-tail markers in parent_text
 0 duplicate chunk IDs
 0 bad JSONL lines
 0 selection-rule issues

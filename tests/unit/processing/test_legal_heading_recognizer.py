@@ -180,6 +180,28 @@ def test_source_note_tail_suppresses_all_hierarchy_levels() -> None:
     assert result.warnings[0].code == ParsingIssueCode.SOURCE_NOTE_EXCLUDED
 
 
+def test_vbhn_certification_tail_suppresses_source_law_headings() -> None:
+    """VBHN certification blocks trailing amendment-law content from hierarchy."""
+    text = "\n".join(
+        [
+            "Điều 1. Main Article",
+            "Main body.",
+            "XÁC THỰC VĂN BẢN HỢP NHẤT",
+            "CHỦ NHIỆM",
+            "Luật sửa đổi, bổ sung một số điều của Luật Kiểm thử có căn cứ ban hành như sau:",
+            "Điều 1. Source-law Article",
+            "1. Source-law clause",
+            "a) Source-law point",
+        ]
+    )
+
+    result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
+
+    assert [heading.heading_text for heading in result.headings] == ["Điều 1. Main Article"]
+    assert result.warnings[0].code == ParsingIssueCode.SOURCE_NOTE_EXCLUDED
+    assert result.warnings[0].start_offset == text.index("XÁC THỰC")
+
+
 def test_bracketed_footnote_source_note_tail_suppresses_all_hierarchy_levels() -> None:
     """Footnote-source tails such as `[48] Điều ... quy định...` are excluded."""
     text = "\n".join(

@@ -40,7 +40,8 @@ Phase 2: Registry-driven crawling           complete
 Phase 3: Raw corpus audit and validation    complete
 Phase 4: Cleaning & Normalization           complete / gate-ready
 Phase 5: Legal hierarchy parsing            complete and hardened
-Phase 6: Parent-child chunking              next
+Phase 6: Parent-child chunking              complete and hardened
+Phase 7: Processed JSONL validation         next
 ```
 
 ## 2. Cross-Phase Principles
@@ -647,18 +648,59 @@ These warnings are preserved in the parsing report for Phase 6 chunk
 validation. Note: AMBIGUOUS_CLAUSE_CANDIDATE and POINT_LIKE_LINE_OUTSIDE_CLAUSE
 have zero occurrences in the full 52-law corpus.
 
-## 10. Current Next Phase — Parent-child Chunking
+## 10. Phase 6 — Parent-child Chunking
 
-The next phase should consume:
+Phase 6 is complete and hardened. It consumes:
 
 ```text
 data/interim/{LAW_ID}/hierarchy.json
 ```
 
-It should produce validated processed chunks without starting embedding,
+and produces:
+
+```text
+data/processed/legal_chunks.jsonl
+artifacts/reports/chunking/chunking_report.json
+artifacts/reports/chunking/full_corpus_validation_report.json
+artifacts/reports/chunking/priority_audit.json
+```
+
+Final Phase 6 result:
+
+```text
+Total laws:                           52
+Success:                              34
+Success with warnings:                18
+Failed:                               0
+Total chunks:                         40,389
+Article chunks:                       1,322
+Clause chunks:                        20,643
+Point chunks:                         18,424
+Chunks with is_empty_or_repealed:     180
+Source-tail markers in text:          0
+Source-tail markers in parent_text:   0
+Max text length:                      3,430 chars
+Max parent_text length:               14,481 chars
+Long parent_text chunks >20,000 chars: 0
+Duplicate chunk IDs:                  0
+Chunk invariant issues:               0
+```
+
+Hardening fixed VBHN/source-law tail leakage at the Phase 5 span boundary,
+then regenerated hierarchy and chunk outputs. Phase 6 did not start embedding,
 retrieval, RAG, Advanced RAG, or GraphRAG.
 
-## 11. Commands Reference
+## 11. Current Next Phase — Processed JSONL Validation
+
+The next phase should validate:
+
+```text
+data/processed/legal_chunks.jsonl
+```
+
+It should confirm embedding-readiness without starting embedding/indexing yet.
+
+## 12. Commands Reference
 
 Official commands used through the completed phases:
 
@@ -669,6 +711,7 @@ uv run python scripts/clean_raw_corpus.py --help
 uv run python scripts/audit_cleaning_quality.py --help
 uv run pytest tests/unit/ingestion -q
 uv run python scripts/parse_legal_hierarchy.py --help
+uv run python scripts/chunk_legal_corpus.py --help
 ```
 
 Completed full validation commands:
@@ -688,7 +731,19 @@ uv run python scripts/audit_cleaning_quality.py \
   --registry configs/laws/corpus_registry.yml
 ```
 
-## 11. Related Documentation
+Phase 6 command:
+
+```bash
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output data/processed/legal_chunks.jsonl \
+  --report artifacts/reports/chunking/chunking_report.json \
+  --overwrite \
+  --verbose \
+  --no-color
+```
+
+## 13. Related Documentation
 
 | Document | Role |
 |---|---|
@@ -698,11 +753,11 @@ uv run python scripts/audit_cleaning_quality.py \
 | `docs/raw_corpus_audit.md` | Raw artifact audit gate |
 | `docs/cleaning_normalization.md` | Cleaning and normalization details |
 | `docs/legal_parsing.md` | Planned/current legal hierarchy parser design |
-| `docs/parent_child_chunking.md` | Future chunking design |
-| `docs/processed_jsonl.md` | Future processed artifact schema |
+| `docs/parent_child_chunking.md` | Implemented Phase 6 chunking design and validation |
+| `docs/processed_jsonl.md` | Phase 7 processed JSONL validation plan |
 | `docs/evaluation.md` | Future evaluation strategy |
 
-## 12. Maintenance Notes
+## 14. Maintenance Notes
 
 - Keep this journal factual. Do not document planned behavior as implemented.
 - When a phase passes, record the validation command and gate evidence.

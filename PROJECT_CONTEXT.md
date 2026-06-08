@@ -78,15 +78,18 @@ Corpus Registry
 - **Phase 6 — Parent-child Chunking is complete and validated.**
 - Output JSONL: `data/processed/legal_chunks.jsonl`.
 - Chunking report: `artifacts/reports/chunking/chunking_report.json`.
-- Full-corpus result: 52/52 laws successful, 0 failures, 40,389 chunks.
+- Full-corpus result: 34 successes, 18 successes with warnings, 0 failures,
+  40,389 chunks.
 - Chunk breakdown: 1,322 article chunks, 20,643 clause chunks, 18,424 point chunks.
 - Full-corpus validation: 0 bad JSON lines, 0 duplicate `chunk_id`, 0
   selection-rule issues, 0 chunk invariant issues.
+- Phase 6 hardening result: 0 source-tail markers in chunk `text`, 0
+  source-tail markers in `parent_text`, 180 empty/repealed chunks flagged, and
+  max `parent_text` length reduced to 14,481 characters.
 - Full validation audit:
   `artifacts/reports/chunking/full_corpus_validation_report.json`.
-- Long Article parent contexts remain a Phase 7/8 design caveat: 570 chunks
-  have `parent_text` longer than 8,000 characters; max parent text is 58,955
-  characters. Do not arbitrarily split them in Phase 6.
+- Do not arbitrarily split Article parent context in Phase 6. Phase 7/8 should
+  embed only `text` and handle `parent_text` as Article context payload.
 - The next engineering phase is **Phase 7 — Processed JSONL Validation /
   Embedding-readiness checks**, followed by embedding/indexing only after the
   processed chunk output remains validated.
@@ -240,8 +243,7 @@ Phase 7 — Processed JSONL Validation / embedding-readiness checks
 
 Phase 7 should validate `data/processed/legal_chunks.jsonl` as the stable
 input to embedding/indexing. Phase 8 embedding/indexing should embed only
-`text`; keep `parent_text` as retrieval/LLM context payload and handle very
-long Article parent contexts deliberately.
+`text`; keep `parent_text` as retrieval/LLM context payload.
 
 ## 6. Next Immediate Tasks
 

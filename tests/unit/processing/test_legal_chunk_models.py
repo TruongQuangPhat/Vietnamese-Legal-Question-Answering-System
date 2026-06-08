@@ -181,12 +181,14 @@ class TestChunkingMetadata:
     def test_default_metadata(self) -> None:
         meta = ChunkingMetadata()
         assert meta.is_empty_or_repealed is False
+        assert meta.is_source_unit_repealed is False
         assert meta.source_warnings == []
         assert meta.caveat_references == []
 
     def test_empty_article_flag(self) -> None:
-        meta = ChunkingMetadata(is_empty_or_repealed=True)
+        meta = ChunkingMetadata(is_empty_or_repealed=True, is_source_unit_repealed=True)
         assert meta.is_empty_or_repealed is True
+        assert meta.is_source_unit_repealed is True
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError):
@@ -212,6 +214,7 @@ class TestLegalChunkModel:
         assert dumped["citation"] == "Luật Kiểm thử, Khoản 1, Điều 1"
         assert dumped["metadata"] == {
             "is_empty_or_repealed": False,
+            "is_source_unit_repealed": False,
             "source_warnings": [],
             "caveat_references": [],
         }

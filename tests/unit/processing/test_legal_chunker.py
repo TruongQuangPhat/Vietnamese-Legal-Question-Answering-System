@@ -264,6 +264,50 @@ def test_empty_article_produces_flagged_article_level_chunk() -> None:
     assert chunk.warnings[0].code == "EMPTY_ARTICLE_CHUNK"
 
 
+def test_repealed_article_text_sets_empty_or_repealed_metadata() -> None:
+    """Article placeholder text is flagged even without a parser warning."""
+    document = _load_document("sample_hierarchy_article_only.json")
+    nodes = [node.model_copy(deep=True) for node in document.nodes]
+    nodes[1].text = "Điều 1. (được bãi bỏ)"
+    document = document.model_copy(update={"nodes": nodes, "warnings": []}, deep=True)
+
+    chunk = LegalChunker().chunk_document(document)[0]
+
+    assert chunk.chunk_kind == "article_level_empty"
+    assert chunk.metadata.is_empty_or_repealed is True
+    assert chunk.metadata.is_source_unit_repealed is True
+
+
+def test_repealed_clause_text_sets_source_unit_metadata() -> None:
+    """Clause-level repealed placeholders are clearly flagged in metadata."""
+    document = _load_document("sample_hierarchy_article_clause_only.json")
+    nodes = [node.model_copy(deep=True) for node in document.nodes]
+    nodes[1].text = "Điều 1. Phạm vi điều chỉnh\n1. (được bãi bỏ)"
+    nodes[2].text = "1. (được bãi bỏ)"
+    document = document.model_copy(update={"nodes": nodes}, deep=True)
+
+    chunk = LegalChunker().chunk_document(document)[0]
+
+    assert chunk.level == ChunkingLevel.CLAUSE
+    assert chunk.chunk_kind == "clause_level"
+    assert chunk.metadata.is_empty_or_repealed is True
+    assert chunk.metadata.is_source_unit_repealed is True
+
+
+def test_repealed_point_text_sets_source_unit_metadata() -> None:
+    """Point-level repealed placeholders are clearly flagged in metadata."""
+    document = _load_document("sample_hierarchy_clause_point.json")
+    nodes = [node.model_copy(deep=True) for node in document.nodes]
+    nodes[3].text = "a) (được bãi bỏ)"
+    document = document.model_copy(update={"nodes": nodes}, deep=True)
+
+    chunk = LegalChunker().chunk_document(document)[0]
+
+    assert chunk.level == ChunkingLevel.POINT
+    assert chunk.metadata.is_empty_or_repealed is True
+    assert chunk.metadata.is_source_unit_repealed is True
+
+
 def test_chunks_include_minimal_citation_path_offsets_and_hashes() -> None:
     """Step 2 chunks are already schema-valid and traceable to hierarchy nodes."""
     document = _load_document("sample_hierarchy_article_clause_only.json")

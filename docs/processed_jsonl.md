@@ -28,6 +28,11 @@ Phase 6 validation result:
 ```text
 Laws:                    52
 Chunks:                  40,389
+Success with warnings:   18
+Failed laws:             0
+Empty/repealed chunks:   180
+Source-tail markers:     0 in text, 0 in parent_text
+Max parent_text length:  14,481 chars
 Bad JSONL lines:         0
 Duplicate chunk_id:      0
 Selection-rule issues:   0
@@ -102,16 +107,18 @@ Do not embed `parent_text` as the primary vector text. `parent_text` can be very
 long and is meant for downstream LLM context once a child chunk has been
 retrieved.
 
-The current full corpus has:
+The current Phase 6 hardening audit has:
 
 ```text
-parent_text > 8,000 chars: 570 chunks
-max parent_text:            58,955 chars
+source-tail markers in text:        0
+source-tail markers in parent_text: 0
+max parent_text:                    14,481 chars
+parent_text > 20,000 chars:         0 chunks
 ```
 
-This is expected because Phase 6 preserves whole Article context. Phase 7/8
-should design payload storage and context packing deliberately instead of
-splitting legal text arbitrarily.
+Phase 6 preserves whole Article context. Phase 7/8 should design payload
+storage and context packing deliberately instead of splitting legal text
+arbitrarily.
 
 ## Non-goals
 

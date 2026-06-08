@@ -95,9 +95,13 @@ Phase 5 Legal Hierarchy Parsing is complete and hardened:
 Phase 6 Parent-child Chunking is complete and validated:
   output: data/processed/legal_chunks.jsonl
   report: artifacts/reports/chunking/chunking_report.json
-  52/52 laws successful
+  34 laws successful
+  18 laws successful with warnings
   0 failed laws
   40,389 chunks
+  180 empty/repealed chunks flagged
+  0 source-tail markers in text
+  0 source-tail markers in parent_text
   0 duplicate chunk IDs
   0 bad JSONL lines
 

@@ -29,6 +29,7 @@ skills in `.agents/skills/` are the primary Codex-discovered repo skills.
 Current status is defined in `.codex/context/PROJECT_CONTEXT.md`. Crawling,
 raw corpus audit, Phase 4 Cleaning & Normalization, Phase 5 Legal Hierarchy
 Parsing, and Phase 6 Parent-child Chunking are implemented and validated. Phase
+6 is hardened with 0 source-tail markers in chunk `text`/`parent_text`. Phase
 7 Processed JSONL Validation / embedding-readiness checks is next. Embedding,
 indexing, RAG, Advanced RAG, and GraphRAG must wait until the processed JSONL
 validation gate passes.

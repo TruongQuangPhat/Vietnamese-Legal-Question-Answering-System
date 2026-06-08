@@ -13,10 +13,11 @@ This skill runs after cleaning/normalization (Phase 4) and before embedding/inde
 Current project status: Phase 5 Legal Hierarchy Parsing is complete and
 hardened with 52/52 hierarchy outputs, 0 parser failures, 0 validator failures,
 0 RED/ORANGE audit cases, and 0 source-tail leakage nodes. Phase 6
-Parent-child Chunking is complete and validated with
-`data/processed/legal_chunks.jsonl`, 52/52 successful laws, 0 failed laws, and
-40,389 chunks. Phase 7 Processed JSONL Validation / embedding-readiness checks
-is next.
+Parent-child Chunking is complete and hardened with
+`data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
+0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
+and 180 empty/repealed chunks flagged. Phase 7 Processed JSONL Validation /
+embedding-readiness checks is next.
 
 ## Phase 5 — Legal Hierarchy Parsing
 
@@ -163,12 +164,16 @@ hierarchy.json
 Validated result:
 
 ```text
-52/52 laws successful
+34 laws successful
+18 laws successful with warnings
 0 failed laws
 40,389 chunks
 1,322 article chunks
 20,643 clause chunks
 18,424 point chunks
+180 empty/repealed chunks flagged
+0 source-tail markers in text
+0 source-tail markers in parent_text
 0 duplicate chunk IDs
 0 bad JSONL lines
 0 selection-rule issues

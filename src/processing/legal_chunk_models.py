@@ -60,6 +60,8 @@ class ChunkingMetadata(BaseModel):
         is_empty_or_repealed: Whether the source Article is empty, repealed,
             or a placeholder. Non-blocking for chunking; preserves citation
             traceability.
+        is_source_unit_repealed: Whether the selected source unit itself
+            contains a repealed placeholder, including Clause and Point chunks.
         source_warnings: Phase 5 warning codes that affect this chunk's
             source node (e.g., EMPTY_ARTICLE_NODE, NODE_ID_COLLISION_RESOLVED).
         caveat_references: Phase 5 caveat reference strings for this chunk's
@@ -71,6 +73,10 @@ class ChunkingMetadata(BaseModel):
     is_empty_or_repealed: bool = Field(
         False,
         description="Article is empty, repealed, or placeholder-like",
+    )
+    is_source_unit_repealed: bool = Field(
+        False,
+        description="Selected Article, Clause, or Point unit is repealed or placeholder-like",
     )
     source_warnings: list[str] = Field(
         default_factory=list,

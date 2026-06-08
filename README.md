@@ -61,11 +61,15 @@ Phase 6 is complete and validated:
 Chunk output:            data/processed/legal_chunks.jsonl
 Chunking report:         artifacts/reports/chunking/chunking_report.json
 Validated laws:          52/52
+Success with warnings:   18
 Chunking failures:       0
 Total chunks:            40,389
 Article chunks:          1,322
 Clause chunks:           20,643
 Point chunks:            18,424
+Empty/repealed chunks:   180
+Source-tail markers:     0 in text, 0 in parent_text
+Max parent_text length:  14,481 chars
 Duplicate chunk_id:      0
 Bad JSONL lines:         0
 Selection-rule issues:   0
@@ -75,8 +79,9 @@ Validation audit:        artifacts/reports/chunking/full_corpus_validation_repor
 
 Phase 6 preserves Article parent context in `parent_text` and uses
 Article/Clause/Point hierarchy units instead of arbitrary token or character
-windows. Some Article parent contexts are long; Phase 7/8 must handle context
-packing deliberately and should embed only `text`, not `parent_text`.
+windows. Phase 6 hardening removed VBHN/source-tail leakage from chunk
+`text` and `parent_text`, and flags repealed placeholder chunks in metadata.
+Phase 7/8 should embed only `text`, not `parent_text`.
 
 ## Legal Accuracy Rules
 
@@ -506,9 +511,14 @@ uv run python scripts/chunk_legal_corpus.py \
 Result:
 
 ```text
-52/52 laws succeeded
+34 laws succeeded
+18 laws succeeded with warnings
 0 failed laws
 40,389 chunks
+180 empty/repealed chunks flagged
+0 source-tail markers in text
+0 source-tail markers in parent_text
+max parent_text length: 14,481 chars
 0 bad JSONL lines
 0 duplicate chunk IDs
 0 selection-rule issues
@@ -522,6 +532,8 @@ Chunk selection policy:
 - Clause with Point children -> one point-level chunk per Point.
 - `text` is the embedding unit.
 - `parent_text` is the full Article context for downstream RAG.
+- `metadata.is_empty_or_repealed` flags empty/repealed placeholders.
+- `metadata.is_source_unit_repealed` flags repealed Article/Clause/Point units.
 
 ## Setup
 

@@ -8,10 +8,10 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 Use this skill to enforce repository organization and module boundaries.
 
-Current status: Phases 0-5 are complete. Phase 5 Legal Hierarchy Parsing is
-complete and hardened. Phase 6 Parent-child Chunking is next and not yet
-implemented. Phase 6+ files listed below are placement guidance unless they
-already exist in the repository.
+Current status: Phases 0-6 are complete and hardened. Phase 6 Parent-child
+Chunking produced `data/processed/legal_chunks.jsonl`; Phase 7 Processed JSONL
+Validation is next. Phase 8+ files listed below are placement guidance unless
+they already exist in the repository.
 
 ## Canonical Layout
 
@@ -76,7 +76,7 @@ VnLaw-QA/
 │   │   ├── selector.py
 │   │   ├── storage.py
 │   │   └── rate_limiter.py
-│   ├── processing/              # Phase 5 implemented; Phase 6-7 planned
+│   ├── processing/              # Phase 5-6 implemented; Phase 7 planned
 │   │   ├── normalized_input.py
 │   │   ├── legal_heading_recognizer.py
 │   │   ├── legal_span_segmenter.py
@@ -84,7 +84,7 @@ VnLaw-QA/
 │   │   ├── legal_hierarchy_models.py
 │   │   ├── legal_tree_validator.py
 │   │   ├── legal_parser.py
-│   │   └── ...                  # Phase 6+ modules added only when started
+│   │   └── legal_chunk*.py      # Phase 6 chunking modules
 │   ├── indexing/                # Phase 8: embedding, Qdrant
 │   ├── retrieval/               # Phase 9-10: retrieval, reranking
 │   ├── generation/              # Phase 9-11: LLM, prompts, answers
@@ -94,7 +94,8 @@ VnLaw-QA/
 │   │   ├── cleaning_service.py
 │   │   ├── cleaning_quality_audit_service.py
 │   │   ├── legal_parsing_service.py
-│   │   └── ...                  # Phase 6+ services added only when started
+│   │   ├── chunking_service.py  # Phase 6 orchestration
+│   │   └── ...                  # Phase 7+ services added only when started
 │   ├── api/                     # Phase 13: FastAPI
 │   ├── evaluation/              # Phase 12: RAGAS, metrics
 │   ├── monitoring/              # Phase 14: monitoring
@@ -105,7 +106,8 @@ VnLaw-QA/
 │   ├── clean_raw_corpus.py
 │   ├── audit_cleaning_quality.py
 │   ├── parse_legal_hierarchy.py
-│   └── ...                      # Phase 6+ scripts added only when started
+│   ├── chunk_legal_corpus.py    # Phase 6 CLI
+│   └── ...                      # Phase 7+ scripts added only when started
 ├── tests/                       # Test suite
 │   ├── __init__.py
 │   ├── unit/                    # Unit tests
@@ -153,7 +155,7 @@ data/raw/{law_id}/latest/metadata.json   # Crawl metadata (immutable)
 data/interim/{law_id}/normalized.json    # Cleaned + normalized text
 data/interim/{law_id}/cleaned.txt        # Optional debug artifact
 data/interim/{law_id}/hierarchy.json     # Parsed legal hierarchy (Phase 5)
-data/processed/{law_id}.jsonl            # Future chunks ready for embedding (Phase 7)
+data/processed/legal_chunks.jsonl        # Validated Phase 6 chunk corpus
 data/indexes/                            # Qdrant indexes (Phase 8)
 data/eval/                               # Evaluation datasets (Phase 12)
 ```

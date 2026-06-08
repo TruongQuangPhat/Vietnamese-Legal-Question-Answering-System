@@ -12,14 +12,14 @@ The index enables retrieval of relevant legal provisions based on semantic simil
 
 ```bash
 uv run python scripts/build_embedding_index.py \
-  --input-dir data/processed \
+  --input data/processed/legal_chunks.jsonl \
   --qdrant-url http://localhost:6333 \
   --collection-name vnlaw_qa_chunks \
   --batch-size 32
 ```
 
 **Expected workflow**:
-1. Input: `data/processed/{law_id}.jsonl` (52 files)
+1. Input: `data/processed/legal_chunks.jsonl`
 2. Model: Load embedding model (e.g., BGE-M3)
 3. Process: Generate dense + sparse vectors in batches
 4. Output: Qdrant collection `vnlaw_qa_chunks` with full payload
@@ -30,7 +30,7 @@ uv run python scripts/build_embedding_index.py \
 ```
 ┌──────────────────────┐
 │  Processed JSONL     │
-│  (52 files)          │
+│  legal_chunks.jsonl  │
 └──────────┬───────────┘
            │
            ▼
@@ -176,7 +176,7 @@ uv run python scripts/build_embedding_index.py \
 
 ## Pipeline Execution Flow
 
-1. Load validated `data/processed/{law_id}.jsonl` files (or specific `--law-ids`).
+1. Load validated `data/processed/legal_chunks.jsonl` rows.
 2. Initialize embedding model (download if needed).
 3. For each chunk in streaming batches:
    - Compute dense vector via model.

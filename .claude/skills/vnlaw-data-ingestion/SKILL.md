@@ -23,12 +23,13 @@ configs/laws/corpus_registry.yml
 ```
 
 For Phase 1-4, focus only on reliable corpus acquisition, raw storage,
-cleaning, and normalization. Phases 1-5 are complete; Phase 6 Parent-child
-Chunking is next and consumes `data/interim/{LAW_ID}/hierarchy.json`.
+cleaning, and normalization. Phases 1-6 are complete and hardened; Phase 7
+Processed JSONL Validation is next and consumes
+`data/processed/legal_chunks.jsonl`.
 
 Do not rerun crawling or cleaning unless explicitly requested. Do not jump into
-embedding, Qdrant, Neo4j, Advanced RAG, or GraphRAG until Phase 6 chunking and
-processed JSONL validation pass.
+embedding, Qdrant, Neo4j, Advanced RAG, or GraphRAG until processed JSONL
+validation passes.
 
 ## Trusted Source
 

@@ -13,10 +13,11 @@ This skill defines the mission, architecture direction, trusted corpus policy, a
 Current project status: Phases 0-6 are complete. Phase 5 Legal Hierarchy
 Parsing is complete and hardened with 52/52 hierarchy outputs and 0 failures.
 Phase 6 Parent-child Chunking is complete and validated with
-`data/processed/legal_chunks.jsonl`, 52/52 successful laws, 0 failed laws, and
-40,389 chunks. Embedding, indexing, retrieval, RAG, Advanced RAG, and GraphRAG
-must wait until the Phase 7 processed JSONL validation / embedding-readiness
-gate passes.
+`data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
+0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
+and 180 empty/repealed chunks flagged. Embedding, indexing, retrieval, RAG,
+Advanced RAG, and GraphRAG must wait until the Phase 7 processed JSONL
+validation / embedding-readiness gate passes.
 
 ## Mission
 

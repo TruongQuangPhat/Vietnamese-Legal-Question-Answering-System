@@ -24,6 +24,7 @@ from src.processing.legal_hierarchy_models import LegalHierarchyDocument
 from src.processing.legal_tree_validator import LegalTreeValidationResult, LegalTreeValidator
 
 REPORT_SCHEMA_VERSION = "1.0"
+LONG_PARENT_TEXT_CHARS = 20_000
 
 
 class _Clock(Protocol):
@@ -445,6 +446,9 @@ def _success_summary(
         point_level_chunks=chunks_by_level.get("point", 0),
         empty_or_repealed_chunks=sum(
             1 for chunk in chunks if chunk.metadata.is_empty_or_repealed
+        ),
+        long_parent_text_chunks=sum(
+            1 for chunk in chunks if len(chunk.parent_text) > LONG_PARENT_TEXT_CHARS
         ),
         warning_count=len(validation.warnings),
         error_count=0,

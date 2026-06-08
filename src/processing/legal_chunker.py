@@ -7,6 +7,7 @@ validate corpus-wide uniqueness, generate embeddings, or repair legal text.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 
 from src.processing.legal_chunk_models import (
@@ -138,9 +139,15 @@ class LegalChunker:
     ) -> LegalChunk:
         """Build one schema-valid chunk from an Article, Clause, or Point node."""
         level = ChunkingLevel(source.level.value)
-        is_empty_or_repealed = self._is_empty_or_repealed(document, article)
+        is_source_unit_repealed = _is_repealed_placeholder_text(source.text)
+        is_empty_or_repealed = self._is_empty_or_repealed(
+            document,
+            article,
+            source,
+        )
         metadata = ChunkingMetadata(
             is_empty_or_repealed=is_empty_or_repealed,
+            is_source_unit_repealed=is_source_unit_repealed,
             source_warnings=_source_warning_codes(document.warnings, source, article),
             caveat_references=_source_caveat_references(document.warnings, source, article),
         )
@@ -188,8 +195,13 @@ class LegalChunker:
     def _is_empty_or_repealed(
         document: LegalHierarchyDocument,
         article: LegalNode,
+        source: LegalNode,
     ) -> bool:
         """Return whether an Article should be flagged as empty/repealed."""
+        if _is_repealed_placeholder_text(source.text):
+            return True
+        if _is_repealed_placeholder_text(article.text) and source.node_id == article.node_id:
+            return True
         if bool(article.metadata.get("is_empty")):
             return True
         if not article.text.strip():
@@ -199,6 +211,19 @@ class LegalChunker:
             and warning.node_id == article.node_id
             for warning in document.warnings
         )
+
+
+def _is_repealed_placeholder_text(text: str) -> bool:
+    """Return whether text contains a deterministic repealed placeholder."""
+    return (
+        re.search(r"\(\s*được\s+bãi\s+bỏ\s*\)", text, re.IGNORECASE) is not None
+        or re.search(
+            r"\b(?:Điều|Khoản|Điểm)\s+này\s+được\s+bãi\s+bỏ\b",
+            text,
+            re.IGNORECASE,
+        )
+        is not None
+    )
 
 
 def _ordered_nodes(nodes: Iterable[LegalNode]) -> list[LegalNode]:

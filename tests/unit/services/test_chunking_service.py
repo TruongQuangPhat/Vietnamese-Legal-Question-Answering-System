@@ -130,6 +130,51 @@ def _document(*, law_id: str = "A_LAW", law_name: str | None = None) -> LegalHie
     )
 
 
+def _long_article_document(*, law_id: str = "LONG_LAW") -> LegalHierarchyDocument:
+    """Build a valid Article-only hierarchy with long parent Article text."""
+    title = f"Luật Kiểm thử {law_id}"
+    article_body = " ".join(["Nội dung kiểm thử dài."] * 1200)
+    root_text = "\n".join([title, "Điều 1. Điều dài", article_body, ""])
+    root_id = f"{law_id}__root"
+    article_id = f"{root_id}__article_1"
+    article_start = root_text.index("Điều 1.")
+
+    return LegalHierarchyDocument(
+        schema_version="1.0",
+        parser_version="v0.1.0",
+        cleaner_version="v0.8.0",
+        law_id=law_id,
+        source_file=f"data/interim/{law_id}/normalized.json",
+        root_node_id=root_id,
+        metadata=_metadata(law_id=law_id, law_name=title),
+        warnings=[],
+        nodes=[
+            LegalNode(
+                node_id=root_id,
+                level=LegalNodeLevel.LAW,
+                number=None,
+                title=title,
+                text=root_text,
+                start_offset=0,
+                end_offset=len(root_text),
+                parent_id=None,
+                children=[article_id],
+            ),
+            LegalNode(
+                node_id=article_id,
+                level=LegalNodeLevel.ARTICLE,
+                number="1",
+                title="Điều dài",
+                text=root_text[article_start:],
+                start_offset=article_start,
+                end_offset=len(root_text),
+                parent_id=root_id,
+                children=[],
+            ),
+        ],
+    )
+
+
 def _write_hierarchy(input_dir: Path, document: LegalHierarchyDocument) -> Path:
     """Write one hierarchy fixture under input_dir/{LAW_ID}/hierarchy.json."""
     path = input_dir / document.law_id / "hierarchy.json"
@@ -202,6 +247,22 @@ def test_successful_run_writes_utf8_jsonl_and_report(tmp_path: Path) -> None:
     assert "\\u" not in output_path.read_text(encoding="utf-8")
     assert report_payload["chunks_by_law"] == {"A_LAW": 1, "B_LAW": 1}
     assert report_payload["chunks_by_level"] == {"point": 2}
+
+
+def test_long_parent_text_chunks_are_reported_without_splitting(tmp_path: Path) -> None:
+    """Very long Article context is reported as audit signal, not split."""
+    input_dir = tmp_path / "input"
+    output_path = tmp_path / "processed" / "legal_chunks.jsonl"
+    report_path = tmp_path / "reports" / "chunking_report.json"
+    _write_hierarchy(input_dir, _long_article_document())
+
+    result = _run_service(input_dir, output_path, report_path)
+    chunk = LegalChunk.model_validate(json.loads(output_path.read_text(encoding="utf-8")))
+
+    assert result.report.total_chunks == 1
+    assert result.report.law_summaries[0].long_parent_text_chunks == 1
+    assert chunk.level == "article"
+    assert len(chunk.parent_text) > 20_000
 
 
 def test_requested_missing_law_is_isolated_and_reported(tmp_path: Path) -> None:

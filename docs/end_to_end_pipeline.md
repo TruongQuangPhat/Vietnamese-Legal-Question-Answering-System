@@ -10,12 +10,12 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **Phase 5 Legal Hierarchy Parsing is complete and hardened**.
-The corpus has 52/52 raw artifacts, 52/52 normalized outputs, and 52/52
-hierarchy outputs with 0 parser failures and 0 validator failures. The next
-engineering phase is **Phase 6 — Parent-child Chunking**, which is not yet
-implemented. Phase 7 — Processed JSONL Validation must wait until the Phase 6
-gate passes.
+Current status: **Phase 6 Parent-child Chunking is complete and hardened**.
+The corpus has 52/52 raw artifacts, 52/52 normalized outputs, 52/52 hierarchy
+outputs, and `data/processed/legal_chunks.jsonl` with 40,389 validated chunks.
+The next engineering phase is **Phase 7 — Processed JSONL Validation /
+embedding-readiness checks**. Embedding, indexing, retrieval, and RAG have not
+started.
 
 ## 2. Quick Start
 
@@ -321,32 +321,42 @@ MAX_ARTICLE_NUMBER_MISMATCH.
 
 **Pipeline Summary**:
 - **Parent unit**: full Article + metadata (title, article number)
-- **Child unit**: Clause or Point (Clause/Point) — this is the embedding unit
-- **Chunk ID design**: `{law_id}__article_{article_number}__clause_{clause_number}__point_{point_label}` (e.g., `lo_2024_123__article_1__clause_2__point_c`)
-- **Citation construction**: `Luật {law_name}, Điều {article_number}, Khoản {clause_number}, Điểm {point_label}` (if present)
-- **Metadata propagation**: `law_id`, `law_name`, `law_type`, `legal_status`, `article_number`, `article_title`, `clause_number`, `point_label`, `effective_date`, `issued_date`, `expiry_date`, `source_url`, `source_domain`, `source_type`
+- **Child unit**: Article, Clause, or Point according to hierarchy rules
+- **Chunk ID design**: `{source_node_id}__chunk`, preserving Phase 5 node IDs
+  and collision-resolved suffixes
+- **Citation construction**: `{Law Name}, Điều ...`, `{Law Name}, Khoản ...,
+  Điều ...`, or `{Law Name}, Điểm ..., Khoản ..., Điều ...`
+- **Metadata propagation**: `law_id`, `law_name`, `article_number`,
+  `article_title`, `clause_number`, `point_label`, `citation`,
+  `hierarchy_path`, `source_url`, `source_domain`, `source_type`, offsets,
+  hashes, and repealed/empty flags
 - **Text fields**:
-  - `text`: content for embedding (Clause/Point)
+  - `text`: content for embedding (Article/Clause/Point child unit)
   - `parent_text`: full Article for LLM context
-- **Hierarchy structure**: `hierarchy_path` object with part, chapter, section, article, clause, point (null when absent)
-- **Parent reference**: `parent_id` points to the parent article-level chunk ID
+- **Hierarchy structure**: `hierarchy_path` string built only from real
+  ancestors
+- **Parent reference**: `parent_article_node_id` and logical
+  `parent_chunk_id`
 - **Traceability**: `text_hash` for duplicate detection, `source_url` and `source_domain` for provenance
 - Reason for not using arbitrary character chunking: would break legal clauses, invalidate citations, destroy hierarchy.
 
-**Output**: `data/processed/{law_id}.jsonl` (one child chunk per line, Phase 6 output).
+**Output**: `data/processed/legal_chunks.jsonl`.
 
 **Validation Criteria**:
 - Each chunk has unique `chunk_id` and valid Vietnamese citation format
 - `parent_text` exists and contains `text`
-- Metadata is complete (law_id, law_name, law_type, legal_status, article_number, clause_number, level)
+- Metadata is complete (`law_id`, `law_name`, article/clause/point fields,
+  source fields, offsets, hashes, and repealed flags)
 - `hierarchy_path` correctly reflects legal hierarchy levels
-- `parent_id` references a valid article-level chunk
+- `parent_article_node_id` references a valid Article node
 - `source_url`, `source_domain`, `source_type` present
-- `issued_date`, `effective_date`, `expiry_date` properly set
 - `text_hash` computed and present
 - No empty `text` fields
+- 0 source-tail markers in `text` and `parent_text`
 
-**Status**: Next phase (not implemented yet)
+**Status**: Complete and hardened. Final output has 40,389 chunks, 0 failed
+laws, 0 duplicate chunk IDs, 0 chunk invariant issues, 180 empty/repealed
+chunks flagged, and 0 source-tail markers in `text`/`parent_text`.
 
 **Detailed documentation**: `docs/parent_child_chunking.md`
 
@@ -356,10 +366,10 @@ MAX_ARTICLE_NUMBER_MISMATCH.
 
 **Goal**: Export validated chunks to standard JSONL format, check schema, duplicates, and integrity before embedding.
 
-**Input**: `data/interim/{law_id}/chunks.jsonl`.
+**Input**: `data/processed/legal_chunks.jsonl`.
 
 **Pipeline Summary**:
-- Export to `data/processed/{law_id}.jsonl`
+- Validate `data/processed/legal_chunks.jsonl`
 - Required fields per line (canonical schema):
   ```json
   {
@@ -424,7 +434,7 @@ MAX_ARTICLE_NUMBER_MISMATCH.
 - `issued_date`, `effective_date`, `expiry_date` properly formatted
 - Zero empty `text` fields
 
-**Status**: Blocked on Phase 6 gate (not started)
+**Status**: Next phase.
 
 **Detailed documentation**: `docs/processed_jsonl.md`
 
@@ -848,9 +858,9 @@ Remaining warnings are accepted non-blocking caveats for Phase 6 chunk
 validation: SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE,
 NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH,
 MAX_ARTICLE_NUMBER_MISMATCH.
-### Phase 6 — Parent-child Chunking — Next (not implemented)
+### Phase 6 — Parent-child Chunking — Complete and hardened
 
-### Phase 7 — Processed JSONL Export & Validation — Planned
+### Phase 7 — Processed JSONL Export & Validation — Next
 
 ### Phase 8 — Embedding & Indexing — Future extension
 

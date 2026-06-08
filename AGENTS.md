@@ -54,8 +54,10 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - Phase 6 Parent-child Chunking is complete and validated.
 - Chunk output exists at `data/processed/legal_chunks.jsonl`.
 - Chunking report exists at `artifacts/reports/chunking/chunking_report.json`.
-- Phase 6 full-corpus result: 52/52 laws successful, 0 failures, 40,389
-  chunks, 0 duplicate chunk IDs, and 0 bad JSONL lines.
+- Phase 6 full-corpus result after hardening: 34 successes, 18 successes with
+  warnings, 0 failures, 40,389 chunks, 0 duplicate chunk IDs, 0 bad JSONL
+  lines, 0 source-tail markers in `text`, 0 source-tail markers in
+  `parent_text`, and 180 empty/repealed chunks flagged.
 - Embedding/RAG/Advanced RAG/GraphRAG has not started.
 - The next phase is Phase 7 Processed JSONL Validation / embedding-readiness
   checks over `data/processed/legal_chunks.jsonl`.
@@ -132,6 +134,8 @@ the pipeline.
   `data/processed/legal_chunks.jsonl`.
 - Phase 8 embedding/indexing should embed `text` only; keep `parent_text` as
   Article context payload for retrieval/generation.
+- Phase 6 hardening treats VBHN/source-law certification tail as excluded
+  hierarchy content and flags `(được bãi bỏ)` source units in metadata.
 - Never split legal text by arbitrary character or token windows if doing so
   breaks clauses, points, or legal meaning.
 - Do not mutate `data/raw/`; write derived artifacts to separate directories.

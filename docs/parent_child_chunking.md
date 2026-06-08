@@ -21,12 +21,16 @@ Phase 6 is complete and validated.
 
 ```text
 Input laws:              52
-Successful laws:         52
+Successful laws:         34
+Success with warnings:   18
 Failed laws:             0
 Total chunks:            40,389
 Article chunks:          1,322
 Clause chunks:           20,643
 Point chunks:            18,424
+Empty/repealed chunks:   180
+Source-tail markers:     0 in text, 0 in parent_text
+Max parent_text length:  14,481 chars
 Duplicate chunk_id:      0
 Bad JSONL lines:         0
 Selection-rule issues:   0
@@ -167,6 +171,11 @@ warnings
 `text` is the future embedding unit. `parent_text` is the full Article context
 for retrieval/generation payloads.
 
+`metadata.is_empty_or_repealed` is true for empty/repealed placeholder chunks.
+`metadata.is_source_unit_repealed` is true when the selected Article, Clause,
+or Point text itself contains a deterministic repealed placeholder such as
+`(được bãi bỏ)`.
+
 ## Deterministic IDs
 
 Chunk IDs are derived from Phase 5 `LegalNode.node_id` and preserve
@@ -221,16 +230,25 @@ Full-corpus validation checks:
 - no Law/Part/Chapter/Section chunks exist;
 - report counts match JSONL line counts and grouped counts.
 
-## Long Parent Text Caveat
+## Phase 6 Hardening
 
-Phase 6 intentionally keeps the full Article parent context. The full corpus has
-570 chunks with `parent_text` longer than 8,000 characters; max parent context is
-58,955 characters.
+Final hardening confirmed that source-tail leakage originated in Phase 5 Article
+spans, not in the chunker. The parser now treats trailing VBHN/source-law
+markers such as `XÁC THỰC VĂN BẢN HỢP NHẤT`, `CHỦ NHIỆM`, and source-law
+preamble lines containing `có căn cứ ban hành như sau` as source-note/tail
+boundaries. Regenerated chunks have:
 
-This is not a Phase 6 defect. Phase 7/8 must handle long parent contexts during
-embedding-readiness checks, payload design, retrieval, and prompt context
-packing. Do not split Article parent text in Phase 6 using arbitrary character
-or token windows.
+```text
+source-tail marker count in text:        0
+source-tail marker count in parent_text: 0
+chunks with is_empty_or_repealed=true:   180
+max text length:                         3,430 chars
+max parent_text length:                  14,481 chars
+long parent_text chunks >20,000 chars:   0
+```
+
+Phase 6 still intentionally keeps the full Article parent context. Do not split
+Article parent text in Phase 6 using arbitrary character or token windows.
 
 ## Next Phase
 

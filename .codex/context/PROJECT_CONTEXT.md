@@ -82,10 +82,14 @@ Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning /
 - **Phase 6 — Parent-child Chunking is complete and validated.**
 - Output JSONL: `data/processed/legal_chunks.jsonl`.
 - Chunking report: `artifacts/reports/chunking/chunking_report.json`.
-- Full-corpus result: 52/52 laws successful, 0 failures, 40,389 chunks.
+- Full-corpus result: 34 successes, 18 successes with warnings, 0 failures,
+  40,389 chunks.
 - Chunk breakdown: 1,322 article chunks, 20,643 clause chunks, 18,424 point chunks.
 - Full-corpus validation: 0 bad JSON lines, 0 duplicate `chunk_id`, 0
   selection-rule issues, 0 chunk invariant issues.
+- Phase 6 hardening result: 0 source-tail markers in chunk `text`, 0
+  source-tail markers in `parent_text`, 180 empty/repealed chunks flagged, and
+  max `parent_text` length reduced to 14,481 characters.
 - The next engineering phase is **Phase 7 — Processed JSONL Validation /
   embedding-readiness checks** over `data/processed/legal_chunks.jsonl`.
 
