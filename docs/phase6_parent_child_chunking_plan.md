@@ -486,5 +486,5 @@ Khong implement trong Phase 6:
 - [x] Step 6 - Service va JSONL writer
 - [x] Step 7 - CLI
 - [x] Step 8 - Priority audit
-- [ ] Step 9 - Full corpus run
-- [ ] Step 10 - Documentation
+- [x] Step 9 - Full corpus run
+- [x] Step 10 - Documentation

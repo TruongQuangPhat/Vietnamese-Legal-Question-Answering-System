@@ -27,10 +27,11 @@ skills in `.agents/skills/` are the primary Codex-discovered repo skills.
 ## Phase Discipline
 
 Current status is defined in `.codex/context/PROJECT_CONTEXT.md`. Crawling,
-raw corpus audit, Phase 4 Cleaning & Normalization, and Phase 5 Legal
-Hierarchy Parsing are implemented and validated. Phase 6 Parent-child Chunking
-is next and not yet implemented. Embedding, indexing, RAG, Advanced RAG, and
-GraphRAG must wait until chunking output quality is validated.
+raw corpus audit, Phase 4 Cleaning & Normalization, Phase 5 Legal Hierarchy
+Parsing, and Phase 6 Parent-child Chunking are implemented and validated. Phase
+7 Processed JSONL Validation / embedding-readiness checks is next. Embedding,
+indexing, RAG, Advanced RAG, and GraphRAG must wait until the processed JSONL
+validation gate passes.
 
 Do not implement future phases early. If a task crosses phase boundaries, read
 `vnlaw-workflow-review` and surface the boundary before changing code.

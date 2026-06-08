@@ -24,6 +24,9 @@ Codex should look first at `AGENTS.md`, then at the repo-scoped skills under
 - `.codex/context/skills_mirror/` is inactive reference only.
 - `.codex/skills` should not be used as an active skill folder in this repo.
 - `.claude/skills/` is Claude-only and must be preserved.
+- Current phase status: Phase 6 Parent-child Chunking is complete and
+  validated; Phase 7 Processed JSONL Validation / embedding-readiness checks
+  is next.
 
 ## Source-to-Codex Mapping
 

@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 6 — Parent-child Chunking
+Current phase: Phase 7 — Processed JSONL Validation / embedding-readiness checks
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -20,11 +20,12 @@ Completed:
   Phase 3 — Raw Corpus Audit and Validation
   Phase 4 — Cleaning & Normalization
   Phase 5 — Legal Hierarchy Parsing
+  Phase 6 — Parent-child Chunking
 
 Next:
-  Build parent-child chunks from data/interim/{LAW_ID}/hierarchy.json
-  Preserve Article parent context for Clause/Point child chunks
-  Do not implement indexing or RAG before chunk validation passes
+  Validate processed JSONL embedding-readiness
+  Design embedding/indexing payloads
+  Do not claim RAG-ready before retrieval/generation/evaluation pass
 ```
 
 Phase 4 is gate-ready:
@@ -53,6 +54,29 @@ Hierarchy output:        data/interim/{LAW_ID}/hierarchy.json
 Parsing report:          artifacts/reports/parsing/legal_parsing_report.json
 Remaining caveats:       non-fatal parser warnings documented in the report
 ```
+
+Phase 6 is complete and validated:
+
+```text
+Chunk output:            data/processed/legal_chunks.jsonl
+Chunking report:         artifacts/reports/chunking/chunking_report.json
+Validated laws:          52/52
+Chunking failures:       0
+Total chunks:            40,389
+Article chunks:          1,322
+Clause chunks:           20,643
+Point chunks:            18,424
+Duplicate chunk_id:      0
+Bad JSONL lines:         0
+Selection-rule issues:   0
+Invariant issues:        0
+Validation audit:        artifacts/reports/chunking/full_corpus_validation_report.json
+```
+
+Phase 6 preserves Article parent context in `parent_text` and uses
+Article/Clause/Point hierarchy units instead of arbitrary token or character
+windows. Some Article parent contexts are long; Phase 7/8 must handle context
+packing deliberately and should embed only `text`, not `parent_text`.
 
 ## Legal Accuracy Rules
 
@@ -91,7 +115,7 @@ VnLaw-QA/
 ├── data/
 │   ├── raw/          # immutable crawl artifacts
 │   ├── interim/      # normalized artifacts and hierarchy outputs
-│   ├── processed/    # future JSONL chunks
+│   ├── processed/    # validated legal chunk JSONL
 │   ├── indexes/      # future retrieval indexes
 │   └── eval/         # future evaluation datasets
 ├── artifacts/
@@ -123,7 +147,7 @@ VnLaw-QA/
 ├── src/
 │   ├── core/
 │   ├── ingestion/    # implemented ingestion and cleaning domain logic
-│   ├── processing/   # implemented parser and future chunking domain logic
+│   ├── processing/   # implemented parser and chunking domain logic
 │   ├── indexing/     # future indexing logic
 │   ├── retrieval/    # future retrieval logic
 │   ├── generation/   # future generation/RAG logic
@@ -240,14 +264,15 @@ Implemented and planned pipeline:
 ┌──────────────────────────────┐
 │ Phase 6                      │
 │ Parent-child Chunking        │
-│ input: hierarchy.json        │
-│ NEXT / NOT IMPLEMENTED       │
+│ data/processed/legal_chunks.jsonl │
+│ COMPLETE AND VALIDATED       │
 └──────────────┬───────────────┘
                │
                ▼
 ┌──────────────────────────────┐
 │ Later Phases                 │
-│ Embedding → Naive RAG        │
+│ JSONL validation → Embedding │
+│ → Naive RAG                  │
 │ → Advanced RAG → GraphRAG    │
 │ PLANNED                      │
 └──────────────────────────────┘
@@ -454,6 +479,50 @@ warnings. Remaining non-fatal warnings (SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE
 NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH, MAX_ARTICLE_NUMBER_MISMATCH)
 are preserved in the parsing report for Phase 6 reference.
 
+## Phase 6 Parent-child Chunking
+
+Phase 6 chunks the validated legal hierarchy into a single corpus JSONL file.
+It does not embed, index, retrieve, or generate answers.
+
+```text
+Input:   data/interim/{LAW_ID}/hierarchy.json
+Output:  data/processed/legal_chunks.jsonl
+Report:  artifacts/reports/chunking/chunking_report.json
+Audit:   artifacts/reports/chunking/full_corpus_validation_report.json
+```
+
+Official command:
+
+```bash
+uv run python scripts/chunk_legal_corpus.py \
+  --input-dir data/interim \
+  --output data/processed/legal_chunks.jsonl \
+  --report artifacts/reports/chunking/chunking_report.json \
+  --overwrite \
+  --verbose \
+  --no-color
+```
+
+Result:
+
+```text
+52/52 laws succeeded
+0 failed laws
+40,389 chunks
+0 bad JSONL lines
+0 duplicate chunk IDs
+0 selection-rule issues
+0 chunk invariant issues
+```
+
+Chunk selection policy:
+
+- Article without Clause/Point children -> article-level chunk.
+- Clause without Point children -> clause-level chunk.
+- Clause with Point children -> one point-level chunk per Point.
+- `text` is the embedding unit.
+- `parent_text` is the full Article context for downstream RAG.
+
 ## Setup
 
 Requirements:
@@ -580,16 +649,15 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/raw_corpus_audit.md` | Raw artifact audit gate |
 | `docs/cleaning_normalization.md` | Cleaning pipeline and validation details |
 | `docs/legal_parsing.md` | Phase 5 parser design |
-| `docs/parent_child_chunking.md` | Future parent-child chunking design |
-| `docs/processed_jsonl.md` | Future processed JSONL schema |
+| `docs/parent_child_chunking.md` | Implemented Phase 6 parent-child chunking design and command |
+| `docs/processed_jsonl.md` | Phase 7 processed JSONL validation / embedding-readiness notes |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries
 
 Do not do yet:
 
-- Do not implement parent-child chunking before parser validation.
-- Do not implement processed JSONL export before chunking validation.
+- Do not modify raw or interim corpus artifacts without explicit approval.
 - Do not implement embedding/indexing before processed JSONL validation.
 - Do not implement Naive RAG, Advanced RAG, or GraphRAG yet.
 - Do not mutate `data/raw/`.

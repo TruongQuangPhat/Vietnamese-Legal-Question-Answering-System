@@ -51,11 +51,16 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - Phase 5 Legal Hierarchy Parsing is complete and hardened with 52/52
   generated `hierarchy.json` outputs, 0 failed documents, 0 validator
   failures, 0 RED/ORANGE audit cases, and 0 source-tail leakage nodes.
+- Phase 6 Parent-child Chunking is complete and validated.
+- Chunk output exists at `data/processed/legal_chunks.jsonl`.
+- Chunking report exists at `artifacts/reports/chunking/chunking_report.json`.
+- Phase 6 full-corpus result: 52/52 laws successful, 0 failures, 40,389
+  chunks, 0 duplicate chunk IDs, and 0 bad JSONL lines.
 - Embedding/RAG/Advanced RAG/GraphRAG has not started.
-- The next phase is Phase 6 Parent-child Chunking over
-  `data/interim/{LAW_ID}/hierarchy.json`.
-- Do not jump ahead to embedding, RAG, Advanced RAG, or GraphRAG before
-  parent-child chunking and processed JSONL validation pass.
+- The next phase is Phase 7 Processed JSONL Validation / embedding-readiness
+  checks over `data/processed/legal_chunks.jsonl`.
+- Do not jump ahead to embedding, RAG, Advanced RAG, or GraphRAG before the
+  processed JSONL validation gate passes.
 
 ## 5. Official Commands
 
@@ -66,6 +71,8 @@ uv run python scripts/crawl_raw_corpus.py --help
 uv run python scripts/audit_raw_corpus.py --help
 uv run python scripts/clean_raw_corpus.py --help
 uv run python scripts/audit_cleaning_quality.py --help
+uv run python scripts/parse_legal_hierarchy.py --help
+uv run python scripts/chunk_legal_corpus.py --help
 uv run pytest tests/unit/ingestion -q
 ```
 
@@ -116,11 +123,15 @@ the pipeline.
 ## 9. Data and Chunking Rules
 
 - Preserve legal hierarchy: Part -> Chapter -> Section -> Article -> Clause -> Point.
-- Later parent-child chunking should use:
+- Parent-child chunking uses:
   - child unit = Clause or Point
   - parent unit = Article
   - embedding content = child content
   - LLM context = parent article content
+- Phase 6 output is a single corpus-level JSONL file:
+  `data/processed/legal_chunks.jsonl`.
+- Phase 8 embedding/indexing should embed `text` only; keep `parent_text` as
+  Article context payload for retrieval/generation.
 - Never split legal text by arbitrary character or token windows if doing so
   breaks clauses, points, or legal meaning.
 - Do not mutate `data/raw/`; write derived artifacts to separate directories.
@@ -162,9 +173,11 @@ After editing:
   `__pycache__`, or huge generated folders.
 - Do not mutate `data/raw/`.
 - Do not modify `data/interim/` or generated `artifacts/` outputs unless explicitly asked.
+- Do not modify `data/processed/legal_chunks.jsonl` unless explicitly rerunning
+  the Phase 6 chunking command.
 - `data/reports/` is a historical/protected path only; active reports belong under
   `artifacts/reports/{phase}/`.
 - Do not run full crawl, audit, or cleaning commands unless explicitly requested.
-- Do not proceed to chunking/RAG before the legal hierarchy parser gate is solid.
+- Do not proceed to embedding/RAG before the processed JSONL validation gate is solid.
 - Do not delete `.claude/`, `.claude/skills/`, Claude settings files,
   `CLAUDE.md`, or `PROJECT_CONTEXT.md`.
