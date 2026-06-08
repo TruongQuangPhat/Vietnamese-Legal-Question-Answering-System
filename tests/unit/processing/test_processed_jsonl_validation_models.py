@@ -59,6 +59,8 @@ def _report(**overrides: object) -> ProcessedJsonlValidationReport:
         "traceability_failures": 0,
         "contamination_failures": 0,
         "contamination_warnings": 0,
+        "errors_total": 0,
+        "warnings_total": 0,
         "chunks_by_level": {"article": 10, "clause": 20, "point": 70},
         "chunks_by_law": {"law_001": 100},
         "text_length_summary": {"min": 10, "max": 500, "mean": 100.0},
@@ -71,8 +73,7 @@ def _report(**overrides: object) -> ProcessedJsonlValidationReport:
         "payload_readiness_summary": {"all_fields_present": 100},
         "embedding_readiness": {"ready": True, "empty_text_chunks": 0},
         "sample_failures": [],
-        "warnings": [],
-        "errors": [],
+        "sample_warnings": [],
         "status": "pass",
     }
     payload.update(overrides)
@@ -104,6 +105,7 @@ class TestIssueCodeEnum:
             "PAYLOAD_FIELD_MISSING",
             "VERY_LONG_PARENT_TEXT",
             "COUNT_RECONCILIATION_FAILED",
+            "DUPLICATE_CHUNK_ID",
         }
         actual = {m.value for m in ProcessedJsonlValidationIssueCode}
         assert expected == actual
@@ -185,40 +187,36 @@ class TestReportStatus:
     """ProcessedJsonlValidationReport status field logic."""
 
     def test_pass_when_no_errors_no_warnings(self) -> None:
-        report = _report(errors=[], warnings=[], status="pass")
+        report = _report(errors_total=0, warnings_total=0, status="pass")
         assert report.status == "pass"
 
-    def test_fail_when_errors_present(self) -> None:
-        report = _report(
-            errors=[_issue()],
-            warnings=[],
-            status="pass_with_warnings",
-        )
+    def test_fail_when_errors_total_positive(self) -> None:
+        report = _report(errors_total=1, warnings_total=0, status="pass_with_warnings")
         assert report.status == "fail"
 
     def test_pass_with_warnings_when_only_warnings(self) -> None:
-        report = _report(
-            errors=[],
-            warnings=[_issue()],
-            status="pass",
-        )
+        report = _report(errors_total=0, warnings_total=1, status="pass")
         assert report.status == "pass_with_warnings"
 
-    def test_pass_when_errors_empty_warnings_empty(self) -> None:
-        report = _report(errors=[], warnings=[])
+    def test_pass_when_errors_warnings_both_zero(self) -> None:
+        report = _report(errors_total=0, warnings_total=0)
         assert report.status == "pass"
 
     def test_status_fail_overrides_pass_with_warnings(self) -> None:
-        report = _report(
-            errors=[_issue()],
-            warnings=[_issue()],
-            status="pass",
-        )
+        report = _report(errors_total=1, warnings_total=1, status="pass_with_warnings")
         assert report.status == "fail"
 
     def test_status_fail_overrides_pass(self) -> None:
-        report = _report(errors=[_issue()], warnings=[], status="pass")
+        report = _report(errors_total=1, warnings_total=0, status="pass")
         assert report.status == "fail"
+
+    def test_pass_with_warnings_overrides_pass_when_warnings_exist(self) -> None:
+        report = _report(errors_total=0, warnings_total=1, status="pass")
+        assert report.status == "pass_with_warnings"
+
+    def test_pass_restored_when_errors_warnings_become_zero(self) -> None:
+        report = _report(errors_total=0, warnings_total=0, status="pass_with_warnings")
+        assert report.status == "pass"
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +236,7 @@ class TestReportSerialization:
 
     def test_vietnamese_preserved_in_serialization(self) -> None:
         report = _report(
-            warnings=[
+            sample_warnings=[
                 _issue(
                     message="Chứa BỘ TRƯỞNG trong văn bản",
                     law_id="luật_abc",
@@ -252,7 +250,7 @@ class TestReportSerialization:
 
     def test_vietnamese_preserved_in_file_write(self, tmp_path: Path) -> None:
         report = _report(
-            warnings=[_issue(message="Văn bản chứa CHỦ TỊCH QUỐC HỘI", law_id="luật_xyz")],
+            sample_warnings=[_issue(message="Văn bản chứa CHỦ TỊCH QUỐC HỘI", law_id="luật_xyz")],
         )
         out = tmp_path / "report.json"
         out.write_text(
@@ -278,6 +276,42 @@ class TestReportSerialization:
     def test_invalid_status_rejected(self) -> None:
         with pytest.raises(ValidationError):
             _report(status="unknown")  # type: ignore[arg-type]
+
+    def test_sample_failures_and_warnings_are_capped_lists(self) -> None:
+        """sample_failures and sample_warnings are the only sample lists."""
+        issue = _issue()
+        report = _report(
+            sample_failures=[issue],
+            sample_warnings=[issue],
+            errors_total=1,
+            warnings_total=1,
+        )
+        assert len(report.sample_failures) == 1
+        assert len(report.sample_warnings) == 1
+        # No uncapped errors/warnings fields
+        assert not hasattr(report, "errors")
+        assert not hasattr(report, "warnings")
+
+    def test_status_uses_total_counters_not_sample_lists(self) -> None:
+        """Status logic uses errors_total/warnings_total, not sample lists."""
+        # Even with empty samples, status should be fail if errors_total > 0
+        report = _report(
+            sample_failures=[],
+            sample_warnings=[],
+            errors_total=5,
+            warnings_total=0,
+            status="pass",
+        )
+        assert report.status == "fail"
+        # Even with empty samples, status should be pass_with_warnings
+        report2 = _report(
+            sample_failures=[],
+            sample_warnings=[],
+            errors_total=0,
+            warnings_total=3,
+            status="pass",
+        )
+        assert report2.status == "pass_with_warnings"
 
 
 # ---------------------------------------------------------------------------
@@ -410,12 +444,12 @@ parent_text_medium_chars: 10000
 parent_text_long_chars: 15000
 parent_text_very_long_chars: 20000
 hard_contamination_markers:
-  - "XÁC THỰC VĂN BẢN HỢP NHẤT"
-  - "Nơi nhận:"
+- "XÁC THỰC VĂN BẢN HỢP NHẤT"
+- "Nơi nhận:"
 warning_contamination_markers:
-  - "BỘ TRƯỞNG"
+- "BỘ TRƯỞNG"
 repealed_placeholder_patterns:
-  - "(được bãi bỏ)"
+- "(được bãi bỏ)"
 """
         yaml_file = tmp_path / "config.yml"
         yaml_file.write_text(yaml_content, encoding="utf-8")
@@ -450,12 +484,12 @@ parent_text_medium_chars: 10000
 parent_text_long_chars: 15000
 parent_text_very_long_chars: 20000
 hard_contamination_markers:
-  - "XÁC THỰC VĂN BẢN HỢP NHẤT"
-  - "Nơi nhận:"
+- "XÁC THỰC VĂN BẢN HỢP NHẤT"
+- "Nơi nhận:"
 warning_contamination_markers:
-  - "CHỦ TỊCH QUỐC HỘI"
+- "CHỦ TỊCH QUỐC HỘI"
 repealed_placeholder_patterns:
-  - "Điều này được bãi bỏ"
+- "Điều này được bãi bỏ"
 """
         yaml_file = tmp_path / "config.yml"
         yaml_file.write_text(yaml_content, encoding="utf-8")
@@ -489,25 +523,27 @@ class TestIssueInReport:
             message="hash mismatch detected",
         )
         report = _report(
-            errors=[issue],
             sample_failures=[issue],
+            errors_total=1,
+            warnings_total=0,
             status="fail",
         )
         assert len(report.sample_failures) == 1
         assert report.sample_failures[0].code == ProcessedJsonlValidationIssueCode.HASH_MISMATCH
         assert report.status == "fail"
 
-    def test_warnings_populated(self) -> None:
+    def test_sample_warnings_populated(self) -> None:
         issue = _issue(
             code=ProcessedJsonlValidationIssueCode.WARNING_CONTAMINATION_FOUND,
             message="found BỘ TRƯỞNG",
         )
         report = _report(
-            warnings=[issue],
-            errors=[],
+            sample_warnings=[issue],
+            errors_total=0,
+            warnings_total=1,
             status="pass_with_warnings",
         )
-        assert len(report.warnings) == 1
+        assert len(report.sample_warnings) == 1
         assert report.status == "pass_with_warnings"
 
     def test_report_counts_are_non_negative(self) -> None:

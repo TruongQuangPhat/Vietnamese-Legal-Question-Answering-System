@@ -20,6 +20,7 @@ class ProcessedJsonlValidationIssueCode(StrEnum):
     JSONL_PARSE_ERROR = "JSONL_PARSE_ERROR"
     SCHEMA_VALIDATION_FAILED = "SCHEMA_VALIDATION_FAILED"
     REQUIRED_FIELD_MISSING = "REQUIRED_FIELD_MISSING"
+    DUPLICATE_CHUNK_ID = "DUPLICATE_CHUNK_ID"
     HASH_MISMATCH = "HASH_MISMATCH"
     CITATION_STRUCTURE_MISMATCH = "CITATION_STRUCTURE_MISMATCH"
     HARD_CONTAMINATION_FOUND = "HARD_CONTAMINATION_FOUND"
@@ -63,6 +64,11 @@ class ProcessedJsonlValidationReport(BaseModel):
     Confirms that ``data/processed/legal_chunks.jsonl`` is safe for Phase 8
     embedding/indexing.
 
+    Design note: ``errors_total`` and ``warnings_total`` are the authoritative
+    counts. ``sample_failures`` and ``sample_warnings`` are capped inspection
+    samples only — they do NOT contain all issues. The report must not store
+    uncapped issue lists for a 40k-chunk corpus.
+
     Attributes:
         schema_version: Report schema version.
         validator_version: Validator version that produced this report.
@@ -86,6 +92,8 @@ class ProcessedJsonlValidationReport(BaseModel):
         traceability_failures: Chunks failing hierarchy traceability checks.
         contamination_failures: Hard-fail contamination markers found.
         contamination_warnings: Warning-only contamination markers found.
+        errors_total: Authoritative total of hard-failure issues across all checks.
+        warnings_total: Authoritative total of non-fatal warning issues.
         chunks_by_level: Chunk counts grouped by level.
         chunks_by_law: Chunk counts grouped by law_id.
         text_length_summary: Statistics for chunk text lengths.
@@ -94,9 +102,8 @@ class ProcessedJsonlValidationReport(BaseModel):
         repealed_metadata_summary: Repealed/empty flag distribution.
         payload_readiness_summary: Payload field availability summary.
         embedding_readiness: Embedding contract validation summary.
-        sample_failures: Up to max_sample_failures representative error issues.
-        warnings: Non-fatal warning issues.
-        errors: Hard failure issues.
+        sample_failures: Representative error issues (capped by max_sample_failures).
+        sample_warnings: Representative warning issues (capped by max_sample_warnings).
         status: Overall gate status: pass, pass_with_warnings, or fail.
     """
 
@@ -106,7 +113,7 @@ class ProcessedJsonlValidationReport(BaseModel):
     validator_version: str = Field(..., min_length=1, description="Validator version")
     started_at: str = Field(..., min_length=1, description="ISO-8601 UTC start time")
     finished_at: str = Field(..., min_length=1, description="ISO-8601 UTC finish time")
-    duration_seconds: float = Field(..., ge=0.0, description="Validation duration")
+    duration_seconds: float = Field(..., ge=0.0, description="Validation duration in seconds")
     input_path: str = Field(..., min_length=1, description="Validated JSONL path")
     chunking_report_path: str = Field(..., min_length=1, description="Phase 6 chunking report path")
     hierarchy_dir: str | None = Field(None, description="Hierarchy JSON directory path or null")
@@ -137,6 +144,10 @@ class ProcessedJsonlValidationReport(BaseModel):
     contamination_warnings: int = Field(
         0, ge=0, description="Warning-only contamination markers found"
     )
+    errors_total: int = Field(0, ge=0, description="Total hard-failure issues across all checks")
+    warnings_total: int = Field(
+        0, ge=0, description="Total non-fatal warning issues across all checks"
+    )
 
     chunks_by_level: dict[str, int] = Field(
         default_factory=dict, description="Chunk counts by level"
@@ -164,13 +175,12 @@ class ProcessedJsonlValidationReport(BaseModel):
     )
 
     sample_failures: list[ProcessedJsonlIssue] = Field(
-        default_factory=list, description="Representative error issues (capped)"
+        default_factory=list,
+        description="Representative error issues (capped by max_sample_failures)",
     )
-    warnings: list[ProcessedJsonlIssue] = Field(
-        default_factory=list, description="Non-fatal warning issues"
-    )
-    errors: list[ProcessedJsonlIssue] = Field(
-        default_factory=list, description="Hard failure issues"
+    sample_warnings: list[ProcessedJsonlIssue] = Field(
+        default_factory=list,
+        description="Representative warning issues (capped by max_sample_warnings)",
     )
 
     status: Literal["pass", "pass_with_warnings", "fail"] = Field(
@@ -179,12 +189,17 @@ class ProcessedJsonlValidationReport(BaseModel):
 
     @model_validator(mode="after")
     def _validate_status_consistency(self) -> ProcessedJsonlValidationReport:
-        """Ensure status reflects errors and warnings."""
-        if self.errors and self.status != "fail":
+        """Ensure status reflects total error/warning counters, not sample lists.
+
+        Status logic uses ``errors_total`` and ``warnings_total`` as the
+        authoritative source because ``sample_failures``/``sample_warnings``
+        may be capped or intentionally empty.
+        """
+        if self.errors_total > 0 and self.status != "fail":
             self.status = "fail"
-        if not self.errors and self.warnings and self.status == "pass":
+        if self.errors_total == 0 and self.warnings_total > 0 and self.status == "pass":
             self.status = "pass_with_warnings"
-        if not self.errors and not self.warnings and self.status != "pass":
+        if self.errors_total == 0 and self.warnings_total == 0 and self.status != "pass":
             self.status = "pass"
         return self
 
@@ -219,7 +234,9 @@ class ProcessedJsonlValidationConfig(BaseModel):
     schema_version: str = Field(..., min_length=1, description="Config schema version")
     validator_version: str = Field(..., min_length=1, description="Validator version")
     input_path: str = Field(
-        "data/processed/legal_chunks.jsonl", min_length=1, description="JSONL input path"
+        "data/processed/legal_chunks.jsonl",
+        min_length=1,
+        description="JSONL input path",
     )
     chunking_report_path: str = Field(
         "artifacts/reports/chunking/chunking_report.json",

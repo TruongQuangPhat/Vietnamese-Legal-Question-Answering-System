@@ -1,0 +1,437 @@
+"""Phase 7 processed JSONL validator.
+
+This module implements the core JSONL validation pipeline for Phase 7.
+It streams ``data/processed/legal_chunks.jsonl`` line-by-line, validates
+each row as a ``LegalChunk``, checks required field completeness by
+``chunk_kind``, enforces global ``chunk_id`` uniqueness, and accumulates
+counters for the validation report.
+
+This validator is independent from Phase 6's ``LegalChunkValidator``.
+It reuses ``LegalChunk`` for schema validation but has its own issue codes
+and report model. Hash integrity, citation, contamination, hierarchy
+traceability, and embedding-readiness checks are added in later slices.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from src.processing.legal_chunk_models import (
+    ChunkingLevel,
+    LegalChunk,
+)
+from src.processing.processed_jsonl_validation_models import (
+    ProcessedJsonlIssue,
+    ProcessedJsonlValidationConfig,
+    ProcessedJsonlValidationIssueCode,
+    ProcessedJsonlValidationReport,
+)
+
+# Required field rules by chunk_kind (used by _check_required_field_values)
+_REQUIRED_BY_KIND: dict[str, dict[str, int | None]] = {
+    "article_level": {"article_number": 1},
+    "clause_level": {"article_number": 1, "clause_number": 1},
+    "point_level": {"article_number": 1, "clause_number": 1, "point_label": 1},
+}
+
+
+class ProcessedJsonlValidator:
+    """Phase 7 core validator for the processed chunk JSONL file.
+
+    Streams the JSONL file, validates each chunk, and produces a
+    ``ProcessedJsonlValidationReport``. Checks implemented in Slice 2:
+
+    1. JSONL parseability — every line parses as valid JSON.
+    2. ``LegalChunk`` schema validation — every row validates.
+    3. Required field presence — on raw dict before schema validation.
+    4. Required field value validity — by ``chunk_kind`` after validation.
+    5. Global ``chunk_id`` uniqueness.
+    6. Basic counters and distribution summaries.
+
+    Later slices add: hash integrity, count reconciliation, citation
+    structure, contamination, hierarchy traceability, embedding-readiness,
+    payload-readiness, and repealed metadata.
+    """
+
+    def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
+        """Initialize the validator with a config.
+
+        Args:
+            config: Phase 7 validation configuration including thresholds,
+                marker lists, and file paths.
+        """
+        self.config = config
+
+    def validate(
+        self,
+        input_path: Path,
+    ) -> ProcessedJsonlValidationReport:
+        """Run Slice 2 validation checks on the processed JSONL.
+
+        Streams the file line-by-line, validates each row, and builds
+        a ``ProcessedJsonlValidationReport`` with counters and capped
+        sample issues.
+
+        Args:
+            input_path: Path to ``data/processed/legal_chunks.jsonl``.
+
+        Returns:
+            A ``ProcessedJsonlValidationReport`` with validation results.
+            Status is ``pass`` when no errors or warnings are found,
+            ``pass_with_warnings`` when only warnings exist, and ``fail``
+            when any hard errors are found.
+        """
+        started_at = datetime.now(UTC).isoformat()
+        start_time = time.perf_counter()
+
+        # Accumulators
+        total_lines: int = 0
+        valid_chunks: int = 0
+        invalid_chunks: int = 0
+        jsonl_parse_failures: int = 0
+        schema_failures: int = 0
+        required_field_failures: int = 0
+        duplicate_chunk_ids: int = 0
+        errors_total: int = 0
+        warnings_total: int = 0
+
+        chunks_by_level: dict[str, int] = {}
+        chunks_by_law: dict[str, int] = {}
+
+        sample_failures: list[ProcessedJsonlIssue] = []
+        sample_warnings: list[ProcessedJsonlIssue] = []
+
+        seen_chunk_ids: set[str] = set()
+
+        def _add_sample_failure(issue: ProcessedJsonlIssue) -> None:
+            if len(sample_failures) < self.config.max_sample_failures:
+                sample_failures.append(issue)
+
+        def _add_sample_warning(issue: ProcessedJsonlIssue) -> None:
+            if len(sample_warnings) < self.config.max_sample_warnings:
+                sample_warnings.append(issue)
+
+        def _bump_level(level: ChunkingLevel) -> None:
+            key = level.value
+            chunks_by_level[key] = chunks_by_level.get(key, 0) + 1
+
+        def _bump_law(law_id: str) -> None:
+            chunks_by_law[law_id] = chunks_by_law.get(law_id, 0) + 1
+
+        def _make_issue(
+            code: ProcessedJsonlValidationIssueCode,
+            message: str,
+            law_id: str,
+            chunk_id: str | None,
+            line_number: int | None,
+            context: dict[str, Any] | None = None,
+        ) -> ProcessedJsonlIssue:
+            # Sanitize: ProcessedJsonlIssue requires non-empty law_id
+            safe_law_id = law_id if law_id else "unknown"
+            return ProcessedJsonlIssue(
+                code=code,
+                message=message,
+                law_id=safe_law_id,
+                chunk_id=chunk_id,
+                line_number=line_number,
+                context=context or {},
+            )
+
+        # --- Stream and validate ---
+        with input_path.open("r", encoding="utf-8") as fh:
+            for line_number, raw_line in enumerate(fh, start=1):
+                total_lines += 1
+                stripped = raw_line.strip()
+                line_has_error = False
+
+                # Blank lines are validation errors in processed JSONL
+                if not stripped:
+                    jsonl_parse_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.JSONL_PARSE_ERROR,
+                            message="Blank line in JSONL",
+                            law_id="unknown",
+                            chunk_id=None,
+                            line_number=line_number,
+                        )
+                    )
+                    invalid_chunks += 1
+                    continue
+
+                # Check 1: JSONL parseability
+                try:
+                    parsed: dict[str, Any] = json.loads(stripped)
+                except json.JSONDecodeError as exc:
+                    jsonl_parse_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.JSONL_PARSE_ERROR,
+                            message=f"JSON parse error: {exc}",
+                            law_id="unknown",
+                            chunk_id=None,
+                            line_number=line_number,
+                            context={"error": str(exc)},
+                        )
+                    )
+                    invalid_chunks += 1
+                    continue
+
+                if not isinstance(parsed, dict):
+                    schema_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    invalid_chunks += 1
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.SCHEMA_VALIDATION_FAILED,
+                            message="JSONL row is not a JSON object",
+                            law_id="unknown",
+                            chunk_id=None,
+                            line_number=line_number,
+                        )
+                    )
+                    continue
+
+                # Check 2a: Required field presence on raw dict
+                # Catches missing fields before Pydantic defaults hide them
+                presence_errors = _check_required_field_presence(parsed)
+                if presence_errors:
+                    required_field_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    for field_name, reason in presence_errors:
+                        _add_sample_failure(
+                            _make_issue(
+                                code=ProcessedJsonlValidationIssueCode.REQUIRED_FIELD_MISSING,
+                                message=reason,
+                                law_id=parsed.get("law_id", "unknown") or "unknown",
+                                chunk_id=parsed.get("chunk_id"),
+                                line_number=line_number,
+                                context={"field": field_name},
+                            )
+                        )
+                    invalid_chunks += 1
+                    continue
+
+                # Check 2b: LegalChunk schema validation
+                try:
+                    chunk = LegalChunk.model_validate(parsed)
+                except Exception as exc:
+                    schema_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    invalid_chunks += 1
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.SCHEMA_VALIDATION_FAILED,
+                            message=f"Schema validation failed: {exc}",
+                            law_id=parsed.get("law_id", "unknown") or "unknown",
+                            chunk_id=parsed.get("chunk_id"),
+                            line_number=line_number,
+                            context={"error": str(exc)},
+                        )
+                    )
+                    continue
+
+                # Track distribution for valid schema rows
+                _bump_level(chunk.level)
+                _bump_law(chunk.law_id)
+
+                # Check 3: Required field value validity by chunk_kind
+                field_errors = _check_required_field_values(chunk, chunk.chunk_kind)
+                if field_errors:
+                    required_field_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    for field_name, reason in field_errors:
+                        _add_sample_failure(
+                            _make_issue(
+                                code=ProcessedJsonlValidationIssueCode.REQUIRED_FIELD_MISSING,
+                                message=reason,
+                                law_id=chunk.law_id,
+                                chunk_id=chunk.chunk_id,
+                                line_number=line_number,
+                                context={"field": field_name},
+                            )
+                        )
+                    invalid_chunks += 1
+                    continue
+
+                # Check 4: Global chunk_id uniqueness
+                if chunk.chunk_id in seen_chunk_ids:
+                    duplicate_chunk_ids += 1
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.DUPLICATE_CHUNK_ID,
+                            message=f"Duplicate chunk_id: {chunk.chunk_id}",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={"chunk_id": chunk.chunk_id},
+                        )
+                    )
+                else:
+                    seen_chunk_ids.add(chunk.chunk_id)
+
+                # Count valid/invalid per line
+                if line_has_error:
+                    invalid_chunks += 1
+                else:
+                    valid_chunks += 1
+
+        # --- Build report ---
+        finished_at = datetime.now(UTC).isoformat()
+        duration_seconds = round(time.perf_counter() - start_time, 3)
+
+        report = ProcessedJsonlValidationReport(
+            schema_version=self.config.schema_version,
+            validator_version=self.config.validator_version,
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_seconds=duration_seconds,
+            input_path=str(input_path),
+            chunking_report_path=self.config.chunking_report_path,
+            hierarchy_dir=self.config.hierarchy_dir,
+            traceability_checks_skipped=True,
+            total_lines=total_lines,
+            valid_chunks=valid_chunks,
+            invalid_chunks=invalid_chunks,
+            jsonl_parse_failures=jsonl_parse_failures,
+            schema_failures=schema_failures,
+            required_field_failures=required_field_failures,
+            duplicate_chunk_ids=duplicate_chunk_ids,
+            count_reconciliation_failures=0,
+            hash_mismatches=0,
+            citation_failures=0,
+            traceability_failures=0,
+            contamination_failures=0,
+            contamination_warnings=0,
+            errors_total=errors_total,
+            warnings_total=warnings_total,
+            chunks_by_level=chunks_by_level,
+            chunks_by_law=chunks_by_law,
+            text_length_summary={},
+            parent_text_length_summary={},
+            long_parent_text_summary={},
+            repealed_metadata_summary={},
+            payload_readiness_summary={},
+            embedding_readiness={},
+            sample_failures=sample_failures,
+            sample_warnings=sample_warnings,
+            status="pass",
+        )
+
+        return report
+
+
+def _check_required_field_presence(
+    parsed: dict[str, Any],
+) -> list[tuple[str, str]]:
+    """Check that all required fields are present in the raw parsed dict.
+
+    Runs before ``LegalChunk.model_validate`` so missing fields are
+    reported as ``REQUIRED_FIELD_MISSING`` rather than
+    ``SCHEMA_VALIDATION_FAILED``.
+
+    Args:
+        parsed: Raw parsed JSON dict from the JSONL line.
+
+    Returns:
+        A list of ``(field_name, reason)`` tuples for each missing field.
+    """
+    errors: list[tuple[str, str]] = []
+    required_fields = [
+        "chunk_id",
+        "law_id",
+        "law_name",
+        "level",
+        "chunk_kind",
+        "citation",
+        "hierarchy_path",
+        "source_node_id",
+        "parent_article_node_id",
+        "article_number",
+        "clause_number",
+        "point_label",
+        "text",
+        "parent_text",
+        "text_hash",
+        "parent_text_hash",
+        "metadata",
+    ]
+    for field_name in required_fields:
+        if field_name not in parsed:
+            errors.append((field_name, f"{field_name} is missing from JSONL row"))
+    return errors
+
+
+def _check_required_field_values(
+    chunk: LegalChunk,
+    chunk_kind: str,
+) -> list[tuple[str, str]]:
+    """Check required field value validity by chunk_kind.
+
+    Runs after ``LegalChunk.model_validate`` on the validated chunk
+    object. Checks that fields with defaults are not empty/None when
+    they should have real values.
+
+    Args:
+        chunk: The validated ``LegalChunk`` to check.
+        chunk_kind: The chunk's kind string (e.g. ``"article_level"``).
+
+    Returns:
+        A list of ``(field_name, reason)`` tuples for each invalid field.
+    """
+    errors: list[tuple[str, str]] = []
+
+    # Universal non-empty string fields
+    if not chunk.chunk_id:
+        errors.append(("chunk_id", "chunk_id is empty"))
+    if not chunk.law_id:
+        errors.append(("law_id", "law_id is empty"))
+    if not chunk.law_name:
+        errors.append(("law_name", "law_name is empty"))
+    if not chunk.chunk_kind:
+        errors.append(("chunk_kind", "chunk_kind is empty"))
+    if not chunk.citation:
+        errors.append(("citation", "citation is empty"))
+    if not chunk.source_node_id:
+        errors.append(("source_node_id", "source_node_id is empty"))
+    if not chunk.parent_article_node_id:
+        errors.append(("parent_article_node_id", "parent_article_node_id is empty"))
+    if not chunk.text:
+        errors.append(("text", "text is empty"))
+    if not chunk.parent_text:
+        errors.append(("parent_text", "parent_text is empty"))
+    if not chunk.text_hash:
+        errors.append(("text_hash", "text_hash is empty"))
+    if not chunk.parent_text_hash:
+        errors.append(("parent_text_hash", "parent_text_hash is empty"))
+
+    # Metadata booleans must be present
+    if not isinstance(chunk.metadata.is_empty_or_repealed, bool):
+        errors.append(("metadata.is_empty_or_repealed", "must be a boolean"))
+    if not isinstance(chunk.metadata.is_source_unit_repealed, bool):
+        errors.append(("metadata.is_source_unit_repealed", "must be a boolean"))
+
+    # Kind-specific required fields
+    kind_rules = _REQUIRED_BY_KIND.get(chunk_kind, {})
+    if "article_number" in kind_rules and not chunk.article_number:
+        errors.append(("article_number", f"required for {chunk_kind}"))
+    if "clause_number" in kind_rules and not chunk.clause_number:
+        errors.append(("clause_number", f"required for {chunk_kind}"))
+    if "point_label" in kind_rules and not chunk.point_label:
+        errors.append(("point_label", f"required for {chunk_kind}"))
+
+    return errors
