@@ -10,8 +10,8 @@ against the Phase 6 chunking report.
 This validator is independent from Phase 6's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
 and report model. Hash integrity, count reconciliation, citation structure,
-hierarchy traceability, and contamination checks are implemented;
-embedding-readiness checks are added in later slices.
+hierarchy traceability, contamination checks, and repealed metadata auditing
+are implemented; embedding-readiness checks are added in later slices.
 """
 
 from __future__ import annotations
@@ -57,9 +57,9 @@ class ProcessedJsonlValidator:
     6. Basic counters and distribution summaries.
 
     Slice 3A adds hash integrity, Slice 3B adds count reconciliation, Slice 3C
-    adds citation structure, Slice 3D adds hierarchy traceability, and Slice 3E
-    adds contamination auditing. Later slices add embedding-readiness,
-    payload-readiness, and repealed metadata.
+    adds citation structure, Slice 3D adds hierarchy traceability, Slice 3E
+    adds contamination auditing, and Slice 3F audits repealed/empty metadata.
+    Later slices add embedding-readiness and payload-readiness.
     """
 
     def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
@@ -75,7 +75,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3E on the processed JSONL.
+        """Run validation checks through Slice 3F on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -106,12 +106,24 @@ class ProcessedJsonlValidator:
         traceability_failures: int = 0
         contamination_failures: int = 0
         contamination_warnings: int = 0
+        repealed_metadata_mismatches: int = 0
+        repealed_metadata_warnings: int = 0
         count_reconciliation_failures: int = 0
         errors_total: int = 0
         warnings_total: int = 0
 
         chunks_by_level: dict[str, int] = {}
         chunks_by_law: dict[str, int] = {}
+        repealed_metadata_summary: dict[str, int] = {
+            "metadata_empty_or_repealed_count": 0,
+            "metadata_source_unit_repealed_count": 0,
+            "text_repealed_pattern_count": 0,
+            "parent_text_repealed_pattern_count": 0,
+            "text_or_parent_repealed_pattern_count": 0,
+            "text_repealed_but_metadata_not_marked_count": 0,
+            "article_parent_repealed_but_metadata_not_marked_count": 0,
+            "metadata_marked_but_no_text_pattern_count": 0,
+        }
 
         sample_failures: list[ProcessedJsonlIssue] = []
         sample_warnings: list[ProcessedJsonlIssue] = []
@@ -626,6 +638,99 @@ class ProcessedJsonlValidator:
                         )
                     )
 
+                # Check 9: Repealed/empty metadata consistency
+                text_repealed_matches, parent_repealed_matches = _scan_repealed_patterns(
+                    chunk.text,
+                    chunk.parent_text,
+                    self.config.repealed_placeholder_patterns,
+                )
+                metadata_empty_or_repealed = chunk.metadata.is_empty_or_repealed
+                metadata_source_unit_repealed = chunk.metadata.is_source_unit_repealed
+                metadata_marked = metadata_empty_or_repealed or metadata_source_unit_repealed
+                text_has_repealed_pattern = bool(text_repealed_matches)
+                parent_text_has_repealed_pattern = bool(parent_repealed_matches)
+                any_text_pattern = text_has_repealed_pattern or parent_text_has_repealed_pattern
+
+                if metadata_empty_or_repealed:
+                    repealed_metadata_summary["metadata_empty_or_repealed_count"] += 1
+                if metadata_source_unit_repealed:
+                    repealed_metadata_summary["metadata_source_unit_repealed_count"] += 1
+                if text_has_repealed_pattern:
+                    repealed_metadata_summary["text_repealed_pattern_count"] += 1
+                if parent_text_has_repealed_pattern:
+                    repealed_metadata_summary["parent_text_repealed_pattern_count"] += 1
+                if any_text_pattern:
+                    repealed_metadata_summary["text_or_parent_repealed_pattern_count"] += 1
+
+                text_metadata_mismatch = text_has_repealed_pattern and not metadata_marked
+                article_parent_metadata_mismatch = (
+                    chunk.chunk_kind in {"article_level", "article_level_empty"}
+                    and parent_text_has_repealed_pattern
+                    and not metadata_marked
+                )
+                if text_metadata_mismatch:
+                    repealed_metadata_summary["text_repealed_but_metadata_not_marked_count"] += 1
+                if article_parent_metadata_mismatch:
+                    repealed_metadata_summary[
+                        "article_parent_repealed_but_metadata_not_marked_count"
+                    ] += 1
+
+                if text_metadata_mismatch or article_parent_metadata_mismatch:
+                    repealed_metadata_mismatches += 1
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.REPEALED_METADATA_MISMATCH,
+                            message="Repealed text is not reflected in chunk metadata",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "citation": chunk.citation,
+                                "metadata": {
+                                    "is_empty_or_repealed": metadata_empty_or_repealed,
+                                    "is_source_unit_repealed": (metadata_source_unit_repealed),
+                                },
+                                "matched_patterns": [
+                                    {"field": field, "pattern": pattern}
+                                    for field, pattern in (
+                                        text_repealed_matches + parent_repealed_matches
+                                    )
+                                ],
+                                "text_has_repealed_pattern": (text_has_repealed_pattern),
+                                "parent_text_has_repealed_pattern": (
+                                    parent_text_has_repealed_pattern
+                                ),
+                            },
+                        )
+                    )
+
+                if metadata_marked and not any_text_pattern:
+                    repealed_metadata_warnings += 1
+                    repealed_metadata_summary["metadata_marked_but_no_text_pattern_count"] += 1
+                    warnings_total += 1
+                    _add_sample_warning(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.REPEALED_METADATA_MISMATCH,
+                            message="Repealed metadata has no configured text pattern",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "citation": chunk.citation,
+                                "metadata": {
+                                    "is_empty_or_repealed": metadata_empty_or_repealed,
+                                    "is_source_unit_repealed": (metadata_source_unit_repealed),
+                                },
+                                "text_has_repealed_pattern": False,
+                                "parent_text_has_repealed_pattern": False,
+                            },
+                        )
+                    )
+
                 # Count valid/invalid per line
                 if line_has_error:
                     invalid_chunks += 1
@@ -636,6 +741,8 @@ class ProcessedJsonlValidator:
         count_reconciliation_failures += recon_failures
         errors_total += recon_failures
         warnings_total += recon_warnings
+        repealed_metadata_summary["metadata_mismatch_failure_count"] = repealed_metadata_mismatches
+        repealed_metadata_summary["metadata_mismatch_warning_count"] = repealed_metadata_warnings
 
         # --- Build report ---
         finished_at = datetime.now(UTC).isoformat()
@@ -671,7 +778,7 @@ class ProcessedJsonlValidator:
             text_length_summary={},
             parent_text_length_summary={},
             long_parent_text_summary={},
-            repealed_metadata_summary={},
+            repealed_metadata_summary=repealed_metadata_summary,
             payload_readiness_summary={},
             embedding_readiness={},
             sample_failures=sample_failures,
@@ -1074,6 +1181,41 @@ def _scan_contamination(
         return matches
 
     return _find(hard_markers), _find(warning_markers)
+
+
+def _scan_repealed_patterns(
+    text: str,
+    parent_text: str,
+    patterns: list[str],
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Find configured repealed placeholders in child and parent text.
+
+    Patterns are treated as conservative fixed phrases rather than broad
+    semantic expressions. Matching is case-insensitive and tolerates runs of
+    whitespace, while preserving punctuation such as literal parentheses.
+
+    Args:
+        text: Selected Article, Clause, or Point content.
+        parent_text: Parent Article context.
+        patterns: Configured repealed placeholder phrases.
+
+    Returns:
+        Separate child and parent matches as ``(field_name, pattern)`` tuples.
+    """
+
+    def _normalize(value: str) -> str:
+        return " ".join(value.casefold().split())
+
+    def _find(field_name: str, value: str) -> list[tuple[str, str]]:
+        normalized_value = _normalize(value)
+        matches: list[tuple[str, str]] = []
+        for pattern in patterns:
+            normalized_pattern = _normalize(pattern)
+            if normalized_pattern and normalized_pattern in normalized_value:
+                matches.append((field_name, pattern))
+        return matches
+
+    return _find("text", text), _find("parent_text", parent_text)
 
 
 def _check_citation_structure(chunk: LegalChunk) -> list[tuple[str, str]]:

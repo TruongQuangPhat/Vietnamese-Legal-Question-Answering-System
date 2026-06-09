@@ -16,7 +16,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3C: Complete
 - Slice 3D: Complete
 - Slice 3E: Complete
-- Slice 3F and later: Not started
+- Slice 3F: Complete
+- Slice 3G and later: Not started
 
 ## Completed Slices
 
@@ -115,6 +116,21 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - A chunk containing both categories records one hard failure and one warning.
 - The colon remains required for `Nơi nhận:` and `Lưu:`, so text such as
   `Lưu ý` does not trigger the `Lưu:` hard marker.
+
+### Slice 3F — Repealed / Empty Metadata Audit
+
+- Counts both `is_empty_or_repealed` and `is_source_unit_repealed` flags.
+- Scans `text` and `parent_text` for the configured conservative repealed
+  placeholder phrases using case-insensitive, whitespace-normalized matching.
+- Hard-fails direct `text` patterns without either metadata flag.
+- Hard-fails parent-only patterns without metadata for Article chunks, where
+  the parent and selected source represent the same legal unit.
+- Does not fail Clause or Point chunks solely because shared `parent_text`
+  contains a repealed sibling; those matches remain visible in the summary.
+- Warns when metadata is marked but neither field contains a configured
+  repealed pattern.
+- Counts one mismatch per affected chunk and retains matched field/pattern
+  details in capped issue samples.
 
 ## Current Review Before Slice 3C
 
@@ -318,6 +334,62 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Slice 3F Implementation — Repealed / Empty Metadata Audit
+
+Objective: audit whether empty/repealed metadata agrees with conservative
+placeholder phrases in selected chunk text and parent Article context, without
+modifying generated chunks.
+
+Configured patterns:
+
+- `(được bãi bỏ)`
+- `Điều này được bãi bỏ`
+- `Khoản này được bãi bỏ`
+- `Điểm này được bãi bỏ`
+
+Populated summary fields:
+
+- `metadata_empty_or_repealed_count`
+- `metadata_source_unit_repealed_count`
+- `text_repealed_pattern_count`
+- `parent_text_repealed_pattern_count`
+- `text_or_parent_repealed_pattern_count`
+- `text_repealed_but_metadata_not_marked_count`
+- `article_parent_repealed_but_metadata_not_marked_count`
+- `metadata_marked_but_no_text_pattern_count`
+- `metadata_mismatch_failure_count`
+- `metadata_mismatch_warning_count`
+
+Implementation files:
+
+- `src/processing/processed_jsonl_validation_models.py`
+- `src/processing/processed_jsonl_validator.py`
+- `tests/unit/processing/test_processed_jsonl_validation_models.py`
+- `tests/unit/processing/test_processed_jsonl_validator.py`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+The validation model received the minimal stable issue code
+`REPEALED_METADATA_MISMATCH`. No new source module was created.
+
+Verification result:
+
+- Phase 7 model and validator tests: 132 passed.
+- Read-only full-corpus validation: 40,389 valid chunks, 0 invalid chunks,
+  0 Slice 3F failures, and 0 Slice 3F warnings.
+- Full-corpus repealed summary: 180 `is_empty_or_repealed`, 180
+  `is_source_unit_repealed`, 180 direct `text` matches, 756 `parent_text`
+  matches, and 0 metadata inconsistencies.
+- The additional 576 parent-only matches belong to Clause/Point chunks whose
+  shared parent Article contains a repealed sibling; they are summarized but
+  not treated as source-unit mismatches.
+- Overall status remains `pass_with_warnings` because Slice 3E still reports
+  3,561 warning-only contamination chunks.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
+
 ## Non-goals
 
 Phase 7 validation slices must not:
@@ -359,5 +431,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3E is complete. Slice 3F and later are not started; wait for explicit
+Slice 3F is complete. Slice 3G and later are not started; wait for explicit
 approval before implementing the next validation slice.

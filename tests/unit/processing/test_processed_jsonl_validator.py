@@ -972,12 +972,15 @@ class TestCitationStructure:
         assert report.status == "pass"
 
     def test_article_level_empty_citation_with_article_passes(self, tmp_path: Path) -> None:
+        text = "Điều 1. (được bãi bỏ)"
         report = self._validate_chunk(
             tmp_path,
             "article_empty_valid.jsonl",
             _valid_chunk(
                 chunk_kind="article_level_empty",
                 citation="Luật thử nghiệm (VBHN), Điều 1",
+                text=text,
+                text_hash=_compute_text_hash(text),
                 metadata=ChunkingMetadata(
                     is_empty_or_repealed=True,
                     is_source_unit_repealed=True,
@@ -1738,12 +1741,236 @@ class TestContaminationAudit:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3E scope: later checks are not yet implemented
+# Slice 3F: Repealed/empty metadata audit tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3EScope:
-    """Slice 3E implements contamination auditing; later checks are neutral."""
+class TestRepealedMetadataAudit:
+    """Repealed text patterns and metadata consistency checks."""
+
+    def _chunk(
+        self,
+        *,
+        text: str = "Nội dung văn bản pháp luật.",
+        parent_text: str = "Nội dung đầy đủ của Điều 1.",
+        metadata: ChunkingMetadata | None = None,
+        **overrides: object,
+    ) -> LegalChunk:
+        return _valid_chunk(
+            text=text,
+            parent_text=parent_text,
+            text_hash=_compute_text_hash(text),
+            parent_text_hash=_compute_text_hash(parent_text),
+            metadata=metadata or ChunkingMetadata(),
+            **overrides,
+        )
+
+    def _validate_chunk(
+        self,
+        tmp_path: Path,
+        filename: str,
+        chunk: LegalChunk,
+    ) -> ProcessedJsonlValidationReport:
+        jsonl_path = tmp_path / filename
+        _write_jsonl(jsonl_path, [chunk])
+        return ProcessedJsonlValidator(_config(jsonl_path)).validate(jsonl_path)
+
+    def test_clean_non_repealed_chunk_summary_counts_zero(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "repealed_clean.jsonl",
+            self._chunk(),
+        )
+
+        assert report.repealed_metadata_summary == {
+            "metadata_empty_or_repealed_count": 0,
+            "metadata_source_unit_repealed_count": 0,
+            "text_repealed_pattern_count": 0,
+            "parent_text_repealed_pattern_count": 0,
+            "text_or_parent_repealed_pattern_count": 0,
+            "text_repealed_but_metadata_not_marked_count": 0,
+            "article_parent_repealed_but_metadata_not_marked_count": 0,
+            "metadata_marked_but_no_text_pattern_count": 0,
+            "metadata_mismatch_failure_count": 0,
+            "metadata_mismatch_warning_count": 0,
+        }
+
+    def test_metadata_empty_or_repealed_counted(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "metadata_empty.jsonl",
+            self._chunk(
+                text="Điều 1. (được bãi bỏ)",
+                metadata=ChunkingMetadata(is_empty_or_repealed=True),
+            ),
+        )
+
+        summary = report.repealed_metadata_summary
+        assert summary["metadata_empty_or_repealed_count"] == 1
+        assert summary["text_repealed_pattern_count"] == 1
+        assert summary["metadata_mismatch_failure_count"] == 0
+
+    def test_metadata_source_unit_repealed_counted(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "metadata_source.jsonl",
+            self._chunk(
+                text="Điều này được bãi bỏ",
+                metadata=ChunkingMetadata(is_source_unit_repealed=True),
+            ),
+        )
+
+        assert report.repealed_metadata_summary["metadata_source_unit_repealed_count"] == 1
+        assert report.status == "pass"
+
+    def test_text_repealed_pattern_counted(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "repealed_text.jsonl",
+            self._chunk(
+                text="Khoản này được bãi bỏ",
+                metadata=ChunkingMetadata(is_source_unit_repealed=True),
+                level=ChunkingLevel.CLAUSE,
+                chunk_kind="clause_level",
+                clause_number="2",
+                citation="Luật thử nghiệm, Khoản 2, Điều 1",
+            ),
+        )
+
+        assert report.repealed_metadata_summary["text_repealed_pattern_count"] == 1
+        assert report.repealed_metadata_summary["text_or_parent_repealed_pattern_count"] == 1
+
+    def test_parent_text_repealed_pattern_counted(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "repealed_parent.jsonl",
+            self._chunk(
+                parent_text="Điểm này được bãi bỏ",
+                metadata=ChunkingMetadata(is_empty_or_repealed=True),
+            ),
+        )
+
+        assert report.repealed_metadata_summary["parent_text_repealed_pattern_count"] == 1
+        assert report.repealed_metadata_summary["text_or_parent_repealed_pattern_count"] == 1
+
+    def test_repealed_text_without_metadata_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "repealed_text_mismatch.jsonl",
+            self._chunk(text="Khoản này được bãi bỏ"),
+        )
+
+        assert report.status == "fail"
+        assert report.errors_total == 1
+        assert report.invalid_chunks == 1
+        assert (
+            report.sample_failures[0].code
+            == ProcessedJsonlValidationIssueCode.REPEALED_METADATA_MISMATCH
+        )
+        assert report.repealed_metadata_summary["text_repealed_but_metadata_not_marked_count"] == 1
+
+    def test_repealed_parent_text_without_metadata_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "repealed_parent_mismatch.jsonl",
+            self._chunk(parent_text="Điều này được bãi bỏ"),
+        )
+
+        assert report.status == "fail"
+        assert report.invalid_chunks == 1
+        assert (
+            report.repealed_metadata_summary[
+                "article_parent_repealed_but_metadata_not_marked_count"
+            ]
+            == 1
+        )
+
+    def test_metadata_marked_without_text_pattern_warns(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "repealed_metadata_warning.jsonl",
+            self._chunk(
+                metadata=ChunkingMetadata(is_empty_or_repealed=True),
+            ),
+        )
+
+        assert report.status == "pass_with_warnings"
+        assert report.invalid_chunks == 0
+        assert report.warnings_total == 1
+        assert (
+            report.sample_warnings[0].code
+            == ProcessedJsonlValidationIssueCode.REPEALED_METADATA_MISMATCH
+        )
+        assert report.repealed_metadata_summary["metadata_marked_but_no_text_pattern_count"] == 1
+
+    def test_multiple_repealed_patterns_count_once_per_chunk_for_mismatch(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "multiple_repealed_patterns.jsonl",
+            self._chunk(
+                text="Điều này được bãi bỏ.\nKhoản này được bãi bỏ.",
+            ),
+        )
+
+        assert report.errors_total == 1
+        assert report.invalid_chunks == 1
+        assert report.repealed_metadata_summary["metadata_mismatch_failure_count"] == 1
+        assert len(report.sample_failures[0].context["matched_patterns"]) == 2
+
+    def test_summary_counts_multiple_chunks(self, tmp_path: Path) -> None:
+        chunks = [
+            self._chunk(chunk_id="clean"),
+            self._chunk(
+                chunk_id="marked",
+                text="Điều 1. (được bãi bỏ)",
+                metadata=ChunkingMetadata(
+                    is_empty_or_repealed=True,
+                    is_source_unit_repealed=True,
+                ),
+            ),
+            self._chunk(
+                chunk_id="parent_context",
+                level=ChunkingLevel.CLAUSE,
+                chunk_kind="clause_level",
+                clause_number="2",
+                citation="Luật thử nghiệm, Khoản 2, Điều 1",
+                parent_text="Điều 1.\nĐiểm này được bãi bỏ",
+            ),
+            self._chunk(
+                chunk_id="metadata_warning",
+                metadata=ChunkingMetadata(is_empty_or_repealed=True),
+            ),
+        ]
+        jsonl_path = tmp_path / "repealed_summary.jsonl"
+        _write_jsonl(jsonl_path, chunks)
+
+        report = ProcessedJsonlValidator(_config(jsonl_path)).validate(jsonl_path)
+
+        assert report.repealed_metadata_summary == {
+            "metadata_empty_or_repealed_count": 2,
+            "metadata_source_unit_repealed_count": 1,
+            "text_repealed_pattern_count": 1,
+            "parent_text_repealed_pattern_count": 1,
+            "text_or_parent_repealed_pattern_count": 2,
+            "text_repealed_but_metadata_not_marked_count": 0,
+            "article_parent_repealed_but_metadata_not_marked_count": 0,
+            "metadata_marked_but_no_text_pattern_count": 1,
+            "metadata_mismatch_failure_count": 0,
+            "metadata_mismatch_warning_count": 1,
+        }
+        assert report.status == "pass_with_warnings"
+
+
+# ---------------------------------------------------------------------------
+# Slice 3F scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3FScope:
+    """Slice 3F audits repealed metadata; later readiness checks are neutral."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""
@@ -1789,6 +2016,7 @@ class TestSlice3EScope:
         assert report.text_length_summary == {}
         assert report.parent_text_length_summary == {}
         assert report.long_parent_text_summary == {}
-        assert report.repealed_metadata_summary == {}
+        assert report.repealed_metadata_summary["metadata_mismatch_failure_count"] == 0
+        assert report.repealed_metadata_summary["metadata_mismatch_warning_count"] == 0
         assert report.payload_readiness_summary == {}
         assert report.embedding_readiness == {}
