@@ -17,7 +17,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3D: Complete
 - Slice 3E: Complete
 - Slice 3F: Complete
-- Slice 3G and later: Not started
+- Slice 3G: Complete
+- Slice 3H and later: Not started
 
 ## Completed Slices
 
@@ -131,6 +132,22 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
   repealed pattern.
 - Counts one mismatch per affected chunk and retains matched field/pattern
   details in capped issue samples.
+
+### Slice 3G — Text Length / Parent Text Length Readiness
+
+- Collects character lengths for schema-valid `text` and `parent_text`.
+- Populates deterministic min/max/mean/median and p90/p95/p99 summaries.
+- Uses 20 characters as the very-short reporting threshold, 50 characters for
+  short-text warnings, and 4,000 characters for long-text warnings.
+- Uses configured parent thresholds: 15,000 characters for long warnings and
+  20,000 for extreme warnings.
+- Whitespace-only non-repealed `text` is a hard failure; repealed/empty
+  metadata suppresses that new length hard failure.
+- Short/long text and empty/long/extreme parent context are warning-only.
+- Counts each condition authoritatively while emitting at most one length
+  warning issue per affected chunk.
+- Preserves up to five longest parent-context examples and reports configured
+  parent length bucket counts without modifying or truncating chunks.
 
 ## Current Review Before Slice 3C
 
@@ -390,6 +407,61 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Slice 3G Implementation — Text Length / Parent Text Length Readiness
+
+Objective: measure embedding-unit and parent-context character lengths and
+surface readiness risks without splitting, truncating, or rewriting chunks.
+
+Thresholds:
+
+- very short `text`: fewer than 20 characters, summary-only counter;
+- short `text`: fewer than 50 characters, warning-only;
+- long `text`: more than 4,000 characters, warning-only;
+- long `parent_text`: more than configured 15,000 characters, warning-only;
+- extreme `parent_text`: more than configured 20,000 characters, warning-only.
+
+Populated report summaries:
+
+- `text_length_summary`: count, min/max/mean/median, p90/p95/p99, empty,
+  very-short, short-warning and long-warning counts, plus thresholds.
+- `parent_text_length_summary`: count, min/max/mean/median, p90/p95/p99,
+  empty, long-warning and extreme-warning counts, plus thresholds.
+- `long_parent_text_summary`: thresholds, long/extreme counts, maximum,
+  configured bucket counts, and up to five longest examples.
+
+Implementation files:
+
+- `src/processing/processed_jsonl_validation_models.py`
+- `src/processing/processed_jsonl_validator.py`
+- `tests/unit/processing/test_processed_jsonl_validation_models.py`
+- `tests/unit/processing/test_processed_jsonl_validator.py`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+The validation model received `TEXT_LENGTH_WARNING` and `EMPTY_TEXT_FOUND`.
+The existing `VERY_LONG_PARENT_TEXT` code is reused. The existing
+`long_parent_text_summary` value type was widened to support structured capped
+examples. No new source module was created.
+
+Verification result:
+
+- Phase 7 model and validator tests: 144 passed.
+- Read-only full-corpus validation: 40,389 valid chunks, 0 invalid chunks, and
+  0 hard length failures.
+- `text`: min 9, max 3,430, p95 466, p99 728; 475 very-short chunks,
+  4,645 short-text warnings, 0 empty text, and 0 long-text warnings.
+- `parent_text`: min 26, max 14,481, p95 4,884, p99 8,704; 0 empty,
+  0 long warnings, and 0 extreme warnings.
+- Parent buckets: 36,887 at or below 4,000; 3,284 from 4,001–10,000;
+  218 from 10,001–15,000; none above 15,000.
+- Overall status remains `pass_with_warnings`; authoritative warnings total
+  8,206, including the existing 3,561 contamination warnings and 4,645 new
+  short-text readiness warnings.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
+
 ## Non-goals
 
 Phase 7 validation slices must not:
@@ -431,5 +503,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3F is complete. Slice 3G and later are not started; wait for explicit
+Slice 3G is complete. Slice 3H and later are not started; wait for explicit
 approval before implementing the next validation slice.

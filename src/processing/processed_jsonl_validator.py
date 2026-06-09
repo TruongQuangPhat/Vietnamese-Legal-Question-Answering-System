@@ -10,8 +10,9 @@ against the Phase 6 chunking report.
 This validator is independent from Phase 6's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
 and report model. Hash integrity, count reconciliation, citation structure,
-hierarchy traceability, contamination checks, and repealed metadata auditing
-are implemented; embedding-readiness checks are added in later slices.
+hierarchy traceability, contamination checks, repealed metadata auditing, and
+text-length readiness summaries are implemented; embedding-readiness checks
+are added in later slices.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import mean, median
 from typing import Any
 
 from src.processing.legal_chunk_models import (
@@ -42,6 +44,11 @@ _REQUIRED_BY_KIND: dict[str, dict[str, int | None]] = {
     "point_level": {"article_number": 1, "clause_number": 1, "point_label": 1},
 }
 
+_MIN_TEXT_CHARS = 20
+_SHORT_TEXT_WARNING_CHARS = 50
+_LONG_TEXT_WARNING_CHARS = 4000
+_LONG_PARENT_TEXT_EXAMPLE_LIMIT = 5
+
 
 class ProcessedJsonlValidator:
     """Phase 7 core validator for the processed chunk JSONL file.
@@ -58,8 +65,9 @@ class ProcessedJsonlValidator:
 
     Slice 3A adds hash integrity, Slice 3B adds count reconciliation, Slice 3C
     adds citation structure, Slice 3D adds hierarchy traceability, Slice 3E
-    adds contamination auditing, and Slice 3F audits repealed/empty metadata.
-    Later slices add embedding-readiness and payload-readiness.
+    adds contamination auditing, Slice 3F audits repealed/empty metadata, and
+    Slice 3G adds text-length readiness summaries. Later slices add
+    embedding-readiness and payload-readiness.
     """
 
     def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
@@ -75,7 +83,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3F on the processed JSONL.
+        """Run validation checks through Slice 3G on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -111,6 +119,16 @@ class ProcessedJsonlValidator:
         count_reconciliation_failures: int = 0
         errors_total: int = 0
         warnings_total: int = 0
+        text_lengths: list[int] = []
+        parent_text_lengths: list[int] = []
+        empty_text_count: int = 0
+        very_short_text_count: int = 0
+        short_text_warning_count: int = 0
+        long_text_warning_count: int = 0
+        empty_parent_text_count: int = 0
+        long_parent_text_warning_count: int = 0
+        extreme_parent_text_warning_count: int = 0
+        long_parent_text_examples: list[dict[str, Any]] = []
 
         chunks_by_level: dict[str, int] = {}
         chunks_by_law: dict[str, int] = {}
@@ -731,6 +749,108 @@ class ProcessedJsonlValidator:
                         )
                     )
 
+                # Check 10: Text length and parent context readiness
+                text_chars = len(chunk.text)
+                parent_text_chars = len(chunk.parent_text)
+                text_lengths.append(text_chars)
+                parent_text_lengths.append(parent_text_chars)
+
+                text_is_empty = not chunk.text.strip()
+                parent_text_is_empty = not chunk.parent_text.strip()
+                text_is_very_short = text_chars < _MIN_TEXT_CHARS
+                text_is_short = text_chars < _SHORT_TEXT_WARNING_CHARS
+                text_is_long = text_chars > _LONG_TEXT_WARNING_CHARS
+                parent_text_is_long = parent_text_chars > self.config.parent_text_long_chars
+                parent_text_is_extreme = parent_text_chars > self.config.parent_text_very_long_chars
+
+                if text_is_empty:
+                    empty_text_count += 1
+                if text_is_very_short:
+                    very_short_text_count += 1
+                if text_is_short and not text_is_empty and not metadata_marked:
+                    short_text_warning_count += 1
+                if text_is_long:
+                    long_text_warning_count += 1
+                if parent_text_is_empty:
+                    empty_parent_text_count += 1
+                if parent_text_is_long:
+                    long_parent_text_warning_count += 1
+                    long_parent_text_examples.append(
+                        {
+                            "law_id": chunk.law_id,
+                            "chunk_id": chunk.chunk_id,
+                            "chunk_kind": chunk.chunk_kind,
+                            "parent_text_chars": parent_text_chars,
+                            "text_chars": text_chars,
+                            "citation": chunk.citation,
+                        }
+                    )
+                if parent_text_is_extreme:
+                    extreme_parent_text_warning_count += 1
+
+                if text_is_empty and not metadata_marked:
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.EMPTY_TEXT_FOUND,
+                            message="Embedding text is empty or whitespace-only",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "citation": chunk.citation,
+                                "text_chars": text_chars,
+                                "parent_text_chars": parent_text_chars,
+                            },
+                        )
+                    )
+
+                length_warning_reasons: list[str] = []
+                if text_is_short and not text_is_empty and not metadata_marked:
+                    length_warning_reasons.append("short_text")
+                if text_is_long:
+                    length_warning_reasons.append("long_text")
+                if parent_text_is_empty:
+                    length_warning_reasons.append("empty_parent_text")
+                if parent_text_is_long:
+                    length_warning_reasons.append("long_parent_text")
+                if parent_text_is_extreme:
+                    length_warning_reasons.append("extreme_parent_text")
+
+                if length_warning_reasons:
+                    warnings_total += 1
+                    issue_code = (
+                        ProcessedJsonlValidationIssueCode.VERY_LONG_PARENT_TEXT
+                        if parent_text_is_long
+                        else ProcessedJsonlValidationIssueCode.TEXT_LENGTH_WARNING
+                    )
+                    _add_sample_warning(
+                        _make_issue(
+                            code=issue_code,
+                            message="Chunk text length may reduce retrieval readiness",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "citation": chunk.citation,
+                                "text_chars": text_chars,
+                                "parent_text_chars": parent_text_chars,
+                                "reasons": length_warning_reasons,
+                                "thresholds": {
+                                    "short_text_chars": _SHORT_TEXT_WARNING_CHARS,
+                                    "long_text_chars": _LONG_TEXT_WARNING_CHARS,
+                                    "long_parent_text_chars": (self.config.parent_text_long_chars),
+                                    "extreme_parent_text_chars": (
+                                        self.config.parent_text_very_long_chars
+                                    ),
+                                },
+                            },
+                        )
+                    )
+
                 # Count valid/invalid per line
                 if line_has_error:
                     invalid_chunks += 1
@@ -743,6 +863,57 @@ class ProcessedJsonlValidator:
         warnings_total += recon_warnings
         repealed_metadata_summary["metadata_mismatch_failure_count"] = repealed_metadata_mismatches
         repealed_metadata_summary["metadata_mismatch_warning_count"] = repealed_metadata_warnings
+        text_length_summary = {
+            **_summarize_lengths(text_lengths),
+            "empty_text_count": empty_text_count,
+            "very_short_text_count": very_short_text_count,
+            "short_text_warning_count": short_text_warning_count,
+            "long_text_warning_count": long_text_warning_count,
+            "very_short_threshold_chars": _MIN_TEXT_CHARS,
+            "short_warning_threshold_chars": _SHORT_TEXT_WARNING_CHARS,
+            "long_warning_threshold_chars": _LONG_TEXT_WARNING_CHARS,
+        }
+        parent_text_length_summary = {
+            **_summarize_lengths(parent_text_lengths),
+            "empty_parent_text_count": empty_parent_text_count,
+            "long_parent_text_warning_count": long_parent_text_warning_count,
+            "extreme_parent_text_warning_count": (extreme_parent_text_warning_count),
+            "long_warning_threshold_chars": self.config.parent_text_long_chars,
+            "extreme_warning_threshold_chars": (self.config.parent_text_very_long_chars),
+        }
+        top_parent_examples = sorted(
+            long_parent_text_examples,
+            key=lambda item: int(item["parent_text_chars"]),
+            reverse=True,
+        )[:_LONG_PARENT_TEXT_EXAMPLE_LIMIT]
+        long_parent_text_summary: dict[str, Any] = {
+            "threshold_chars": self.config.parent_text_long_chars,
+            "extreme_threshold_chars": self.config.parent_text_very_long_chars,
+            "long_count": long_parent_text_warning_count,
+            "extreme_count": extreme_parent_text_warning_count,
+            "max_chars": max(parent_text_lengths, default=0),
+            "short_bucket_count": sum(
+                length <= self.config.parent_text_short_chars for length in parent_text_lengths
+            ),
+            "medium_bucket_count": sum(
+                self.config.parent_text_short_chars < length <= self.config.parent_text_medium_chars
+                for length in parent_text_lengths
+            ),
+            "long_bucket_count": sum(
+                self.config.parent_text_medium_chars < length <= self.config.parent_text_long_chars
+                for length in parent_text_lengths
+            ),
+            "very_long_bucket_count": sum(
+                self.config.parent_text_long_chars
+                < length
+                <= self.config.parent_text_very_long_chars
+                for length in parent_text_lengths
+            ),
+            "extreme_bucket_count": sum(
+                length > self.config.parent_text_very_long_chars for length in parent_text_lengths
+            ),
+            "top_examples": top_parent_examples,
+        }
 
         # --- Build report ---
         finished_at = datetime.now(UTC).isoformat()
@@ -775,9 +946,9 @@ class ProcessedJsonlValidator:
             warnings_total=warnings_total,
             chunks_by_level=chunks_by_level,
             chunks_by_law=chunks_by_law,
-            text_length_summary={},
-            parent_text_length_summary={},
-            long_parent_text_summary={},
+            text_length_summary=text_length_summary,
+            parent_text_length_summary=parent_text_length_summary,
+            long_parent_text_summary=long_parent_text_summary,
             repealed_metadata_summary=repealed_metadata_summary,
             payload_readiness_summary={},
             embedding_readiness={},
@@ -787,6 +958,45 @@ class ProcessedJsonlValidator:
         )
 
         return report
+
+
+def _summarize_lengths(lengths: list[int]) -> dict[str, int | float]:
+    """Summarize character lengths with deterministic nearest percentiles.
+
+    Args:
+        lengths: Character counts collected from schema-valid chunks.
+
+    Returns:
+        Stable count, range, central tendency, and percentile statistics.
+    """
+    if not lengths:
+        return {
+            "count": 0,
+            "min_chars": 0,
+            "max_chars": 0,
+            "mean_chars": 0.0,
+            "median_chars": 0.0,
+            "p90_chars": 0,
+            "p95_chars": 0,
+            "p99_chars": 0,
+        }
+
+    ordered = sorted(lengths)
+
+    def _percentile(quantile: float) -> int:
+        index = int(round((len(ordered) - 1) * quantile))
+        return ordered[index]
+
+    return {
+        "count": len(ordered),
+        "min_chars": ordered[0],
+        "max_chars": ordered[-1],
+        "mean_chars": round(mean(ordered), 2),
+        "median_chars": median(ordered),
+        "p90_chars": _percentile(0.90),
+        "p95_chars": _percentile(0.95),
+        "p99_chars": _percentile(0.99),
+    }
 
 
 def _check_required_field_presence(

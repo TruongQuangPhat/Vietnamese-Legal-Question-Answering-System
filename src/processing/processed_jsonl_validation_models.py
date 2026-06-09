@@ -33,6 +33,8 @@ class ProcessedJsonlValidationIssueCode(StrEnum):
     EMBEDDING_READINESS_ISSUE = "EMBEDDING_READINESS_ISSUE"
     PAYLOAD_FIELD_MISSING = "PAYLOAD_FIELD_MISSING"
     VERY_LONG_PARENT_TEXT = "VERY_LONG_PARENT_TEXT"
+    TEXT_LENGTH_WARNING = "TEXT_LENGTH_WARNING"
+    EMPTY_TEXT_FOUND = "EMPTY_TEXT_FOUND"
     COUNT_RECONCILIATION_FAILED = "COUNT_RECONCILIATION_FAILED"
 
 
@@ -162,7 +164,7 @@ class ProcessedJsonlValidationReport(BaseModel):
     parent_text_length_summary: dict[str, Any] = Field(
         default_factory=dict, description="Parent text length statistics"
     )
-    long_parent_text_summary: dict[str, int] = Field(
+    long_parent_text_summary: dict[str, Any] = Field(
         default_factory=dict, description="Parent text bucket distribution"
     )
     repealed_metadata_summary: dict[str, int] = Field(

@@ -105,6 +105,8 @@ class TestIssueCodeEnum:
             "EMBEDDING_READINESS_ISSUE",
             "PAYLOAD_FIELD_MISSING",
             "VERY_LONG_PARENT_TEXT",
+            "TEXT_LENGTH_WARNING",
+            "EMPTY_TEXT_FOUND",
             "COUNT_RECONCILIATION_FAILED",
             "DUPLICATE_CHUNK_ID",
         }

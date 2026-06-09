@@ -50,7 +50,7 @@ def _config(
 
 def _valid_chunk(**overrides: object) -> LegalChunk:
     """Build a minimal valid LegalChunk with real hashes for test data."""
-    text = "Nội dung văn bản pháp luật."
+    text = "Nội dung văn bản pháp luật dùng để kiểm tra một đoạn dữ liệu hợp lệ."
     parent_text = "Nội dung đầy đủ của Điều 1."
     payload: dict[str, object] = {
         "schema_version": "1.0",
@@ -1585,7 +1585,7 @@ class TestContaminationAudit:
         tmp_path: Path,
         filename: str,
         *,
-        text: str = "Nội dung văn bản pháp luật.",
+        text: str = "Nội dung văn bản pháp luật dùng để kiểm tra một đoạn dữ liệu hợp lệ.",
         parent_text: str = "Nội dung đầy đủ của Điều 1.",
     ) -> ProcessedJsonlValidationReport:
         chunk = _valid_chunk(
@@ -1644,7 +1644,7 @@ class TestContaminationAudit:
         report = self._validate_text(
             tmp_path,
             "luu_y.jsonl",
-            text="Lưu ý việc áp dụng quy định này.",
+            text="Lưu ý việc áp dụng quy định này trong toàn bộ quá trình thử nghiệm.",
         )
 
         assert report.contamination_failures == 0
@@ -1711,8 +1711,13 @@ class TestContaminationAudit:
         )
 
         assert report.contamination_warnings == 1
-        assert len(report.sample_warnings) == 1
-        assert len(report.sample_warnings[0].context["matches"]) == 3
+        contamination_samples = [
+            issue
+            for issue in report.sample_warnings
+            if issue.code == ProcessedJsonlValidationIssueCode.WARNING_CONTAMINATION_FOUND
+        ]
+        assert len(contamination_samples) == 1
+        assert len(contamination_samples[0].context["matches"]) == 3
 
     def test_matching_is_case_insensitive(self, tmp_path: Path) -> None:
         report = self._validate_text(
@@ -1751,7 +1756,7 @@ class TestRepealedMetadataAudit:
     def _chunk(
         self,
         *,
-        text: str = "Nội dung văn bản pháp luật.",
+        text: str = "Nội dung văn bản pháp luật dùng để kiểm tra một đoạn dữ liệu hợp lệ.",
         parent_text: str = "Nội dung đầy đủ của Điều 1.",
         metadata: ChunkingMetadata | None = None,
         **overrides: object,
@@ -1965,12 +1970,222 @@ class TestRepealedMetadataAudit:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3F scope: later checks are not yet implemented
+# Slice 3G: Text length readiness tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3FScope:
-    """Slice 3F audits repealed metadata; later readiness checks are neutral."""
+class TestTextLengthReadiness:
+    """Character-length summaries and readiness warnings."""
+
+    def _chunk(
+        self,
+        *,
+        text: str = "Nội dung văn bản pháp luật dùng để kiểm tra một đoạn dữ liệu hợp lệ.",
+        parent_text: str = "Nội dung đầy đủ của Điều 1.",
+        metadata: ChunkingMetadata | None = None,
+        **overrides: object,
+    ) -> LegalChunk:
+        return _valid_chunk(
+            text=text,
+            parent_text=parent_text,
+            text_hash=_compute_text_hash(text),
+            parent_text_hash=_compute_text_hash(parent_text),
+            metadata=metadata or ChunkingMetadata(),
+            **overrides,
+        )
+
+    def _validate(
+        self,
+        tmp_path: Path,
+        filename: str,
+        chunks: list[LegalChunk],
+        **config_overrides: object,
+    ) -> ProcessedJsonlValidationReport:
+        jsonl_path = tmp_path / filename
+        _write_jsonl(jsonl_path, chunks)
+        return ProcessedJsonlValidator(_config(jsonl_path, **config_overrides)).validate(jsonl_path)
+
+    def test_text_length_summary_populated_for_clean_chunk(self, tmp_path: Path) -> None:
+        chunk = self._chunk()
+        report = self._validate(tmp_path, "length_text.jsonl", [chunk])
+
+        summary = report.text_length_summary
+        assert summary["count"] == 1
+        assert summary["min_chars"] == len(chunk.text)
+        assert summary["max_chars"] == len(chunk.text)
+        assert summary["mean_chars"] == len(chunk.text)
+
+    def test_parent_text_length_summary_populated(self, tmp_path: Path) -> None:
+        chunk = self._chunk(parent_text="P" * 120)
+        report = self._validate(tmp_path, "length_parent.jsonl", [chunk])
+
+        summary = report.parent_text_length_summary
+        assert summary["count"] == 1
+        assert summary["min_chars"] == 120
+        assert summary["max_chars"] == 120
+
+    def test_multiple_chunks_percentiles_are_stable(self, tmp_path: Path) -> None:
+        lengths = [60, 70, 80, 90, 100]
+        chunks = [self._chunk(chunk_id=f"length_{length}", text="x" * length) for length in lengths]
+        report = self._validate(tmp_path, "length_percentiles.jsonl", chunks)
+
+        summary = report.text_length_summary
+        assert summary["count"] == 5
+        assert summary["min_chars"] == 60
+        assert summary["max_chars"] == 100
+        assert summary["p90_chars"] == 100
+        assert summary["p95_chars"] == 100
+        assert summary["p99_chars"] == 100
+
+    def test_empty_text_non_repealed_fails_or_is_counted_once(self, tmp_path: Path) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_empty_text.jsonl",
+            [self._chunk(text="   ")],
+        )
+
+        assert report.text_length_summary["empty_text_count"] == 1
+        assert report.errors_total == 1
+        assert report.invalid_chunks == 1
+        empty_issues = [
+            issue
+            for issue in report.sample_failures
+            if issue.code == ProcessedJsonlValidationIssueCode.EMPTY_TEXT_FOUND
+        ]
+        assert len(empty_issues) == 1
+
+    def test_empty_text_repealed_chunk_does_not_fail_length_readiness(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_empty_repealed.jsonl",
+            [
+                self._chunk(
+                    text="   ",
+                    metadata=ChunkingMetadata(
+                        is_empty_or_repealed=True,
+                        is_source_unit_repealed=True,
+                    ),
+                )
+            ],
+        )
+
+        assert report.text_length_summary["empty_text_count"] == 1
+        assert report.errors_total == 0
+        assert all(
+            issue.code != ProcessedJsonlValidationIssueCode.EMPTY_TEXT_FOUND
+            for issue in report.sample_failures
+        )
+
+    def test_short_text_warns_only(self, tmp_path: Path) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_short.jsonl",
+            [self._chunk(text="Nội dung ngắn nhưng hợp lệ.")],
+        )
+
+        assert report.text_length_summary["short_text_warning_count"] == 1
+        assert report.status == "pass_with_warnings"
+        assert report.invalid_chunks == 0
+
+    def test_long_text_warns_only(self, tmp_path: Path) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_long_text.jsonl",
+            [self._chunk(text="x" * 4001)],
+        )
+
+        assert report.text_length_summary["long_text_warning_count"] == 1
+        assert report.status == "pass_with_warnings"
+        assert report.invalid_chunks == 0
+
+    def test_empty_parent_text_warns_only(self, tmp_path: Path) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_empty_parent.jsonl",
+            [self._chunk(parent_text="   ")],
+        )
+
+        assert report.parent_text_length_summary["empty_parent_text_count"] == 1
+        assert report.status == "pass_with_warnings"
+        assert report.invalid_chunks == 0
+
+    def test_long_parent_text_warns_only(self, tmp_path: Path) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_long_parent.jsonl",
+            [self._chunk(parent_text="p" * 151)],
+            parent_text_long_chars=100,
+            parent_text_very_long_chars=200,
+        )
+
+        assert report.parent_text_length_summary["long_parent_text_warning_count"] == 1
+        assert report.status == "pass_with_warnings"
+        assert report.invalid_chunks == 0
+        assert (
+            report.sample_warnings[0].code
+            == ProcessedJsonlValidationIssueCode.VERY_LONG_PARENT_TEXT
+        )
+
+    def test_extreme_parent_text_counted(self, tmp_path: Path) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_extreme_parent.jsonl",
+            [self._chunk(parent_text="p" * 251)],
+            parent_text_long_chars=100,
+            parent_text_very_long_chars=200,
+        )
+
+        summary = report.parent_text_length_summary
+        assert summary["long_parent_text_warning_count"] == 1
+        assert summary["extreme_parent_text_warning_count"] == 1
+        assert report.long_parent_text_summary["extreme_count"] == 1
+
+    def test_long_parent_text_summary_top_examples_limited(self, tmp_path: Path) -> None:
+        chunks = [
+            self._chunk(
+                chunk_id=f"long_parent_{index}",
+                parent_text="p" * (200 + index),
+            )
+            for index in range(8)
+        ]
+        report = self._validate(
+            tmp_path,
+            "length_parent_examples.jsonl",
+            chunks,
+            parent_text_long_chars=100,
+            parent_text_very_long_chars=500,
+        )
+
+        examples = report.long_parent_text_summary["top_examples"]
+        assert len(examples) == 5
+        assert examples[0]["parent_text_chars"] == 207
+
+    def test_length_warnings_do_not_mutate_validity_when_no_errors(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "length_warning_validity.jsonl",
+            [self._chunk(text="Nội dung ngắn.")],
+        )
+
+        assert report.warnings_total == 1
+        assert report.status == "pass_with_warnings"
+        assert report.valid_chunks == 1
+        assert report.invalid_chunks == 0
+
+
+# ---------------------------------------------------------------------------
+# Slice 3G scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3GScope:
+    """Slice 3G audits text lengths; later readiness checks remain neutral."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""
@@ -2013,9 +2228,9 @@ class TestSlice3FScope:
         assert report.traceability_failures == 0
         assert report.contamination_failures == 0
         assert report.contamination_warnings == 0
-        assert report.text_length_summary == {}
-        assert report.parent_text_length_summary == {}
-        assert report.long_parent_text_summary == {}
+        assert report.text_length_summary["count"] == 1
+        assert report.parent_text_length_summary["count"] == 1
+        assert report.long_parent_text_summary["long_count"] == 0
         assert report.repealed_metadata_summary["metadata_mismatch_failure_count"] == 0
         assert report.repealed_metadata_summary["metadata_mismatch_warning_count"] == 0
         assert report.payload_readiness_summary == {}
