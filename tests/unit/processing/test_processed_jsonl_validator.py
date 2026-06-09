@@ -1,11 +1,16 @@
-"""Unit tests for Phase 7 processed JSONL validator (Slice 2)."""
+"""Unit tests for Phase 7 processed JSONL validator (Slice 3A)."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from src.processing.legal_chunk_models import ChunkingLevel, ChunkingMetadata, LegalChunk
+from src.processing.legal_chunk_models import (
+    ChunkingLevel,
+    ChunkingMetadata,
+    LegalChunk,
+    _compute_text_hash,
+)
 from src.processing.processed_jsonl_validation_models import (
     ProcessedJsonlValidationConfig,
     ProcessedJsonlValidationIssueCode,
@@ -28,7 +33,9 @@ def _config(**overrides: object) -> ProcessedJsonlValidationConfig:
 
 
 def _valid_chunk(**overrides: object) -> LegalChunk:
-    """Build a minimal valid LegalChunk for test data."""
+    """Build a minimal valid LegalChunk with real hashes for test data."""
+    text = "Nội dung văn bản pháp luật."
+    parent_text = "Nội dung đầy đủ của Điều 1."
     payload: dict[str, object] = {
         "schema_version": "1.0",
         "chunker_version": "v0.1.0",
@@ -50,14 +57,14 @@ def _valid_chunk(**overrides: object) -> LegalChunk:
         "point_label": None,
         "citation": "Điều 1 Luật thử nghiệm",
         "hierarchy_path": "Luật thử nghiệm/Điều 1",
-        "text": "Nội dung văn bản pháp luật.",
-        "parent_text": "Nội dung đầy đủ của Điều 1.",
+        "text": text,
+        "parent_text": parent_text,
         "start_offset": 0,
         "end_offset": 30,
         "article_start_offset": 0,
         "article_end_offset": 100,
-        "text_hash": "abc123",
-        "parent_text_hash": "def456",
+        "text_hash": _compute_text_hash(text),
+        "parent_text_hash": _compute_text_hash(parent_text),
         "metadata": ChunkingMetadata(
             is_empty_or_repealed=False,
             is_source_unit_repealed=False,
@@ -255,9 +262,7 @@ class TestRequiredFields:
         # We bypass LegalChunk validation by writing a row that LegalChunk
         # accepts (all required fields present) but then remove a field from
         # the raw dict and verify the required-field check catches it.
-        # Since LegalChunk fills defaults, we test with an empty text value
-        # that LegalChunk rejects (min_length=1) — caught as schema failure.
-        # Instead, test with a valid chunk that has empty text_hash:
+        # Since LegalChunk fills defaults, we test with an empty text_hash:
         # LegalChunk allows empty text_hash (default ""), so our check catches it.
         row = _valid_chunk(chunk_id="c1").model_dump(mode="json")
         row["text_hash"] = ""  # LegalChunk accepts this, but our check rejects it
@@ -428,7 +433,7 @@ class TestCappedSamples:
         assert len(report.sample_warnings) == 0
 
     def test_sample_warnings_capped(self, tmp_path: Path) -> None:
-        # Slice 2 doesn't produce warnings, but test the cap mechanism
+        # Slice 3A doesn't produce warnings, but test the cap mechanism
         config = _config(max_sample_warnings=5)
         validator = ProcessedJsonlValidator(config)
         # Just verify the config is accepted
@@ -484,24 +489,142 @@ class TestCounts:
         assert report.chunks_by_law == {"law_a": 2, "law_b": 1}
 
 
-class TestSlice2Scope:
-    """Slice 2 does not implement later checks."""
+# ---------------------------------------------------------------------------
+# Slice 3A: Hash integrity tests
+# ---------------------------------------------------------------------------
 
-    def test_no_hash_check_in_slice2(self, tmp_path: Path) -> None:
-        """Hash mismatches are not checked in Slice 2."""
-        chunk = _valid_chunk(chunk_id="c1", text_hash="wrong_hash")
-        jsonl_path = tmp_path / "hash.jsonl"
+
+class TestHashIntegrity:
+    """Hash integrity checks (Slice 3A)."""
+
+    def test_valid_hashes_pass(self, tmp_path: Path) -> None:
+        """Chunks with correct hashes should pass validation."""
+        chunk = _valid_chunk(chunk_id="h_ok")
+        jsonl_path = tmp_path / "hash_ok.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
         validator = ProcessedJsonlValidator(_config())
         report = validator.validate(jsonl_path)
 
-        # Slice 2 does not check hashes — should pass
         assert report.hash_mismatches == 0
         assert report.status == "pass"
+        assert report.valid_chunks == 1
+        assert report.invalid_chunks == 0
 
-    def test_no_citation_check_in_slice2(self, tmp_path: Path) -> None:
-        """Citation structure is not checked in Slice 2."""
+    def test_text_hash_mismatch_detected(self, tmp_path: Path) -> None:
+        """A wrong text_hash should be flagged as a hash mismatch."""
+        chunk = _valid_chunk(chunk_id="h_text_bad", text_hash="wrong_hash")
+        jsonl_path = tmp_path / "hash_text_bad.jsonl"
+        _write_jsonl(jsonl_path, [chunk])
+
+        validator = ProcessedJsonlValidator(_config())
+        report = validator.validate(jsonl_path)
+
+        assert report.hash_mismatches == 1
+        assert report.status == "fail"
+        assert report.invalid_chunks == 1
+        assert report.valid_chunks == 0
+        assert report.sample_failures[0].code == ProcessedJsonlValidationIssueCode.HASH_MISMATCH
+        assert report.sample_failures[0].context["text_hash_match"] is False
+        assert report.sample_failures[0].context["parent_text_hash_match"] is True
+
+    def test_parent_text_hash_mismatch_detected(self, tmp_path: Path) -> None:
+        """A wrong parent_text_hash should be flagged as a hash mismatch."""
+        chunk = _valid_chunk(
+            chunk_id="h_parent_bad",
+            parent_text_hash="wrong_hash",
+        )
+        jsonl_path = tmp_path / "hash_parent_bad.jsonl"
+        _write_jsonl(jsonl_path, [chunk])
+
+        validator = ProcessedJsonlValidator(_config())
+        report = validator.validate(jsonl_path)
+
+        assert report.hash_mismatches == 1
+        assert report.status == "fail"
+        assert report.invalid_chunks == 1
+        assert report.sample_failures[0].code == ProcessedJsonlValidationIssueCode.HASH_MISMATCH
+        assert report.sample_failures[0].context["text_hash_match"] is True
+        assert report.sample_failures[0].context["parent_text_hash_match"] is False
+
+    def test_both_hashes_mismatch_increments_once(self, tmp_path: Path) -> None:
+        """Both hashes wrong on one line should increment hash_mismatches once."""
+        chunk = _valid_chunk(
+            chunk_id="h_both_bad",
+            text_hash="wrong1",
+            parent_text_hash="wrong2",
+        )
+        jsonl_path = tmp_path / "hash_both_bad.jsonl"
+        _write_jsonl(jsonl_path, [chunk])
+
+        validator = ProcessedJsonlValidator(_config())
+        report = validator.validate(jsonl_path)
+
+        assert report.hash_mismatches == 1  # one line, one increment
+        assert report.errors_total == 1  # one error total
+        assert report.invalid_chunks == 1
+        assert report.valid_chunks == 0
+
+    def test_one_line_both_mismatches_is_one_invalid_chunk(self, tmp_path: Path) -> None:
+        """A single line with both hashes wrong counts as one invalid chunk."""
+        chunk = _valid_chunk(
+            chunk_id="h_one_line",
+            text_hash="wrong",
+            parent_text_hash="wrong",
+        )
+        jsonl_path = tmp_path / "hash_one_line.jsonl"
+        _write_jsonl(jsonl_path, [chunk])
+
+        validator = ProcessedJsonlValidator(_config())
+        report = validator.validate(jsonl_path)
+
+        assert report.invalid_chunks == 1
+        assert report.valid_chunks == 0
+        assert report.hash_mismatches == 1
+
+    def test_hash_mismatch_sample_failures_capped(self, tmp_path: Path) -> None:
+        """Hash mismatch samples are capped by max_sample_failures."""
+        rows = []
+        for i in range(15):
+            chunk = _valid_chunk(
+                chunk_id=f"h_cap_{i}",
+                text_hash=f"wrong_{i}",
+            )
+            rows.append(chunk.model_dump(mode="json"))
+        jsonl_path = tmp_path / "hash_cap.jsonl"
+        _write_raw_jsonl(jsonl_path, rows)
+
+        config = _config(max_sample_failures=5)
+        validator = ProcessedJsonlValidator(config)
+        report = validator.validate(jsonl_path)
+
+        assert report.hash_mismatches == 15
+        assert report.errors_total == 15
+        assert len(report.sample_failures) == 5  # capped
+
+
+# ---------------------------------------------------------------------------
+# Slice 3A scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3AScope:
+    """Slice 3A only implements hash integrity; later checks are skipped."""
+
+    def test_count_reconciliation_not_implemented(self, tmp_path: Path) -> None:
+        """Count reconciliation is not checked in Slice 3A."""
+        chunk = _valid_chunk(chunk_id="c1")
+        jsonl_path = tmp_path / "recon.jsonl"
+        _write_jsonl(jsonl_path, [chunk])
+
+        validator = ProcessedJsonlValidator(_config())
+        report = validator.validate(jsonl_path)
+
+        assert report.count_reconciliation_failures == 0
+        assert report.status == "pass"
+
+    def test_citation_not_checked_in_slice3a(self, tmp_path: Path) -> None:
+        """Citation structure is not checked in Slice 3A."""
         chunk = _valid_chunk(chunk_id="c1", citation="bad citation")
         jsonl_path = tmp_path / "cite.jsonl"
         _write_jsonl(jsonl_path, [chunk])
@@ -512,8 +635,8 @@ class TestSlice2Scope:
         assert report.citation_failures == 0
         assert report.status == "pass"
 
-    def test_no_hierarchy_check_in_slice2(self, tmp_path: Path) -> None:
-        """Hierarchy traceability is not checked in Slice 2."""
+    def test_hierarchy_traceability_not_checked_in_slice3a(self, tmp_path: Path) -> None:
+        """Hierarchy traceability is not checked in Slice 3A."""
         chunk = _valid_chunk(chunk_id="c1")
         jsonl_path = tmp_path / "hier.jsonl"
         _write_jsonl(jsonl_path, [chunk])
@@ -534,7 +657,6 @@ class TestSlice2Scope:
         report = validator.validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
-        assert report.hash_mismatches == 0
         assert report.citation_failures == 0
         assert report.traceability_failures == 0
         assert report.contamination_failures == 0

@@ -23,6 +23,7 @@ from typing import Any
 from src.processing.legal_chunk_models import (
     ChunkingLevel,
     LegalChunk,
+    _compute_text_hash,
 )
 from src.processing.processed_jsonl_validation_models import (
     ProcessedJsonlIssue,
@@ -62,7 +63,7 @@ class ProcessedJsonlValidator:
 
         Args:
             config: Phase 7 validation configuration including thresholds,
-                marker lists, and file paths.
+            marker lists, and file paths.
         """
         self.config = config
 
@@ -96,6 +97,7 @@ class ProcessedJsonlValidator:
         schema_failures: int = 0
         required_field_failures: int = 0
         duplicate_chunk_ids: int = 0
+        hash_mismatches: int = 0
         errors_total: int = 0
         warnings_total: int = 0
 
@@ -284,6 +286,29 @@ class ProcessedJsonlValidator:
                 else:
                     seen_chunk_ids.add(chunk.chunk_id)
 
+                # Check 5: Hash integrity
+                expected_text_hash = _compute_text_hash(chunk.text)
+                expected_parent_text_hash = _compute_text_hash(chunk.parent_text)
+                text_hash_matches = chunk.text_hash == expected_text_hash
+                parent_text_hash_matches = chunk.parent_text_hash == expected_parent_text_hash
+                if not text_hash_matches or not parent_text_hash_matches:
+                    hash_mismatches += 1
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.HASH_MISMATCH,
+                            message="text_hash or parent_text_hash mismatch",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "text_hash_match": text_hash_matches,
+                                "parent_text_hash_match": parent_text_hash_matches,
+                            },
+                        )
+                    )
+
                 # Count valid/invalid per line
                 if line_has_error:
                     invalid_chunks += 1
@@ -312,7 +337,7 @@ class ProcessedJsonlValidator:
             required_field_failures=required_field_failures,
             duplicate_chunk_ids=duplicate_chunk_ids,
             count_reconciliation_failures=0,
-            hash_mismatches=0,
+            hash_mismatches=hash_mismatches,
             citation_failures=0,
             traceability_failures=0,
             contamination_failures=0,
