@@ -49,6 +49,37 @@ _SHORT_TEXT_WARNING_CHARS = 50
 _LONG_TEXT_WARNING_CHARS = 4000
 _LONG_PARENT_TEXT_EXAMPLE_LIMIT = 5
 
+_PAYLOAD_REQUIRED_FIELDS = (
+    "law_id",
+    "chunk_id",
+    "chunk_kind",
+    "level",
+    "citation",
+    "hierarchy_path",
+    "source_node_id",
+    "parent_article_node_id",
+    "text_hash",
+    "parent_text_hash",
+    "metadata",
+)
+_PAYLOAD_CONDITIONAL_FIELDS: dict[str, tuple[str, ...]] = {
+    "article_level": ("article_number",),
+    "article_level_empty": ("article_number",),
+    "clause_level": ("article_number", "clause_number"),
+    "point_level": ("article_number", "clause_number", "point_label"),
+}
+_PAYLOAD_RECOMMENDED_METADATA_FIELDS = (
+    "is_empty_or_repealed",
+    "is_source_unit_repealed",
+)
+_PAYLOAD_RECOMMENDED_SOURCE_FIELDS = (
+    "law_name",
+    "source_url",
+    "source_domain",
+    "source_type",
+    "source_file",
+)
+
 
 class ProcessedJsonlValidator:
     """Phase 7 core validator for the processed chunk JSONL file.
@@ -66,8 +97,8 @@ class ProcessedJsonlValidator:
     Slice 3A adds hash integrity, Slice 3B adds count reconciliation, Slice 3C
     adds citation structure, Slice 3D adds hierarchy traceability, Slice 3E
     adds contamination auditing, Slice 3F audits repealed/empty metadata, and
-    Slice 3G adds text-length readiness summaries. Later slices add
-    embedding-readiness and payload-readiness.
+    Slice 3G adds text-length readiness summaries, and Slice 3H audits payload
+    readiness. Later slices add embedding-readiness.
     """
 
     def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
@@ -83,7 +114,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3G on the processed JSONL.
+        """Run validation checks through Slice 3H on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -129,6 +160,23 @@ class ProcessedJsonlValidator:
         long_parent_text_warning_count: int = 0
         extreme_parent_text_warning_count: int = 0
         long_parent_text_examples: list[dict[str, Any]] = []
+        payload_checked_chunks: int = 0
+        payload_ready_chunks: int = 0
+        payload_not_ready_chunks: int = 0
+        payload_failure_chunks: int = 0
+        payload_warning_chunks: int = 0
+        payload_schema_unavailable_chunks: int = 0
+        payload_missing_required_counts: dict[str, int] = dict.fromkeys(_PAYLOAD_REQUIRED_FIELDS, 0)
+        payload_empty_required_counts: dict[str, int] = dict.fromkeys(_PAYLOAD_REQUIRED_FIELDS, 0)
+        payload_missing_conditional_counts: dict[str, int] = dict.fromkeys(
+            ("article_number", "clause_number", "point_label"), 0
+        )
+        payload_missing_recommended_metadata_counts: dict[str, int] = dict.fromkeys(
+            _PAYLOAD_RECOMMENDED_METADATA_FIELDS, 0
+        )
+        payload_missing_recommended_source_counts: dict[str, int] = dict.fromkeys(
+            _PAYLOAD_RECOMMENDED_SOURCE_FIELDS, 0
+        )
 
         chunks_by_level: dict[str, int] = {}
         chunks_by_law: dict[str, int] = {}
@@ -418,6 +466,29 @@ class ProcessedJsonlValidator:
                     )
                     continue
 
+                payload_checked_chunks += 1
+                (
+                    payload_failures,
+                    payload_warnings,
+                    payload_details,
+                ) = _check_payload_readiness(parsed)
+                for field in payload_details["missing_required"]:
+                    payload_missing_required_counts[field] += 1
+                for field in payload_details["empty_required"]:
+                    payload_empty_required_counts[field] += 1
+                for field in payload_details["missing_conditional"]:
+                    payload_missing_conditional_counts[field] += 1
+                for field in payload_details["missing_recommended_metadata"]:
+                    payload_missing_recommended_metadata_counts[field] += 1
+                for field in payload_details["missing_recommended_source"]:
+                    payload_missing_recommended_source_counts[field] += 1
+
+                if payload_failures:
+                    payload_failure_chunks += 1
+                    payload_not_ready_chunks += 1
+                else:
+                    payload_ready_chunks += 1
+
                 # Check 2a: Required field presence on raw dict
                 # Catches missing fields before Pydantic defaults hide them
                 presence_errors = _check_required_field_presence(parsed)
@@ -443,6 +514,8 @@ class ProcessedJsonlValidator:
                 try:
                     chunk = LegalChunk.model_validate(parsed)
                 except Exception as exc:
+                    if not payload_failures:
+                        payload_schema_unavailable_chunks += 1
                     schema_failures += 1
                     errors_total += 1
                     line_has_error = True
@@ -851,6 +924,43 @@ class ProcessedJsonlValidator:
                         )
                     )
 
+                # Check 11: Vector payload readiness
+                if payload_failures:
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.PAYLOAD_FIELD_MISSING,
+                            message="Chunk payload is not ready for indexing",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "citation": chunk.citation,
+                                "failures": payload_failures,
+                            },
+                        )
+                    )
+
+                if payload_warnings:
+                    payload_warning_chunks += 1
+                    warnings_total += 1
+                    _add_sample_warning(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.PAYLOAD_FIELD_MISSING,
+                            message="Chunk payload has recommended metadata warnings",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "citation": chunk.citation,
+                                "warnings": payload_warnings,
+                            },
+                        )
+                    )
+
                 # Count valid/invalid per line
                 if line_has_error:
                     invalid_chunks += 1
@@ -914,6 +1024,25 @@ class ProcessedJsonlValidator:
             ),
             "top_examples": top_parent_examples,
         }
+        payload_readiness_summary: dict[str, Any] = {
+            "checked_chunks": payload_checked_chunks,
+            "ready_chunks": payload_ready_chunks,
+            "not_ready_chunks": payload_not_ready_chunks,
+            "payload_failure_chunks": payload_failure_chunks,
+            "payload_warning_chunks": payload_warning_chunks,
+            "schema_unavailable_chunks": payload_schema_unavailable_chunks,
+            "missing_required_field_counts": payload_missing_required_counts,
+            "empty_required_field_counts": payload_empty_required_counts,
+            "missing_conditional_field_counts": (payload_missing_conditional_counts),
+            "missing_recommended_metadata_counts": (payload_missing_recommended_metadata_counts),
+            "missing_recommended_source_counts": (payload_missing_recommended_source_counts),
+            "ready_rate": round(
+                payload_ready_chunks / payload_checked_chunks,
+                4,
+            )
+            if payload_checked_chunks
+            else 0.0,
+        }
 
         # --- Build report ---
         finished_at = datetime.now(UTC).isoformat()
@@ -950,7 +1079,7 @@ class ProcessedJsonlValidator:
             parent_text_length_summary=parent_text_length_summary,
             long_parent_text_summary=long_parent_text_summary,
             repealed_metadata_summary=repealed_metadata_summary,
-            payload_readiness_summary={},
+            payload_readiness_summary=payload_readiness_summary,
             embedding_readiness={},
             sample_failures=sample_failures,
             sample_warnings=sample_warnings,
@@ -997,6 +1126,87 @@ def _summarize_lengths(lengths: list[int]) -> dict[str, int | float]:
         "p95_chars": _percentile(0.95),
         "p99_chars": _percentile(0.99),
     }
+
+
+def _check_payload_readiness(
+    parsed: dict[str, Any],
+) -> tuple[
+    list[dict[str, str]],
+    list[dict[str, str]],
+    dict[str, list[str]],
+]:
+    """Inspect raw chunk fields for downstream payload completeness.
+
+    Raw JSON is used so missing metadata keys remain visible before Pydantic
+    defaults are applied. This helper classifies payload gaps but does not
+    decide whether an earlier schema/required-field check already owns the
+    line-level error count.
+
+    Args:
+        parsed: Parsed JSON object for one processed chunk line.
+
+    Returns:
+        Hard failures, warning-only gaps, and field names grouped by summary
+        category.
+    """
+
+    def _is_empty(value: Any) -> bool:
+        if value is None or value == [] or value == {}:
+            return True
+        return isinstance(value, str) and not value.strip()
+
+    failures: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    details: dict[str, list[str]] = {
+        "missing_required": [],
+        "empty_required": [],
+        "missing_conditional": [],
+        "missing_recommended_metadata": [],
+        "missing_recommended_source": [],
+    }
+
+    for field in _PAYLOAD_REQUIRED_FIELDS:
+        if field not in parsed:
+            details["missing_required"].append(field)
+            failures.append({"field": field, "reason": "missing_required"})
+        elif _is_empty(parsed[field]):
+            details["empty_required"].append(field)
+            failures.append({"field": field, "reason": "empty_required"})
+
+    chunk_kind = parsed.get("chunk_kind")
+    if isinstance(chunk_kind, str):
+        for field in _PAYLOAD_CONDITIONAL_FIELDS.get(chunk_kind, ()):
+            if field not in parsed or _is_empty(parsed.get(field)):
+                details["missing_conditional"].append(field)
+                failures.append({"field": field, "reason": "missing_conditional"})
+
+    metadata = parsed.get("metadata")
+    if isinstance(metadata, dict):
+        for field in _PAYLOAD_RECOMMENDED_METADATA_FIELDS:
+            if field not in metadata:
+                details["missing_recommended_metadata"].append(field)
+                warnings.append(
+                    {
+                        "field": f"metadata.{field}",
+                        "reason": "missing_recommended_metadata",
+                    }
+                )
+    else:
+        for field in _PAYLOAD_RECOMMENDED_METADATA_FIELDS:
+            details["missing_recommended_metadata"].append(field)
+            warnings.append(
+                {
+                    "field": f"metadata.{field}",
+                    "reason": "missing_recommended_metadata",
+                }
+            )
+
+    for field in _PAYLOAD_RECOMMENDED_SOURCE_FIELDS:
+        if field not in parsed or _is_empty(parsed.get(field)):
+            details["missing_recommended_source"].append(field)
+            warnings.append({"field": field, "reason": "missing_recommended_source"})
+
+    return failures, warnings, details
 
 
 def _check_required_field_presence(

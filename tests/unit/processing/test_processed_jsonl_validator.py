@@ -2180,12 +2180,176 @@ class TestTextLengthReadiness:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3G scope: later checks are not yet implemented
+# Slice 3H: Payload readiness tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3GScope:
-    """Slice 3G audits text lengths; later readiness checks remain neutral."""
+class TestPayloadReadiness:
+    """Vector payload completeness for filtering, citation, and traceability."""
+
+    def _validate_rows(
+        self,
+        tmp_path: Path,
+        filename: str,
+        rows: list[dict[str, object]],
+    ) -> ProcessedJsonlValidationReport:
+        jsonl_path = tmp_path / filename
+        _write_raw_jsonl(jsonl_path, rows)
+        return ProcessedJsonlValidator(_config(jsonl_path)).validate(jsonl_path)
+
+    def test_payload_summary_populated_for_ready_chunk(self, tmp_path: Path) -> None:
+        row = _valid_chunk().model_dump(mode="json")
+        report = self._validate_rows(tmp_path, "payload_ready.jsonl", [row])
+
+        summary = report.payload_readiness_summary
+        assert summary["checked_chunks"] == 1
+        assert summary["ready_chunks"] == 1
+        assert summary["not_ready_chunks"] == 0
+        assert summary["payload_failure_chunks"] == 0
+
+    def test_ready_rate_computed(self, tmp_path: Path) -> None:
+        rows = [
+            _valid_chunk(chunk_id="payload_1").model_dump(mode="json"),
+            _valid_chunk(chunk_id="payload_2").model_dump(mode="json"),
+        ]
+        report = self._validate_rows(tmp_path, "payload_rate.jsonl", rows)
+
+        assert report.payload_readiness_summary["ready_rate"] == 1.0
+
+    def test_missing_required_payload_field_counted(self, tmp_path: Path) -> None:
+        row = _valid_chunk().model_dump(mode="json")
+        del row["source_node_id"]
+        report = self._validate_rows(tmp_path, "payload_missing_required.jsonl", [row])
+
+        summary = report.payload_readiness_summary
+        assert summary["missing_required_field_counts"]["source_node_id"] == 1
+        assert summary["payload_failure_chunks"] == 1
+        assert summary["not_ready_chunks"] == 1
+        assert report.errors_total == 1
+
+    def test_empty_required_payload_field_counted(self, tmp_path: Path) -> None:
+        row = _valid_chunk().model_dump(mode="json")
+        row["hierarchy_path"] = ""
+        report = self._validate_rows(tmp_path, "payload_empty_required.jsonl", [row])
+
+        summary = report.payload_readiness_summary
+        assert summary["empty_required_field_counts"]["hierarchy_path"] == 1
+        assert summary["payload_failure_chunks"] == 1
+        assert report.invalid_chunks == 1
+        assert (
+            next(
+                issue
+                for issue in report.sample_failures
+                if issue.code == ProcessedJsonlValidationIssueCode.PAYLOAD_FIELD_MISSING
+            ).context["failures"][0]["field"]
+            == "hierarchy_path"
+        )
+
+    def test_article_level_requires_article_number(self, tmp_path: Path) -> None:
+        row = _valid_chunk().model_dump(mode="json")
+        row["article_number"] = None
+        report = self._validate_rows(tmp_path, "payload_article_number.jsonl", [row])
+
+        assert (
+            report.payload_readiness_summary["missing_conditional_field_counts"]["article_number"]
+            == 1
+        )
+        assert report.payload_readiness_summary["payload_failure_chunks"] == 1
+
+    def test_clause_level_requires_article_and_clause_number(self, tmp_path: Path) -> None:
+        row = _valid_chunk(
+            level=ChunkingLevel.CLAUSE,
+            chunk_kind="clause_level",
+            clause_number="2",
+            citation="Luật thử nghiệm, Khoản 2, Điều 1",
+        ).model_dump(mode="json")
+        row["clause_number"] = None
+        report = self._validate_rows(tmp_path, "payload_clause_number.jsonl", [row])
+
+        assert (
+            report.payload_readiness_summary["missing_conditional_field_counts"]["clause_number"]
+            == 1
+        )
+        assert report.payload_readiness_summary["payload_failure_chunks"] == 1
+
+    def test_point_level_requires_article_clause_point(self, tmp_path: Path) -> None:
+        row = _valid_chunk(
+            level=ChunkingLevel.POINT,
+            chunk_kind="point_level",
+            clause_number="2",
+            point_label="a",
+            citation="Luật thử nghiệm, Điểm a, Khoản 2, Điều 1",
+        ).model_dump(mode="json")
+        row["point_label"] = None
+        report = self._validate_rows(tmp_path, "payload_point_label.jsonl", [row])
+
+        assert (
+            report.payload_readiness_summary["missing_conditional_field_counts"]["point_label"] == 1
+        )
+        assert report.payload_readiness_summary["payload_failure_chunks"] == 1
+
+    def test_missing_recommended_metadata_warns_only(self, tmp_path: Path) -> None:
+        row = _valid_chunk().model_dump(mode="json")
+        del row["metadata"]["is_empty_or_repealed"]
+        report = self._validate_rows(tmp_path, "payload_metadata_warning.jsonl", [row])
+
+        summary = report.payload_readiness_summary
+        assert summary["missing_recommended_metadata_counts"]["is_empty_or_repealed"] == 1
+        assert summary["payload_warning_chunks"] == 1
+        assert summary["ready_chunks"] == 1
+        assert report.invalid_chunks == 0
+
+    def test_payload_failure_counts_once_per_chunk(self, tmp_path: Path) -> None:
+        row = _valid_chunk().model_dump(mode="json")
+        row["hierarchy_path"] = ""
+        row["text_hash"] = ""
+        report = self._validate_rows(tmp_path, "payload_multiple_failures.jsonl", [row])
+
+        summary = report.payload_readiness_summary
+        assert summary["payload_failure_chunks"] == 1
+        assert summary["empty_required_field_counts"]["hierarchy_path"] == 1
+        assert summary["empty_required_field_counts"]["text_hash"] == 1
+        assert report.errors_total == 1
+
+    def test_payload_warning_counts_once_per_chunk(self, tmp_path: Path) -> None:
+        row = _valid_chunk().model_dump(mode="json")
+        del row["metadata"]["is_empty_or_repealed"]
+        del row["metadata"]["is_source_unit_repealed"]
+        report = self._validate_rows(tmp_path, "payload_multiple_warnings.jsonl", [row])
+
+        summary = report.payload_readiness_summary
+        assert summary["payload_warning_chunks"] == 1
+        assert sum(summary["missing_recommended_metadata_counts"].values()) == 2
+
+    def test_payload_summary_aggregates_multiple_chunks(self, tmp_path: Path) -> None:
+        ready = _valid_chunk(chunk_id="payload_ready").model_dump(mode="json")
+        warning = _valid_chunk(chunk_id="payload_warning").model_dump(mode="json")
+        del warning["metadata"]["is_empty_or_repealed"]
+        not_ready = _valid_chunk(chunk_id="payload_not_ready").model_dump(mode="json")
+        not_ready["hierarchy_path"] = ""
+
+        report = self._validate_rows(
+            tmp_path,
+            "payload_mixed.jsonl",
+            [ready, warning, not_ready],
+        )
+
+        summary = report.payload_readiness_summary
+        assert summary["checked_chunks"] == 3
+        assert summary["ready_chunks"] == 2
+        assert summary["not_ready_chunks"] == 1
+        assert summary["payload_failure_chunks"] == 1
+        assert summary["payload_warning_chunks"] == 1
+        assert summary["ready_rate"] == 0.6667
+
+
+# ---------------------------------------------------------------------------
+# Slice 3H scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3HScope:
+    """Slice 3H audits payload readiness; final embedding checks stay neutral."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""
@@ -2233,5 +2397,7 @@ class TestSlice3GScope:
         assert report.long_parent_text_summary["long_count"] == 0
         assert report.repealed_metadata_summary["metadata_mismatch_failure_count"] == 0
         assert report.repealed_metadata_summary["metadata_mismatch_warning_count"] == 0
-        assert report.payload_readiness_summary == {}
+        assert report.payload_readiness_summary["checked_chunks"] == 1
+        assert report.payload_readiness_summary["ready_chunks"] == 1
+        assert report.payload_readiness_summary["not_ready_chunks"] == 0
         assert report.embedding_readiness == {}

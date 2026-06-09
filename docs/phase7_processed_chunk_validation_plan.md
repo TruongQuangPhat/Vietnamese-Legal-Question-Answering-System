@@ -18,7 +18,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3E: Complete
 - Slice 3F: Complete
 - Slice 3G: Complete
-- Slice 3H and later: Not started
+- Slice 3H: Complete
+- Slice 3I and later: Not started
 
 ## Completed Slices
 
@@ -148,6 +149,21 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
   warning issue per affected chunk.
 - Preserves up to five longest parent-context examples and reports configured
   parent length bucket counts without modifying or truncating chunks.
+
+### Slice 3H — Payload Readiness Audit
+
+- Inspects raw JSON objects before Pydantic defaults hide missing metadata keys.
+- Requires identifiers, chunk kind/level, citation/hierarchy path, traceability
+  node IDs, hashes, and metadata for every payload.
+- Applies Article/Clause/Point hierarchy field requirements by `chunk_kind`.
+- Treats missing recommended repealed flags and existing source/debug fields
+  as warning-only payload diagnostics.
+- Counts one payload failure or warning chunk regardless of how many fields are
+  affected.
+- Avoids duplicate hard-error counts when Slice 2 already rejects the same
+  missing or invalid field.
+- Populates readiness totals, field-level distributions, and a four-decimal
+  ready rate without embedding or indexing data.
 
 ## Current Review Before Slice 3C
 
@@ -462,6 +478,86 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Slice 3H Implementation — Payload Readiness Audit
+
+Objective: verify that every chunk has enough structured payload data for
+future filtering, citation rendering, hierarchy traceability, and retrieval
+debugging without creating vectors or indexes.
+
+Required payload fields:
+
+- `law_id`
+- `chunk_id`
+- `chunk_kind`
+- `level`
+- `citation`
+- `hierarchy_path`
+- `source_node_id`
+- `parent_article_node_id`
+- `text_hash`
+- `parent_text_hash`
+- `metadata`
+
+Conditional hierarchy fields:
+
+- Article chunks: `article_number`
+- Clause chunks: `article_number`, `clause_number`
+- Point chunks: `article_number`, `clause_number`, `point_label`
+
+Recommended warning-only fields:
+
+- Metadata: `is_empty_or_repealed`, `is_source_unit_repealed`
+- Existing source/debug fields: `law_name`, `source_url`, `source_domain`,
+  `source_type`, `source_file`
+
+Populated `payload_readiness_summary` fields:
+
+- `checked_chunks`
+- `ready_chunks`
+- `not_ready_chunks`
+- `payload_failure_chunks`
+- `payload_warning_chunks`
+- `schema_unavailable_chunks`
+- `missing_required_field_counts`
+- `empty_required_field_counts`
+- `missing_conditional_field_counts`
+- `missing_recommended_metadata_counts`
+- `missing_recommended_source_counts`
+- `ready_rate`
+
+Implementation files:
+
+- `src/processing/processed_jsonl_validator.py`
+- `tests/unit/processing/test_processed_jsonl_validator.py`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+The validation model was not modified because `PAYLOAD_FIELD_MISSING` and the
+typed `payload_readiness_summary` field already existed. No new source module
+was created.
+
+Verification result:
+
+- Phase 7 model and validator tests: 155 passed.
+- Read-only full-corpus validation: 40,389 checked chunks, 40,389 ready,
+  0 not ready, 0 payload failures, 0 payload warnings, and ready rate 1.0.
+- All required, conditional, recommended metadata, and existing source/debug
+  field counters are zero.
+- Overall status remains `pass_with_warnings` with 0 errors and 8,206 warnings.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
+
+## Deferred Warning Follow-up
+
+- The 8,206 total warnings after Slice 3G were intentionally not resolved,
+  suppressed, reclassified, or weakened in Slice 3H.
+- This total remains 3,561 contamination warning-only chunks from Slice 3E
+  plus 4,645 short-text warnings from Slice 3G.
+- Handle this distribution later through a dedicated warning audit and policy
+  decision task.
+
 ## Non-goals
 
 Phase 7 validation slices must not:
@@ -503,5 +599,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3G is complete. Slice 3H and later are not started; wait for explicit
+Slice 3H is complete. Slice 3I and later are not started; wait for explicit
 approval before implementing the next validation slice.
