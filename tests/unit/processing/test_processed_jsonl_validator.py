@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 processed JSONL validator through Slice 3C."""
+"""Unit tests for Phase 7 processed JSONL validator through Slice 3E."""
 
 from __future__ import annotations
 
@@ -1570,12 +1570,180 @@ class TestHierarchyTraceability:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3D scope: later checks are not yet implemented
+# Slice 3E: Contamination audit tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3DScope:
-    """Slice 3D implements hierarchy traceability; later checks are skipped."""
+class TestContaminationAudit:
+    """Hard and warning contamination checks for child and parent text."""
+
+    def _validate_text(
+        self,
+        tmp_path: Path,
+        filename: str,
+        *,
+        text: str = "Nội dung văn bản pháp luật.",
+        parent_text: str = "Nội dung đầy đủ của Điều 1.",
+    ) -> ProcessedJsonlValidationReport:
+        chunk = _valid_chunk(
+            text=text,
+            parent_text=parent_text,
+            text_hash=_compute_text_hash(text),
+            parent_text_hash=_compute_text_hash(parent_text),
+        )
+        jsonl_path = tmp_path / filename
+        _write_jsonl(jsonl_path, [chunk])
+        return ProcessedJsonlValidator(_config(jsonl_path)).validate(jsonl_path)
+
+    def test_no_contamination_passes(self, tmp_path: Path) -> None:
+        report = self._validate_text(tmp_path, "clean.jsonl")
+
+        assert report.contamination_failures == 0
+        assert report.contamination_warnings == 0
+        assert report.status == "pass"
+
+    def test_hard_marker_in_text_fails(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "hard_text.jsonl",
+            text="XÁC THỰC VĂN BẢN HỢP NHẤT\nNội dung.",
+        )
+
+        assert report.contamination_failures == 1
+        assert report.status == "fail"
+        assert report.invalid_chunks == 1
+        assert (
+            report.sample_failures[0].code
+            == ProcessedJsonlValidationIssueCode.HARD_CONTAMINATION_FOUND
+        )
+
+    def test_hard_marker_in_parent_text_fails(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "hard_parent.jsonl",
+            parent_text="Nội dung Điều 1.\nNơi nhận: Cơ quan liên quan.",
+        )
+
+        assert report.contamination_failures == 1
+        assert report.status == "fail"
+
+    def test_luu_colon_hard_marker_fails(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "luu_colon.jsonl",
+            text="Nội dung.\nLưu: Văn thư.",
+        )
+
+        assert report.contamination_failures == 1
+        assert report.status == "fail"
+
+    def test_luu_y_does_not_trigger_luu_colon(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "luu_y.jsonl",
+            text="Lưu ý việc áp dụng quy định này.",
+        )
+
+        assert report.contamination_failures == 0
+        assert report.status == "pass"
+
+    def test_warning_marker_in_text_warns_only(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "warning_text.jsonl",
+            text="BỘ TRƯỞNG\nNội dung ký xác nhận.",
+        )
+
+        assert report.contamination_warnings == 1
+        assert report.contamination_failures == 0
+        assert report.status == "pass_with_warnings"
+        assert report.invalid_chunks == 0
+
+    def test_warning_marker_in_parent_text_warns_only(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "warning_parent.jsonl",
+            parent_text="Nội dung Điều 1.\nCHỦ TỊCH QUỐC HỘI",
+        )
+
+        assert report.contamination_warnings == 1
+        assert report.contamination_failures == 0
+        assert report.invalid_chunks == 0
+
+    def test_hard_and_warning_markers_count_separately(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "hard_warning.jsonl",
+            text="Văn bản này được hợp nhất.\nBỘ TRƯỞNG",
+        )
+
+        assert report.contamination_failures == 1
+        assert report.contamination_warnings == 1
+        assert report.invalid_chunks == 1
+        assert report.status == "fail"
+
+    def test_multiple_hard_markers_count_once_per_chunk(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "multiple_hard.jsonl",
+            text="XÁC THỰC VĂN BẢN HỢP NHẤT\nLưu: Văn thư.",
+            parent_text="Nơi nhận: Cơ quan liên quan.",
+        )
+
+        assert report.contamination_failures == 1
+        hard_samples = [
+            issue
+            for issue in report.sample_failures
+            if issue.code == ProcessedJsonlValidationIssueCode.HARD_CONTAMINATION_FOUND
+        ]
+        assert len(hard_samples) == 1
+        assert len(hard_samples[0].context["matches"]) == 3
+
+    def test_multiple_warning_markers_count_once_per_chunk(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "multiple_warning.jsonl",
+            text="BỘ TRƯỞNG\nCHỦ NHIỆM",
+            parent_text="TM. QUỐC HỘI",
+        )
+
+        assert report.contamination_warnings == 1
+        assert len(report.sample_warnings) == 1
+        assert len(report.sample_warnings[0].context["matches"]) == 3
+
+    def test_matching_is_case_insensitive(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "case_insensitive_contamination.jsonl",
+            text="xác thực văn bản hợp nhất",
+        )
+
+        assert report.contamination_failures == 1
+
+    def test_matches_context_includes_field_and_marker(self, tmp_path: Path) -> None:
+        report = self._validate_text(
+            tmp_path,
+            "match_context.jsonl",
+            parent_text="Nội dung.\nNơi nhận: Cơ quan liên quan.",
+        )
+
+        contamination_issue = next(
+            issue
+            for issue in report.sample_failures
+            if issue.code == ProcessedJsonlValidationIssueCode.HARD_CONTAMINATION_FOUND
+        )
+        assert contamination_issue.context["matches"] == [
+            {"field": "parent_text", "marker": "Nơi nhận:"}
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Slice 3E scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3EScope:
+    """Slice 3E implements contamination auditing; later checks are neutral."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""

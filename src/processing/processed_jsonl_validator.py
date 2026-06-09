@@ -9,8 +9,8 @@ against the Phase 6 chunking report.
 
 This validator is independent from Phase 6's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
-and report model. Hash integrity, count reconciliation, and citation structure
-and hierarchy traceability are implemented; contamination and
+and report model. Hash integrity, count reconciliation, citation structure,
+hierarchy traceability, and contamination checks are implemented;
 embedding-readiness checks are added in later slices.
 """
 
@@ -57,9 +57,9 @@ class ProcessedJsonlValidator:
     6. Basic counters and distribution summaries.
 
     Slice 3A adds hash integrity, Slice 3B adds count reconciliation, Slice 3C
-    adds citation structure, and Slice 3D adds hierarchy traceability. Later
-    slices add contamination, embedding-readiness, payload-readiness, and
-    repealed metadata.
+    adds citation structure, Slice 3D adds hierarchy traceability, and Slice 3E
+    adds contamination auditing. Later slices add embedding-readiness,
+    payload-readiness, and repealed metadata.
     """
 
     def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
@@ -75,7 +75,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3D on the processed JSONL.
+        """Run validation checks through Slice 3E on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -104,6 +104,8 @@ class ProcessedJsonlValidator:
         hash_mismatches: int = 0
         citation_failures: int = 0
         traceability_failures: int = 0
+        contamination_failures: int = 0
+        contamination_warnings: int = 0
         count_reconciliation_failures: int = 0
         errors_total: int = 0
         warnings_total: int = 0
@@ -576,6 +578,54 @@ class ProcessedJsonlValidator:
                     if hierarchy_load_failed:
                         sampled_hierarchy_load_failures.add(chunk.law_id)
 
+                # Check 8: Processed text contamination
+                hard_matches, warning_matches = _scan_contamination(
+                    chunk.text,
+                    chunk.parent_text,
+                    self.config.hard_contamination_markers,
+                    self.config.warning_contamination_markers,
+                )
+                if hard_matches:
+                    contamination_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.HARD_CONTAMINATION_FOUND,
+                            message="Processed chunk contains hard contamination markers",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "matches": [
+                                    {"field": field, "marker": marker}
+                                    for field, marker in hard_matches
+                                ],
+                            },
+                        )
+                    )
+
+                if warning_matches:
+                    contamination_warnings += 1
+                    warnings_total += 1
+                    _add_sample_warning(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.WARNING_CONTAMINATION_FOUND,
+                            message="Processed chunk contains warning contamination markers",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "chunk_kind": chunk.chunk_kind,
+                                "matches": [
+                                    {"field": field, "marker": marker}
+                                    for field, marker in warning_matches
+                                ],
+                            },
+                        )
+                    )
+
                 # Count valid/invalid per line
                 if line_has_error:
                     invalid_chunks += 1
@@ -612,8 +662,8 @@ class ProcessedJsonlValidator:
             hash_mismatches=hash_mismatches,
             citation_failures=citation_failures,
             traceability_failures=traceability_failures,
-            contamination_failures=0,
-            contamination_warnings=0,
+            contamination_failures=contamination_failures,
+            contamination_warnings=contamination_warnings,
             errors_total=errors_total,
             warnings_total=warnings_total,
             chunks_by_level=chunks_by_level,
@@ -982,6 +1032,48 @@ def _citation_contains_label(
     """
     pattern = rf"\b{re.escape(label)}\s+{re.escape(value)}(?!(?:\w|[.-]\w))"
     return re.search(pattern, citation, flags=re.IGNORECASE) is not None
+
+
+def _scan_contamination(
+    text: str,
+    parent_text: str,
+    hard_markers: list[str],
+    warning_markers: list[str],
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Find configured contamination markers in child and parent text.
+
+    Matching is Unicode-aware and case-insensitive. Runs of whitespace are
+    normalized so fixed markers remain detectable across line wrapping, while
+    punctuation such as the colon in ``Lưu:`` remains required.
+
+    Args:
+        text: Child chunk content used for embedding.
+        parent_text: Parent Article context used for retrieval and generation.
+        hard_markers: Markers that make the chunk invalid.
+        warning_markers: Markers that produce warning-only diagnostics.
+
+    Returns:
+        Hard and warning matches as ``(field_name, configured_marker)`` tuples.
+    """
+
+    def _normalize(value: str) -> str:
+        return " ".join(value.casefold().split())
+
+    normalized_fields = {
+        "text": _normalize(text),
+        "parent_text": _normalize(parent_text),
+    }
+
+    def _find(markers: list[str]) -> list[tuple[str, str]]:
+        matches: list[tuple[str, str]] = []
+        for field_name, normalized_text in normalized_fields.items():
+            for marker in markers:
+                normalized_marker = _normalize(marker)
+                if normalized_marker and normalized_marker in normalized_text:
+                    matches.append((field_name, marker))
+        return matches
+
+    return _find(hard_markers), _find(warning_markers)
 
 
 def _check_citation_structure(chunk: LegalChunk) -> list[tuple[str, str]]:

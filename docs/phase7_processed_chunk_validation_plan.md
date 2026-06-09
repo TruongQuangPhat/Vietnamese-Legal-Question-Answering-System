@@ -15,7 +15,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3B: Complete
 - Slice 3C: Complete
 - Slice 3D: Complete
-- Slice 3E and later: Not started
+- Slice 3E: Complete
+- Slice 3F and later: Not started
 
 ## Completed Slices
 
@@ -99,6 +100,21 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Checks are marked skipped only when `hierarchy_dir` is explicitly `None`.
 - Unknown chunk kinds receive common node-existence and parent Article checks
   but no kind-specific source checks.
+
+### Slice 3E — Contamination Audit
+
+- Scans both embedding `text` and parent Article `parent_text`.
+- Uses the configured hard and warning marker lists without modifying chunks.
+- Matching is Unicode-aware, case-insensitive, and whitespace-normalized.
+- Hard markers increment `contamination_failures` and `errors_total`, and mark
+  the affected line invalid.
+- Warning markers increment `contamination_warnings` and `warnings_total`
+  without invalidating the line.
+- Multiple hard or warning marker matches on one chunk count once for that
+  severity; issue context retains all matched fields and configured markers.
+- A chunk containing both categories records one hard failure and one warning.
+- The colon remains required for `Nơi nhận:` and `Lưu:`, so text such as
+  `Lưu ý` does not trigger the `Lưu:` hard marker.
 
 ## Current Review Before Slice 3C
 
@@ -257,9 +273,54 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Slice 3E Implementation — Contamination Audit
+
+Objective: detect fixed non-content boilerplate and signature/authority
+markers in processed child and parent text without cleaning or mutating the
+generated corpus.
+
+Hard-failure markers:
+
+- `XÁC THỰC VĂN BẢN HỢP NHẤT`
+- `Nơi nhận:`
+- `Lưu:`
+- `Văn bản này được hợp nhất`
+
+Warning-only markers:
+
+- `BỘ TRƯỞNG`
+- `CHỦ NHIỆM`
+- `CHỦ TỊCH QUỐC HỘI`
+- `TM. QUỐC HỘI`
+- `KT. BỘ TRƯỞNG`
+
+Implementation files:
+
+- `src/processing/processed_jsonl_validator.py`
+- `tests/unit/processing/test_processed_jsonl_validator.py`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+The validation model file was not modified because
+`HARD_CONTAMINATION_FOUND` and `WARNING_CONTAMINATION_FOUND` already existed.
+No new source module was created.
+
+Verification result:
+
+- Phase 7 model and validator tests: 122 passed.
+- Read-only full-corpus validation: 40,389 valid chunks, 0 invalid chunks,
+  0 hard contamination failures, and 3,561 warning-only contamination chunks.
+- Full-corpus status: `pass_with_warnings`; the broad authority markers can
+  appear in substantive provisions, so their warning-only classification is
+  preserved.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
+
 ## Non-goals
 
-Slice 3C must not:
+Phase 7 validation slices must not:
 
 - validate whether a citation is legally or semantically correct;
 - compare citations with hierarchy JSON files;
@@ -268,7 +329,7 @@ Slice 3C must not:
 - modify citations or chunks;
 - parse or rechunk legal text;
 - add external legal sources or network calls;
-- implement contamination, payload, embedding-readiness, or traceability checks;
+- implement payload or embedding-readiness checks before their approved slice;
 - implement services, CLI commands, reports on disk, embedding, indexing,
   retrieval, reranking, generation, Naive RAG, Advanced RAG, or GraphRAG.
 
@@ -298,5 +359,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3D is complete. Slice 3E and later are not started; wait for explicit
+Slice 3E is complete. Slice 3F and later are not started; wait for explicit
 approval before implementing the next validation slice.
