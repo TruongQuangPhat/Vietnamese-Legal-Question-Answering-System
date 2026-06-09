@@ -4,7 +4,8 @@ This module implements the core JSONL validation pipeline for Phase 7.
 It streams ``data/processed/legal_chunks.jsonl`` line-by-line, validates
 each row as a ``LegalChunk``, checks required field completeness by
 ``chunk_kind``, enforces global ``chunk_id`` uniqueness, and accumulates
-counters for the validation report.
+counters for the validation report. It also reconciles corpus-level counts
+against the Phase 6 chunking report.
 
 This validator is independent from Phase 6's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
@@ -53,9 +54,10 @@ class ProcessedJsonlValidator:
     5. Global ``chunk_id`` uniqueness.
     6. Basic counters and distribution summaries.
 
-    Later slices add: hash integrity, count reconciliation, citation
-    structure, contamination, hierarchy traceability, embedding-readiness,
-    payload-readiness, and repealed metadata.
+    Slice 3A adds hash integrity, and Slice 3B adds count reconciliation.
+    Later slices add citation structure, contamination, hierarchy
+    traceability, embedding-readiness, payload-readiness, and repealed
+    metadata.
     """
 
     def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
@@ -71,7 +73,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run Slice 2 validation checks on the processed JSONL.
+        """Run validation checks through Slice 3B on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -98,6 +100,7 @@ class ProcessedJsonlValidator:
         required_field_failures: int = 0
         duplicate_chunk_ids: int = 0
         hash_mismatches: int = 0
+        count_reconciliation_failures: int = 0
         errors_total: int = 0
         warnings_total: int = 0
 
@@ -142,6 +145,141 @@ class ProcessedJsonlValidator:
                 line_number=line_number,
                 context=context or {},
             )
+
+        def _reconcile_counts_with_chunking_report() -> tuple[int, int]:
+            report_path = Path(self.config.chunking_report_path)
+            issue_code = ProcessedJsonlValidationIssueCode.COUNT_RECONCILIATION_FAILED
+
+            def _warning(message: str, context: dict[str, Any]) -> None:
+                _add_sample_warning(
+                    _make_issue(
+                        code=issue_code,
+                        message=message,
+                        law_id="unknown",
+                        chunk_id=None,
+                        line_number=None,
+                        context={"report_path": str(report_path), **context},
+                    )
+                )
+
+            def _failure(message: str, context: dict[str, Any]) -> None:
+                _add_sample_failure(
+                    _make_issue(
+                        code=issue_code,
+                        message=message,
+                        law_id="unknown",
+                        chunk_id=None,
+                        line_number=None,
+                        context={"report_path": str(report_path), **context},
+                    )
+                )
+
+            if not report_path.exists():
+                _warning(
+                    "Phase 6 chunking report is missing",
+                    {"reason": "report_missing"},
+                )
+                return 0, 1
+
+            try:
+                chunking_report = json.loads(report_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                _warning(
+                    "Phase 6 chunking report contains invalid JSON",
+                    {"reason": "invalid_json", "error": str(exc)},
+                )
+                return 0, 1
+            except (OSError, UnicodeError) as exc:
+                _warning(
+                    "Phase 6 chunking report could not be read",
+                    {"reason": "report_unreadable", "error": str(exc)},
+                )
+                return 0, 1
+
+            if not isinstance(chunking_report, dict):
+                _warning(
+                    "Phase 6 chunking report root is not a JSON object",
+                    {"reason": "report_root_not_object"},
+                )
+                return 0, 1
+
+            if "total_chunks" not in chunking_report:
+                _warning(
+                    "Phase 6 chunking report is missing total_chunks",
+                    {"reason": "total_chunks_missing"},
+                )
+                return 0, 1
+
+            expected_total = chunking_report["total_chunks"]
+            if (
+                not isinstance(expected_total, int)
+                or isinstance(expected_total, bool)
+                or expected_total < 0
+            ):
+                _warning(
+                    "Phase 6 chunking report has invalid total_chunks",
+                    {
+                        "reason": "total_chunks_invalid",
+                        "raw_total_chunks": expected_total,
+                    },
+                )
+                return 0, 1
+
+            failure_count = 0
+            warning_count = 0
+
+            if expected_total != total_lines:
+                _failure(
+                    "JSONL line count does not match Phase 6 total_chunks",
+                    {
+                        "expected_total": expected_total,
+                        "observed_total": total_lines,
+                        "delta": total_lines - expected_total,
+                    },
+                )
+                failure_count += 1
+
+            if "chunks_by_level" in chunking_report:
+                expected_by_level = chunking_report["chunks_by_level"]
+                if not isinstance(expected_by_level, dict):
+                    _warning(
+                        "Phase 6 chunks_by_level is malformed",
+                        {"reason": "chunks_by_level_malformed"},
+                    )
+                    warning_count += 1
+                else:
+                    for level, expected in expected_by_level.items():
+                        observed = chunks_by_level.get(str(level), 0)
+                        if expected != observed:
+                            _failure(
+                                "JSONL level count does not match Phase 6 report",
+                                {
+                                    "level": str(level),
+                                    "expected": expected,
+                                    "observed": observed,
+                                },
+                            )
+                            failure_count += 1
+
+            if "chunks_by_law" in chunking_report:
+                expected_by_law = chunking_report["chunks_by_law"]
+                if not isinstance(expected_by_law, dict):
+                    _warning(
+                        "Phase 6 chunks_by_law is malformed",
+                        {"reason": "chunks_by_law_malformed"},
+                    )
+                    warning_count += 1
+                elif len(expected_by_law) != len(chunks_by_law):
+                    _warning(
+                        "JSONL law count does not match Phase 6 report",
+                        {
+                            "expected_law_count": len(expected_by_law),
+                            "observed_law_count": len(chunks_by_law),
+                        },
+                    )
+                    warning_count += 1
+
+            return failure_count, warning_count
 
         # --- Stream and validate ---
         with input_path.open("r", encoding="utf-8") as fh:
@@ -315,6 +453,11 @@ class ProcessedJsonlValidator:
                 else:
                     valid_chunks += 1
 
+        recon_failures, recon_warnings = _reconcile_counts_with_chunking_report()
+        count_reconciliation_failures += recon_failures
+        errors_total += recon_failures
+        warnings_total += recon_warnings
+
         # --- Build report ---
         finished_at = datetime.now(UTC).isoformat()
         duration_seconds = round(time.perf_counter() - start_time, 3)
@@ -336,7 +479,7 @@ class ProcessedJsonlValidator:
             schema_failures=schema_failures,
             required_field_failures=required_field_failures,
             duplicate_chunk_ids=duplicate_chunk_ids,
-            count_reconciliation_failures=0,
+            count_reconciliation_failures=count_reconciliation_failures,
             hash_mismatches=hash_mismatches,
             citation_failures=0,
             traceability_failures=0,

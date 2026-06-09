@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 processed JSONL validator (Slice 3A)."""
+"""Unit tests for Phase 7 processed JSONL validator through Slice 3B."""
 
 from __future__ import annotations
 
@@ -22,12 +22,23 @@ from src.processing.processed_jsonl_validator import ProcessedJsonlValidator
 # ---------------------------------------------------------------------------
 
 
-def _config(**overrides: object) -> ProcessedJsonlValidationConfig:
+def _config(
+    jsonl_path: Path | None = None,
+    **overrides: object,
+) -> ProcessedJsonlValidationConfig:
     """Build a ProcessedJsonlValidationConfig with sensible defaults."""
     payload: dict[str, object] = {
         "schema_version": "1.0",
         "validator_version": "v0.1.0",
     }
+    if jsonl_path is not None and "chunking_report_path" not in overrides:
+        report_path = jsonl_path.with_name(f"{jsonl_path.stem}_chunking_report.json")
+        total_lines = len(jsonl_path.read_text(encoding="utf-8").splitlines())
+        report_path.write_text(
+            json.dumps({"total_chunks": total_lines}),
+            encoding="utf-8",
+        )
+        payload["chunking_report_path"] = str(report_path)
     payload.update(overrides)
     return ProcessedJsonlValidationConfig(**payload)
 
@@ -104,7 +115,7 @@ class TestValidJsonl:
         jsonl_path = tmp_path / "valid.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "pass"
@@ -123,7 +134,7 @@ class TestValidJsonl:
         jsonl_path = tmp_path / "multi.jsonl"
         _write_jsonl(jsonl_path, chunks)
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "pass"
@@ -141,7 +152,7 @@ class TestJsonlParseErrors:
         jsonl_path = tmp_path / "bad.jsonl"
         jsonl_path.write_text("not_valid_json_at_all\n", encoding="utf-8")
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "fail"
@@ -157,7 +168,7 @@ class TestJsonlParseErrors:
         jsonl_path = tmp_path / "blank.jsonl"
         jsonl_path.write_text("\n", encoding="utf-8")
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "fail"
@@ -174,7 +185,7 @@ class TestJsonlParseErrors:
         with jsonl_path.open("a", encoding="utf-8") as fh:
             fh.write("not json\n")
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.total_lines == 2
@@ -212,7 +223,7 @@ class TestSchemaValidation:
         jsonl_path = tmp_path / "schema_bad.jsonl"
         _write_raw_jsonl(jsonl_path, [bad_row])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "fail"
@@ -229,7 +240,7 @@ class TestSchemaValidation:
         jsonl_path = tmp_path / "array.jsonl"
         jsonl_path.write_text('["not", "a", "dict"]\n', encoding="utf-8")
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "fail"
@@ -249,7 +260,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "missing_field.jsonl"
         _write_raw_jsonl(jsonl_path, [row])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "fail"
@@ -269,7 +280,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "req_field.jsonl"
         _write_raw_jsonl(jsonl_path, [row])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.required_field_failures == 1
@@ -284,7 +295,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "missing_meta.jsonl"
         _write_raw_jsonl(jsonl_path, [row])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.required_field_failures == 1
@@ -302,7 +313,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "article.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "pass"
@@ -322,7 +333,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "clause_bad.jsonl"
         _write_raw_jsonl(jsonl_path, [row])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.required_field_failures == 1
@@ -339,7 +350,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "clause_ok.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "pass"
@@ -358,7 +369,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "point_bad.jsonl"
         _write_raw_jsonl(jsonl_path, [row])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.required_field_failures == 1
@@ -371,7 +382,7 @@ class TestRequiredFields:
         jsonl_path = tmp_path / "empty_field.jsonl"
         _write_raw_jsonl(jsonl_path, [row])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.schema_failures == 1
@@ -386,7 +397,7 @@ class TestDuplicateChunkId:
         jsonl_path = tmp_path / "dup.jsonl"
         _write_jsonl(jsonl_path, [chunk, chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.status == "fail"
@@ -407,7 +418,7 @@ class TestDuplicateChunkId:
         jsonl_path = tmp_path / "unique.jsonl"
         _write_jsonl(jsonl_path, chunks)
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.duplicate_chunk_ids == 0
@@ -424,7 +435,7 @@ class TestCappedSamples:
         jsonl_path = tmp_path / "many_bad.jsonl"
         _write_raw_jsonl(jsonl_path, rows)
 
-        config = _config(max_sample_failures=10)
+        config = _config(jsonl_path, max_sample_failures=10)
         validator = ProcessedJsonlValidator(config)
         report = validator.validate(jsonl_path)
 
@@ -433,7 +444,7 @@ class TestCappedSamples:
         assert len(report.sample_warnings) == 0
 
     def test_sample_warnings_capped(self, tmp_path: Path) -> None:
-        # Slice 3A doesn't produce warnings, but test the cap mechanism
+        # Verify the warning sample cap is accepted by the config.
         config = _config(max_sample_warnings=5)
         validator = ProcessedJsonlValidator(config)
         # Just verify the config is accepted
@@ -464,7 +475,7 @@ class TestCounts:
                 + "\n"
             )
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.total_lines == 4
@@ -482,7 +493,7 @@ class TestCounts:
         jsonl_path = tmp_path / "dist.jsonl"
         _write_jsonl(jsonl_path, chunks)
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.chunks_by_level == {"article": 1, "clause": 1, "point": 1}
@@ -503,7 +514,7 @@ class TestHashIntegrity:
         jsonl_path = tmp_path / "hash_ok.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.hash_mismatches == 0
@@ -517,7 +528,7 @@ class TestHashIntegrity:
         jsonl_path = tmp_path / "hash_text_bad.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.hash_mismatches == 1
@@ -537,7 +548,7 @@ class TestHashIntegrity:
         jsonl_path = tmp_path / "hash_parent_bad.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.hash_mismatches == 1
@@ -557,7 +568,7 @@ class TestHashIntegrity:
         jsonl_path = tmp_path / "hash_both_bad.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.hash_mismatches == 1  # one line, one increment
@@ -575,7 +586,7 @@ class TestHashIntegrity:
         jsonl_path = tmp_path / "hash_one_line.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.invalid_chunks == 1
@@ -594,7 +605,7 @@ class TestHashIntegrity:
         jsonl_path = tmp_path / "hash_cap.jsonl"
         _write_raw_jsonl(jsonl_path, rows)
 
-        config = _config(max_sample_failures=5)
+        config = _config(jsonl_path, max_sample_failures=5)
         validator = ProcessedJsonlValidator(config)
         report = validator.validate(jsonl_path)
 
@@ -604,44 +615,276 @@ class TestHashIntegrity:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3A scope: later checks are not yet implemented
+# Slice 3B: Count reconciliation tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3AScope:
-    """Slice 3A only implements hash integrity; later checks are skipped."""
+class TestCountReconciliation:
+    """Count reconciliation against the Phase 6 chunking report."""
 
-    def test_count_reconciliation_not_implemented(self, tmp_path: Path) -> None:
-        """Count reconciliation is not checked in Slice 3A."""
+    def _write_chunking_report(self, path: Path, data: object) -> None:
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    def test_missing_chunking_report_warns_without_failure(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "missing_report.jsonl"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        report_path = tmp_path / "does_not_exist.json"
+
+        validator = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path)))
+        report = validator.validate(jsonl_path)
+
+        assert report.count_reconciliation_failures == 0
+        assert report.warnings_total >= 1
+        assert report.status == "pass_with_warnings"
+        assert (
+            report.sample_warnings[0].code
+            == ProcessedJsonlValidationIssueCode.COUNT_RECONCILIATION_FAILED
+        )
+        assert report.sample_warnings[0].context["reason"] == "report_missing"
+
+    def test_invalid_chunking_report_json_warns_without_failure(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "invalid_report_json.jsonl"
+        report_path = tmp_path / "invalid_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        report_path.write_text("{invalid json", encoding="utf-8")
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.warnings_total == 1
+        assert report.status == "pass_with_warnings"
+        assert report.sample_warnings[0].context["reason"] == "invalid_json"
+        assert "error" in report.sample_warnings[0].context
+
+    def test_non_object_chunking_report_warns_without_failure(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "non_object_report.jsonl"
+        report_path = tmp_path / "non_object_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(report_path, ["not", "an", "object"])
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.warnings_total == 1
+        assert report.status == "pass_with_warnings"
+        assert report.sample_warnings[0].context["reason"] == "report_root_not_object"
+
+    def test_missing_total_chunks_warns_without_failure(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "missing_total.jsonl"
+        report_path = tmp_path / "missing_total_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(report_path, {"successful": 1})
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.warnings_total == 1
+        assert report.status == "pass_with_warnings"
+        assert report.sample_warnings[0].context["reason"] == "total_chunks_missing"
+
+    def test_invalid_total_chunks_warns_without_failure(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "invalid_total.jsonl"
+        report_path = tmp_path / "invalid_total_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(report_path, {"total_chunks": "1"})
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.warnings_total == 1
+        assert report.status == "pass_with_warnings"
+        assert report.sample_warnings[0].context["reason"] == "total_chunks_invalid"
+        assert report.sample_warnings[0].context["raw_total_chunks"] == "1"
+
+    def test_negative_total_chunks_warns_without_failure(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "negative_total.jsonl"
+        report_path = tmp_path / "negative_total_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(report_path, {"total_chunks": -1})
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.warnings_total == 1
+        assert report.status == "pass_with_warnings"
+        assert report.sample_warnings[0].context["reason"] == "total_chunks_invalid"
+        assert report.sample_warnings[0].context["raw_total_chunks"] == -1
+
+    def test_matching_total_chunks_passes(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "matching_total.jsonl"
+        report_path = tmp_path / "matching_total_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(report_path, {"total_chunks": 1})
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.status == "pass"
+
+    def test_mismatched_total_chunks_fails(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "mismatched_total.jsonl"
+        report_path = tmp_path / "mismatched_total_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(report_path, {"total_chunks": 3})
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 1
+        assert report.errors_total >= 1
+        assert report.status == "fail"
+        issue = report.sample_failures[0]
+        assert issue.code == ProcessedJsonlValidationIssueCode.COUNT_RECONCILIATION_FAILED
+        assert issue.context["expected_total"] == 3
+        assert issue.context["observed_total"] == 1
+        assert issue.context["delta"] == -2
+
+    def test_matching_chunks_by_level_passes(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "matching_levels.jsonl"
+        report_path = tmp_path / "matching_levels_report.json"
+        chunks = [
+            _valid_chunk(chunk_id="article", level=ChunkingLevel.ARTICLE),
+            _valid_chunk(chunk_id="clause", level=ChunkingLevel.CLAUSE),
+        ]
+        _write_jsonl(jsonl_path, chunks)
+        self._write_chunking_report(
+            report_path,
+            {"total_chunks": 2, "chunks_by_level": {"article": 1, "clause": 1}},
+        )
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.status == "pass"
+
+    def test_mismatched_chunks_by_level_fails(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "mismatched_levels.jsonl"
+        report_path = tmp_path / "mismatched_levels_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(
+            report_path,
+            {"total_chunks": 1, "chunks_by_level": {"article": 2}},
+        )
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 1
+        assert report.status == "fail"
+        issue = report.sample_failures[0]
+        assert issue.context["level"] == "article"
+        assert issue.context["expected"] == 2
+        assert issue.context["observed"] == 1
+
+    def test_malformed_chunks_by_level_warns(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "malformed_levels.jsonl"
+        report_path = tmp_path / "malformed_levels_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(
+            report_path,
+            {"total_chunks": 1, "chunks_by_level": ["article"]},
+        )
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.status == "pass_with_warnings"
+        assert report.sample_warnings[0].context["reason"] == "chunks_by_level_malformed"
+
+    def test_law_count_mismatch_warns_not_fails(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "law_count_mismatch.jsonl"
+        report_path = tmp_path / "law_count_mismatch_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk(law_id="law_001")])
+        self._write_chunking_report(
+            report_path,
+            {"total_chunks": 1, "chunks_by_law": {"law_001": 1, "law_002": 0}},
+        )
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.status == "pass_with_warnings"
+        issue = report.sample_warnings[0]
+        assert issue.context["expected_law_count"] == 2
+        assert issue.context["observed_law_count"] == 1
+
+    def test_malformed_chunks_by_law_warns(self, tmp_path: Path) -> None:
+        jsonl_path = tmp_path / "malformed_laws.jsonl"
+        report_path = tmp_path / "malformed_laws_report.json"
+        _write_jsonl(jsonl_path, [_valid_chunk()])
+        self._write_chunking_report(
+            report_path,
+            {"total_chunks": 1, "chunks_by_law": ["law_001"]},
+        )
+
+        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
+            jsonl_path
+        )
+
+        assert report.count_reconciliation_failures == 0
+        assert report.status == "pass_with_warnings"
+        assert report.sample_warnings[0].context["reason"] == "chunks_by_law_malformed"
+
+
+# ---------------------------------------------------------------------------
+# Slice 3B scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3BScope:
+    """Slice 3B implements count reconciliation; later checks are skipped."""
+
+    def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
+        """Count reconciliation remains neutral when the report matches."""
         chunk = _valid_chunk(chunk_id="c1")
         jsonl_path = tmp_path / "recon.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass"
 
-    def test_citation_not_checked_in_slice3a(self, tmp_path: Path) -> None:
-        """Citation structure is not checked in Slice 3A."""
+    def test_citation_not_checked_in_slice3b(self, tmp_path: Path) -> None:
+        """Citation structure is not checked in Slice 3B."""
         chunk = _valid_chunk(chunk_id="c1", citation="bad citation")
         jsonl_path = tmp_path / "cite.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.citation_failures == 0
         assert report.status == "pass"
 
-    def test_hierarchy_traceability_not_checked_in_slice3a(self, tmp_path: Path) -> None:
-        """Hierarchy traceability is not checked in Slice 3A."""
+    def test_hierarchy_traceability_not_checked_in_slice3b(self, tmp_path: Path) -> None:
+        """Hierarchy traceability is not checked in Slice 3B."""
         chunk = _valid_chunk(chunk_id="c1")
         jsonl_path = tmp_path / "hier.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.traceability_failures == 0
@@ -653,7 +896,7 @@ class TestSlice3AScope:
         jsonl_path = tmp_path / "neutral.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
-        validator = ProcessedJsonlValidator(_config())
+        validator = ProcessedJsonlValidator(_config(jsonl_path))
         report = validator.validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
