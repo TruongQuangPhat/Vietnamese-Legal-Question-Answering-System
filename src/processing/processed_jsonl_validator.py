@@ -10,7 +10,7 @@ against the Phase 6 chunking report.
 This validator is independent from Phase 6's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
 and report model. Hash integrity, count reconciliation, and citation structure
-are implemented; contamination, hierarchy traceability, and
+and hierarchy traceability are implemented; contamination and
 embedding-readiness checks are added in later slices.
 """
 
@@ -56,9 +56,9 @@ class ProcessedJsonlValidator:
     5. Global ``chunk_id`` uniqueness.
     6. Basic counters and distribution summaries.
 
-    Slice 3A adds hash integrity, Slice 3B adds count reconciliation, and
-    Slice 3C adds citation structure. Later slices add contamination,
-    hierarchy traceability, embedding-readiness, payload-readiness, and
+    Slice 3A adds hash integrity, Slice 3B adds count reconciliation, Slice 3C
+    adds citation structure, and Slice 3D adds hierarchy traceability. Later
+    slices add contamination, embedding-readiness, payload-readiness, and
     repealed metadata.
     """
 
@@ -75,7 +75,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3C on the processed JSONL.
+        """Run validation checks through Slice 3D on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -103,6 +103,7 @@ class ProcessedJsonlValidator:
         duplicate_chunk_ids: int = 0
         hash_mismatches: int = 0
         citation_failures: int = 0
+        traceability_failures: int = 0
         count_reconciliation_failures: int = 0
         errors_total: int = 0
         warnings_total: int = 0
@@ -114,6 +115,10 @@ class ProcessedJsonlValidator:
         sample_warnings: list[ProcessedJsonlIssue] = []
 
         seen_chunk_ids: set[str] = set()
+        hierarchy_index_cache: dict[str, dict[str, dict[str, Any]] | None] = {}
+        hierarchy_load_failures: dict[str, str] = {}
+        sampled_hierarchy_load_failures: set[str] = set()
+        traceability_checks_skipped = self.config.hierarchy_dir is None
 
         def _add_sample_failure(issue: ProcessedJsonlIssue) -> None:
             if len(sample_failures) < self.config.max_sample_failures:
@@ -148,6 +153,43 @@ class ProcessedJsonlValidator:
                 line_number=line_number,
                 context=context or {},
             )
+
+        def _get_hierarchy_index(
+            law_id: str,
+        ) -> dict[str, dict[str, Any]] | None:
+            if law_id in hierarchy_index_cache:
+                return hierarchy_index_cache[law_id]
+
+            if self.config.hierarchy_dir is None:
+                hierarchy_index_cache[law_id] = None
+                return None
+
+            hierarchy_path = Path(self.config.hierarchy_dir) / law_id / "hierarchy.json"
+            try:
+                hierarchy_data = json.loads(hierarchy_path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                hierarchy_load_failures[law_id] = f"Hierarchy file is missing: {hierarchy_path}"
+                hierarchy_index_cache[law_id] = None
+                return None
+            except json.JSONDecodeError as exc:
+                hierarchy_load_failures[law_id] = f"Hierarchy file contains invalid JSON: {exc}"
+                hierarchy_index_cache[law_id] = None
+                return None
+            except (OSError, UnicodeError) as exc:
+                hierarchy_load_failures[law_id] = f"Hierarchy file could not be read: {exc}"
+                hierarchy_index_cache[law_id] = None
+                return None
+
+            hierarchy_index = _index_hierarchy_nodes(hierarchy_data)
+            if not hierarchy_index:
+                hierarchy_load_failures[law_id] = (
+                    f"Hierarchy file contains no indexable nodes: {hierarchy_path}"
+                )
+                hierarchy_index_cache[law_id] = None
+                return None
+
+            hierarchy_index_cache[law_id] = hierarchy_index
+            return hierarchy_index
 
         def _reconcile_counts_with_chunking_report() -> tuple[int, int]:
             report_path = Path(self.config.chunking_report_path)
@@ -477,6 +519,63 @@ class ProcessedJsonlValidator:
                         )
                     )
 
+                # Check 7: Hierarchy traceability
+                traceability_errors: list[tuple[str, str]] = []
+                hierarchy_load_failed = False
+                if not traceability_checks_skipped:
+                    hierarchy_index = _get_hierarchy_index(chunk.law_id)
+                    if hierarchy_index is None:
+                        hierarchy_load_failed = True
+                        traceability_errors.append(
+                            (
+                                "hierarchy_file",
+                                hierarchy_load_failures.get(
+                                    chunk.law_id,
+                                    "Hierarchy index is unavailable",
+                                ),
+                            )
+                        )
+                    else:
+                        traceability_errors = _check_hierarchy_traceability(
+                            chunk,
+                            hierarchy_index,
+                        )
+
+                if traceability_errors:
+                    traceability_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    should_sample = (
+                        not hierarchy_load_failed
+                        or chunk.law_id not in sampled_hierarchy_load_failures
+                    )
+                    if should_sample:
+                        _add_sample_failure(
+                            _make_issue(
+                                code=(
+                                    ProcessedJsonlValidationIssueCode.HIERARCHY_TRACEABILITY_FAILED
+                                ),
+                                message="Chunk cannot be traced to its legal hierarchy",
+                                law_id=chunk.law_id,
+                                chunk_id=chunk.chunk_id,
+                                line_number=line_number,
+                                context={
+                                    "chunk_kind": chunk.chunk_kind,
+                                    "source_node_id": chunk.source_node_id,
+                                    "parent_article_node_id": (chunk.parent_article_node_id),
+                                    "article_number": chunk.article_number,
+                                    "clause_number": chunk.clause_number,
+                                    "point_label": chunk.point_label,
+                                    "failures": [
+                                        {"field": field, "reason": reason}
+                                        for field, reason in traceability_errors
+                                    ],
+                                },
+                            )
+                        )
+                    if hierarchy_load_failed:
+                        sampled_hierarchy_load_failures.add(chunk.law_id)
+
                 # Count valid/invalid per line
                 if line_has_error:
                     invalid_chunks += 1
@@ -501,7 +600,7 @@ class ProcessedJsonlValidator:
             input_path=str(input_path),
             chunking_report_path=self.config.chunking_report_path,
             hierarchy_dir=self.config.hierarchy_dir,
-            traceability_checks_skipped=True,
+            traceability_checks_skipped=traceability_checks_skipped,
             total_lines=total_lines,
             valid_chunks=valid_chunks,
             invalid_chunks=invalid_chunks,
@@ -512,7 +611,7 @@ class ProcessedJsonlValidator:
             count_reconciliation_failures=count_reconciliation_failures,
             hash_mismatches=hash_mismatches,
             citation_failures=citation_failures,
-            traceability_failures=0,
+            traceability_failures=traceability_failures,
             contamination_failures=0,
             contamination_warnings=0,
             errors_total=errors_total,
@@ -633,6 +732,234 @@ def _check_required_field_values(
         errors.append(("point_label", f"required for {chunk_kind}"))
 
     return errors
+
+
+def _index_hierarchy_nodes(root: Any) -> dict[str, dict[str, Any]]:
+    """Build a node ID index from a hierarchy JSON object.
+
+    The canonical hierarchy schema stores nodes in a flat top-level list, but
+    recursive traversal also supports small nested fixtures without changing
+    the traceability contract.
+
+    Args:
+        root: Parsed hierarchy JSON value.
+
+    Returns:
+        Mapping from non-empty ``node_id`` values to their node dictionaries.
+    """
+    index: dict[str, dict[str, Any]] = {}
+
+    def _visit(value: Any) -> None:
+        if isinstance(value, dict):
+            node_id = value.get("node_id")
+            if isinstance(node_id, str) and node_id:
+                index[node_id] = value
+            for child in value.values():
+                _visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                _visit(child)
+
+    _visit(root)
+    return index
+
+
+def _check_hierarchy_traceability(
+    chunk: LegalChunk,
+    hierarchy_index: dict[str, dict[str, Any]],
+) -> list[tuple[str, str]]:
+    """Return structural hierarchy traceability failures for one chunk.
+
+    Checks node existence and compares hierarchy level/number metadata only
+    when those fields are clearly present in the indexed node dictionaries.
+    It does not compare source text, offsets, legal semantics, or citations.
+
+    Args:
+        chunk: Validated processed legal chunk.
+        hierarchy_index: Mapping of hierarchy node IDs to node dictionaries.
+
+    Returns:
+        A list of ``(field, reason)`` failures. Multiple failures still
+        represent one failed chunk in the validation report.
+    """
+    failures: list[tuple[str, str]] = []
+    source_node = hierarchy_index.get(chunk.source_node_id)
+    parent_article_node = hierarchy_index.get(chunk.parent_article_node_id)
+
+    if source_node is None:
+        failures.append(
+            (
+                "source_node_id",
+                f"source_node_id not found in hierarchy: {chunk.source_node_id}",
+            )
+        )
+    if parent_article_node is None:
+        failures.append(
+            (
+                "parent_article_node_id",
+                (f"parent_article_node_id not found in hierarchy: {chunk.parent_article_node_id}"),
+            )
+        )
+
+    if parent_article_node is not None:
+        parent_level = parent_article_node.get("level")
+        if parent_level is not None and str(parent_level) != "article":
+            failures.append(
+                (
+                    "parent_article_node_id",
+                    f"parent node level is {parent_level!r}, expected 'article'",
+                )
+            )
+        parent_number = parent_article_node.get("number")
+        if (
+            parent_number is not None
+            and chunk.article_number is not None
+            and str(parent_number) != chunk.article_number
+        ):
+            failures.append(
+                (
+                    "article_number",
+                    (
+                        f"parent article number is {parent_number!r}, "
+                        f"chunk has {chunk.article_number!r}"
+                    ),
+                )
+            )
+
+    if source_node is None:
+        return failures
+
+    source_level = source_node.get("level")
+    source_number = source_node.get("number")
+
+    if chunk.chunk_kind in {"article_level", "article_level_empty"}:
+        if source_level is not None and str(source_level) != "article":
+            failures.append(
+                ("source_node_id", f"source node level is {source_level!r}, expected 'article'")
+            )
+        if (
+            source_number is not None
+            and chunk.article_number is not None
+            and str(source_number) != chunk.article_number
+        ):
+            failures.append(
+                (
+                    "article_number",
+                    (
+                        f"source article number is {source_number!r}, "
+                        f"chunk has {chunk.article_number!r}"
+                    ),
+                )
+            )
+        if chunk.source_node_id != chunk.parent_article_node_id:
+            failures.append(
+                (
+                    "parent_article_node_id",
+                    "article-level source and parent article node IDs differ",
+                )
+            )
+    elif chunk.chunk_kind == "clause_level":
+        if source_level is not None and str(source_level) != "clause":
+            failures.append(
+                ("source_node_id", f"source node level is {source_level!r}, expected 'clause'")
+            )
+        if (
+            source_number is not None
+            and chunk.clause_number is not None
+            and str(source_number) != chunk.clause_number
+        ):
+            failures.append(
+                (
+                    "clause_number",
+                    (
+                        f"source clause number is {source_number!r}, "
+                        f"chunk has {chunk.clause_number!r}"
+                    ),
+                )
+            )
+        source_parent_id = source_node.get("parent_id")
+        if (
+            isinstance(source_parent_id, str)
+            and source_parent_id
+            and source_parent_id != chunk.parent_article_node_id
+        ):
+            failures.append(
+                (
+                    "parent_article_node_id",
+                    (
+                        f"source clause parent is {source_parent_id!r}, "
+                        f"chunk has {chunk.parent_article_node_id!r}"
+                    ),
+                )
+            )
+    elif chunk.chunk_kind == "point_level":
+        if source_level is not None and str(source_level) != "point":
+            failures.append(
+                ("source_node_id", f"source node level is {source_level!r}, expected 'point'")
+            )
+        if (
+            source_number is not None
+            and chunk.point_label is not None
+            and str(source_number) != chunk.point_label
+        ):
+            failures.append(
+                (
+                    "point_label",
+                    (f"source point label is {source_number!r}, chunk has {chunk.point_label!r}"),
+                )
+            )
+
+        clause_node_id = source_node.get("parent_id")
+        if isinstance(clause_node_id, str) and clause_node_id:
+            clause_node = hierarchy_index.get(clause_node_id)
+            if clause_node is None:
+                failures.append(
+                    (
+                        "clause_number",
+                        f"point parent clause node not found: {clause_node_id}",
+                    )
+                )
+            else:
+                clause_level = clause_node.get("level")
+                if clause_level is not None and str(clause_level) != "clause":
+                    failures.append(
+                        (
+                            "clause_number",
+                            f"point parent level is {clause_level!r}, expected 'clause'",
+                        )
+                    )
+                clause_number = clause_node.get("number")
+                if (
+                    clause_number is not None
+                    and chunk.clause_number is not None
+                    and str(clause_number) != chunk.clause_number
+                ):
+                    failures.append(
+                        (
+                            "clause_number",
+                            (
+                                f"parent clause number is {clause_number!r}, "
+                                f"chunk has {chunk.clause_number!r}"
+                            ),
+                        )
+                    )
+                clause_parent_id = clause_node.get("parent_id")
+                if (
+                    isinstance(clause_parent_id, str)
+                    and clause_parent_id
+                    and clause_parent_id != chunk.parent_article_node_id
+                ):
+                    failures.append(
+                        (
+                            "parent_article_node_id",
+                            (
+                                f"parent clause belongs to {clause_parent_id!r}, "
+                                f"chunk has {chunk.parent_article_node_id!r}"
+                            ),
+                        )
+                    )
+
+    return failures
 
 
 def _citation_contains_label(

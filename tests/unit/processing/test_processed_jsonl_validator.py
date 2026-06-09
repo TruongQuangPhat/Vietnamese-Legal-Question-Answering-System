@@ -40,6 +40,10 @@ def _config(
             encoding="utf-8",
         )
         payload["chunking_report_path"] = str(report_path)
+    if jsonl_path is not None and "hierarchy_dir" not in overrides:
+        hierarchy_root = jsonl_path.with_name(f"{jsonl_path.stem}_hierarchies")
+        _write_matching_hierarchies(jsonl_path, hierarchy_root)
+        payload["hierarchy_dir"] = str(hierarchy_root)
     payload.update(overrides)
     return ProcessedJsonlValidationConfig(**payload)
 
@@ -84,6 +88,11 @@ def _valid_chunk(**overrides: object) -> LegalChunk:
         "warnings": [],
     }
     payload.update(overrides)
+    chunk_kind = payload["chunk_kind"]
+    if chunk_kind == "clause_level" and "source_node_id" not in overrides:
+        payload["source_node_id"] = "node_001__clause"
+    if chunk_kind == "point_level" and "source_node_id" not in overrides:
+        payload["source_node_id"] = "node_001__clause__point"
     return LegalChunk(**payload)
 
 
@@ -101,6 +110,89 @@ def _write_raw_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False))
             fh.write("\n")
+
+
+def _write_hierarchy(
+    root: Path,
+    law_id: str,
+    nodes: list[dict[str, object]],
+) -> Path:
+    """Write a minimal flat hierarchy fixture matching the production schema."""
+    path = root / law_id / "hierarchy.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"law_id": law_id, "nodes": nodes}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_matching_hierarchies(jsonl_path: Path, hierarchy_root: Path) -> None:
+    """Write minimal hierarchy fixtures for schema-valid-looking JSONL rows."""
+    nodes_by_law: dict[str, dict[str, dict[str, object]]] = {}
+    for raw_line in jsonl_path.read_text(encoding="utf-8").splitlines():
+        try:
+            row = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+
+        law_id = row.get("law_id")
+        source_node_id = row.get("source_node_id")
+        parent_article_node_id = row.get("parent_article_node_id")
+        if not all(
+            isinstance(value, str) and value
+            for value in (law_id, source_node_id, parent_article_node_id)
+        ):
+            continue
+
+        article_number = row.get("article_number")
+        clause_number = row.get("clause_number")
+        point_label = row.get("point_label")
+        level = row.get("level")
+        chunk_kind = row.get("chunk_kind")
+        source_level = {
+            "article_level": "article",
+            "article_level_empty": "article",
+            "clause_level": "clause",
+            "point_level": "point",
+        }.get(chunk_kind, level)
+        law_nodes = nodes_by_law.setdefault(law_id, {})
+        law_nodes[parent_article_node_id] = {
+            "node_id": parent_article_node_id,
+            "level": "article",
+            "number": article_number,
+            "parent_id": f"{law_id}__root",
+            "children": [],
+        }
+
+        source_parent_id = parent_article_node_id
+        if source_level == "point":
+            source_parent_id = f"{source_node_id}__test_parent_clause"
+            law_nodes[source_parent_id] = {
+                "node_id": source_parent_id,
+                "level": "clause",
+                "number": clause_number,
+                "parent_id": parent_article_node_id,
+                "children": [source_node_id],
+            }
+
+        source_number = {
+            "article": article_number,
+            "clause": clause_number,
+            "point": point_label,
+        }.get(source_level)
+        law_nodes[source_node_id] = {
+            "node_id": source_node_id,
+            "level": source_level,
+            "number": source_number,
+            "parent_id": source_parent_id,
+            "children": [],
+        }
+
+    for law_id, nodes in nodes_by_law.items():
+        _write_hierarchy(hierarchy_root, law_id, list(nodes.values()))
 
 
 # ---------------------------------------------------------------------------
@@ -633,7 +725,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         report_path = tmp_path / "does_not_exist.json"
 
-        validator = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path)))
+        validator = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        )
         report = validator.validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
@@ -651,9 +745,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         report_path.write_text("{invalid json", encoding="utf-8")
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.warnings_total == 1
@@ -667,9 +761,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         self._write_chunking_report(report_path, ["not", "an", "object"])
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.warnings_total == 1
@@ -682,9 +776,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         self._write_chunking_report(report_path, {"successful": 1})
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.warnings_total == 1
@@ -697,9 +791,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         self._write_chunking_report(report_path, {"total_chunks": "1"})
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.warnings_total == 1
@@ -713,9 +807,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         self._write_chunking_report(report_path, {"total_chunks": -1})
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.warnings_total == 1
@@ -729,9 +823,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         self._write_chunking_report(report_path, {"total_chunks": 1})
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass"
@@ -742,9 +836,9 @@ class TestCountReconciliation:
         _write_jsonl(jsonl_path, [_valid_chunk()])
         self._write_chunking_report(report_path, {"total_chunks": 3})
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 1
         assert report.errors_total >= 1
@@ -768,9 +862,9 @@ class TestCountReconciliation:
             {"total_chunks": 2, "chunks_by_level": {"article": 1, "clause": 1}},
         )
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass"
@@ -784,9 +878,9 @@ class TestCountReconciliation:
             {"total_chunks": 1, "chunks_by_level": {"article": 2}},
         )
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 1
         assert report.status == "fail"
@@ -804,9 +898,9 @@ class TestCountReconciliation:
             {"total_chunks": 1, "chunks_by_level": ["article"]},
         )
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass_with_warnings"
@@ -821,9 +915,9 @@ class TestCountReconciliation:
             {"total_chunks": 1, "chunks_by_law": {"law_001": 1, "law_002": 0}},
         )
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass_with_warnings"
@@ -840,9 +934,9 @@ class TestCountReconciliation:
             {"total_chunks": 1, "chunks_by_law": ["law_001"]},
         )
 
-        report = ProcessedJsonlValidator(_config(chunking_report_path=str(report_path))).validate(
-            jsonl_path
-        )
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, chunking_report_path=str(report_path))
+        ).validate(jsonl_path)
 
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass_with_warnings"
@@ -1125,12 +1219,363 @@ class TestCitationStructure:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3C scope: later checks are not yet implemented
+# Slice 3D: Hierarchy traceability validation tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3CScope:
-    """Slice 3C implements citation structure; later checks are skipped."""
+class TestHierarchyTraceability:
+    """Hierarchy node existence and metadata traceability checks."""
+
+    def _validate_chunk(
+        self,
+        tmp_path: Path,
+        filename: str,
+        chunk: LegalChunk,
+        nodes: list[dict[str, object]] | None,
+    ) -> ProcessedJsonlValidationReport:
+        jsonl_path = tmp_path / filename
+        hierarchy_root = tmp_path / f"{jsonl_path.stem}_hierarchies"
+        _write_jsonl(jsonl_path, [chunk])
+        if nodes is not None:
+            _write_hierarchy(hierarchy_root, chunk.law_id, nodes)
+        return ProcessedJsonlValidator(
+            _config(jsonl_path, hierarchy_dir=str(hierarchy_root))
+        ).validate(jsonl_path)
+
+    def test_article_level_traceability_passes(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk()
+        report = self._validate_chunk(
+            tmp_path,
+            "article_trace.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": chunk.source_node_id,
+                    "level": "article",
+                    "number": "1",
+                    "parent_id": "law_001__root",
+                    "children": [],
+                }
+            ],
+        )
+
+        assert report.traceability_failures == 0
+        assert report.traceability_checks_skipped is False
+        assert report.status == "pass"
+
+    def test_clause_level_traceability_passes(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk(
+            source_node_id="clause_2",
+            parent_article_node_id="article_5",
+            level=ChunkingLevel.CLAUSE,
+            chunk_kind="clause_level",
+            article_number="5",
+            clause_number="2",
+            citation="Luật thử nghiệm, Khoản 2, Điều 5",
+        )
+        report = self._validate_chunk(
+            tmp_path,
+            "clause_trace.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": "article_5",
+                    "level": "article",
+                    "number": "5",
+                    "parent_id": "law_001__root",
+                },
+                {
+                    "node_id": "clause_2",
+                    "level": "clause",
+                    "number": "2",
+                    "parent_id": "article_5",
+                },
+            ],
+        )
+
+        assert report.traceability_failures == 0
+        assert report.status == "pass"
+
+    def test_point_level_traceability_passes(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk(
+            source_node_id="point_a",
+            parent_article_node_id="article_5",
+            level=ChunkingLevel.POINT,
+            chunk_kind="point_level",
+            article_number="5",
+            clause_number="2",
+            point_label="a",
+            citation="Luật thử nghiệm, Điểm a, Khoản 2, Điều 5",
+        )
+        report = self._validate_chunk(
+            tmp_path,
+            "point_trace.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": "article_5",
+                    "level": "article",
+                    "number": "5",
+                    "parent_id": "law_001__root",
+                },
+                {
+                    "node_id": "clause_2",
+                    "level": "clause",
+                    "number": "2",
+                    "parent_id": "article_5",
+                },
+                {
+                    "node_id": "point_a",
+                    "level": "point",
+                    "number": "a",
+                    "parent_id": "clause_2",
+                },
+            ],
+        )
+
+        assert report.traceability_failures == 0
+        assert report.status == "pass"
+
+    def test_missing_hierarchy_file_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "missing_hierarchy.jsonl",
+            _valid_chunk(),
+            None,
+        )
+
+        assert report.traceability_failures == 1
+        assert report.status == "fail"
+        assert (
+            report.sample_failures[0].code
+            == ProcessedJsonlValidationIssueCode.HIERARCHY_TRACEABILITY_FAILED
+        )
+        assert report.sample_failures[0].context["failures"][0]["field"] == "hierarchy_file"
+
+    def test_invalid_hierarchy_json_fails(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk()
+        jsonl_path = tmp_path / "invalid_hierarchy.jsonl"
+        hierarchy_root = tmp_path / "invalid_hierarchies"
+        hierarchy_path = hierarchy_root / chunk.law_id / "hierarchy.json"
+        hierarchy_path.parent.mkdir(parents=True, exist_ok=True)
+        hierarchy_path.write_text("{invalid json", encoding="utf-8")
+        _write_jsonl(jsonl_path, [chunk])
+
+        report = ProcessedJsonlValidator(
+            _config(jsonl_path, hierarchy_dir=str(hierarchy_root))
+        ).validate(jsonl_path)
+
+        assert report.traceability_failures == 1
+        assert report.status == "fail"
+        reason = report.sample_failures[0].context["failures"][0]["reason"]
+        assert "invalid JSON" in reason
+
+    def test_source_node_missing_fails(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk(
+            source_node_id="missing_article",
+            parent_article_node_id="article_1",
+        )
+        report = self._validate_chunk(
+            tmp_path,
+            "source_missing.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": "article_1",
+                    "level": "article",
+                    "number": "1",
+                }
+            ],
+        )
+
+        assert report.traceability_failures == 1
+        assert report.status == "fail"
+        fields = {failure["field"] for failure in report.sample_failures[0].context["failures"]}
+        assert "source_node_id" in fields
+
+    def test_parent_article_node_missing_fails(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk(
+            source_node_id="clause_2",
+            parent_article_node_id="missing_article",
+            level=ChunkingLevel.CLAUSE,
+            chunk_kind="clause_level",
+            article_number="5",
+            clause_number="2",
+            citation="Luật thử nghiệm, Khoản 2, Điều 5",
+        )
+        report = self._validate_chunk(
+            tmp_path,
+            "parent_missing.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": "clause_2",
+                    "level": "clause",
+                    "number": "2",
+                    "parent_id": "missing_article",
+                }
+            ],
+        )
+
+        assert report.traceability_failures == 1
+        assert report.status == "fail"
+        fields = {failure["field"] for failure in report.sample_failures[0].context["failures"]}
+        assert "parent_article_node_id" in fields
+
+    def test_article_number_mismatch_fails_when_node_field_exists(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        chunk = _valid_chunk(article_number="1", citation="Luật thử nghiệm, Điều 1")
+        report = self._validate_chunk(
+            tmp_path,
+            "article_number_mismatch.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": chunk.source_node_id,
+                    "level": "article",
+                    "number": "9",
+                }
+            ],
+        )
+
+        assert report.traceability_failures == 1
+        assert report.status == "fail"
+
+    def test_clause_number_mismatch_fails_when_node_field_exists(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        chunk = _valid_chunk(
+            source_node_id="clause_2",
+            parent_article_node_id="article_5",
+            level=ChunkingLevel.CLAUSE,
+            chunk_kind="clause_level",
+            article_number="5",
+            clause_number="2",
+            citation="Luật thử nghiệm, Khoản 2, Điều 5",
+        )
+        report = self._validate_chunk(
+            tmp_path,
+            "clause_number_mismatch.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": "article_5",
+                    "level": "article",
+                    "number": "5",
+                },
+                {
+                    "node_id": "clause_2",
+                    "level": "clause",
+                    "number": "9",
+                    "parent_id": "article_5",
+                },
+            ],
+        )
+
+        assert report.traceability_failures == 1
+        assert report.status == "fail"
+
+    def test_point_label_mismatch_fails_when_node_field_exists(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        chunk = _valid_chunk(
+            source_node_id="point_a",
+            parent_article_node_id="article_5",
+            level=ChunkingLevel.POINT,
+            chunk_kind="point_level",
+            article_number="5",
+            clause_number="2",
+            point_label="a",
+            citation="Luật thử nghiệm, Điểm a, Khoản 2, Điều 5",
+        )
+        report = self._validate_chunk(
+            tmp_path,
+            "point_label_mismatch.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": "article_5",
+                    "level": "article",
+                    "number": "5",
+                },
+                {
+                    "node_id": "clause_2",
+                    "level": "clause",
+                    "number": "2",
+                    "parent_id": "article_5",
+                },
+                {
+                    "node_id": "point_a",
+                    "level": "point",
+                    "number": "b",
+                    "parent_id": "clause_2",
+                },
+            ],
+        )
+
+        assert report.traceability_failures == 1
+        assert report.status == "fail"
+
+    def test_multiple_traceability_errors_count_once_per_chunk(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        chunk = _valid_chunk(
+            source_node_id="missing_source",
+            parent_article_node_id="missing_article",
+        )
+        report = self._validate_chunk(
+            tmp_path,
+            "multiple_trace_errors.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": "unrelated_node",
+                    "level": "article",
+                    "number": "99",
+                }
+            ],
+        )
+
+        assert report.traceability_failures == 1
+        assert report.errors_total == 1
+        assert report.invalid_chunks == 1
+        assert report.valid_chunks == 0
+        assert len(report.sample_failures[0].context["failures"]) >= 2
+
+    def test_unknown_chunk_kind_does_not_fail_traceability_if_nodes_exist(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        chunk = _valid_chunk(chunk_kind="future_article_variant")
+        report = self._validate_chunk(
+            tmp_path,
+            "unknown_kind.jsonl",
+            chunk,
+            [
+                {
+                    "node_id": chunk.source_node_id,
+                    "level": "article",
+                    "number": "1",
+                }
+            ],
+        )
+
+        assert report.traceability_failures == 0
+        assert report.status == "pass"
+
+
+# ---------------------------------------------------------------------------
+# Slice 3D scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3DScope:
+    """Slice 3D implements hierarchy traceability; later checks are skipped."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""
@@ -1144,8 +1589,11 @@ class TestSlice3CScope:
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass"
 
-    def test_hierarchy_traceability_not_checked_in_slice3c(self, tmp_path: Path) -> None:
-        """Hierarchy traceability is not checked in Slice 3C."""
+    def test_hierarchy_traceability_passes_with_matching_hierarchy(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Matching hierarchy fixtures keep traceability counters neutral."""
         chunk = _valid_chunk(chunk_id="c1")
         jsonl_path = tmp_path / "hier.jsonl"
         _write_jsonl(jsonl_path, [chunk])
@@ -1154,7 +1602,7 @@ class TestSlice3CScope:
         report = validator.validate(jsonl_path)
 
         assert report.traceability_failures == 0
-        assert report.traceability_checks_skipped is True
+        assert report.traceability_checks_skipped is False
 
     def test_later_slice_fields_are_neutral(self, tmp_path: Path) -> None:
         """Fields for later slices are set to neutral values."""

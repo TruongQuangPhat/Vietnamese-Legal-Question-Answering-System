@@ -14,7 +14,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3A: Complete
 - Slice 3B: Complete
 - Slice 3C: Complete
-- Slice 3D and later: Not started
+- Slice 3D: Complete
+- Slice 3E and later: Not started
 
 ## Completed Slices
 
@@ -73,6 +74,31 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
   slice; required-field validation remains responsible for missing metadata.
 - Citation validation does not inspect law titles, years, legal semantics,
   source text, or hierarchy files.
+
+### Slice 3D — Hierarchy Traceability Validation
+
+- Uses configured `hierarchy_dir/{law_id}/hierarchy.json` files read-only.
+- Caches one hierarchy node index per law to avoid per-chunk file reads.
+- Indexes dictionaries with non-empty `node_id` values; production files use a
+  flat top-level `nodes` list, while recursive traversal supports simple nested
+  fixtures.
+- Requires `source_node_id` and `parent_article_node_id` to exist.
+- Verifies the parent node is an Article and compares its `number` with
+  `chunk.article_number` when present.
+- Article chunks verify Article source level/number and require source and
+  parent Article IDs to match.
+- Clause chunks verify Clause source level/number and direct Article parent ID
+  when those fields exist.
+- Point chunks verify Point source level/label, resolve the direct Clause
+  parent when available, compare Clause number, and verify its Article parent.
+- Missing, unreadable, invalid, or node-empty hierarchy files are hard
+  per-chunk failures. Load-failure samples are emitted at most once per law.
+- Multiple traceability problems on one chunk increment
+  `traceability_failures`, `errors_total`, and the line-level invalid count
+  once.
+- Checks are marked skipped only when `hierarchy_dir` is explicitly `None`.
+- Unknown chunk kinds receive common node-existence and parent Article checks
+  but no kind-specific source checks.
 
 ## Current Review Before Slice 3C
 
@@ -196,6 +222,41 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Slice 3D Implementation — Hierarchy Traceability Validation
+
+Observed hierarchy schema:
+
+- top-level object fields include `law_id`, `root_node_id`, metadata, warnings,
+  and a flat `nodes` list;
+- nodes expose `node_id`, `level`, `number`, `parent_id`, and `children`;
+- `children` contains node ID strings rather than nested node objects.
+
+Objective: prove that each processed chunk references real hierarchy nodes and
+that clearly available Article/Clause/Point metadata agrees with the chunk.
+This slice does not compare source text, offsets, citations, or legal meaning.
+
+Implementation files:
+
+- `src/processing/processed_jsonl_validator.py`
+- `tests/unit/processing/test_processed_jsonl_validator.py`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+The validation model file was not modified because
+`HIERARCHY_TRACEABILITY_FAILED` already existed. No new source module was
+created.
+
+Verification result:
+
+- Phase 7 model and validator tests: 110 passed.
+- Read-only full-corpus validation: 40,389 valid chunks, 0 invalid chunks,
+  traceability checks not skipped, 0 traceability failures, 0 citation
+  failures, 0 hash mismatches, and 0 reconciliation failures.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
+
 ## Non-goals
 
 Slice 3C must not:
@@ -237,5 +298,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3C is complete. Slice 3D and later are not started; wait for explicit
+Slice 3D is complete. Slice 3E and later are not started; wait for explicit
 approval before implementing the next validation slice.
