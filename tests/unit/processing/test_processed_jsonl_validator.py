@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 processed JSONL validator through Slice 3B."""
+"""Unit tests for Phase 7 processed JSONL validator through Slice 3C."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from src.processing.legal_chunk_models import (
 from src.processing.processed_jsonl_validation_models import (
     ProcessedJsonlValidationConfig,
     ProcessedJsonlValidationIssueCode,
+    ProcessedJsonlValidationReport,
 )
 from src.processing.processed_jsonl_validator import ProcessedJsonlValidator
 
@@ -327,6 +328,7 @@ class TestRequiredFields:
             level=ChunkingLevel.CLAUSE,
             clause_number="2",
             point_label=None,
+            citation="Luật thử nghiệm, Khoản 2, Điều 1",
         )
         row = chunk.model_dump(mode="json")
         del row["clause_number"]
@@ -346,6 +348,7 @@ class TestRequiredFields:
             level=ChunkingLevel.CLAUSE,
             clause_number="2",
             point_label=None,
+            citation="Luật thử nghiệm, Khoản 2, Điều 1",
         )
         jsonl_path = tmp_path / "clause_ok.jsonl"
         _write_jsonl(jsonl_path, [chunk])
@@ -847,12 +850,287 @@ class TestCountReconciliation:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3B scope: later checks are not yet implemented
+# Slice 3C: Citation structural validation tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3BScope:
-    """Slice 3B implements count reconciliation; later checks are skipped."""
+class TestCitationStructure:
+    """Citation structure checks against chunk hierarchy metadata."""
+
+    def _validate_chunk(
+        self,
+        tmp_path: Path,
+        filename: str,
+        chunk: LegalChunk,
+    ) -> ProcessedJsonlValidationReport:
+        jsonl_path = tmp_path / filename
+        _write_jsonl(jsonl_path, [chunk])
+        return ProcessedJsonlValidator(_config(jsonl_path)).validate(jsonl_path)
+
+    def test_article_level_citation_with_article_passes(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "article_valid.jsonl",
+            _valid_chunk(citation="Luật thử nghiệm, Điều 1"),
+        )
+
+        assert report.citation_failures == 0
+        assert report.status == "pass"
+
+    def test_article_level_empty_citation_with_article_passes(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "article_empty_valid.jsonl",
+            _valid_chunk(
+                chunk_kind="article_level_empty",
+                citation="Luật thử nghiệm (VBHN), Điều 1",
+                metadata=ChunkingMetadata(
+                    is_empty_or_repealed=True,
+                    is_source_unit_repealed=True,
+                ),
+            ),
+        )
+
+        assert report.citation_failures == 0
+        assert report.status == "pass"
+
+    def test_article_level_missing_article_in_citation_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "article_missing.jsonl",
+            _valid_chunk(citation="Luật thử nghiệm"),
+        )
+
+        assert report.citation_failures == 1
+        assert report.status == "fail"
+        issue = report.sample_failures[0]
+        assert issue.code == ProcessedJsonlValidationIssueCode.CITATION_STRUCTURE_MISMATCH
+        assert issue.context["missing_components"] == [{"label": "Điều", "value": "1"}]
+
+    def test_clause_level_requires_clause_and_article(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "clause_valid.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.CLAUSE,
+                chunk_kind="clause_level",
+                article_number="5",
+                clause_number="2",
+                citation="Luật thử nghiệm, Điều 5; Khoản 2",
+            ),
+        )
+
+        assert report.citation_failures == 0
+        assert report.status == "pass"
+
+    def test_clause_level_missing_clause_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "clause_missing_clause.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.CLAUSE,
+                chunk_kind="clause_level",
+                article_number="5",
+                clause_number="2",
+                citation="Luật thử nghiệm, Điều 5",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.sample_failures[0].context["missing_components"] == [
+            {"label": "Khoản", "value": "2"}
+        ]
+
+    def test_clause_level_missing_article_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "clause_missing_article.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.CLAUSE,
+                chunk_kind="clause_level",
+                article_number="5",
+                clause_number="2",
+                citation="Luật thử nghiệm, Khoản 2",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.sample_failures[0].context["missing_components"] == [
+            {"label": "Điều", "value": "5"}
+        ]
+
+    def test_point_level_requires_point_clause_article(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "point_valid.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.POINT,
+                chunk_kind="point_level",
+                article_number="5",
+                clause_number="2",
+                point_label="a",
+                citation="Luật thử nghiệm: Điều 5, Điểm a, Khoản 2.",
+            ),
+        )
+
+        assert report.citation_failures == 0
+        assert report.status == "pass"
+
+    def test_point_level_missing_point_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "point_missing_point.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.POINT,
+                chunk_kind="point_level",
+                article_number="5",
+                clause_number="2",
+                point_label="a",
+                citation="Luật thử nghiệm, Khoản 2, Điều 5",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.sample_failures[0].context["missing_components"] == [
+            {"label": "Điểm", "value": "a"}
+        ]
+
+    def test_point_level_missing_clause_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "point_missing_clause.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.POINT,
+                chunk_kind="point_level",
+                article_number="5",
+                clause_number="2",
+                point_label="a",
+                citation="Luật thử nghiệm, Điểm a, Điều 5",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.sample_failures[0].context["missing_components"] == [
+            {"label": "Khoản", "value": "2"}
+        ]
+
+    def test_point_level_missing_article_fails(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "point_missing_article.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.POINT,
+                chunk_kind="point_level",
+                article_number="5",
+                clause_number="2",
+                point_label="a",
+                citation="Luật thử nghiệm, Điểm a, Khoản 2",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.sample_failures[0].context["missing_components"] == [
+            {"label": "Điều", "value": "5"}
+        ]
+
+    def test_citation_matching_is_case_insensitive(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "case_insensitive.jsonl",
+            _valid_chunk(citation="Luật thử nghiệm, đIềU 1"),
+        )
+
+        assert report.citation_failures == 0
+        assert report.status == "pass"
+
+    def test_citation_matching_allows_extra_whitespace(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "extra_whitespace.jsonl",
+            _valid_chunk(citation="Luật thử nghiệm, Điều \n\t  1"),
+        )
+
+        assert report.citation_failures == 0
+        assert report.status == "pass"
+
+    def test_article_boundary_does_not_match_prefix(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "article_prefix.jsonl",
+            _valid_chunk(article_number="1", citation="Luật thử nghiệm, Điều 10"),
+        )
+
+        assert report.citation_failures == 1
+        assert report.status == "fail"
+
+    def test_clause_boundary_does_not_match_prefix(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "clause_prefix.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.CLAUSE,
+                chunk_kind="clause_level",
+                article_number="5",
+                clause_number="2",
+                citation="Luật thử nghiệm, Khoản 20, Điều 5",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.status == "fail"
+
+    def test_point_boundary_does_not_match_prefix(self, tmp_path: Path) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "point_prefix.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.POINT,
+                chunk_kind="point_level",
+                article_number="5",
+                clause_number="2",
+                point_label="a",
+                citation="Luật thử nghiệm, Điểm aa, Khoản 2, Điều 5",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.status == "fail"
+
+    def test_one_chunk_with_multiple_missing_components_counts_once(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "point_all_missing.jsonl",
+            _valid_chunk(
+                level=ChunkingLevel.POINT,
+                chunk_kind="point_level",
+                article_number="5",
+                clause_number="2",
+                point_label="a",
+                citation="Luật thử nghiệm",
+            ),
+        )
+
+        assert report.citation_failures == 1
+        assert report.errors_total == 1
+        assert report.invalid_chunks == 1
+        assert report.valid_chunks == 0
+        assert report.sample_failures[0].context["missing_components"] == [
+            {"label": "Điểm", "value": "a"},
+            {"label": "Khoản", "value": "2"},
+            {"label": "Điều", "value": "5"},
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Slice 3C scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3CScope:
+    """Slice 3C implements citation structure; later checks are skipped."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""
@@ -866,20 +1144,8 @@ class TestSlice3BScope:
         assert report.count_reconciliation_failures == 0
         assert report.status == "pass"
 
-    def test_citation_not_checked_in_slice3b(self, tmp_path: Path) -> None:
-        """Citation structure is not checked in Slice 3B."""
-        chunk = _valid_chunk(chunk_id="c1", citation="bad citation")
-        jsonl_path = tmp_path / "cite.jsonl"
-        _write_jsonl(jsonl_path, [chunk])
-
-        validator = ProcessedJsonlValidator(_config(jsonl_path))
-        report = validator.validate(jsonl_path)
-
-        assert report.citation_failures == 0
-        assert report.status == "pass"
-
-    def test_hierarchy_traceability_not_checked_in_slice3b(self, tmp_path: Path) -> None:
-        """Hierarchy traceability is not checked in Slice 3B."""
+    def test_hierarchy_traceability_not_checked_in_slice3c(self, tmp_path: Path) -> None:
+        """Hierarchy traceability is not checked in Slice 3C."""
         chunk = _valid_chunk(chunk_id="c1")
         jsonl_path = tmp_path / "hier.jsonl"
         _write_jsonl(jsonl_path, [chunk])

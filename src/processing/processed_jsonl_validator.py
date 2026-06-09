@@ -9,13 +9,15 @@ against the Phase 6 chunking report.
 
 This validator is independent from Phase 6's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
-and report model. Hash integrity, citation, contamination, hierarchy
-traceability, and embedding-readiness checks are added in later slices.
+and report model. Hash integrity, count reconciliation, and citation structure
+are implemented; contamination, hierarchy traceability, and
+embedding-readiness checks are added in later slices.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -54,10 +56,10 @@ class ProcessedJsonlValidator:
     5. Global ``chunk_id`` uniqueness.
     6. Basic counters and distribution summaries.
 
-    Slice 3A adds hash integrity, and Slice 3B adds count reconciliation.
-    Later slices add citation structure, contamination, hierarchy
-    traceability, embedding-readiness, payload-readiness, and repealed
-    metadata.
+    Slice 3A adds hash integrity, Slice 3B adds count reconciliation, and
+    Slice 3C adds citation structure. Later slices add contamination,
+    hierarchy traceability, embedding-readiness, payload-readiness, and
+    repealed metadata.
     """
 
     def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
@@ -73,7 +75,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3B on the processed JSONL.
+        """Run validation checks through Slice 3C on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -100,6 +102,7 @@ class ProcessedJsonlValidator:
         required_field_failures: int = 0
         duplicate_chunk_ids: int = 0
         hash_mismatches: int = 0
+        citation_failures: int = 0
         count_reconciliation_failures: int = 0
         errors_total: int = 0
         warnings_total: int = 0
@@ -447,6 +450,33 @@ class ProcessedJsonlValidator:
                         )
                     )
 
+                # Check 6: Citation structural validation
+                citation_errors = _check_citation_structure(chunk)
+                if citation_errors:
+                    citation_failures += 1
+                    errors_total += 1
+                    line_has_error = True
+                    _add_sample_failure(
+                        _make_issue(
+                            code=ProcessedJsonlValidationIssueCode.CITATION_STRUCTURE_MISMATCH,
+                            message="Citation structure does not match chunk hierarchy metadata",
+                            law_id=chunk.law_id,
+                            chunk_id=chunk.chunk_id,
+                            line_number=line_number,
+                            context={
+                                "citation": chunk.citation,
+                                "chunk_kind": chunk.chunk_kind,
+                                "article_number": chunk.article_number,
+                                "clause_number": chunk.clause_number,
+                                "point_label": chunk.point_label,
+                                "missing_components": [
+                                    {"label": label, "value": value}
+                                    for label, value in citation_errors
+                                ],
+                            },
+                        )
+                    )
+
                 # Count valid/invalid per line
                 if line_has_error:
                     invalid_chunks += 1
@@ -481,7 +511,7 @@ class ProcessedJsonlValidator:
             duplicate_chunk_ids=duplicate_chunk_ids,
             count_reconciliation_failures=count_reconciliation_failures,
             hash_mismatches=hash_mismatches,
-            citation_failures=0,
+            citation_failures=citation_failures,
             traceability_failures=0,
             contamination_failures=0,
             contamination_warnings=0,
@@ -603,3 +633,63 @@ def _check_required_field_values(
         errors.append(("point_label", f"required for {chunk_kind}"))
 
     return errors
+
+
+def _citation_contains_label(
+    citation: str,
+    label: str,
+    value: str,
+) -> bool:
+    """Return whether a citation contains one exact hierarchy label and value.
+
+    Matching is case-insensitive, allows flexible whitespace, and rejects
+    identifier continuations such as ``Điều 10`` when ``Điều 1`` is expected.
+
+    Args:
+        citation: Citation text to inspect.
+        label: Vietnamese hierarchy label such as ``Điều`` or ``Khoản``.
+        value: Expected hierarchy identifier.
+
+    Returns:
+        True when the expected structural component appears in the citation.
+    """
+    pattern = rf"\b{re.escape(label)}\s+{re.escape(value)}(?!(?:\w|[.-]\w))"
+    return re.search(pattern, citation, flags=re.IGNORECASE) is not None
+
+
+def _check_citation_structure(chunk: LegalChunk) -> list[tuple[str, str]]:
+    """Return required citation components missing for a supported chunk kind.
+
+    Unknown chunk kinds are outside Slice 3C and are not failed here. Missing
+    hierarchy metadata values are handled by required-field validation, so
+    this helper skips checks whose expected value is absent.
+
+    Args:
+        chunk: Validated legal chunk whose citation should be checked.
+
+    Returns:
+        Missing ``(label, value)`` pairs. An empty list means the citation is
+        structurally valid for the supported chunk kind.
+    """
+    required_components: list[tuple[str, str | None]]
+    if chunk.chunk_kind in {"article_level", "article_level_empty"}:
+        required_components = [("Điều", chunk.article_number)]
+    elif chunk.chunk_kind == "clause_level":
+        required_components = [
+            ("Khoản", chunk.clause_number),
+            ("Điều", chunk.article_number),
+        ]
+    elif chunk.chunk_kind == "point_level":
+        required_components = [
+            ("Điểm", chunk.point_label),
+            ("Khoản", chunk.clause_number),
+            ("Điều", chunk.article_number),
+        ]
+    else:
+        return []
+
+    return [
+        (label, value)
+        for label, value in required_components
+        if value is not None and not _citation_contains_label(chunk.citation, label, value)
+    ]
