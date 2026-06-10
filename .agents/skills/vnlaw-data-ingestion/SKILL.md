@@ -27,7 +27,7 @@ embedding, Qdrant, Neo4j, Advanced RAG, and GraphRAG belong to later gates.
 
 Phase 4 Cleaning & Normalization, Phase 5 Legal Hierarchy Parsing, and Phase 6
 Parent-child Chunking are complete and hardened. The current next engineering
-phase is Phase 7 Processed JSONL Validation over
+phase is Phase 7 Processed Chunk Validation & Embedding Readiness over
 `data/processed/legal_chunks.jsonl`.
 
 ## Trusted Source

@@ -390,7 +390,7 @@ Regression evaluation should run before promoting a new corpus or index version.
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
-│  Processed JSONL     │
+│  Processed Chunk Validation     │
 │  Validation          │
 └──────────┬───────────┘
            ▼
@@ -475,7 +475,7 @@ Rollback should be possible at multiple layers:
 | Layer | Rollback Method |
 |-------|-----------------|
 | Raw corpus | Restore previous raw snapshot |
-| Processed JSONL | Repoint `latest/` to previous processed version |
+| Processed Chunk Validation | Repoint `latest/` to previous processed version |
 | Vector index | Switch Qdrant alias to previous collection |
 | Graph index | Restore Neo4j dump or use previous graph version |
 | Prompt/model config | Revert config version |
@@ -677,7 +677,7 @@ uv run python scripts/audit_raw_corpus.py \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
 
-# Processed JSONL validation
+# Processed Chunk Validation
 uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
@@ -806,7 +806,7 @@ All maintenance actions should write structured logs with `maintenance_id`, `cor
 | `docs/cleaning_normalization.md` | Existing | HTML-to-text extraction and normalization |
 | `docs/legal_parsing.md` | Existing | Legal hierarchy parsing into Phần/Chương/Mục/Điều/Khoản/Điểm |
 | `docs/parent_child_chunking.md` | Existing | Parent-child chunking and citation construction |
-| `docs/processed_jsonl.md` | Existing | Processed JSONL schema and validation |
+| `docs/processed_jsonl.md` | Existing | Processed Chunk Validation schema and validation |
 | `docs/embedding_indexing.md` | Future extension | Embedding generation and vector indexing |
 | `docs/naive_rag.md` | Future extension | Baseline RAG pipeline |
 | `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, and time-aware filtering |

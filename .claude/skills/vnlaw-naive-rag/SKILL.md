@@ -8,7 +8,7 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 Use this skill to build the first working legal QA baseline (Phase 9) before Advanced RAG or GraphRAG.
 
-**Prerequisites**: Phases 0-8 must be complete. Processed JSONL must validate. Embeddings must be indexed in Qdrant.
+**Prerequisites**: Phases 0-8 must be complete. Processed Chunk Validation must pass. Embeddings must be indexed in Qdrant.
 
 ## Goal
 

@@ -9,14 +9,14 @@ Use this skill to orient major work in the repository.
 
 This skill defines the mission, architecture direction, trusted corpus policy, and implementation priority.
 
-Current project status: Phases 0-6 are complete. Phase 5 Legal Hierarchy
-Parsing is complete and hardened with 52/52 hierarchy outputs and 0 failures.
-Phase 6 Parent-child Chunking is complete and validated with
-`data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
-0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
-and 180 empty/repealed chunks flagged. Embedding, indexing, retrieval, RAG,
-Advanced RAG, and GraphRAG must wait until the Phase 7 processed JSONL
-validation / embedding-readiness gate passes.
+Current project status: Phases 0-7.5 are complete. Phase 7 validated all
+40,389 chunks with 0 invalid chunks, 0 hard errors, payload ready rate 1.0,
+and `embedding_ready=true` / `ready_with_warnings`. Its 8,206 warnings are
+accepted non-blocking quality signals under the closed W1-W3 decision.
+Phase 7.5 completed a read-only semantic corpus audit with a **Go with watch
+items** decision. Phase 8 baseline embedding/indexing is next but must be
+separately scoped and must rerun the Phase 7 gate before indexing. Retrieval,
+RAG, Advanced RAG, and GraphRAG have not started.
 
 ## Mission
 
@@ -46,7 +46,7 @@ The system provides legal research support, not professional legal representatio
 
 Implement in this order:
 
-### 0. Processed JSONL Validation
+### 0. Processed Chunk Validation & Embedding Readiness
 
 ```text
 validate data/processed/legal_chunks.jsonl

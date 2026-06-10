@@ -58,11 +58,20 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
   warnings, 0 failures, 40,389 chunks, 0 duplicate chunk IDs, 0 bad JSONL
   lines, 0 source-tail markers in `text`, 0 source-tail markers in
   `parent_text`, and 180 empty/repealed chunks flagged.
+- Phase 7 Processed Chunk Validation & Embedding Readiness is complete:
+  40,389 valid chunks, 0 invalid chunks, 0 hard errors, payload ready rate
+  1.0, and `embedding_ready=true`.
+- Phase 7 has 8,206 accepted non-blocking warnings:
+  4,645 short-text warnings and 3,561 authority-marker warnings.
+- Warning follow-up W1-W3 is closed. Warnings remain visible and were not
+  resolved, suppressed, or reclassified.
+- Phase 7.5 LLM-assisted corpus audit is complete with a **Go with watch
+  items** decision.
 - Embedding/RAG/Advanced RAG/GraphRAG has not started.
-- The next phase is Phase 7 Processed JSONL Validation / embedding-readiness
-  checks over `data/processed/legal_chunks.jsonl`.
-- Do not jump ahead to embedding, RAG, Advanced RAG, or GraphRAG before the
-  processed JSONL validation gate passes.
+- Phase 8 baseline embedding/indexing is next, but it must be separately
+  scoped and must rerun the Phase 7 gate before indexing.
+- Read `docs/phase75_llm_corpus_audit.md` and
+  `docs/phase7_warning_resolution_decision.md` before Phase 8 work.
 
 ## 5. Official Commands
 
@@ -75,11 +84,22 @@ uv run python scripts/clean_raw_corpus.py --help
 uv run python scripts/audit_cleaning_quality.py --help
 uv run python scripts/parse_legal_hierarchy.py --help
 uv run python scripts/chunk_legal_corpus.py --help
+uv run python scripts/validate_processed_jsonl.py --help
 uv run pytest tests/unit/ingestion -q
 ```
 
 Run only `--help` for crawl/clean commands unless explicitly asked to execute
 the pipeline.
+
+Before any separately scoped Phase 8 indexing work, run:
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
+```
 
 ## 6. Python/OOP Standards
 
@@ -134,6 +154,9 @@ the pipeline.
   `data/processed/legal_chunks.jsonl`.
 - Phase 8 embedding/indexing should embed `text` only; keep `parent_text` as
   Article context payload for retrieval/generation.
+- Preserve chunk IDs, citations, hierarchy IDs, hashes, source metadata,
+  warning visibility, and repeal flags during Phase 8.
+- Do not drop short chunks or remove authority phrases lexically.
 - Phase 6 hardening treats VBHN/source-law certification tail as excluded
   hierarchy content and flags `(được bãi bỏ)` source units in metadata.
 - Never split legal text by arbitrary character or token windows if doing so
@@ -182,6 +205,9 @@ After editing:
 - `data/reports/` is a historical/protected path only; active reports belong under
   `artifacts/reports/{phase}/`.
 - Do not run full crawl, audit, or cleaning commands unless explicitly requested.
-- Do not proceed to embedding/RAG before the processed JSONL validation gate is solid.
+- Before indexing, run the official Phase 7 validator and stop on hard errors
+  or `embedding_ready=false`.
+- Do not start embedding/indexing/retrieval unless a separate Phase 8 task is
+  explicitly scoped.
 - Do not delete `.claude/`, `.claude/skills/`, Claude settings files,
   `CLAUDE.md`, or `PROJECT_CONTEXT.md`.

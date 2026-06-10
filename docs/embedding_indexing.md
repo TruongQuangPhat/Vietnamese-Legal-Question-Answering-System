@@ -4,6 +4,11 @@
 
 The Embedding & Indexing phase transforms validated legal chunks into vector embeddings and builds a hybrid search index. This phase starts only after processed JSONL validation is stable and all 52 laws have passed quality gates.
 
+Status: design handoff only. Phase 8 implementation has not started. Phase 7
+and Phase 7.5 approve a baseline with watch items; read
+`docs/phase75_llm_corpus_audit.md` and rerun the official Phase 7 validator
+before indexing.
+
 The index enables retrieval of relevant legal provisions based on semantic similarity and keyword matching. Metadata filtering supports time-aware queries and corpus subsetting.
 
 ## Quick Start
@@ -29,7 +34,7 @@ uv run python scripts/build_embedding_index.py \
 
 ```
 ┌──────────────────────┐
-│  Processed JSONL     │
+│  Processed Chunk Validation     │
 │  legal_chunks.jsonl  │
 └──────────┬───────────┘
            │
@@ -135,7 +140,10 @@ uv run python scripts/build_embedding_index.py \
 }
 ```
 
-**Important**: Do not store `parent_text` in vector payload (too large). Store only `text` and metadata.
+**Important**: Embed only `text`. Preserve `parent_text` as traceable Article
+context in the vector payload or an equivalent deterministic context store.
+Do not blindly pass the complete parent into every prompt; context selection
+must respect relevance and token budgets.
 
 ### 4. Vector Store Writer
 
@@ -213,13 +221,19 @@ client.create_collection(
 
 ### Point Payload Schema
 
-Same as `ProcessedChunk` but without `parent_text` and optionally without `text` (can be omitted if storage cost high). Keep:
+Preserve the validated chunk contract in the payload. Embed `text`, and retain
+both `text` and `parent_text` (or a deterministic reference to the full parent
+context) for traceability and answer-context assembly. Keep:
 - `law_id`, `law_name`, `law_type`, `legal_status`
 - `article_number`, `article_title`, `clause_number`, `point_label`
 - `hierarchy_path`
 - `citation`, `source_url`, `source_domain`, `source_type`
 - `effective_date`, `expiry_date`, `issued_date`
-- `text_hash`, `metadata`
+- `text`, `parent_text`, `text_hash`, `parent_text_hash`, `metadata`
+
+The current `LegalChunk` does not contain effective/expiry dates or legal
+status. Phase 8 must define a deterministic enrichment source, such as the
+approved corpus registry, rather than inventing these values.
 
 ### Index Validation Report
 

@@ -255,7 +255,7 @@ Article parent text in Phase 6 using arbitrary character or token windows.
 Next phase:
 
 ```text
-Phase 7 — Processed JSONL Validation / embedding-readiness checks
+Phase 7 — Processed Chunk Validation & Embedding Readiness
 ```
 
 Phase 8 embedding/indexing should embed `text` only and keep `parent_text` as

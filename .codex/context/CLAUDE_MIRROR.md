@@ -3,6 +3,18 @@
 This file is a Codex-compatible mirror of `CLAUDE.md`. The original content is
 preserved below.
 
+## Current Status Refresh — June 10, 2026
+
+This refresh supersedes older phase-status statements in the preserved mirror:
+
+- Phase 7 and Phase 7.5 are complete.
+- Current gate: 40,389 valid chunks, 0 invalid chunks, 0 hard errors,
+  8,206 accepted warnings, and `embedding_ready=true`.
+- Phase 8 baseline embedding/indexing is next but has not started.
+- A separate Phase 8 task must rerun Phase 7 and preserve all legal
+  traceability and warning-aware context requirements documented in
+  `docs/phase75_llm_corpus_audit.md`.
+
 # VnLaw-QA — Claude Code Project Instructions
 
 This repository implements **VnLaw-QA**, a Vietnamese legal question-answering system that evolves from **Naive RAG → Advanced RAG → GraphRAG**. Claude must follow these instructions for every coding, design, review, documentation, and evaluation task in this repository.
@@ -106,7 +118,7 @@ Phase 6 Parent-child Chunking is complete and validated:
   0 bad JSONL lines
 
 Next phase:
-  Phase 7 — Processed JSONL Validation / embedding-readiness checks
+  Phase 7 — Processed Chunk Validation & Embedding Readiness
 ```
 
 Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker

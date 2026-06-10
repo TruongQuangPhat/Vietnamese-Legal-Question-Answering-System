@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 7 — Processed JSONL Validation / embedding-readiness checks
+Current phase: Phase 7.5 complete — Phase 8 handoff ready with watch items
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -21,10 +21,12 @@ Completed:
   Phase 4 — Cleaning & Normalization
   Phase 5 — Legal Hierarchy Parsing
   Phase 6 — Parent-child Chunking
+  Phase 7 — Processed Chunk Validation & Embedding Readiness
 
 Next:
-  Validate processed JSONL embedding-readiness
-  Design embedding/indexing payloads
+  Scope Phase 8 baseline embedding/indexing separately
+  Run Phase 7 validation before indexing
+  Preserve warning-aware payload and context requirements
   Do not claim RAG-ready before retrieval/generation/evaluation pass
 ```
 
@@ -81,7 +83,24 @@ Phase 6 preserves Article parent context in `parent_text` and uses
 Article/Clause/Point hierarchy units instead of arbitrary token or character
 windows. Phase 6 hardening removed VBHN/source-tail leakage from chunk
 `text` and `parent_text`, and flags repealed placeholder chunks in metadata.
-Phase 7/8 should embed only `text`, not `parent_text`.
+Phase 7 validates embedding-readiness. Phase 8 embeds only `text`; `parent_text` is stored as retrieval/LLM context payload.
+
+Phase 7 is implementation-complete:
+
+```text
+Valid chunks:            40,389
+Invalid chunks:          0
+Errors:                  0
+Warnings:                8,206
+Embedding ready:         true
+Readiness status:        ready_with_warnings
+Validation report:       artifacts/reports/chunking/processed_jsonl_validation_report.json
+```
+
+Phase 7 warning follow-up W1-W3 and the Phase 7.5 read-only corpus audit are
+complete. The handoff decision is **Go with watch items** for a separately
+scoped Phase 8 baseline. See `docs/phase75_llm_corpus_audit.md` and
+`docs/phase7_warning_resolution_decision.md`.
 
 ## Legal Accuracy Rules
 
@@ -562,6 +581,19 @@ uv run ruff check .
 
 ## Official Commands
 
+Validate processed chunks for Phase 8 readiness:
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
+```
+
+Use `--fail-on-warnings` in strict CI environments. Warning-only reports exit
+with code 0 by default and code 2 in strict mode.
+
 Inspect crawler:
 
 ```bash
@@ -662,7 +694,10 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/cleaning_normalization.md` | Cleaning pipeline and validation details |
 | `docs/legal_parsing.md` | Phase 5 parser design |
 | `docs/parent_child_chunking.md` | Implemented Phase 6 parent-child chunking design and command |
-| `docs/processed_jsonl.md` | Phase 7 processed JSONL validation / embedding-readiness notes |
+| `docs/processed_jsonl.md` | Phase 7 processed chunk validation & embedding-readiness notes |
+| `docs/phase75_llm_corpus_audit.md` | Phase 7.5 semantic corpus audit and Phase 8 guardrails |
+| `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
+| `docs/embedding_indexing.md` | Existing Phase 8 design handoff; implementation not started |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries
