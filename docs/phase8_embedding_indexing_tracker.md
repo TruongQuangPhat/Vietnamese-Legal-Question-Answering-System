@@ -49,7 +49,7 @@ remain null or empty until deterministic enrichment exists.
 | 8B | Chunk loader and metadata enrichment | Done | Read-only streaming and deterministic mapping |
 | 8C | Embedding model pilot | Done | BGE-M3 loaded; 10- and 100-chunk CPU pilots passed; dense dimension 1024 |
 | 8D | Payload builder | Done | Typed payload mapping and deterministic UUIDv5 point IDs |
-| 8E | Qdrant collection setup | Not started | Named dense vector, sparse optional |
+| 8E | Qdrant collection setup | Done | Safe schema setup; no corpus points indexed |
 | 8F | Indexing service | Not started | Batch embed/upsert/checkpoint |
 | 8G | Official CLI | Not started | `build_embedding_index.py` |
 | 8H | Index validation | Not started | Count/vector/payload/filter/idempotency |
@@ -262,6 +262,39 @@ Slice 8D adds:
 It does not generate or persist vectors, load BGE-M3, connect to Qdrant,
 create collections, upsert points, index the corpus, or implement retrieval.
 
+## Slice 8E Summary
+
+Slice 8E adds:
+
+- an async Qdrant collection setup layer with lazy optional dependency loading;
+- a named `dense` vector schema using the measured BGE-M3 dimension of 1024;
+- optional named sparse-vector configuration, disabled by default;
+- deterministic payload indexes for `law_id`, chunk hierarchy fields, repeal
+  metadata, source domain, and Article number;
+- safe existing-collection validation with explicit recreation only;
+- a collection-only CLI with a no-connection `--dry-run` mode;
+- fake-client unit tests that do not require Qdrant, Docker, BGE-M3, or
+  internet access.
+
+The default setup is non-destructive: `recreate=false`. A matching collection
+is retained, while a mismatched collection fails unless recreation is
+explicitly requested. Python payloads continue to retain null temporal and
+status fields; Qdrant server payload behavior must be checked before full
+indexing, and this slice does not change the null policy.
+
+It does not load BGE-M3, generate vectors, read the processed corpus, upsert
+points, perform full indexing, implement retrieval, or write official reports.
+
+Slice 8E server-backed Qdrant smoke test:
+- Local Qdrant URL: http://localhost:6333
+- Dev collection: vnlaw_chunks_bgem3_v1_dev
+- Collection status: green
+- Dense vector: dense, size 1024, distance Cosine
+- Payload indexes: law_id, chunk_kind, level, metadata.is_empty_or_repealed, metadata.is_source_unit_repealed, source_domain, article_number
+- points_count: 0, expected because 8E does not index corpus points
+- Idempotency check: pass, existing matching collection returns already_exists
+- Mismatch protection: pass, requesting dense dimension 768 fails without recreate
+
 ## Verification
 
 ```bash
@@ -272,31 +305,38 @@ uv run python scripts/validate_processed_jsonl.py \
   --pretty
 uv run python -m py_compile src/indexing/indexing_models.py src/indexing/chunk_loader.py \
   src/indexing/embedding_model.py src/indexing/payload_builder.py \
-  scripts/pilot_bge_m3_embeddings.py
+  src/indexing/qdrant_collection.py scripts/pilot_bge_m3_embeddings.py \
+  scripts/setup_qdrant_collection.py
 uv run pytest tests/unit/indexing/test_indexing_models.py \
   tests/unit/indexing/test_chunk_loader.py \
   tests/unit/indexing/test_embedding_model.py \
-  tests/unit/indexing/test_payload_builder.py -q
+  tests/unit/indexing/test_payload_builder.py \
+  tests/unit/indexing/test_qdrant_collection.py -q
 uv run pytest tests/unit/processing -q
 uv run ruff check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
   src/indexing/embedding_model.py src/indexing/payload_builder.py \
-  scripts/pilot_bge_m3_embeddings.py \
+  src/indexing/qdrant_collection.py scripts/pilot_bge_m3_embeddings.py \
+  scripts/setup_qdrant_collection.py \
   tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py \
-  tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py
+  tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py \
+  tests/unit/indexing/test_qdrant_collection.py
 uv run ruff format --check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
   src/indexing/embedding_model.py src/indexing/payload_builder.py \
-  scripts/pilot_bge_m3_embeddings.py \
+  src/indexing/qdrant_collection.py scripts/pilot_bge_m3_embeddings.py \
+  scripts/setup_qdrant_collection.py \
   tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py \
-  tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py
+  tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py \
+  tests/unit/indexing/test_qdrant_collection.py
+uv lock --check
 git diff --check
 git status --short data/raw data/interim data/reports data/processed artifacts/reports
 ```
 
 ## Next Slice
 
-Slice 8E should define and validate Qdrant collection setup with a named dense
-vector and optional sparse vector configuration, without starting full
-indexing.
+Slice 8F should implement the separately scoped indexing service with bounded
+batches, deterministic point IDs, payload preservation, retries, and
+checkpointing.
 
 Before full indexing in Slice 8F, rerun a larger pilot or benchmark to estimate
 full-corpus CPU runtime and determine a safe batch size.

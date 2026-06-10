@@ -407,6 +407,83 @@ class IndexingIssue(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class PayloadIndexSpec(BaseModel):
+    """One deterministic Qdrant payload index requested during collection setup."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    field_name: str = Field(..., min_length=1)
+    field_schema: Literal["keyword", "integer", "float", "text", "bool", "datetime", "uuid"]
+
+    @field_validator("field_name")
+    @classmethod
+    def validate_field_name(cls, value: str) -> str:
+        """Reject whitespace-only payload field paths."""
+        if not value.strip():
+            raise ValueError("field_name must not be blank")
+        return value
+
+
+class CollectionSchemaPlan(BaseModel):
+    """Validated, non-executing plan for one Qdrant collection schema."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    collection_name: str = Field(..., min_length=1)
+    dense_vector_name: str = Field(..., min_length=1)
+    dense_dimension: int = Field(..., gt=0)
+    distance: Literal["Cosine", "Dot", "Euclid", "Manhattan"] = "Cosine"
+    sparse_enabled: bool = False
+    sparse_vector_name: str | None = None
+    recreate: bool = False
+    payload_indexes: list[PayloadIndexSpec] = Field(default_factory=list)
+
+    @field_validator("collection_name", "dense_vector_name")
+    @classmethod
+    def validate_required_names(cls, value: str) -> str:
+        """Reject whitespace-only collection and dense-vector names."""
+        if not value.strip():
+            raise ValueError("collection and dense vector names must not be blank")
+        return value
+
+    @field_validator("sparse_vector_name")
+    @classmethod
+    def validate_optional_sparse_name(cls, value: str | None) -> str | None:
+        """Reject a blank sparse-vector name when one is provided."""
+        if value is not None and not value.strip():
+            raise ValueError("sparse_vector_name must be null or non-blank")
+        return value
+
+    @model_validator(mode="after")
+    def validate_sparse_configuration(self) -> CollectionSchemaPlan:
+        """Require a distinct sparse name only when sparse vectors are enabled."""
+        if self.sparse_enabled and self.sparse_vector_name is None:
+            raise ValueError("sparse_vector_name is required when sparse vectors are enabled")
+        if self.sparse_enabled and self.sparse_vector_name == self.dense_vector_name:
+            raise ValueError("sparse vector name must differ from dense vector name")
+        return self
+
+
+class CollectionSetupResult(BaseModel):
+    """Outcome of validating or creating a Qdrant collection schema."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    collection_name: str = Field(..., min_length=1)
+    created: bool = False
+    recreated: bool = False
+    already_exists: bool = False
+    dense_vector_name: str = Field(..., min_length=1)
+    dense_dimension: int = Field(..., gt=0)
+    distance: Literal["Cosine", "Dot", "Euclid", "Manhattan"]
+    sparse_enabled: bool = False
+    sparse_vector_name: str | None = None
+    payload_indexes_requested: list[PayloadIndexSpec] = Field(default_factory=list)
+    payload_indexes_created: list[str] = Field(default_factory=list)
+    status: Literal["created", "recreated", "already_exists"]
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
 class IndexingReport(BaseModel):
     """Typed report contract for planned and future Phase 8 indexing runs.
 

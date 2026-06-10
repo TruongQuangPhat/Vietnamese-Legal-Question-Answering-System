@@ -32,6 +32,9 @@ dev = [
 embedding = [
     "flagembedding==1.4.0",
 ]
+qdrant = [
+    "qdrant-client>=1.18.0",
+]
 
 
 [build-system]
