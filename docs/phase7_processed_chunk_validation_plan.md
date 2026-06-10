@@ -815,6 +815,27 @@ Summary:
 - Warning resolution remains deferred until policy review and separately
   approved follow-up work.
 
+## Follow-up W2 — Representative Warning Examples Audit
+
+Status: Complete
+
+Summary:
+
+- Reviewed representative short-text, very-short, repeal-metadata, direct
+  authority-marker, and parent-only authority-marker examples.
+- Scanned all 40,389 processed chunks read-only and used the official Phase 7
+  warning distribution rather than relying only on capped samples.
+- Created the examples audit at
+  `docs/phase7_warning_examples_audit.md`.
+- Confirmed that the W1 warning-only policy is supported by the sampled
+  evidence.
+- Found no strong sampled evidence of direct-text signature/footer
+  contamination requiring cleaner or chunker changes.
+- No warnings were resolved, suppressed, reclassified, or weakened.
+- No data, generated artifacts, validator logic, thresholds, source code, or
+  tests were modified.
+- Phase 7 remains implementation-complete and Phase 8 has not started.
+
 ## Non-goals
 
 Phase 7 validation slices must not:

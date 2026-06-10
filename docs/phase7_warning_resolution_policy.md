@@ -22,6 +22,9 @@ uv run python scripts/validate_processed_jsonl.py \
   --pretty
 ```
 
+See also: `docs/phase7_warning_examples_audit.md` for representative examples
+supporting this policy.
+
 ## Current Phase 7 Readiness Snapshot
 
 | Metric | Result |
