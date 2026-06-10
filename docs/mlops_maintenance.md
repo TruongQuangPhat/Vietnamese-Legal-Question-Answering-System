@@ -677,7 +677,7 @@ uv run python scripts/audit_raw_corpus.py \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
 
-# Processed Chunk Validation validation
+# Processed Chunk Validation
 uv run python scripts/export_processed_jsonl.py \
   --input-dir data/interim \
   --output-dir data/processed \
