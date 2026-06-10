@@ -21,7 +21,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3H: Complete
 - Slice 3I: Complete
 - Slice 3J: Complete
-- Slice 3K and later: Not started
+- Slice 3K: Complete
+- Phase 7: Implementation-complete, pending user review/commit/handoff
 
 ## Completed Slices
 
@@ -190,6 +191,16 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
   per issue code at 5.
 - Keeps warning counts, validation status, and embedding readiness unchanged.
 - Explicitly defers warning cleanup, suppression, and policy changes.
+
+### Slice 3K — Final Report / CLI Integration
+
+- Adds the official `scripts/validate_processed_jsonl.py` argparse entrypoint.
+- Loads the existing YAML config and applies explicit input/report overrides.
+- Writes the complete Pydantic report as compact or pretty UTF-8 JSON.
+- Prints a concise validation and embedding-readiness summary unless quiet.
+- Uses exit code 0 for pass and default warning-only pass, 1 for hard failure,
+  and 2 for strict warning-only failure.
+- Does not mutate chunks, resolve warnings, or start Phase 8.
 
 ## Current Review Before Slice 3C
 
@@ -715,6 +726,74 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Slice 3K Implementation — Final Phase 7 Report / CLI Integration
+
+Official command:
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
+```
+
+Default paths:
+
+- input: `data/processed/legal_chunks.jsonl`
+- config: `configs/processing/processed_jsonl_validation.yml`
+- output:
+  `artifacts/reports/chunking/processed_jsonl_validation_report.json`
+
+Exit policy:
+
+- `0`: report status `pass`.
+- `0`: report status `pass_with_warnings` by default.
+- `1`: report status `fail`, or CLI/config/report I/O failure.
+- `2`: report status `pass_with_warnings` with `--fail-on-warnings`.
+
+Report behavior:
+
+- serializes the full `ProcessedJsonlValidationReport`;
+- uses UTF-8 and preserves Vietnamese text;
+- writes compact JSON by default and indented JSON with `--pretty`;
+- creates missing output parent directories;
+- prints status, line/chunk counts, errors, warnings, embedding readiness, and
+  report path unless `--quiet` is set.
+
+Implementation files:
+
+- `scripts/validate_processed_jsonl.py`
+- `tests/unit/services/test_validate_processed_jsonl_cli.py`
+- `README.md`
+- `docs/processed_jsonl.md`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+Safe full-corpus CLI verification used
+`/tmp/processed_jsonl_validation_report.json`, not the protected artifacts
+directory:
+
+- exit code: 0
+- status: `pass_with_warnings`
+- total/valid chunks: 40,389 / 40,389
+- invalid chunks/errors: 0 / 0
+- warnings: 8,206
+- embedding readiness: `ready_with_warnings`
+- embedding ready: true
+- the report parsed successfully as JSON and protected paths stayed clean
+
+The 8,206 warnings remain unchanged and deferred: 4,645
+`TEXT_LENGTH_WARNING` and 3,561 `WARNING_CONTAMINATION_FOUND`.
+
+Verification result:
+
+- Phase 7 model, validator, and CLI tests: 185 passed.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
+
 ## Non-goals
 
 Phase 7 validation slices must not:
@@ -726,8 +805,8 @@ Phase 7 validation slices must not:
 - modify citations or chunks;
 - parse or rechunk legal text;
 - add external legal sources or network calls;
-- implement services, CLI commands, reports on disk, embedding, indexing,
-  retrieval, reranking, generation, Naive RAG, Advanced RAG, or GraphRAG.
+- implement embedding, indexing, retrieval, reranking, generation, Naive RAG,
+  Advanced RAG, or GraphRAG.
 
 ## Remaining Risks / Open Questions
 
@@ -755,5 +834,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3J is complete. Slice 3K and later are not started; wait for explicit
-approval before implementing any later slice.
+Phase 7 is implementation-complete. Await user review, commit, and final
+handoff before any explicitly approved Phase 8 work.

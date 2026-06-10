@@ -21,9 +21,10 @@ Completed:
   Phase 4 — Cleaning & Normalization
   Phase 5 — Legal Hierarchy Parsing
   Phase 6 — Parent-child Chunking
+  Phase 7 — Processed Chunk Validation & Embedding Readiness
 
 Next:
-  Validate processed JSONL for embedding readiness (validation gate only)
+  Review the Phase 7 ready_with_warnings gate and deferred warning policy
   Design embedding/indexing payloads
   Do not claim RAG-ready before retrieval/generation/evaluation pass
 ```
@@ -82,6 +83,18 @@ Article/Clause/Point hierarchy units instead of arbitrary token or character
 windows. Phase 6 hardening removed VBHN/source-tail leakage from chunk
 `text` and `parent_text`, and flags repealed placeholder chunks in metadata.
 Phase 7 validates embedding-readiness. Phase 8 embeds only `text`; `parent_text` is stored as retrieval/LLM context payload.
+
+Phase 7 is implementation-complete:
+
+```text
+Valid chunks:            40,389
+Invalid chunks:          0
+Errors:                  0
+Warnings:                8,206
+Embedding ready:         true
+Readiness status:        ready_with_warnings
+Validation report:       artifacts/reports/chunking/processed_jsonl_validation_report.json
+```
 
 ## Legal Accuracy Rules
 
@@ -561,6 +574,19 @@ uv run ruff check .
 ```
 
 ## Official Commands
+
+Validate processed chunks for Phase 8 readiness:
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
+```
+
+Use `--fail-on-warnings` in strict CI environments. Warning-only reports exit
+with code 0 by default and code 2 in strict mode.
 
 Inspect crawler:
 

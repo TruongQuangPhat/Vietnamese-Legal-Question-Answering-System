@@ -262,23 +262,22 @@ Files to be created during Phase 7 implementation:
    law distribution against `chunking_report.json`.
 5. **Embedding-readiness checks** — Verify `text`/`parent_text` contract,
    measure `parent_text` length distribution, flag very-long contexts.
-6. **Service and report writer** — Orchestrate all checks, write
-   `processed_jsonl_validation_report.json`.
-7. **CLI** — argparse entrypoint with `--verbose`, `--no-color`, configurable
-   paths.
+6. **Report writer** — Serialize the complete Pydantic report as UTF-8 JSON.
+7. **CLI** — argparse entrypoint with configurable paths, pretty/quiet modes,
+   and explicit warning exit policy.
 8. **Full corpus validation run** — Execute against 40,389 chunks, review
    report, update docs.
 
 ## Execution Progress
 
-- [ ] Step 1 - Documentation/context update
-- [ ] Step 2 - Validation models/config
-- [ ] Step 3 - Core JSONL validator
-- [ ] Step 4 - Report reconciliation and embedding-readiness checks
-- [ ] Step 5 - Service and report writer
-- [ ] Step 6 - CLI
-- [ ] Step 7 - Full corpus validation run
-- [ ] Step 8 - Docs/context final update
+- [x] Step 1 - Documentation/context update
+- [x] Step 2 - Validation models/config
+- [x] Step 3 - Core JSONL validator
+- [x] Step 4 - Report reconciliation and embedding-readiness checks
+- [x] Step 5 - Report writer
+- [x] Step 6 - CLI
+- [x] Step 7 - Full corpus validation run
+- [x] Step 8 - Docs/context final update
 
 ## Commands
 
@@ -299,12 +298,20 @@ Run Phase 7 validation:
 ```bash
 uv run python scripts/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
-  --chunking-report artifacts/reports/chunking/chunking_report.json \
-  --hierarchy-dir data/interim \
-  --report artifacts/reports/chunking/processed_jsonl_validation_report.json \
-  --verbose \
-  --no-color
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
 ```
+
+Exit codes:
+
+- `0`: `pass`, or `pass_with_warnings` under the default policy.
+- `1`: `fail`.
+- `2`: `pass_with_warnings` when `--fail-on-warnings` is enabled.
+
+Use `--quiet` to suppress the normal terminal summary. The current full-corpus
+result is `ready_with_warnings`: all 40,389 chunks are valid and embedding
+ready, while 8,206 warnings remain deferred for a separate policy review.
 
 Basic quantity check:
 
