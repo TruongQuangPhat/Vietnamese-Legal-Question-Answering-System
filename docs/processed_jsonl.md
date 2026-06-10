@@ -100,8 +100,11 @@ contamination_failures
 contamination_warnings
 long_parent_text_summary
 repealed_metadata_summary
-warnings
-errors
+warnings_total
+errors_total
+sample_warnings
+sample_failures
+status
 ```
 
 Phase 7 may also write diagnostic artifacts under:
