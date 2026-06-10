@@ -859,9 +859,13 @@ NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH,
 MAX_ARTICLE_NUMBER_MISMATCH.
 ### Phase 6 — Parent-child Chunking — Complete and hardened
 
-### Phase 7 — Processed Chunk Validation & Embedding Readiness — Next
+### Phase 7 — Processed Chunk Validation & Embedding Readiness — Complete
 
-### Phase 8 — Embedding & Indexing — Future extension
+### Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh — Complete
+
+Decision: Go with watch items. See `docs/phase75_llm_corpus_audit.md`.
+
+### Phase 8 — Embedding & Indexing — Next, not started
 
 ### Phase 9 — Naive RAG — Future extension
 

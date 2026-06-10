@@ -9,9 +9,10 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 Use this skill before legal parsing or chunking.
 
 Current status: Phase 4 Cleaning & Normalization, Phase 5 Legal Hierarchy
-Parsing, and Phase 6 Parent-child Chunking are complete and hardened. Phase 7
-Processed Chunk Validation & Embedding Readiness is next. Do not expand cleaning work unless a
-downstream-blocking defect is proven.
+Parsing, Phase 6 Parent-child Chunking, Phase 7 validation, and Phase 7.5
+semantic audit are complete. Do not expand cleaning work unless a
+downstream-blocking defect is proven with direct-text examples and regression
+tests.
 
 ## Purpose
 

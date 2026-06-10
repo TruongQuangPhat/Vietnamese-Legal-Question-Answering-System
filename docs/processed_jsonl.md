@@ -14,6 +14,11 @@ is safe for embedding/indexing. It does not recrawl, reclean, reparse, or
 rechunk legal text unless a proven upstream blocker is separately approved.
 Phase 7 does not implement embedding or indexing — it is a validation gate.
 
+Current result: Phase 7 is complete with 40,389 valid chunks, 0 invalid
+chunks, 0 hard errors, and 8,206 accepted non-blocking warnings. The warning
+follow-up W1-W3 is closed. The Phase 7.5 semantic audit records a
+**Go with watch items** decision in `docs/phase75_llm_corpus_audit.md`.
+
 ## Current Input
 
 Validated Phase 6 output:
@@ -361,3 +366,10 @@ After Phase 7 passes:
 - Phase 8 should not apply generic text splitters to `legal_chunks.jsonl`.
 - Phase 8 should design context packing for long `parent_text` deliberately,
   using the `long_parent_text_summary` from the Phase 7 report.
+- Phase 8 should preserve warning distribution as audit metadata.
+- Phase 8 should not collapse distinct chunks solely because their direct text
+  is identical; IDs and citations remain authoritative.
+- Phase 8 must define deterministic legal-status/effective-date enrichment
+  before claiming time-aware filtering.
+- A fresh Phase 7 run must block indexing on hard errors or
+  `embedding_ready=false`.

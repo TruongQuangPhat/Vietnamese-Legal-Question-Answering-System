@@ -188,7 +188,7 @@ cleaning diagnostics
 ```text
 implemented legal hierarchy parser
 implemented parent-child chunking domain logic
-future processed JSONL validation logic
+implemented processed JSONL validation logic
 ```
 
 Phase 5 Legal Hierarchy Parsing placement:

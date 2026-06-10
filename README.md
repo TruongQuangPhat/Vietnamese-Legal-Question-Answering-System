@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 7 — Processed Chunk Validation & Embedding Readiness
+Current phase: Phase 7.5 complete — Phase 8 handoff ready with watch items
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -24,8 +24,9 @@ Completed:
   Phase 7 — Processed Chunk Validation & Embedding Readiness
 
 Next:
-  Review the Phase 7 ready_with_warnings gate and deferred warning policy
-  Design embedding/indexing payloads
+  Scope Phase 8 baseline embedding/indexing separately
+  Run Phase 7 validation before indexing
+  Preserve warning-aware payload and context requirements
   Do not claim RAG-ready before retrieval/generation/evaluation pass
 ```
 
@@ -95,6 +96,11 @@ Embedding ready:         true
 Readiness status:        ready_with_warnings
 Validation report:       artifacts/reports/chunking/processed_jsonl_validation_report.json
 ```
+
+Phase 7 warning follow-up W1-W3 and the Phase 7.5 read-only corpus audit are
+complete. The handoff decision is **Go with watch items** for a separately
+scoped Phase 8 baseline. See `docs/phase75_llm_corpus_audit.md` and
+`docs/phase7_warning_resolution_decision.md`.
 
 ## Legal Accuracy Rules
 
@@ -689,6 +695,9 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/legal_parsing.md` | Phase 5 parser design |
 | `docs/parent_child_chunking.md` | Implemented Phase 6 parent-child chunking design and command |
 | `docs/processed_jsonl.md` | Phase 7 processed chunk validation & embedding-readiness notes |
+| `docs/phase75_llm_corpus_audit.md` | Phase 7.5 semantic corpus audit and Phase 8 guardrails |
+| `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
+| `docs/embedding_indexing.md` | Existing Phase 8 design handoff; implementation not started |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries

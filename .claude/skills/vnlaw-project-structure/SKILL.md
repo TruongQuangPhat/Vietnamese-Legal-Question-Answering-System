@@ -193,9 +193,9 @@ legal_hierarchy_builder       → tree construction from segments
 legal_hierarchy_models        → Pydantic models for hierarchy nodes
 legal_tree_validator          → tree integrity validation
 legal_parser                  → per-document parser facade
-future chunk_models           → Pydantic models for legal chunks
-future legal_chunker          → hierarchy-to-chunk conversion
-future processed_jsonl_writer → JSONL output + validation
+legal_chunk_models            → Pydantic models for legal chunks
+legal_chunker                 → hierarchy-to-chunk conversion
+processed_jsonl_validator     → JSONL validation and readiness audit
 ```
 
 ### `src/services/` (All phases - orchestration)
@@ -206,8 +206,7 @@ raw_audit_service              → audit pipeline orchestration
 cleaning_service               → cleaning pipeline orchestration
 cleaning_quality_audit_service → cleaning diagnostics
 legal_parsing_service          → parsing pipeline orchestration
-future chunking_service        → chunking pipeline orchestration
-future processed_jsonl_service → JSONL export + validation
+chunking_service               → chunking pipeline orchestration
 ```
 
 ### `src/indexing/` (Phase 8)

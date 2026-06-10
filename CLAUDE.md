@@ -80,7 +80,7 @@ The project roadmap is:
 Current project state:
 
 ```text
-Phases 0-6 are complete.
+Phases 0-7.5 are complete.
 Phase 5 Legal Hierarchy Parsing is complete and hardened:
   52 hierarchy.json outputs
   0 parser failures
@@ -99,14 +99,36 @@ Phase 6 Parent-child Chunking is complete and validated:
   0 source-tail markers in parent_text
   0 duplicate chunk IDs
   0 bad JSONL lines
+Phase 7 Processed Chunk Validation is complete:
+  40,389 valid chunks
+  0 invalid chunks
+  0 hard errors
+  8,206 accepted non-blocking warnings
+  payload ready rate 1.0
+  embedding_ready=true
+  readiness_status=ready_with_warnings
+Warning follow-up W1-W3 is closed.
+Phase 7.5 read-only corpus audit is complete:
+  decision: Go with watch items
 
-Next phase:
-  Phase 7 — Processed Chunk Validation & Embedding Readiness
+Next phase, only when separately scoped:
+  Phase 8 — Baseline Embedding & Indexing
 ```
 
 Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker
-exists. Do not jump to embedding, indexing, retrieval, RAG, Advanced RAG,
-GraphRAG, API, or deployment before the processed JSONL validation gate passes.
+exists. Before Phase 8 indexing, run the official Phase 7 validator. Do not
+start embedding, indexing, retrieval, RAG, Advanced RAG, GraphRAG, API, or
+deployment unless the task explicitly scopes that phase.
+
+Phase 8 guardrails:
+
+- preserve original `text`, `parent_text`, IDs, citations, hierarchy, hashes,
+  source metadata, warning visibility, and repeal flags;
+- do not drop short chunks or remove authority phrases lexically;
+- distinguish child text from parent Article context;
+- stop if Phase 7 reports hard errors or `embedding_ready=false`;
+- read `docs/phase75_llm_corpus_audit.md` and
+  `docs/phase7_warning_resolution_decision.md` before implementation.
 
 ## 4. Expected Repository Layout
 
@@ -259,6 +281,16 @@ data/processed/legal_chunks.jsonl
 Future embedding/indexing should embed `text` only and keep `parent_text` as
 Article context payload for retrieval/generation. Some Article parent contexts
 are very long; do not split them with arbitrary character or token windows.
+
+Run the Phase 7 gate before indexing:
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
+```
 
 Never split legal documents by arbitrary character count or token windows if that breaks legal clauses or points.
 

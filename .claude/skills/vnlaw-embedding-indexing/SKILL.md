@@ -8,11 +8,25 @@ allowed-tools: Read, Grep, Glob, LS, Bash, Edit, MultiEdit, Write
 
 Use this skill for embedding legal chunks and indexing them into Qdrant (Phase 8).
 
-**Prerequisites**: Phases 0-6 are complete. Phase 7 processed JSONL validation
-/ embedding-readiness checks must pass before indexing starts. The current
-Phase 6 corpus is `data/processed/legal_chunks.jsonl` with 40,389 chunks,
-0 source-tail markers in `text`/`parent_text`, and 180 empty/repealed chunks
-flagged.
+**Prerequisites**: Phases 0-7.5 are complete. The corpus has 40,389 valid
+chunks, 0 invalid chunks, 0 hard errors, payload ready rate 1.0, and
+`embedding_ready=true` / `ready_with_warnings`. The 8,206 warnings are
+accepted quality signals and must remain visible. Phase 8 is next but has not
+started; indexing requires a separately scoped task and a fresh Phase 7 run.
+
+Preserve short chunks, distinct IDs/citations for duplicate text, Article
+`parent_text`, hierarchy IDs, hashes, source metadata, warning distribution,
+and repeal flags. Do not remove authority phrases lexically.
+
+Before indexing:
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
+```
 
 ## Goal
 

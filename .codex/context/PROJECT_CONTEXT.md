@@ -2,6 +2,21 @@
 
 This file is a Codex-compatible mirror of `PROJECT_CONTEXT.md`. The original content is preserved below.
 
+## Current Status Refresh — June 10, 2026
+
+This refresh supersedes older phase-status statements in the preserved mirror:
+
+- Phase 7 and warning follow-up W1-W3 are complete.
+- Phase 7 result: 40,389 valid chunks, 0 invalid chunks, 0 hard errors,
+  8,206 accepted non-blocking warnings, payload ready rate 1.0, and
+  `embedding_ready=true` / `ready_with_warnings`.
+- Phase 7.5 read-only corpus audit is complete with **Go with watch items**.
+- Phase 8 is next but not started and must be separately scoped.
+- Before indexing, run the official Phase 7 validator and read
+  `docs/phase75_llm_corpus_audit.md`.
+- Preserve short chunks, authority phrases, parent context, IDs, citations,
+  hierarchy, hashes, source metadata, warnings, and repeal flags.
+
 # VnLaw-QA Project Context
 
 This file is intended to help Claude Code, Codex, or any future AI coding assistant quickly understand the current project state before making changes.
@@ -211,26 +226,26 @@ Phase 7 — Processed Chunk Validation & Embedding Readiness / embedding-readine
 
 ## 6. Next Immediate Tasks
 
-1. Define Phase 7 validation checks over `data/processed/legal_chunks.jsonl`.
-2. Confirm embedding-readiness fields, payload strategy, and long parent-text
-   handling before Phase 8 indexing.
-3. Do not claim RAG readiness until retrieval, generation, and evaluation gates
-   are implemented and validated.
+1. Scope Phase 8 baseline embedding/indexing separately.
+2. Rerun Phase 7 before indexing and stop on hard errors.
+3. Preserve warning-aware payload, parent context, and legal traceability.
+4. Do not claim RAG readiness until retrieval, generation, and evaluation
+   gates are implemented and validated.
 
-## 7. Next Phase: Phase 7 Processed Chunk Validation & Embedding Readiness
+## 7. Next Phase: Phase 8 Baseline Embedding & Indexing
 
-Phase 7 is the next engineering focus. It consumes
-`data/processed/legal_chunks.jsonl`.
+Phase 7 and Phase 7.5 are complete. Phase 8 is next but not started and must
+be separately scoped.
 
 Key requirements:
 
-- Parse every JSONL line.
-- Validate every row against `LegalChunk`.
-- Check globally unique `chunk_id`.
-- Recompute `text_hash` and `parent_text_hash`.
-- Confirm report counts match JSONL counts.
-- Classify long `parent_text` rows for downstream context packing.
-- Preserve `text` as the embedding unit and `parent_text` as Article context.
+- rerun the Phase 7 validator before indexing;
+- embed `text`, not `parent_text`;
+- retain `parent_text` as traceable Article context;
+- preserve IDs, citations, hierarchy, hashes, source metadata, warnings, and
+  repeal flags;
+- keep short chunks and distinct citations for duplicate text;
+- define deterministic legal-status/effective-date enrichment.
 
 ## 8. Do Not Do Yet
 
@@ -435,8 +450,8 @@ Prefer **VBHN** consolidated documents when available. If no VBHN exists, crawl 
 
 ## 12. Next Phase Preparation
 
-Phase 7 — Processed Chunk Validation & Embedding Readiness / embedding-readiness checks is the next
-engineering focus.
+Phase 8 baseline embedding/indexing is the next engineering focus, but it has
+not started and requires a separately scoped task.
 
 Key design constraints:
 
@@ -444,7 +459,8 @@ Key design constraints:
 - Must not mutate `data/raw/`.
 - Must preserve `Phần / Chương / Mục / Điều / Khoản / Điểm` traceability.
 - Must preserve Article parent context from `parent_text`.
-- Must classify long Article parent contexts before indexing/RAG.
+- Must rerun Phase 7 before indexing.
+- Must preserve accepted warning visibility and repeal metadata.
 - Must validate chunks before any embedding or retrieval work.
 
 ## 13. Out-of-Scope Reminders

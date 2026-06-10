@@ -24,11 +24,11 @@ Codex should look first at `AGENTS.md`, then at the repo-scoped skills under
 - `.codex/context/skills_mirror/` is inactive reference only.
 - `.codex/skills` should not be used as an active skill folder in this repo.
 - `.claude/skills/` is Claude-only and must be preserved.
-- Current phase status: Phase 6 Parent-child Chunking is complete and
-  hardened; `data/processed/legal_chunks.jsonl` has 40,389 chunks, 0 failed
-  laws, 0 source-tail markers in `text`/`parent_text`, and 180
-  empty/repealed chunks flagged. Phase 7 Processed Chunk Validation & Embedding Readiness /
-  embedding-readiness checks is next.
+- Current phase status: Phases 7 and 7.5 are complete. The corpus has 40,389
+  valid chunks, 0 invalid chunks, 0 hard errors, 8,206 accepted non-blocking
+  warnings, payload ready rate 1.0, and `embedding_ready=true` /
+  `ready_with_warnings`. Phase 8 is next but not started; read
+  `docs/phase75_llm_corpus_audit.md` and rerun Phase 7 before indexing.
 
 ## Source-to-Codex Mapping
 

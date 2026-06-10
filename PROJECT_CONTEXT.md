@@ -38,6 +38,7 @@ Corpus Registry
 → Legal Hierarchy Parsing
 → Parent-child Chunking
 → Processed Chunk Validation & Embedding Readiness
+→ LLM-assisted Corpus Audit & Context Refresh
 → Embedding / Indexing
 → Naive RAG
 → Advanced RAG
@@ -88,11 +89,18 @@ Corpus Registry
   max `parent_text` length reduced to 14,481 characters.
 - Full validation audit:
   `artifacts/reports/chunking/full_corpus_validation_report.json`.
-- Do not arbitrarily split Article parent context in Phase 6. Phase 7/8 should
+- Do not arbitrarily split Article parent context in Phase 6. Phase 8 should
   embed only `text` and handle `parent_text` as Article context payload.
-**Phase 7 â Processed Chunk Validation & Embedding Readiness**, a validation gate over `data/processed/legal_chunks.jsonl` before embedding/indexing begins. Phase 7 does not implement embedding or indexing.
-  processed chunk output remains validated.
-- Current branch: `feature/legal-parser-chunking`.
+- **Phase 7 — Processed Chunk Validation & Embedding Readiness is complete.**
+- Phase 7 result: 40,389 valid chunks, 0 invalid chunks, 0 hard errors,
+  8,206 accepted non-blocking warnings, payload ready rate 1.0, and
+  `embedding_ready=true` / `ready_with_warnings`.
+- Warning follow-up W1-W3 is closed. Warnings remain visible and were not
+  resolved, suppressed, or reclassified.
+- **Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh is complete.**
+- Phase 7.5 result: **Go with watch items** for a separately scoped Phase 8
+  baseline. No corpus blocker was found.
+- Embedding, indexing, retrieval, and RAG have not started.
 
 ## 4. Implemented Phases
 
@@ -201,66 +209,51 @@ Key design: `nodes` is a flat list linked by `node_id`/`parent_id`/`children`. P
 
 ## 5. Current Phase
 
-Completed phase:
+Completed phases:
 
 ```text
 Phase 6 — Parent-child Chunking
+Phase 7 — Processed Chunk Validation & Embedding Readiness
+Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh
 ```
 
-Phase 6 creates validated parent-child chunks from the parsed legal hierarchy.
-Child units are Clause or Point where available, with Article text preserved as
-parent context for downstream retrieval and generation.
-
-This phase consumes `data/interim/{LAW_ID}/hierarchy.json`. It does not embed,
-index, retrieve, generate answers, or implement RAG.
-
-Implemented outputs:
+Validated inputs and reports:
 
 ```text
 data/processed/legal_chunks.jsonl
 artifacts/reports/chunking/chunking_report.json
+artifacts/reports/chunking/processed_jsonl_validation_report.json
 ```
-
-Implemented Phase 6 components:
-
-- `src/processing/legal_chunk_models.py`
-- `src/processing/legal_chunker.py`
-- `src/processing/legal_chunk_validator.py`
-- `src/services/chunking_service.py`
-- `scripts/chunk_legal_corpus.py`
-- `tests/unit/processing/test_legal_chunk_models.py`
-- `tests/unit/processing/test_legal_chunker.py`
-- `tests/unit/processing/test_legal_chunk_validator.py`
-- `tests/unit/services/test_chunking_service.py`
-- `tests/unit/services/test_chunk_legal_corpus_cli.py`
 
 Current next phase:
 
 ```text
-Phase 7 — Processed Chunk Validation & Embedding Readiness
+Phase 8 — Baseline Embedding & Indexing
 ```
 
-Phase 7 validates `data/processed/legal_chunks.jsonl` as the safe
-input to Phase 8 embedding/indexing. Phase 7 is a validation gate only;
-it does not implement embedding or indexing. Phase 8 should embed only
-`text`; keep `parent_text` as retrieval/LLM context payload.
+Phase 8 must be separately scoped. Before any indexing run, execute the
+official Phase 7 validator. Embed only `text`; preserve `parent_text` as
+traceable Article context and retain citation, hierarchy IDs, hashes, source
+metadata, warnings, and repeal flags.
 
 ## 6. Next Immediate Tasks
 
-1. Run any final documentation/context review for Phase 6 handoff.
-2. Define and implement Phase 7 validation checks over `data/processed/legal_chunks.jsonl`.
-3. Confirm embedding-readiness fields, payload strategy, and long parent-text
-   handling before Phase 8 indexing.
-4. Do not claim RAG readiness until retrieval, generation, and evaluation gates
-   are implemented and validated.
+1. Scope Phase 8 baseline embedding/indexing as a separate task.
+2. Run Phase 7 validation before indexing and block if hard errors appear.
+3. Define the payload contract, including `parent_text`, warning metadata,
+   repeal flags, and deterministic legal-status/effective-date enrichment.
+4. Preserve short chunks and distinct citations for duplicate legal text.
+5. Do not claim RAG readiness until retrieval, generation, and evaluation
+   gates are implemented and validated.
 
 ## 7. Upcoming Phases
 
 | Phase | Name | Status |
 | --- | --- | --- |
 | 6 | Parent-child Chunking | **Complete / Validated** |
-| 7 | Processed Chunk Validation & Embedding Readiness | **Next** |
-| 8 | Embedding & Indexing | Planned |
+| 7 | Processed Chunk Validation & Embedding Readiness | **Complete** |
+| 7.5 | LLM-Assisted Corpus Audit & Context Refresh | **Complete / Go with watch items** |
+| 8 | Embedding & Indexing | **Next / Not started** |
 | 9 | Naive RAG | Future |
 | 10 | Advanced RAG | Future |
 | 11 | GraphRAG & Agents | Future |
@@ -272,8 +265,11 @@ it does not implement embedding or indexing. Phase 8 should embed only
 
 - Do not modify Phase 6 generated artifacts unless rerunning the official
   chunking command intentionally.
-- Do not implement embedding/indexing before the processed JSONL validation
-  gate is defined and passed.
+- Do not implement embedding/indexing without a separately scoped Phase 8 task.
+- Do not index if a fresh Phase 7 run has hard errors or
+  `embedding_ready=false`.
+- Do not drop short chunks, remove authority phrases lexically, or discard
+  `parent_text`, citation, hierarchy, hashes, source metadata, or repeal flags.
 - Do not implement Naive RAG yet.
 - Do not implement Advanced RAG yet.
 - Do not implement GraphRAG or agents yet.
@@ -309,6 +305,7 @@ docs/project_phase_journal.md
 docs/legal_parsing.md
 docs/parent_child_chunking.md
 docs/processed_jsonl.md
+docs/phase75_llm_corpus_audit.md
 docs/embedding_indexing.md
 docs/naive_rag.md
 docs/advanced_rag.md
@@ -367,6 +364,16 @@ uv run python scripts/chunk_legal_corpus.py \
   --no-color
 ```
 
+### Phase 7 — Validate Processed JSONL
+
+```bash
+uv run python scripts/validate_processed_jsonl.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/processing/processed_jsonl_validation.yml \
+  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --pretty
+```
+
 ## 11. Development Commands
 
 ```bash
@@ -395,9 +402,9 @@ uv run mypy src
 feature/data-crawling           done
 feature/raw-corpus-audit        done
 feature/cleaning-normalization  done
-feature/legal-parser-chunking   current / Phase 6 complete
-feature/processed-jsonl         next
-feature/embedding-indexing      future
+feature/legal-parser-chunking   done
+feature/processed-jsonl         done
+feature/embedding-indexing      next / separately scoped
 feature/naive-rag               future
 feature/advanced-rag            future
 feature/graphrag-agents         future

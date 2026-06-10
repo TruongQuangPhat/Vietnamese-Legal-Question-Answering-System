@@ -16,8 +16,12 @@ hardened with 52/52 hierarchy outputs, 0 parser failures, 0 validator failures,
 Parent-child Chunking is complete and hardened with
 `data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
 0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
-and 180 empty/repealed chunks flagged. Phase 7 Processed Chunk Validation & Embedding Readiness /
-embedding-readiness checks is next.
+and 180 empty/repealed chunks flagged. Phase 7 validation and Phase 7.5
+semantic audit are complete with 0 hard errors and a **Go with watch items**
+decision. Do not modify hierarchy/chunks or start Phase 8 work unless a
+separate task is explicitly scoped. Before indexing, rerun Phase 7 and
+preserve short chunks, authority phrases, parent context, citations, hashes,
+source metadata, and repeal flags.
 
 ## Phase 5 — Legal Hierarchy Parsing
 
