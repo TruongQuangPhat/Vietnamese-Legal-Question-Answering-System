@@ -51,6 +51,7 @@ class EmbeddingInput(BaseModel):
     citation: str = Field(..., min_length=1)
     hierarchy_path: str = Field(..., min_length=1)
     metadata: ChunkingMetadata | None = None
+    warnings: list[ChunkingIssue] = Field(default_factory=list)
 
     @field_validator(
         "chunk_id",

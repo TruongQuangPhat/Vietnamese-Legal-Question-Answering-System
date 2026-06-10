@@ -46,7 +46,7 @@ remain null or empty until deterministic enrichment exists.
 | Slice | Name | Status | Notes |
 |---|---|---|---|
 | 8A | Configuration and typed data contracts | Done | No embedding or Qdrant connection |
-| 8B | Chunk loader and metadata enrichment | Not started | Build `EmbeddingInput` |
+| 8B | Chunk loader and metadata enrichment | Done | Read-only streaming and deterministic mapping |
 | 8C | Embedding model pilot | Not started | BGE-M3 pilot only; measure dense dimension |
 | 8D | Payload builder | Not started | Preserve legal metadata and warnings |
 | 8E | Qdrant collection setup | Not started | Named dense vector, sparse optional |
@@ -68,6 +68,23 @@ Slice 8A adds:
 It does not load BGE-M3, connect to Qdrant, embed text, create collections,
 index points, retrieve data, mutate chunks, or write an official report.
 
+## Slice 8B Summary
+
+Slice 8B adds:
+
+- a read-only, line-by-line `LegalChunk` JSONL loader;
+- fail-fast errors with input path and line number where available;
+- deterministic `text_only`, `citation_plus_text`, and
+  `law_citation_plus_text` mapping;
+- optional exact `law_id` filtering and result limiting;
+- preservation of short text, hashes, citations, hierarchy, typed metadata,
+  warnings, and distinct chunk IDs;
+- unit tests using temporary JSONL files only.
+
+It does not load BGE-M3, generate dense or sparse vectors, connect to Qdrant,
+index points, implement checkpointing or retrieval, mutate the corpus, or
+write an official report. Protected corpus and report paths remain unchanged.
+
 ## Verification
 
 ```bash
@@ -76,17 +93,20 @@ uv run python scripts/validate_processed_jsonl.py \
   --config configs/processing/processed_jsonl_validation.yml \
   --output /tmp/processed_jsonl_validation_report.json \
   --pretty
-uv run python -m py_compile src/indexing/indexing_models.py
-uv run pytest tests/unit/indexing/test_indexing_models.py -q
+uv run python -m py_compile src/indexing/indexing_models.py src/indexing/chunk_loader.py
+uv run pytest tests/unit/indexing/test_indexing_models.py \
+  tests/unit/indexing/test_chunk_loader.py -q
 uv run pytest tests/unit/processing -q
-uv run ruff check src/indexing/indexing_models.py tests/unit/indexing/test_indexing_models.py
-uv run ruff format --check src/indexing/indexing_models.py tests/unit/indexing/test_indexing_models.py
+uv run ruff check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
+  tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py
+uv run ruff format --check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
+  tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py
 git diff --check
 git status --short data/raw data/interim data/reports data/processed artifacts/reports
 ```
 
 ## Next Slice
 
-Slice 8B should implement a read-only chunk loader and deterministic metadata
-enrichment that maps validated `LegalChunk` rows to `EmbeddingInput` without
-changing source text or inventing temporal/domain metadata.
+Slice 8C remains the planned next slice: a constrained BGE-M3 embedding model
+pilot that measures dense output dimension from the actual model. Slice 8D
+remains responsible for building Qdrant payloads.
