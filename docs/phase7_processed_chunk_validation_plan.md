@@ -794,6 +794,27 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Follow-up W1 — Warning Resolution Policy Audit
+
+Status: Complete
+
+Summary:
+
+- Analyzed all 8,206 warnings using the current Phase 7 report and read-only
+  chunk examples.
+- Created the decision-oriented policy at
+  `docs/phase7_warning_resolution_policy.md`.
+- Confirmed that current authority-marker and short-text findings should remain
+  warning-only.
+- Identified parent-context handling and short-child context expansion as
+  later retrieval/context-assembly concerns.
+- Defined evidence requirements for any future cleaner or chunker follow-up.
+- No warnings were resolved, suppressed, reclassified, or weakened.
+- No data, generated artifacts, validator logic, thresholds, source code, or
+  tests were modified.
+- Warning resolution remains deferred until policy review and separately
+  approved follow-up work.
+
 ## Non-goals
 
 Phase 7 validation slices must not:
