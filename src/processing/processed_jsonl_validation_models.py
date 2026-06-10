@@ -105,6 +105,7 @@ class ProcessedJsonlValidationReport(BaseModel):
         repealed_metadata_summary: Repealed/empty flag distribution.
         payload_readiness_summary: Payload field availability summary.
         embedding_readiness: Embedding contract validation summary.
+        warning_distribution_summary: Full warning distribution audit summary.
         sample_failures: Representative error issues (capped by max_sample_failures).
         sample_warnings: Representative warning issues (capped by max_sample_warnings).
         status: Overall gate status: pass, pass_with_warnings, or fail.
@@ -175,6 +176,9 @@ class ProcessedJsonlValidationReport(BaseModel):
     )
     embedding_readiness: dict[str, Any] = Field(
         default_factory=dict, description="Embedding contract validation summary"
+    )
+    warning_distribution_summary: dict[str, Any] = Field(
+        default_factory=dict, description="Full warning distribution audit summary"
     )
 
     sample_failures: list[ProcessedJsonlIssue] = Field(

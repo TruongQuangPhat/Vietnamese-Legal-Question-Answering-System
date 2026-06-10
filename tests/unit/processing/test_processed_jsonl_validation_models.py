@@ -72,6 +72,7 @@ def _report(**overrides: object) -> ProcessedJsonlValidationReport:
         },
         "payload_readiness_summary": {"all_fields_present": 100},
         "embedding_readiness": {"ready": True, "empty_text_chunks": 0},
+        "warning_distribution_summary": {"total_warnings": 0},
         "sample_failures": [],
         "sample_warnings": [],
         "status": "pass",
@@ -236,6 +237,7 @@ class TestReportSerialization:
         assert isinstance(data, dict)
         assert data["status"] == "pass"
         assert data["schema_version"] == "1.0"
+        assert data["warning_distribution_summary"] == {"total_warnings": 0}
 
     def test_vietnamese_preserved_in_serialization(self) -> None:
         report = _report(

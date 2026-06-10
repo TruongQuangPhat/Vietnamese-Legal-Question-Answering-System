@@ -20,7 +20,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3G: Complete
 - Slice 3H: Complete
 - Slice 3I: Complete
-- Slice 3J and later: Not started
+- Slice 3J: Complete
+- Slice 3K and later: Not started
 
 ## Completed Slices
 
@@ -178,6 +179,17 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Preserves blocking and warning category distributions, deferred warning
   follow-ups, and recommended next actions in `embedding_readiness`.
 - Does not embed, index, mutate chunks, or suppress warning counters.
+
+### Slice 3J — Warning Distribution Audit
+
+- Records every warning event before capped sample handling.
+- Summarizes warnings by issue code, law ID, chunk kind, affected field,
+  contamination marker, and short-text source.
+- Produces deterministic top-law, top-kind, marker, and short-text lists.
+- Caps top laws/kinds at 10, markers at 20, examples at 20 total, and examples
+  per issue code at 5.
+- Keeps warning counts, validation status, and embedding readiness unchanged.
+- Explicitly defers warning cleanup, suppression, and policy changes.
 
 ## Current Review Before Slice 3C
 
@@ -566,7 +578,7 @@ Verification result:
 ## Deferred Warning Follow-up
 
 - The 8,206 total warnings after Slice 3G were intentionally not resolved,
-  suppressed, reclassified, or weakened in Slice 3H or Slice 3I.
+  suppressed, reclassified, or weakened in Slice 3H, Slice 3I, or Slice 3J.
 - This total remains 3,561 contamination warning-only chunks from Slice 3E
   plus 4,645 short-text warnings from Slice 3G.
 - Handle this distribution later through a dedicated warning audit and policy
@@ -628,6 +640,81 @@ Verification result:
 - `git diff --check`: passed.
 - Protected data and artifact paths: clean.
 
+## Slice 3J Implementation — Warning Distribution Audit
+
+Objective: expose the full distribution of authoritative warnings without
+deriving statistics from capped `sample_warnings` or changing warning policy.
+
+Populated `warning_distribution_summary` fields:
+
+- `total_warnings`
+- `warning_issue_code_counts`
+- `warning_by_law_id`
+- `warning_by_chunk_kind`
+- `warning_by_field`
+- `top_warning_laws`
+- `top_warning_chunk_kinds`
+- `top_contamination_markers`
+- `top_short_text_laws`
+- `top_short_text_chunk_kinds`
+- `examples`
+- `limits`
+- `deferred_resolution`
+
+Caps:
+
+- top warning laws: 10
+- top warning chunk kinds: 10
+- top contamination markers: 20
+- examples: 20 total and 5 per issue code
+
+Implementation files:
+
+- `src/processing/processed_jsonl_validation_models.py`
+- `src/processing/processed_jsonl_validator.py`
+- `tests/unit/processing/test_processed_jsonl_validation_models.py`
+- `tests/unit/processing/test_processed_jsonl_validator.py`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+The report model received the minimal flexible
+`warning_distribution_summary: dict[str, Any]` field. No new source module was
+created.
+
+Read-only full-corpus result:
+
+- Authoritative warnings remain 8,206.
+- Issue codes: 4,645 `TEXT_LENGTH_WARNING` and 3,561
+  `WARNING_CONTAMINATION_FOUND`.
+- Top warning laws: `BLHS_VBHN` 1,096; `LBVMT_VBHN` 512;
+  `LTATGT_VBHN` 406.
+- Warning chunk kinds: `point_level` 5,533; `clause_level` 2,663;
+  `article_level` 10.
+- Field incidences: `text` 5,187; `parent_text` 3,561; `unknown` 0.
+  Field incidences can exceed warning events because one contamination warning
+  can affect both fields.
+- Top contamination markers: `BỘ TRƯỞNG` 3,935; `CHỦ NHIỆM` 178;
+  `CHỦ TỊCH QUỐC HỘI` 123. Marker incidences can exceed contamination warning
+  events because one chunk can match multiple fields or markers.
+- Top short-text laws: `BLHS_VBHN` 1,080; `BLTTHS_VBHN` 249;
+  `BLDS_2015` 204.
+- Short-text chunk kinds: `point_level` 3,605; `clause_level` 1,039;
+  `article_level` 1.
+- Ten representative examples were retained: five for each observed issue
+  code.
+- Overall and embedding statuses remain `pass_with_warnings` and
+  `ready_with_warnings`.
+- The 8,206 warnings were analyzed only; none were resolved, suppressed,
+  reclassified, or weakened.
+
+Verification result:
+
+- Phase 7 model and validator tests: 176 passed.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
+
 ## Non-goals
 
 Phase 7 validation slices must not:
@@ -668,5 +755,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3I is complete. Slice 3J and later are not started; wait for explicit
+Slice 3J is complete. Slice 3K and later are not started; wait for explicit
 approval before implementing any later slice.

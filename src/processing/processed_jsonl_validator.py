@@ -11,8 +11,8 @@ This validator is independent from Phase 6's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
 and report model. Hash integrity, count reconciliation, citation structure,
 hierarchy traceability, contamination checks, repealed metadata auditing, and
-text-length readiness summaries are implemented; embedding-readiness checks
-are added in later slices.
+text-length, payload, embedding, and warning-distribution readiness summaries
+are implemented.
 """
 
 from __future__ import annotations
@@ -48,6 +48,11 @@ _MIN_TEXT_CHARS = 20
 _SHORT_TEXT_WARNING_CHARS = 50
 _LONG_TEXT_WARNING_CHARS = 4000
 _LONG_PARENT_TEXT_EXAMPLE_LIMIT = 5
+_WARNING_DISTRIBUTION_EXAMPLE_LIMIT = 20
+_WARNING_DISTRIBUTION_EXAMPLES_PER_CODE = 5
+_WARNING_DISTRIBUTION_TOP_LAW_LIMIT = 10
+_WARNING_DISTRIBUTION_TOP_KIND_LIMIT = 10
+_WARNING_DISTRIBUTION_TOP_MARKER_LIMIT = 20
 
 _PAYLOAD_REQUIRED_FIELDS = (
     "law_id",
@@ -97,8 +102,9 @@ class ProcessedJsonlValidator:
     Slice 3A adds hash integrity, Slice 3B adds count reconciliation, Slice 3C
     adds citation structure, Slice 3D adds hierarchy traceability, Slice 3E
     adds contamination auditing, Slice 3F audits repealed/empty metadata, and
-    Slice 3G adds text-length readiness summaries, and Slice 3H audits payload
-    readiness. Later slices add embedding-readiness.
+    Slice 3G adds text-length readiness summaries, Slice 3H audits payload
+    readiness, Slice 3I summarizes embedding readiness, and Slice 3J audits
+    warning distribution.
     """
 
     def __init__(self, config: ProcessedJsonlValidationConfig) -> None:
@@ -114,7 +120,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3H on the processed JSONL.
+        """Run validation checks through Slice 3J on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -177,6 +183,18 @@ class ProcessedJsonlValidator:
         payload_missing_recommended_source_counts: dict[str, int] = dict.fromkeys(
             _PAYLOAD_RECOMMENDED_SOURCE_FIELDS, 0
         )
+        warning_issue_code_counts: dict[str, int] = {}
+        warning_by_law_id: dict[str, int] = {}
+        warning_by_chunk_kind: dict[str, int] = {}
+        warning_by_field: dict[str, int] = {}
+        warning_issue_codes_by_law: dict[str, dict[str, int]] = {}
+        warning_issue_codes_by_chunk_kind: dict[str, dict[str, int]] = {}
+        contamination_marker_counts: dict[str, int] = {}
+        contamination_marker_field_counts: dict[str, dict[str, int]] = {}
+        short_text_warning_by_law_id: dict[str, int] = {}
+        short_text_warning_by_chunk_kind: dict[str, int] = {}
+        warning_distribution_examples: list[dict[str, Any]] = []
+        warning_example_counts_by_code: dict[str, int] = {}
 
         chunks_by_level: dict[str, int] = {}
         chunks_by_law: dict[str, int] = {}
@@ -204,7 +222,109 @@ class ProcessedJsonlValidator:
             if len(sample_failures) < self.config.max_sample_failures:
                 sample_failures.append(issue)
 
+        def _record_warning_distribution(issue: ProcessedJsonlIssue) -> None:
+            code = issue.code.value
+            context = issue.context
+            chunk_kind_value = context.get("chunk_kind")
+            chunk_kind = (
+                str(chunk_kind_value)
+                if isinstance(chunk_kind_value, str) and chunk_kind_value
+                else None
+            )
+            law_id = issue.law_id if issue.law_id != "unknown" else None
+
+            _increment_count(warning_issue_code_counts, code)
+            if law_id is not None:
+                _increment_count(warning_by_law_id, law_id)
+                _increment_nested_count(warning_issue_codes_by_law, law_id, code)
+            if chunk_kind is not None:
+                _increment_count(warning_by_chunk_kind, chunk_kind)
+                _increment_nested_count(
+                    warning_issue_codes_by_chunk_kind,
+                    chunk_kind,
+                    code,
+                )
+
+            fields: set[str] = set()
+            first_marker: str | None = None
+            if issue.code == ProcessedJsonlValidationIssueCode.WARNING_CONTAMINATION_FOUND:
+                matches = context.get("matches", [])
+                if isinstance(matches, list):
+                    for match in matches:
+                        if not isinstance(match, dict):
+                            continue
+                        field_value = match.get("field")
+                        marker_value = match.get("marker")
+                        if field_value in {"text", "parent_text"}:
+                            field = str(field_value)
+                            fields.add(field)
+                        else:
+                            field = "unknown"
+                        if isinstance(marker_value, str) and marker_value:
+                            first_marker = first_marker or marker_value
+                            _increment_count(contamination_marker_counts, marker_value)
+                            _increment_nested_count(
+                                contamination_marker_field_counts,
+                                marker_value,
+                                field,
+                            )
+
+            reasons_value = context.get("reasons", [])
+            reasons = (
+                [str(reason) for reason in reasons_value] if isinstance(reasons_value, list) else []
+            )
+            if issue.code in {
+                ProcessedJsonlValidationIssueCode.TEXT_LENGTH_WARNING,
+                ProcessedJsonlValidationIssueCode.VERY_LONG_PARENT_TEXT,
+            }:
+                if {"short_text", "long_text"} & set(reasons):
+                    fields.add("text")
+                if {
+                    "empty_parent_text",
+                    "long_parent_text",
+                    "extreme_parent_text",
+                } & set(reasons):
+                    fields.add("parent_text")
+                if "short_text" in reasons:
+                    if law_id is not None:
+                        _increment_count(short_text_warning_by_law_id, law_id)
+                    if chunk_kind is not None:
+                        _increment_count(
+                            short_text_warning_by_chunk_kind,
+                            chunk_kind,
+                        )
+
+            if not fields:
+                field_value = context.get("field")
+                fields.add(
+                    str(field_value) if field_value in {"text", "parent_text"} else "unknown"
+                )
+            for field in sorted(fields):
+                _increment_count(warning_by_field, field)
+
+            examples_for_code = warning_example_counts_by_code.get(code, 0)
+            if (
+                len(warning_distribution_examples) < _WARNING_DISTRIBUTION_EXAMPLE_LIMIT
+                and examples_for_code < _WARNING_DISTRIBUTION_EXAMPLES_PER_CODE
+            ):
+                warning_distribution_examples.append(
+                    {
+                        "issue_code": code,
+                        "law_id": issue.law_id,
+                        "chunk_id": issue.chunk_id,
+                        "chunk_kind": chunk_kind,
+                        "citation": context.get("citation"),
+                        "field": sorted(fields)[0],
+                        "reason": ", ".join(reasons) or str(context.get("reason") or issue.message),
+                        "marker": first_marker,
+                        "text_chars": context.get("text_chars"),
+                        "parent_text_chars": context.get("parent_text_chars"),
+                    }
+                )
+                warning_example_counts_by_code[code] = examples_for_code + 1
+
         def _add_sample_warning(issue: ProcessedJsonlIssue) -> None:
+            _record_warning_distribution(issue)
             if len(sample_warnings) < self.config.max_sample_warnings:
                 sample_warnings.append(issue)
 
@@ -1043,6 +1163,20 @@ class ProcessedJsonlValidator:
             if payload_checked_chunks
             else 0.0,
         }
+        warning_distribution_summary = _build_warning_distribution_summary(
+            total_warnings=warnings_total,
+            warning_issue_code_counts=warning_issue_code_counts,
+            warning_by_law_id=warning_by_law_id,
+            warning_by_chunk_kind=warning_by_chunk_kind,
+            warning_by_field=warning_by_field,
+            warning_issue_codes_by_law=warning_issue_codes_by_law,
+            warning_issue_codes_by_chunk_kind=warning_issue_codes_by_chunk_kind,
+            contamination_marker_counts=contamination_marker_counts,
+            contamination_marker_field_counts=contamination_marker_field_counts,
+            short_text_warning_by_law_id=short_text_warning_by_law_id,
+            short_text_warning_by_chunk_kind=short_text_warning_by_chunk_kind,
+            examples=warning_distribution_examples,
+        )
         embedding_readiness = _build_embedding_readiness_summary(
             errors_total=errors_total,
             warnings_total=warnings_total,
@@ -1099,12 +1233,137 @@ class ProcessedJsonlValidator:
             repealed_metadata_summary=repealed_metadata_summary,
             payload_readiness_summary=payload_readiness_summary,
             embedding_readiness=embedding_readiness,
+            warning_distribution_summary=warning_distribution_summary,
             sample_failures=sample_failures,
             sample_warnings=sample_warnings,
             status="pass",
         )
 
         return report
+
+
+def _increment_count(counts: dict[str, int], key: str) -> None:
+    counts[key] = counts.get(key, 0) + 1
+
+
+def _increment_nested_count(
+    counts: dict[str, dict[str, int]],
+    outer_key: str,
+    inner_key: str,
+) -> None:
+    nested_counts = counts.setdefault(outer_key, {})
+    nested_counts[inner_key] = nested_counts.get(inner_key, 0) + 1
+
+
+def _sorted_count_dict(counts: dict[str, int]) -> dict[str, int]:
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _build_warning_distribution_summary(
+    *,
+    total_warnings: int,
+    warning_issue_code_counts: dict[str, int],
+    warning_by_law_id: dict[str, int],
+    warning_by_chunk_kind: dict[str, int],
+    warning_by_field: dict[str, int],
+    warning_issue_codes_by_law: dict[str, dict[str, int]],
+    warning_issue_codes_by_chunk_kind: dict[str, dict[str, int]],
+    contamination_marker_counts: dict[str, int],
+    contamination_marker_field_counts: dict[str, dict[str, int]],
+    short_text_warning_by_law_id: dict[str, int],
+    short_text_warning_by_chunk_kind: dict[str, int],
+    examples: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build deterministic full-corpus warning distributions and capped views."""
+    top_laws = [
+        {
+            "law_id": law_id,
+            "warning_count": count,
+            "top_issue_codes": _sorted_count_dict(warning_issue_codes_by_law.get(law_id, {})),
+        }
+        for law_id, count in sorted(
+            warning_by_law_id.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:_WARNING_DISTRIBUTION_TOP_LAW_LIMIT]
+    ]
+    top_chunk_kinds = [
+        {
+            "chunk_kind": chunk_kind,
+            "warning_count": count,
+            "top_issue_codes": _sorted_count_dict(
+                warning_issue_codes_by_chunk_kind.get(chunk_kind, {})
+            ),
+        }
+        for chunk_kind, count in sorted(
+            warning_by_chunk_kind.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:_WARNING_DISTRIBUTION_TOP_KIND_LIMIT]
+    ]
+    top_markers = [
+        {
+            "marker": marker,
+            "count": count,
+            "fields": {
+                "text": contamination_marker_field_counts.get(marker, {}).get("text", 0),
+                "parent_text": contamination_marker_field_counts.get(marker, {}).get(
+                    "parent_text", 0
+                ),
+                "unknown": contamination_marker_field_counts.get(marker, {}).get("unknown", 0),
+            },
+        }
+        for marker, count in sorted(
+            contamination_marker_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:_WARNING_DISTRIBUTION_TOP_MARKER_LIMIT]
+    ]
+    top_short_text_laws = [
+        {"law_id": law_id, "short_text_warning_count": count}
+        for law_id, count in sorted(
+            short_text_warning_by_law_id.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:_WARNING_DISTRIBUTION_TOP_LAW_LIMIT]
+    ]
+    top_short_text_chunk_kinds = [
+        {"chunk_kind": chunk_kind, "short_text_warning_count": count}
+        for chunk_kind, count in sorted(
+            short_text_warning_by_chunk_kind.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:_WARNING_DISTRIBUTION_TOP_KIND_LIMIT]
+    ]
+
+    return {
+        "total_warnings": total_warnings,
+        "warning_issue_code_counts": _sorted_count_dict(warning_issue_code_counts),
+        "warning_by_law_id": _sorted_count_dict(warning_by_law_id),
+        "warning_by_chunk_kind": _sorted_count_dict(warning_by_chunk_kind),
+        "warning_by_field": {
+            "text": warning_by_field.get("text", 0),
+            "parent_text": warning_by_field.get("parent_text", 0),
+            "unknown": warning_by_field.get("unknown", 0),
+        },
+        "top_warning_laws": top_laws,
+        "top_warning_chunk_kinds": top_chunk_kinds,
+        "top_contamination_markers": top_markers,
+        "top_short_text_laws": top_short_text_laws,
+        "top_short_text_chunk_kinds": top_short_text_chunk_kinds,
+        "examples": examples,
+        "limits": {
+            "top_laws": _WARNING_DISTRIBUTION_TOP_LAW_LIMIT,
+            "top_chunk_kinds": _WARNING_DISTRIBUTION_TOP_KIND_LIMIT,
+            "top_markers": _WARNING_DISTRIBUTION_TOP_MARKER_LIMIT,
+            "examples_total": _WARNING_DISTRIBUTION_EXAMPLE_LIMIT,
+            "examples_per_issue_code": (_WARNING_DISTRIBUTION_EXAMPLES_PER_CODE),
+        },
+        "deferred_resolution": {
+            "should_resolve_now": False,
+            "reason": ("Slice 3J only audits warning distribution; resolution is deferred."),
+            "recommended_next_actions": [
+                "Review warning concentration by law, chunk kind, field, and marker.",
+                "Define warning policy separately before production indexing.",
+                "Do not mutate or suppress processed chunk warnings in this audit.",
+            ],
+        },
+    }
 
 
 def _summarize_lengths(lengths: list[int]) -> dict[str, int | float]:

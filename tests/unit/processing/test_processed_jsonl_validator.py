@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 processed JSONL validator through Slice 3I."""
+"""Unit tests for Phase 7 processed JSONL validator through Slice 3J."""
 
 from __future__ import annotations
 
@@ -2473,12 +2473,262 @@ class TestEmbeddingReadinessSummary:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3I scope: later checks are not yet implemented
+# Slice 3J: Warning distribution audit tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3IScope:
-    """Slice 3I summarizes readiness without starting embedding or indexing."""
+class TestWarningDistributionAudit:
+    """Full warning distributions independent from capped warning samples."""
+
+    def _validate(
+        self,
+        tmp_path: Path,
+        filename: str,
+        chunks: list[LegalChunk],
+    ) -> ProcessedJsonlValidationReport:
+        jsonl_path = tmp_path / filename
+        _write_jsonl(jsonl_path, chunks)
+        return ProcessedJsonlValidator(_config(jsonl_path)).validate(jsonl_path)
+
+    def _contamination_chunk(
+        self,
+        *,
+        chunk_id: str,
+        law_id: str = "law_001",
+        marker: str = "BỘ TRƯỞNG",
+        field: str = "text",
+        **overrides: object,
+    ) -> LegalChunk:
+        base = _valid_chunk()
+        payload: dict[str, object] = {
+            "chunk_id": chunk_id,
+            "law_id": law_id,
+            **overrides,
+        }
+        if field == "parent_text":
+            parent_text = f"{base.parent_text} {marker}"
+            payload.update(
+                parent_text=parent_text,
+                parent_text_hash=_compute_text_hash(parent_text),
+            )
+        else:
+            text = f"{base.text} {marker}"
+            payload.update(text=text, text_hash=_compute_text_hash(text))
+        return _valid_chunk(**payload)
+
+    def _short_chunk(
+        self,
+        *,
+        chunk_id: str,
+        law_id: str = "law_001",
+        **overrides: object,
+    ) -> LegalChunk:
+        text = "Nội dung ngắn."
+        return _valid_chunk(
+            chunk_id=chunk_id,
+            law_id=law_id,
+            text=text,
+            text_hash=_compute_text_hash(text),
+            **overrides,
+        )
+
+    def test_warning_distribution_empty_when_no_warnings(self, tmp_path: Path) -> None:
+        report = self._validate(tmp_path, "warning_empty.jsonl", [_valid_chunk()])
+
+        summary = report.warning_distribution_summary
+        assert summary["total_warnings"] == 0
+        assert summary["warning_issue_code_counts"] == {}
+        assert summary["examples"] == []
+
+    def test_warning_distribution_counts_contamination_warning_by_issue_code(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_code.jsonl",
+            [self._contamination_chunk(chunk_id="warning_code")],
+        )
+
+        counts = report.warning_distribution_summary["warning_issue_code_counts"]
+        assert counts["WARNING_CONTAMINATION_FOUND"] == 1
+
+    def test_warning_distribution_counts_warning_by_law_id(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_laws.jsonl",
+            [
+                self._contamination_chunk(chunk_id="law_a_chunk", law_id="law_a"),
+                self._contamination_chunk(chunk_id="law_b_chunk", law_id="law_b"),
+            ],
+        )
+
+        assert report.warning_distribution_summary["warning_by_law_id"] == {
+            "law_a": 1,
+            "law_b": 1,
+        }
+
+    def test_warning_distribution_counts_warning_by_chunk_kind(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_kinds.jsonl",
+            [
+                self._contamination_chunk(chunk_id="article_warning"),
+                self._contamination_chunk(
+                    chunk_id="clause_warning",
+                    level=ChunkingLevel.CLAUSE,
+                    chunk_kind="clause_level",
+                    clause_number="2",
+                    citation="Khoản 2 Điều 1 Luật thử nghiệm",
+                ),
+            ],
+        )
+
+        assert report.warning_distribution_summary["warning_by_chunk_kind"] == {
+            "article_level": 1,
+            "clause_level": 1,
+        }
+
+    def test_warning_distribution_counts_contamination_marker(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_marker.jsonl",
+            [self._contamination_chunk(chunk_id="marker_warning")],
+        )
+
+        marker = report.warning_distribution_summary["top_contamination_markers"][0]
+        assert marker["marker"] == "BỘ TRƯỞNG"
+        assert marker["count"] == 1
+        assert marker["fields"]["text"] == 1
+
+    def test_warning_distribution_distinguishes_text_and_parent_text(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_fields.jsonl",
+            [
+                self._contamination_chunk(chunk_id="text_warning"),
+                self._contamination_chunk(
+                    chunk_id="parent_warning",
+                    marker="CHỦ NHIỆM",
+                    field="parent_text",
+                ),
+            ],
+        )
+
+        fields = report.warning_distribution_summary["warning_by_field"]
+        assert fields["text"] == 1
+        assert fields["parent_text"] == 1
+        assert fields["unknown"] == 0
+
+    def test_warning_distribution_counts_short_text_by_law(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_short_law.jsonl",
+            [self._short_chunk(chunk_id="short_law", law_id="law_short")],
+        )
+
+        assert report.warning_distribution_summary["top_short_text_laws"] == [
+            {"law_id": "law_short", "short_text_warning_count": 1}
+        ]
+
+    def test_warning_distribution_counts_short_text_by_chunk_kind(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_short_kind.jsonl",
+            [
+                self._short_chunk(
+                    chunk_id="short_clause",
+                    level=ChunkingLevel.CLAUSE,
+                    chunk_kind="clause_level",
+                    clause_number="2",
+                    citation="Khoản 2 Điều 1 Luật thử nghiệm",
+                )
+            ],
+        )
+
+        assert report.warning_distribution_summary["top_short_text_chunk_kinds"] == [
+            {"chunk_kind": "clause_level", "short_text_warning_count": 1}
+        ]
+
+    def test_warning_distribution_examples_are_capped(self, tmp_path: Path) -> None:
+        chunks = [self._contamination_chunk(chunk_id=f"example_{index}") for index in range(25)]
+        report = self._validate(tmp_path, "warning_example_cap.jsonl", chunks)
+
+        summary = report.warning_distribution_summary
+        assert len(summary["examples"]) == 5
+        assert len(summary["examples"]) <= summary["limits"]["examples_total"]
+
+    def test_warning_distribution_top_lists_are_sorted_deterministically(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_sorted.jsonl",
+            [
+                self._contamination_chunk(chunk_id="law_b_chunk", law_id="law_b"),
+                self._contamination_chunk(chunk_id="law_a_chunk", law_id="law_a"),
+            ],
+        )
+
+        top_laws = report.warning_distribution_summary["top_warning_laws"]
+        assert [entry["law_id"] for entry in top_laws] == ["law_a", "law_b"]
+
+    def test_warning_distribution_does_not_change_warning_total(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_total.jsonl",
+            [self._contamination_chunk(chunk_id="warning_total")],
+        )
+
+        assert report.warnings_total == 1
+        assert report.warning_distribution_summary["total_warnings"] == 1
+        assert sum(report.warning_distribution_summary["warning_issue_code_counts"].values()) == 1
+
+    def test_warning_distribution_does_not_resolve_or_suppress_warnings(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate(
+            tmp_path,
+            "warning_deferred.jsonl",
+            [self._short_chunk(chunk_id="warning_deferred")],
+        )
+
+        deferred = report.warning_distribution_summary["deferred_resolution"]
+        assert deferred["should_resolve_now"] is False
+        assert report.status == "pass_with_warnings"
+        assert report.embedding_readiness["readiness_status"] == "ready_with_warnings"
+
+
+# ---------------------------------------------------------------------------
+# Slice 3J scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3JScope:
+    """Slice 3J audits warning distribution without resolving warnings."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""
@@ -2531,3 +2781,4 @@ class TestSlice3IScope:
         assert report.payload_readiness_summary["not_ready_chunks"] == 0
         assert report.embedding_readiness["embedding_ready"] is True
         assert report.embedding_readiness["readiness_status"] == "ready"
+        assert report.warning_distribution_summary["total_warnings"] == 0
