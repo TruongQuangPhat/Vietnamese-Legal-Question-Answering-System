@@ -41,7 +41,7 @@ Phase 3: Raw corpus audit and validation    complete
 Phase 4: Cleaning & Normalization           complete / gate-ready
 Phase 5: Legal hierarchy parsing            complete and hardened
 Phase 6: Parent-child chunking              complete and hardened
-Phase 7: Processed Chunk Validation & Embedding Readiness nextnext
+Phase 7: Processed Chunk Validation & Embedding Readiness complete
 ```
 
 ## 2. Cross-Phase Principles
