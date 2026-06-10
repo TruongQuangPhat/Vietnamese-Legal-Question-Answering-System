@@ -299,5 +299,5 @@ class ProcessedJsonlValidationConfig(BaseModel):
             "Khoản này được bãi bỏ",
             "Điểm này được bãi bỏ",
         ],
-        description="Regex patterns for repealed placeholder text",
+        description="Fixed phrases for repealed placeholder text",
     )
