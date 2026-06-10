@@ -59,6 +59,7 @@ def _vector_payload(**overrides: object) -> VectorPayload:
         "level": "article",
         "chunk_kind": "article_level",
         "article_number": "1",
+        "article_title": "Phạm vi điều chỉnh",
         "clause_number": None,
         "point_label": None,
         "citation": "Bộ luật Dân sự 2015, Điều 1",
@@ -246,6 +247,7 @@ class TestVectorPayload:
         assert payload.chunk_id == "BLDS_2015__article_1__chunk"
         assert payload.law_id == "BLDS_2015"
         assert payload.article_number == "1"
+        assert payload.article_title == "Phạm vi điều chỉnh"
         assert payload.citation == "Bộ luật Dân sự 2015, Điều 1"
         assert payload.parent_article_node_id == "BLDS_2015__article_1"
         assert payload.text_hash == "text-hash"

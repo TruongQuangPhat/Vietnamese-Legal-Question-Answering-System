@@ -48,7 +48,7 @@ remain null or empty until deterministic enrichment exists.
 | 8A | Configuration and typed data contracts | Done | No embedding or Qdrant connection |
 | 8B | Chunk loader and metadata enrichment | Done | Read-only streaming and deterministic mapping |
 | 8C | Embedding model pilot | Done | BGE-M3 loaded; 10- and 100-chunk CPU pilots passed; dense dimension 1024 |
-| 8D | Payload builder | Not started | Preserve legal metadata and warnings |
+| 8D | Payload builder | Done | Typed payload mapping and deterministic UUIDv5 point IDs |
 | 8E | Qdrant collection setup | Not started | Named dense vector, sparse optional |
 | 8F | Indexing service | Not started | Batch embed/upsert/checkpoint |
 | 8G | Official CLI | Not started | `build_embedding_index.py` |
@@ -244,6 +244,24 @@ max_absolute_difference: 9.562628434933718e-08
 - CUDA/GPU is not validated. A prior environment check produced an NVIDIA
   driver warning, so CPU remains the validated execution path.
 
+## Slice 8D Summary
+
+Slice 8D adds:
+
+- deterministic `LegalChunk` to `VectorPayload` mapping;
+- preservation of citation, hierarchy, Article/Clause/Point fields, exact
+  `text` and `parent_text`, hashes, source fields, metadata, and warnings;
+- embedding model, optional revision, payload schema, and indexing run
+  provenance;
+- explicit null/empty storage for unknown temporal, status, and domain fields
+  without inference;
+- deterministic UUIDv5 point IDs derived from namespace and original
+  `chunk_id`;
+- JSON-compatible payload serialization that retains null enrichment fields.
+
+It does not generate or persist vectors, load BGE-M3, connect to Qdrant,
+create collections, upsert points, index the corpus, or implement retrieval.
+
 ## Verification
 
 ```bash
@@ -253,27 +271,32 @@ uv run python scripts/validate_processed_jsonl.py \
   --output /tmp/processed_jsonl_validation_report.json \
   --pretty
 uv run python -m py_compile src/indexing/indexing_models.py src/indexing/chunk_loader.py \
-  src/indexing/embedding_model.py scripts/pilot_bge_m3_embeddings.py
+  src/indexing/embedding_model.py src/indexing/payload_builder.py \
+  scripts/pilot_bge_m3_embeddings.py
 uv run pytest tests/unit/indexing/test_indexing_models.py \
   tests/unit/indexing/test_chunk_loader.py \
-  tests/unit/indexing/test_embedding_model.py -q
+  tests/unit/indexing/test_embedding_model.py \
+  tests/unit/indexing/test_payload_builder.py -q
 uv run pytest tests/unit/processing -q
 uv run ruff check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
-  src/indexing/embedding_model.py scripts/pilot_bge_m3_embeddings.py \
+  src/indexing/embedding_model.py src/indexing/payload_builder.py \
+  scripts/pilot_bge_m3_embeddings.py \
   tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py \
-  tests/unit/indexing/test_embedding_model.py
+  tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py
 uv run ruff format --check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
-  src/indexing/embedding_model.py scripts/pilot_bge_m3_embeddings.py \
+  src/indexing/embedding_model.py src/indexing/payload_builder.py \
+  scripts/pilot_bge_m3_embeddings.py \
   tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py \
-  tests/unit/indexing/test_embedding_model.py
+  tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py
 git diff --check
 git status --short data/raw data/interim data/reports data/processed artifacts/reports
 ```
 
 ## Next Slice
 
-Slice 8D should build the traceability-preserving payload contract mapping
-before Qdrant collection setup or full indexing begins.
+Slice 8E should define and validate Qdrant collection setup with a named dense
+vector and optional sparse vector configuration, without starting full
+indexing.
 
 Before full indexing in Slice 8F, rerun a larger pilot or benchmark to estimate
 full-corpus CPU runtime and determine a safe batch size.

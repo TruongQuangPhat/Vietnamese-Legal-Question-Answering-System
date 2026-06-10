@@ -192,6 +192,7 @@ class VectorPayload(BaseModel):
     level: ChunkingLevel
     chunk_kind: str = Field(..., min_length=1)
     article_number: str | None = None
+    article_title: str | None = None
     clause_number: str | None = None
     point_label: str | None = None
     citation: str = Field(..., min_length=1)
@@ -248,6 +249,7 @@ class VectorPayload(BaseModel):
 
     @field_validator(
         "article_number",
+        "article_title",
         "clause_number",
         "point_label",
         "embedding_revision",
