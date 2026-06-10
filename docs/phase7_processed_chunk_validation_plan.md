@@ -19,7 +19,8 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
 - Slice 3F: Complete
 - Slice 3G: Complete
 - Slice 3H: Complete
-- Slice 3I and later: Not started
+- Slice 3I: Complete
+- Slice 3J and later: Not started
 
 ## Completed Slices
 
@@ -164,6 +165,19 @@ corpus inconsistencies without modifying, reparsing, or rechunking legal data.
   missing or invalid field.
 - Populates readiness totals, field-level distributions, and a four-decimal
   ready rate without embedding or indexing data.
+
+### Slice 3I — Embedding Readiness Summary
+
+- Produces the final Phase 7 decision from existing validation counters and
+  readiness summaries without changing any earlier result.
+- Blocks Phase 8 when errors, invalid chunks, core validation failures,
+  payload failures, payload-not-ready chunks, or a payload ready rate below
+  1.0 are present.
+- Reports `ready_with_warnings` when no blockers exist but warnings remain,
+  and `ready` only when both blockers and warnings are absent.
+- Preserves blocking and warning category distributions, deferred warning
+  follow-ups, and recommended next actions in `embedding_readiness`.
+- Does not embed, index, mutate chunks, or suppress warning counters.
 
 ## Current Review Before Slice 3C
 
@@ -552,11 +566,67 @@ Verification result:
 ## Deferred Warning Follow-up
 
 - The 8,206 total warnings after Slice 3G were intentionally not resolved,
-  suppressed, reclassified, or weakened in Slice 3H.
+  suppressed, reclassified, or weakened in Slice 3H or Slice 3I.
 - This total remains 3,561 contamination warning-only chunks from Slice 3E
   plus 4,645 short-text warnings from Slice 3G.
 - Handle this distribution later through a dedicated warning audit and policy
   decision task.
+
+## Slice 3I Implementation — Embedding Readiness Summary
+
+Objective: combine all completed Phase 7 checks into a stable Phase 8 gate
+decision without performing embedding or indexing.
+
+Readiness policy:
+
+- `blocked`: any authoritative error, invalid chunk, core validation failure,
+  payload failure/not-ready chunk, or payload ready rate below 1.0.
+- `ready_with_warnings`: no blockers and at least one warning.
+- `ready`: no blockers and no warnings.
+
+Populated `embedding_readiness` fields:
+
+- `embedding_ready`
+- `readiness_status`
+- `blocking_error_count`
+- `warning_count`
+- `valid_chunks`
+- `invalid_chunks`
+- `payload_ready_rate`
+- `payload_ready_chunks`
+- `payload_not_ready_chunks`
+- `blocking_categories`
+- `blocking_reasons`
+- `warning_categories`
+- `deferred_warning_followups`
+- `recommended_next_actions`
+
+Implementation files:
+
+- `src/processing/processed_jsonl_validator.py`
+- `tests/unit/processing/test_processed_jsonl_validator.py`
+- `docs/phase7_processed_chunk_validation_plan.md`
+
+The validation model was not modified because `embedding_readiness` already
+supports structured `dict[str, Any]` content. No new source module was created.
+
+Verification result:
+
+- Phase 7 model and validator tests: 164 passed.
+- Read-only full-corpus validation: 40,389 valid chunks, 0 invalid chunks,
+  0 blocking errors, payload ready rate 1.0, and 40,389 payload-ready chunks.
+- Embedding decision: `embedding_ready=true` with status
+  `ready_with_warnings`.
+- All blocking categories are zero.
+- Warning categories remain 8,206 total: 3,561 contamination warnings,
+  4,645 short-text warnings, and 0 payload warnings.
+- The 8,206 warnings remain documented deferred follow-up work and were not
+  suppressed, resolved, or reclassified.
+- Python compilation: passed.
+- Ruff lint: passed.
+- Ruff format check: passed.
+- `git diff --check`: passed.
+- Protected data and artifact paths: clean.
 
 ## Non-goals
 
@@ -569,7 +639,6 @@ Phase 7 validation slices must not:
 - modify citations or chunks;
 - parse or rechunk legal text;
 - add external legal sources or network calls;
-- implement payload or embedding-readiness checks before their approved slice;
 - implement services, CLI commands, reports on disk, embedding, indexing,
   retrieval, reranking, generation, Naive RAG, Advanced RAG, or GraphRAG.
 
@@ -599,5 +668,5 @@ here. This file is the only official Phase 7 tracking plan going forward.
 
 ## Next Action
 
-Slice 3H is complete. Slice 3I and later are not started; wait for explicit
-approval before implementing the next validation slice.
+Slice 3I is complete. Slice 3J and later are not started; wait for explicit
+approval before implementing any later slice.

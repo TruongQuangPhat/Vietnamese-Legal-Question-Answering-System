@@ -1043,6 +1043,24 @@ class ProcessedJsonlValidator:
             if payload_checked_chunks
             else 0.0,
         }
+        embedding_readiness = _build_embedding_readiness_summary(
+            errors_total=errors_total,
+            warnings_total=warnings_total,
+            valid_chunks=valid_chunks,
+            invalid_chunks=invalid_chunks,
+            jsonl_parse_failures=jsonl_parse_failures,
+            schema_failures=schema_failures,
+            required_field_failures=required_field_failures,
+            duplicate_chunk_ids=duplicate_chunk_ids,
+            hash_mismatches=hash_mismatches,
+            count_reconciliation_failures=count_reconciliation_failures,
+            citation_failures=citation_failures,
+            traceability_failures=traceability_failures,
+            contamination_failures=contamination_failures,
+            contamination_warnings=contamination_warnings,
+            text_length_summary=text_length_summary,
+            payload_readiness_summary=payload_readiness_summary,
+        )
 
         # --- Build report ---
         finished_at = datetime.now(UTC).isoformat()
@@ -1080,7 +1098,7 @@ class ProcessedJsonlValidator:
             long_parent_text_summary=long_parent_text_summary,
             repealed_metadata_summary=repealed_metadata_summary,
             payload_readiness_summary=payload_readiness_summary,
-            embedding_readiness={},
+            embedding_readiness=embedding_readiness,
             sample_failures=sample_failures,
             sample_warnings=sample_warnings,
             status="pass",
@@ -1125,6 +1143,126 @@ def _summarize_lengths(lengths: list[int]) -> dict[str, int | float]:
         "p90_chars": _percentile(0.90),
         "p95_chars": _percentile(0.95),
         "p99_chars": _percentile(0.99),
+    }
+
+
+def _build_embedding_readiness_summary(
+    *,
+    errors_total: int,
+    warnings_total: int,
+    valid_chunks: int,
+    invalid_chunks: int,
+    jsonl_parse_failures: int,
+    schema_failures: int,
+    required_field_failures: int,
+    duplicate_chunk_ids: int,
+    hash_mismatches: int,
+    count_reconciliation_failures: int,
+    citation_failures: int,
+    traceability_failures: int,
+    contamination_failures: int,
+    contamination_warnings: int,
+    text_length_summary: dict[str, Any],
+    payload_readiness_summary: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the final Phase 7 decision for proceeding to embedding."""
+    payload_ready_rate = float(payload_readiness_summary.get("ready_rate", 0.0))
+    payload_ready_chunks = int(payload_readiness_summary.get("ready_chunks", 0))
+    payload_not_ready_chunks = int(payload_readiness_summary.get("not_ready_chunks", 0))
+    payload_failure_chunks = int(payload_readiness_summary.get("payload_failure_chunks", 0))
+    payload_warning_chunks = int(payload_readiness_summary.get("payload_warning_chunks", 0))
+    short_text_warnings = int(text_length_summary.get("short_text_warning_count", 0))
+    blocking_categories = {
+        "jsonl_parse_failures": jsonl_parse_failures,
+        "schema_failures": schema_failures,
+        "required_field_failures": required_field_failures,
+        "duplicate_chunk_ids": duplicate_chunk_ids,
+        "hash_mismatches": hash_mismatches,
+        "count_reconciliation_failures": count_reconciliation_failures,
+        "citation_failures": citation_failures,
+        "traceability_failures": traceability_failures,
+        "contamination_failures": contamination_failures,
+        "payload_failure_chunks": payload_failure_chunks,
+    }
+    warning_categories = {
+        "total_warnings": warnings_total,
+        "contamination_warnings": contamination_warnings,
+        "short_text_warnings": short_text_warnings,
+        "payload_warning_chunks": payload_warning_chunks,
+    }
+    blocking_reasons = [category for category, count in blocking_categories.items() if count > 0]
+    if errors_total > 0:
+        blocking_reasons.append("errors_total")
+    if invalid_chunks > 0:
+        blocking_reasons.append("invalid_chunks")
+    if payload_not_ready_chunks > 0:
+        blocking_reasons.append("payload_not_ready_chunks")
+    if payload_ready_rate < 1.0:
+        blocking_reasons.append("payload_ready_rate")
+
+    embedding_ready = not blocking_reasons
+    if not embedding_ready:
+        readiness_status = "blocked"
+        recommended_next_actions = [
+            "Resolve all blocking validation categories before Phase 8 embedding/indexing.",
+            "Re-run Phase 7 validation after correcting source pipeline outputs.",
+            "Do not mutate processed chunks inside the readiness summary.",
+        ]
+    elif warnings_total > 0:
+        readiness_status = "ready_with_warnings"
+        recommended_next_actions = [
+            "Proceed to Phase 8 embedding/indexing only if ready_with_warnings is acceptable.",
+            "Before production indexing, review deferred warning distribution.",
+            "Do not mutate processed chunks during readiness summary.",
+        ]
+    else:
+        readiness_status = "ready"
+        recommended_next_actions = [
+            "Proceed to Phase 8 embedding/indexing.",
+            "Preserve the validated payload, text, and hash contracts.",
+            "Do not mutate processed chunks during indexing preparation.",
+        ]
+
+    deferred_warning_followups: list[dict[str, Any]] = []
+    if contamination_warnings > 0:
+        deferred_warning_followups.append(
+            {
+                "category": "contamination_warnings",
+                "count": contamination_warnings,
+                "source_slice": "3E",
+                "recommended_action": (
+                    "Run warning distribution audit by law_id, chunk_kind, field, and marker."
+                ),
+            }
+        )
+    if short_text_warnings > 0:
+        deferred_warning_followups.append(
+            {
+                "category": "short_text_warnings",
+                "count": short_text_warnings,
+                "source_slice": "3G",
+                "recommended_action": (
+                    "Audit short chunks by law_id, chunk_kind, citation, and "
+                    "repealed metadata before deciding drop/merge policy."
+                ),
+            }
+        )
+
+    return {
+        "embedding_ready": embedding_ready,
+        "readiness_status": readiness_status,
+        "blocking_error_count": errors_total,
+        "warning_count": warnings_total,
+        "valid_chunks": valid_chunks,
+        "invalid_chunks": invalid_chunks,
+        "payload_ready_rate": payload_ready_rate,
+        "payload_ready_chunks": payload_ready_chunks,
+        "payload_not_ready_chunks": payload_not_ready_chunks,
+        "blocking_categories": blocking_categories,
+        "blocking_reasons": blocking_reasons,
+        "warning_categories": warning_categories,
+        "deferred_warning_followups": deferred_warning_followups,
+        "recommended_next_actions": recommended_next_actions,
     }
 
 

@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 processed JSONL validator through Slice 3E."""
+"""Unit tests for Phase 7 processed JSONL validator through Slice 3I."""
 
 from __future__ import annotations
 
@@ -2344,12 +2344,141 @@ class TestPayloadReadiness:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3H scope: later checks are not yet implemented
+# Slice 3I: Embedding readiness summary tests
 # ---------------------------------------------------------------------------
 
 
-class TestSlice3HScope:
-    """Slice 3H audits payload readiness; final embedding checks stay neutral."""
+class TestEmbeddingReadinessSummary:
+    """Final Phase 7 readiness decision assembled from prior audit results."""
+
+    def _validate_chunk(
+        self,
+        tmp_path: Path,
+        filename: str,
+        chunk: LegalChunk,
+    ) -> ProcessedJsonlValidationReport:
+        jsonl_path = tmp_path / filename
+        _write_jsonl(jsonl_path, [chunk])
+        return ProcessedJsonlValidator(_config(jsonl_path)).validate(jsonl_path)
+
+    def test_embedding_readiness_ready_when_no_errors_or_warnings(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate_chunk(tmp_path, "embedding_ready.jsonl", _valid_chunk())
+
+        assert report.embedding_readiness["embedding_ready"] is True
+        assert report.embedding_readiness["readiness_status"] == "ready"
+        assert report.embedding_readiness["warning_count"] == 0
+
+    def test_embedding_readiness_ready_with_warnings(self, tmp_path: Path) -> None:
+        text = "Nội dung ngắn."
+        chunk = _valid_chunk(text=text, text_hash=_compute_text_hash(text))
+        report = self._validate_chunk(tmp_path, "embedding_warning.jsonl", chunk)
+
+        assert report.embedding_readiness["embedding_ready"] is True
+        assert report.embedding_readiness["readiness_status"] == "ready_with_warnings"
+        assert report.embedding_readiness["warning_count"] > 0
+
+    def test_embedding_readiness_blocked_when_error_exists(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk(text_hash="0" * 64)
+        report = self._validate_chunk(tmp_path, "embedding_blocked.jsonl", chunk)
+
+        assert report.embedding_readiness["embedding_ready"] is False
+        assert report.embedding_readiness["readiness_status"] == "blocked"
+        assert report.embedding_readiness["blocking_error_count"] > 0
+
+    def test_embedding_readiness_blocked_by_invalid_chunks(self, tmp_path: Path) -> None:
+        chunk = _valid_chunk(citation="Luật thử nghiệm")
+        report = self._validate_chunk(tmp_path, "embedding_invalid.jsonl", chunk)
+
+        assert report.invalid_chunks == 1
+        assert report.embedding_readiness["embedding_ready"] is False
+        assert "invalid_chunks" in report.embedding_readiness["blocking_reasons"]
+
+    def test_embedding_readiness_includes_payload_ready_rate(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "embedding_payload_rate.jsonl",
+            _valid_chunk(),
+        )
+
+        assert report.embedding_readiness["payload_ready_rate"] == 1.0
+        assert report.embedding_readiness["payload_ready_chunks"] == 1
+        assert report.embedding_readiness["payload_not_ready_chunks"] == 0
+
+    def test_embedding_readiness_includes_blocking_categories(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "embedding_blocking_categories.jsonl",
+            _valid_chunk(),
+        )
+
+        categories = report.embedding_readiness["blocking_categories"]
+        assert {
+            "hash_mismatches",
+            "citation_failures",
+            "traceability_failures",
+            "contamination_failures",
+            "payload_failure_chunks",
+        } <= categories.keys()
+
+    def test_embedding_readiness_includes_warning_categories(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        report = self._validate_chunk(
+            tmp_path,
+            "embedding_warning_categories.jsonl",
+            _valid_chunk(),
+        )
+
+        categories = report.embedding_readiness["warning_categories"]
+        assert {
+            "total_warnings",
+            "contamination_warnings",
+            "short_text_warnings",
+            "payload_warning_chunks",
+        } <= categories.keys()
+
+    def test_embedding_readiness_documents_deferred_warnings(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        text = "BỘ TRƯỞNG"
+        chunk = _valid_chunk(text=text, text_hash=_compute_text_hash(text))
+        report = self._validate_chunk(tmp_path, "embedding_deferred.jsonl", chunk)
+
+        followups = report.embedding_readiness["deferred_warning_followups"]
+        categories = {item["category"] for item in followups}
+        assert categories == {"contamination_warnings", "short_text_warnings"}
+
+    def test_embedding_readiness_does_not_suppress_existing_warnings(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        text = "BỘ TRƯỞNG"
+        chunk = _valid_chunk(text=text, text_hash=_compute_text_hash(text))
+        report = self._validate_chunk(tmp_path, "embedding_preserves_warnings.jsonl", chunk)
+
+        assert report.warnings_total == 2
+        assert report.status == "pass_with_warnings"
+        assert report.embedding_readiness["warning_count"] == report.warnings_total
+
+
+# ---------------------------------------------------------------------------
+# Slice 3I scope: later checks are not yet implemented
+# ---------------------------------------------------------------------------
+
+
+class TestSlice3IScope:
+    """Slice 3I summarizes readiness without starting embedding or indexing."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""
@@ -2378,8 +2507,8 @@ class TestSlice3HScope:
         assert report.traceability_failures == 0
         assert report.traceability_checks_skipped is False
 
-    def test_later_slice_fields_are_neutral(self, tmp_path: Path) -> None:
-        """Fields for later slices are set to neutral values."""
+    def test_embedding_readiness_is_ready_for_clean_chunk(self, tmp_path: Path) -> None:
+        """A clean chunk receives the final ready decision."""
         chunk = _valid_chunk(chunk_id="c1")
         jsonl_path = tmp_path / "neutral.jsonl"
         _write_jsonl(jsonl_path, [chunk])
@@ -2400,4 +2529,5 @@ class TestSlice3HScope:
         assert report.payload_readiness_summary["checked_chunks"] == 1
         assert report.payload_readiness_summary["ready_chunks"] == 1
         assert report.payload_readiness_summary["not_ready_chunks"] == 0
-        assert report.embedding_readiness == {}
+        assert report.embedding_readiness["embedding_ready"] is True
+        assert report.embedding_readiness["readiness_status"] == "ready"
