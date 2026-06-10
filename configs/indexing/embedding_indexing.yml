@@ -1,0 +1,48 @@
+schema_version: "0.1.0"
+
+input:
+  chunks_path: "data/processed/legal_chunks.jsonl"
+  validation_config_path: "configs/processing/processed_jsonl_validation.yml"
+
+embedding:
+  provider: "flagembedding"
+  model_name: "BAAI/bge-m3"
+  model_revision: null
+  device: "auto"
+  batch_size: 8
+  max_length: 8192
+  normalize_embeddings: true
+  dense_vector_name: "dense"
+  dense_dimension: null
+  dense_dimension_policy: "measure_from_model_output"
+  text_template: "text_only"
+
+sparse:
+  enabled: false
+  vector_name: "sparse"
+  provider: null
+
+qdrant:
+  url: "http://localhost:6333"
+  collection_name: "vnlaw_chunks_bgem3_v1"
+  timeout_seconds: 60
+  distance: "Cosine"
+  recreate: false
+  resume: true
+  use_deterministic_uuid: true
+  point_id_namespace: "vnlaw-qa-legal-chunks"
+
+payload:
+  schema_version: "0.1.0"
+  include_text: true
+  include_parent_text: true
+  include_warnings: true
+  include_hashes: true
+  unknown_temporal_metadata_policy: "store_null_do_not_infer"
+
+indexing:
+  batch_size: 64
+  checkpoint_path: null
+  max_retries: 3
+  retry_backoff_seconds: 2
+  report_path: "artifacts/reports/indexing/indexing_report.json"
