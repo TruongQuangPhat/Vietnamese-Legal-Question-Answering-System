@@ -1,5 +1,39 @@
 # Phase 8 Embedding and Indexing Tracker
 
+## Completion Status
+
+**Phase 8 is complete.** Slices 8A through 8H, official artifact cleanup,
+full-corpus indexing, and full index validation are complete.
+
+```text
+Collection: vnlaw_chunks_bgem3_v1_full
+Model: BAAI/bge-m3
+Dense vector: dense
+Dimension: 1024
+Distance: Cosine
+Template: text_only
+Sparse indexing: disabled
+Planned/embedded/upserted/failed: 40,389/40,389/40,389/0
+Count reconciliation: pass
+CPU runtime: approximately 7h29m
+Throughput: approximately 1.50 chunks/s
+Validated points_count: 40,389
+indexed_vectors_count: 40,012
+Sampled points: 100
+Schema/payload/vector/filter/retrieval sanity: pass
+```
+
+Official reports:
+
+```text
+artifacts/reports/indexing/20260611_bgem3_v1_full/processed_corpus_validation_summary.json
+artifacts/reports/indexing/20260611_bgem3_v1_full/indexing_report_full.json
+artifacts/reports/indexing/20260611_bgem3_v1_full/index_validation_report_full.json
+```
+
+Official report JSON uses operational metadata only. Development slice labels
+remain confined to this tracker.
+
 ## Goal
 
 Phase 8 builds a verified vector-index foundation from validated
@@ -15,6 +49,8 @@ configurable so sparse integration cannot block dense indexing.
 - Valid chunks: 40,389 across 52 laws
 - Validation errors and invalid chunks: 0
 - Accepted non-blocking warnings: 8,206
+  - Contamination warning-only chunks: 3,561
+  - Short-text warnings: 4,645
 - Payload ready rate: 1.0
 - Readiness: `embedding_ready=true`, `ready_with_warnings`
 
@@ -40,6 +76,10 @@ Phase 8 does not implement retrieval, reranking, RAG answer generation,
 GraphRAG, model fine-tuning, or legal advice. It must not invent
 `effective_date`, `expiry_date`, `status`, or `domain_tags`; unknown values
 remain null or empty until deterministic enrichment exists.
+
+Phase 8 did not implement RAG generation, a production retrieval API,
+sparse/hybrid retrieval, RRF, reranking, GraphRAG, or a full legal QA
+benchmark.
 
 ## Slicing Plan
 
@@ -754,11 +794,9 @@ git diff --check
 git status --short data/raw data/interim data/reports data/processed artifacts/reports
 ```
 
-## Next Slice
+## Handoff
 
-The next planned phase is Phase 9: the retrieval layer and Naive RAG baseline.
-That work should begin only after validating a sufficiently indexed collection,
-not solely the current 10-point dev sample. Before a production-scale
-transition, run larger controlled indexing and validation steps, reconcile
-report and Qdrant counts, and retain strict citation and evidence fallback
-requirements.
+The next planned work is Phase 9: a retrieval-first Naive RAG baseline over
+`vnlaw_chunks_bgem3_v1_full`. Start with BGE-M3 query embedding, dense top-k
+Qdrant search, payload-backed context assembly, and retrieval evaluation.
+Do not add LLM answer generation until separately scoped.

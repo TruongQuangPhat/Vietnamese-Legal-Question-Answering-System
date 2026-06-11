@@ -10,12 +10,12 @@ Use this skill for embedding legal chunks and indexing them into Qdrant.
 This skill should be used only after processed JSONL chunks already validate
 against the Phase 6 `LegalChunk` schema.
 
-Current project status: Phase 7 and Phase 7.5 are complete. The corpus has
+Current project status: Phase 8 is complete. The corpus has
 40,389 valid chunks, 0 invalid chunks, 0 hard errors, payload ready rate 1.0,
 and `embedding_ready=true` / `ready_with_warnings`. The 8,206 warnings are
-accepted quality signals and must remain visible. Phase 8 is next but has not
-started; create embedding/indexing code only under a separately scoped task
-after rerunning the official Phase 7 validator.
+accepted quality signals and remain visible. All 40,389 chunks are indexed in
+Qdrant collection `vnlaw_chunks_bgem3_v1_full` with `BAAI/bge-m3`, named
+vector `dense`, dimension 1024, cosine distance, and `text_only`.
 
 Phase 8 must preserve short chunks, distinct IDs/citations for duplicate text,
 Article `parent_text`, hierarchy IDs, hashes, source metadata, warning
@@ -27,7 +27,7 @@ Before indexing:
 uv run python scripts/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
-  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --output /tmp/processed_jsonl_validation_report.json \
   --pretty
 ```
 
@@ -164,3 +164,10 @@ After indexing, verify:
 - Do not hardcode collection settings in multiple files.
 - Do not upsert invalid `LegalChunk` records.
 - Do not lose source traceability during indexing.
+- Do not commit Qdrant storage or model caches.
+- Write official artifacts only under
+  `artifacts/reports/indexing/<run_id>/`.
+- Use `report_type`, `run_type`, and `pipeline_stage` in official reports;
+  do not expose internal phase or slice labels.
+- Treat checkpoints as runtime/resume artifacts rather than user-facing
+  reports by default.

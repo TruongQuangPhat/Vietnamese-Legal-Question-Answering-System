@@ -1,15 +1,43 @@
 # Naive RAG Baseline
 
+## Phase 8 Handoff
+
+The validated retrieval foundation is now available:
+
+```text
+Collection: vnlaw_chunks_bgem3_v1_full
+Points: 40,389
+Embedding model: BAAI/bge-m3
+Dense vector: dense
+Dimension: 1024
+Distance: Cosine
+Sparse indexing: disabled
+```
+
+The next implementation should begin with retrieval only:
+
+1. Embed Vietnamese queries with the same BGE-M3 model.
+2. Run dense top-k Qdrant search against named vector `dense`.
+3. Return payload-backed evidence using `text`, `parent_text`, citation,
+   hierarchy, law metadata, hashes, and source fields.
+4. Evaluate retrieval relevance and filtering behavior.
+5. Add LLM answer generation only when explicitly scoped after retrieval
+   quality is understood.
+
+Do not introduce sparse/hybrid retrieval, RRF, reranking, GraphRAG, or a
+production API in the first retrieval slice.
+
 ## Overview
 
-The Naive RAG phase establishes the first baseline question-answering system. It combines a single hybrid retriever with a strict generation prompt to produce Vietnamese legal answers with citations. This baseline validates that the retrieval pipeline returns relevant chunks and that the LLM can ground answers in provided context.
+The Naive RAG phase will establish the first baseline question-answering
+system. Its first slice is dense retrieval only; answer generation follows
+only after retrieval behavior is measured.
 
 Naive RAG is intentionally simple:
-- One retrieval pass (hybrid dense+sparse search)
+- One dense retrieval pass against the existing Qdrant collection
 - No reranking
 - No query decomposition
-- Strict citation enforcement
-- Clear fallback when evidence is insufficient
+- Payload-backed citation and context assembly
 
 This phase runs only after embedding & indexing is complete and validated.
 
@@ -61,7 +89,7 @@ curl -X POST "http://localhost:8000/api/v1/qa" \
 ┌──────────────────────┐
 │  Top-k               │
 │  Retrieval           │
-│  (hybrid search)     │
+│  (dense search)      │
 └──────────┬───────────┘
            │
            ▼
@@ -105,28 +133,25 @@ curl -X POST "http://localhost:8000/api/v1/qa" \
 
 **Process**:
 - Use same embedding model as indexing (e.g., BGE-M3).
-- Optionally generate sparse vector (BM25 tokenization) for hybrid retrieval.
 - Normalize dense vector (if using cosine similarity).
 
-**Output**: `query_vector` (list[float]) and optionally `query_sparse` (dict).
+**Output**: `query_vector` (list[float]).
 
 ### 2. Top-k Retrieval
 
 **Goal**: Fetch most relevant chunks from Qdrant.
 
-**Retrieval method**: Hybrid search combining dense and sparse similarity.
+**Retrieval method**: Dense cosine search using named vector `dense`.
 
 **Parameters**:
 - `k`: number of chunks to retrieve (default: 10)
-- `fusion_method`: "rrf" (Reciprocal Rank Fusion) or weighted sum
 - `metadata_filters`: optional filters (e.g., `law_id`, `effective_date` range)
 
 **Query to Qdrant**:
 ```python
 results = client.search(
-    collection_name="vnlaw_qa_chunks",
+    collection_name="vnlaw_chunks_bgem3_v1_full",
     query_vector=("dense", query_vector),
-    query_sparse_vector=query_sparse,  # if available
     limit=k,
     with_payload=True,
     with_vectors=False
@@ -282,7 +307,7 @@ I could not find a specific regulation for this issue in the current legal corpu
 uv run python scripts/run_naive_rag.py \
   --query "Quyền về đất đai của hộ gia đình?" \
   --qdrant-url http://localhost:6333 \
-  --collection-name vnlaw_qa_chunks
+  --collection-name vnlaw_chunks_bgem3_v1_full
 
 # Batch evaluation (with golden QA)
 uv run python scripts/run_naive_rag.py \

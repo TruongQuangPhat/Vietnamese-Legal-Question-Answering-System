@@ -2,33 +2,22 @@
 
 ## Overview
 
-The Embedding & Indexing phase transforms validated legal chunks into vector embeddings and builds a hybrid search index. This phase starts only after processed JSONL validation is stable and all 52 laws have passed quality gates.
+The Embedding & Indexing phase transforms validated legal chunks into vector
+embeddings and a metadata-preserving Qdrant index.
 
-Status: design handoff only. Phase 8 implementation has not started. Phase 7
-and Phase 7.5 approve a baseline with watch items; read
-`docs/phase75_llm_corpus_audit.md` and rerun the official Phase 7 validator
-before indexing.
+Status: complete and validated. All 40,389 chunks are indexed in
+`vnlaw_chunks_bgem3_v1_full` with `BAAI/bge-m3`, named dense vector `dense`,
+dimension 1024, cosine distance, and `text_only`. Sparse indexing remains
+disabled for v1.
 
-The index enables retrieval of relevant legal provisions based on semantic similarity and keyword matching. Metadata filtering supports time-aware queries and corpus subsetting.
+Official reports are under:
 
-## Quick Start
-
-**Intended CLI** (design phase, not yet implemented):
-
-```bash
-uv run python scripts/build_embedding_index.py \
-  --input data/processed/legal_chunks.jsonl \
-  --qdrant-url http://localhost:6333 \
-  --collection-name vnlaw_qa_chunks \
-  --batch-size 32
+```text
+artifacts/reports/indexing/20260611_bgem3_v1_full/
 ```
 
-**Expected workflow**:
-1. Input: `data/processed/legal_chunks.jsonl`
-2. Model: Load embedding model (e.g., BGE-M3)
-3. Process: Generate dense + sparse vectors in batches
-4. Output: Qdrant collection `vnlaw_qa_chunks` with full payload
-5. Validation: Collection size matches chunk count; hybrid search works.
+Qdrant storage and model caches are runtime state and are not Git artifacts.
+The next implementation boundary is dense retrieval, not reindexing.
 
 ## Architecture
 
@@ -150,20 +139,21 @@ must respect relevance and token budgets.
 **Goal**: Upsert vectors and payloads into Qdrant collection.
 
 **Qdrant configuration**:
-- Collection name: `vnlaw_qa_chunks`
-- Distance metric: `Cosine` (or `Dot` for normalized embeddings)
+- Collection name: `vnlaw_chunks_bgem3_v1_full`
+- Distance metric: `Cosine`
 - Vector params:
-  - `dense`: size = model dim, distance = Cosine
-  - `sparse`: indexed if using hybrid
+  - `dense`: size = 1024, distance = Cosine
+  - sparse vectors: disabled for v1
 - HNSW parameters for approximate nearest neighbor search.
 
 **Upsert strategy**:
 - Batch upserts (e.g., 100–500 points per batch).
 - Use `client.upsert(collection_name, points=batch)`.
-- Point ID = `chunk_id` (deterministic, allows idempotent re-runs).
+- Point ID = deterministic UUIDv5 derived from `chunk_id`.
 - Payload includes all metadata fields listed above.
 
-**Idempotency**: Re-running indexing with same chunks should not create duplicates; `chunk_id` as point ID ensures upsert replaces existing.
+**Idempotency**: Re-running indexing with the same chunks does not create
+duplicates because deterministic UUIDv5 IDs are derived from `chunk_id`.
 
 ### 5. Index Validator
 
@@ -188,9 +178,8 @@ must respect relevance and token budgets.
 2. Initialize embedding model (download if needed).
 3. For each chunk in streaming batches:
    - Compute dense vector via model.
-   - Compute sparse vector (BM25 on tokenized text or model output).
    - Build payload dict with all metadata.
-   - Create Qdrant `PointStruct` with `id=chunk_id`, `vector=dense`, `sparse_vector=sparse`, `payload=payload`.
+   - Create a point with UUIDv5 ID, named dense vector, and payload.
    - Append to batch.
 4. Upsert batch to Qdrant collection (create collection if not exists).
 5. Repeat until all chunks indexed.
@@ -198,22 +187,20 @@ must respect relevance and token budgets.
    - Get collection info → count check.
    - Execute test queries (with/without filters).
    - Verify sample results have expected payload fields.
-7. Write index report: `artifacts/reports/indexing/indexing_validation.json`.
+7. Write operational reports under
+   `artifacts/reports/indexing/<run_id>/`.
 
 ## Data Models / Output Schema
 
 ### Qdrant Collection Configuration
 
 ```python
-from qdrant_client.models import Distance, VectorParams, SparseVectorParams
+from qdrant_client.models import Distance, VectorParams
 
 client.create_collection(
-    collection_name="vnlaw_qa_chunks",
+    collection_name="vnlaw_chunks_bgem3_v1_full",
     vectors_config={
         "dense": VectorParams(size=1024, distance=Distance.COSINE)
-    },
-    sparse_vectors_config={
-        "sparse": SparseVectorParams()
     },
     hnsw_config=HnswConfigDiff(m=16, ef_construct=100)
 )
@@ -239,7 +226,7 @@ approved corpus registry, rather than inventing these values.
 
 ```json
 {
-  "collection_name": "vnlaw_qa_chunks",
+  "collection_name": "vnlaw_chunks_bgem3_v1_full",
   "timestamp": "2025-01-01T12:00:00Z",
   "total_chunks_processed": 15000,
   "collection_points_count": 15000,
@@ -265,7 +252,13 @@ approved corpus registry, rather than inventing these values.
 }
 ```
 
-## CLI Reference
+## Historical CLI Design
+
+The commands below are retained as design background and are not the current
+operational interface. Use `scripts/index_qdrant_chunks.py`,
+`scripts/setup_qdrant_collection.py`, and `scripts/validate_qdrant_index.py`
+for maintained workflows. Do not rerun full indexing unless explicitly
+scoped.
 
 ### Main Command
 
@@ -274,7 +267,7 @@ approved corpus registry, rather than inventing these values.
 uv run python scripts/build_embedding_index.py \
   --input-dir data/processed \
   --qdrant-url http://localhost:6333 \
-  --collection-name vnlaw_qa_chunks \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
   --model-name BAAI/bge-m3 \
   --batch-size 32
 
@@ -288,19 +281,20 @@ uv run python scripts/build_embedding_index.py \
 uv run python scripts/build_embedding_index.py \
   --validate-only \
   --qdrant-url http://localhost:6333 \
-  --collection-name vnlaw_qa_chunks
+  --collection-name vnlaw_chunks_bgem3_v1_full
 
 # Delete and recreate collection (fresh start)
 uv run python scripts/build_embedding_index.py \
   --recreate-collection \
-  --collection-name vnlaw_qa_chunks
+  --collection-name vnlaw_chunks_bgem3_v1_full
 ```
 
 **Arguments**:
 - `--input-dir`: Directory containing `{law_id}.jsonl` files (default: `data/processed`)
 - `--qdrant-url`: Qdrant server URL (default: `http://localhost:6333`)
 - `--qdrant-api-key`: API key if authentication enabled.
-- `--collection-name`: Target collection (default: `vnlaw_qa_chunks`)
+- `--collection-name`: Target collection (official v1:
+  `vnlaw_chunks_bgem3_v1_full`)
 - `--model-name`: Embedding model HuggingFace ID or local path.
 - `--batch-size`: Number of chunks per embedding batch (default: 32)
 - `--law-ids`: Specific laws to index; if omitted, all found.

@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 7.5 complete — Phase 8 handoff ready with watch items
+Current phase: Phase 8 complete — retrieval baseline is next
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -22,12 +22,13 @@ Completed:
   Phase 5 — Legal Hierarchy Parsing
   Phase 6 — Parent-child Chunking
   Phase 7 — Processed Chunk Validation & Embedding Readiness
+  Phase 7.5 — LLM-assisted corpus audit
+  Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
 
 Next:
-  Scope Phase 8 baseline embedding/indexing separately
-  Run Phase 7 validation before indexing
-  Preserve warning-aware payload and context requirements
-  Do not claim RAG-ready before retrieval/generation/evaluation pass
+  Build a dense retrieval baseline over the validated Qdrant collection
+  Evaluate query embedding, top-k search, filters, and context assembly
+  Add answer generation only when separately scoped
 ```
 
 Phase 4 is gate-ready:
@@ -98,9 +99,19 @@ Validation report:       artifacts/reports/chunking/processed_jsonl_validation_r
 ```
 
 Phase 7 warning follow-up W1-W3 and the Phase 7.5 read-only corpus audit are
-complete. The handoff decision is **Go with watch items** for a separately
-scoped Phase 8 baseline. See `docs/phase75_llm_corpus_audit.md` and
-`docs/phase7_warning_resolution_decision.md`.
+complete. Phase 8 indexed all 40,389 chunks into Qdrant collection
+`vnlaw_chunks_bgem3_v1_full` using normalized 1024-dimensional
+`BAAI/bge-m3` dense vectors, named vector `dense`, cosine distance, and the
+`text_only` template. All points were upserted successfully and full index
+validation passed for schema, payload, vectors, filters, and retrieval sanity.
+
+Official reports:
+
+```text
+artifacts/reports/indexing/20260611_bgem3_v1_full/
+```
+
+Qdrant storage and model caches are runtime state and must not be committed.
 
 ## Legal Accuracy Rules
 
@@ -109,8 +120,8 @@ scoped Phase 8 baseline. See `docs/phase75_llm_corpus_audit.md` and
 - Preserve source traceability from raw HTML to final citations.
 - Preserve legal hierarchy: `Phần / Chương / Mục / Điều / Khoản / Điểm`.
 - Do not mutate `data/raw/`; derived artifacts go under `data/interim/`,
-  `data/processed/`, while generated reports go under phase-specific
-  `artifacts/reports/<phase>/` directories.
+  `data/processed/`; official indexing reports go under
+  `artifacts/reports/indexing/<run_id>/`.
 - Do not use LLMs for deterministic legal preprocessing.
 - Do not let future QA generation invent laws, articles, clauses, points, or
   citations.
@@ -581,13 +592,13 @@ uv run ruff check .
 
 ## Official Commands
 
-Validate processed chunks for Phase 8 readiness:
+Validate processed chunks for a future controlled reindexing run:
 
 ```bash
 uv run python scripts/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
-  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --output /tmp/processed_jsonl_validation_report.json \
   --pretty
 ```
 
@@ -697,7 +708,9 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/processed_jsonl.md` | Phase 7 processed chunk validation & embedding-readiness notes |
 | `docs/phase75_llm_corpus_audit.md` | Phase 7.5 semantic corpus audit and Phase 8 guardrails |
 | `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
-| `docs/embedding_indexing.md` | Existing Phase 8 design handoff; implementation not started |
+| `docs/phase8_embedding_indexing_tracker.md` | Completed Phase 8 implementation, indexing, and validation record |
+| `docs/embedding_indexing.md` | Phase 8 design background |
+| `docs/naive_rag.md` | Retrieval-first handoff and future Naive RAG design |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries
@@ -705,8 +718,10 @@ artifacts/reports/cleaning/pattern_groups.json
 Do not do yet:
 
 - Do not modify raw or interim corpus artifacts without explicit approval.
-- Do not implement embedding/indexing before processed JSONL validation.
-- Do not implement Naive RAG, Advanced RAG, or GraphRAG yet.
+- Do not mutate `data/processed/legal_chunks.jsonl`.
+- Do not commit Qdrant storage, model caches, or other runtime state.
+- Do not implement answer generation, Advanced RAG, or GraphRAG without a
+  separately scoped task.
 - Do not mutate `data/raw/`.
 - Do not commit credentials, local provider tokens, `.env`, or machine-specific
   config.
