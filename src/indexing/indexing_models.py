@@ -485,10 +485,7 @@ class CollectionSetupResult(BaseModel):
 
 
 class IndexingReport(BaseModel):
-    """Typed report contract for planned and future Phase 8 indexing runs.
-
-    Slice 8A defines this schema only and does not write an official report.
-    """
+    """Typed report contract for planned and executed Phase 8 indexing runs."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -500,10 +497,14 @@ class IndexingReport(BaseModel):
         "running",
         "completed",
         "completed_with_warnings",
+        "dry_run",
+        "success",
+        "partial_success",
         "failed",
     ] = "planned"
     phase7_gate_status: Literal["not_run", "pass", "pass_with_warnings", "fail"] = "not_run"
     input_chunks_path: str = Field(..., min_length=1)
+    input_path: str | None = None
     input_chunk_count: int = Field(0, ge=0)
     expected_chunk_count: int = Field(0, ge=0)
     model_name: str = Field(..., min_length=1)
@@ -517,3 +518,37 @@ class IndexingReport(BaseModel):
     issues: list[IndexingIssue] = Field(default_factory=list)
     payload_completeness_rate: float = Field(0.0, ge=0.0, le=1.0)
     readiness_for_phase9: bool = False
+    text_template: EmbeddingTextTemplate = EmbeddingTextTemplate.TEXT_ONLY
+    law_id_filter: str | None = None
+    limit: int | None = Field(None, ge=0)
+    batch_size: int = Field(1, gt=0)
+    dry_run: bool = False
+    indexing_run_id: str | None = None
+    total_seen: int = Field(0, ge=0)
+    planned_count: int = Field(0, ge=0)
+    would_embed_count: int = Field(0, ge=0)
+    would_upsert_count: int = Field(0, ge=0)
+    embedded_count: int = Field(0, ge=0)
+    upserted_count: int = Field(0, ge=0)
+    failed_count: int = Field(0, ge=0)
+    skipped_count: int = Field(0, ge=0)
+    failed_chunk_ids: list[str] = Field(default_factory=list)
+    runtime_seconds: float = Field(0.0, ge=0.0)
+    throughput_chunks_per_second: float = Field(0.0, ge=0.0)
+
+
+class IndexingCheckpoint(BaseModel):
+    """Minimal resumability record written after successful indexing batches."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = Field("0.1.0", min_length=1)
+    phase: Literal["8"] = "8"
+    slice: Literal["8F"] = "8F"
+    indexing_run_id: str = Field(..., min_length=1)
+    collection_name: str = Field(..., min_length=1)
+    dense_dimension: int = Field(..., gt=0)
+    processed_chunk_ids: list[str] = Field(default_factory=list)
+    processed_count: int = Field(0, ge=0)
+    upserted_count: int = Field(0, ge=0)
+    failed_chunk_ids: list[str] = Field(default_factory=list)

@@ -50,7 +50,7 @@ remain null or empty until deterministic enrichment exists.
 | 8C | Embedding model pilot | Done | BGE-M3 loaded; 10- and 100-chunk CPU pilots passed; dense dimension 1024 |
 | 8D | Payload builder | Done | Typed payload mapping and deterministic UUIDv5 point IDs |
 | 8E | Qdrant collection setup | Done | Safe schema setup; no corpus points indexed |
-| 8F | Indexing service | Not started | Batch embed/upsert/checkpoint |
+| 8F | Indexing service | Done | Bounded dense embed/upsert, dry-run, report, checkpoint |
 | 8G | Official CLI | Not started | `build_embedding_index.py` |
 | 8H | Index validation | Not started | Count/vector/payload/filter/idempotency |
 
@@ -295,6 +295,133 @@ Slice 8E server-backed Qdrant smoke test:
 - Idempotency check: pass, existing matching collection returns already_exists
 - Mismatch protection: pass, requesting dense dimension 768 fails without recreate
 
+## Slice 8F Summary
+
+Slice 8F adds:
+
+- an async indexing service connecting the validated chunk loader, embedding
+  input mapper, BGE-M3 dense wrapper, payload builder, deterministic UUIDv5
+  point IDs, and Qdrant upsert;
+- bounded batch processing with input-order preservation and explicit
+  per-batch failure accounting;
+- dense vector count, name, order, and measured 1024-dimension validation;
+- a non-mutating dry-run path that builds embedding inputs, payloads, and
+  point IDs without loading BGE-M3 or calling Qdrant;
+- typed success, partial-success, failed, and dry-run reports;
+- optional atomic JSON checkpoints;
+- a safe CLI that requires `--limit` for real indexing unless
+  `--allow-full-corpus` is explicitly supplied;
+- protected-path rejection for experimental reports and checkpoints.
+
+The three-chunk real-corpus dry-run succeeded without loading BGE-M3 or
+contacting Qdrant:
+
+```text
+collection: vnlaw_chunks_bgem3_v1_dev
+limit: 3
+batch size: 2
+status: dry_run
+planned: 3
+embedded/upserted/failed: 0/0/0
+report: /tmp/vnlaw_phase8_8f_dry_run_report_3.json
+```
+
+A bounded real CPU smoke also succeeded using the cached BGE-M3 model:
+
+```text
+collection: vnlaw_chunks_bgem3_v1_dev
+limit: 3
+batch size: 2
+dense dimension: 1024
+status: success
+embedded/upserted/failed: 3/3/0
+runtime seconds: 157.312994
+throughput: 0.0191 chunks/s
+Qdrant points_count after smoke: 3
+report: /tmp/vnlaw_phase8_8f_indexing_report_3.json
+checkpoint: /tmp/vnlaw_phase8_8f_checkpoint_3.json
+```
+
+### Post-Index Validation
+
+The local Qdrant collection remained healthy after the tiny smoke:
+
+```text
+collection: vnlaw_chunks_bgem3_v1_dev
+status: green
+optimizer_status: ok
+points_count: 3
+vectors.dense.size: 1024
+vectors.dense.distance: Cosine
+```
+
+Payload indexes were populated for all three points:
+
+```text
+law_id
+chunk_kind
+level
+article_number
+source_domain
+metadata.is_empty_or_repealed
+metadata.is_source_unit_repealed
+```
+
+Point scrolling confirmed that persisted payloads retain the original
+`chunk_id`, legal citation and hierarchy, exact `text` and `parent_text`,
+source fields, hashes, metadata, warnings, embedding provenance, indexing run
+ID, and nullable temporal/status/domain fields. Vector scrolling confirmed
+that each point contains the named `vector.dense` data.
+
+A payload filter for `law_id = BLDS_2015` returned matching points. This
+confirms that legal traceability fields survived indexing and that the
+configured payload filtering works.
+
+`points_count = 3` is expected for this tiny smoke. Qdrant may report
+`indexed_vectors_count = 0` for very small collections because it may not
+build a full vector index below its optimization/indexing threshold. For this
+smoke, `points_count`, persisted named vectors, and payload/filter validation
+are the relevant checks.
+
+No full-corpus indexing was performed. Protected corpus and official report
+paths were unchanged. The low three-chunk throughput includes model startup
+and is not a reliable full-corpus estimate; rerun a larger benchmark before
+an operational indexing run.
+
+### Slice 8F Verification
+
+Final verification passed:
+
+```text
+Phase 7 gate: pass_with_warnings
+Phase 7 errors/invalid chunks: 0/0
+Phase 7 payload readiness: 1.0
+Indexing tests: 107 passed
+Processing tests: 351 passed
+Python compilation: passed
+Ruff lint and format check: passed
+uv lock --check: passed
+git diff --check: passed
+Protected paths: unchanged
+```
+
+Intermediate environment and formatting failures were corrected before the
+final checks. They included a missing `python` command, restricted uv cache
+access, initial pytest import failures for `src` and `scripts`, sandboxed curl
+access to local Qdrant, and one Ruff formatting correction.
+
+### Known Limitations
+
+- No retrieval service or query embedding CLI exists.
+- Sparse indexing remains unimplemented and disabled.
+- Failed batches are reported, but automatic retries are not implemented.
+- Checkpoints record progress but cannot resume a run yet.
+- The indexing service does not create or recreate collections.
+- No official production indexing report was generated.
+- The CLI does not ingest the Phase 7 report directly, so run reports
+  conservatively record the gate status as `not_run`.
+- No full-corpus indexing was performed.
+
 ## Verification
 
 ```bash
@@ -305,28 +432,31 @@ uv run python scripts/validate_processed_jsonl.py \
   --pretty
 uv run python -m py_compile src/indexing/indexing_models.py src/indexing/chunk_loader.py \
   src/indexing/embedding_model.py src/indexing/payload_builder.py \
-  src/indexing/qdrant_collection.py scripts/pilot_bge_m3_embeddings.py \
-  scripts/setup_qdrant_collection.py
+  src/indexing/qdrant_collection.py src/indexing/indexing_service.py \
+  scripts/setup_qdrant_collection.py scripts/index_qdrant_chunks.py
 uv run pytest tests/unit/indexing/test_indexing_models.py \
   tests/unit/indexing/test_chunk_loader.py \
   tests/unit/indexing/test_embedding_model.py \
   tests/unit/indexing/test_payload_builder.py \
-  tests/unit/indexing/test_qdrant_collection.py -q
+  tests/unit/indexing/test_qdrant_collection.py \
+  tests/unit/indexing/test_indexing_service.py -q
 uv run pytest tests/unit/processing -q
 uv run ruff check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
   src/indexing/embedding_model.py src/indexing/payload_builder.py \
-  src/indexing/qdrant_collection.py scripts/pilot_bge_m3_embeddings.py \
-  scripts/setup_qdrant_collection.py \
+  src/indexing/qdrant_collection.py src/indexing/indexing_service.py \
+  scripts/setup_qdrant_collection.py scripts/index_qdrant_chunks.py \
   tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py \
   tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py \
-  tests/unit/indexing/test_qdrant_collection.py
+  tests/unit/indexing/test_qdrant_collection.py \
+  tests/unit/indexing/test_indexing_service.py
 uv run ruff format --check src/indexing/indexing_models.py src/indexing/chunk_loader.py \
   src/indexing/embedding_model.py src/indexing/payload_builder.py \
-  src/indexing/qdrant_collection.py scripts/pilot_bge_m3_embeddings.py \
-  scripts/setup_qdrant_collection.py \
+  src/indexing/qdrant_collection.py src/indexing/indexing_service.py \
+  scripts/setup_qdrant_collection.py scripts/index_qdrant_chunks.py \
   tests/unit/indexing/test_indexing_models.py tests/unit/indexing/test_chunk_loader.py \
   tests/unit/indexing/test_embedding_model.py tests/unit/indexing/test_payload_builder.py \
-  tests/unit/indexing/test_qdrant_collection.py
+  tests/unit/indexing/test_qdrant_collection.py \
+  tests/unit/indexing/test_indexing_service.py
 uv lock --check
 git diff --check
 git status --short data/raw data/interim data/reports data/processed artifacts/reports
@@ -334,9 +464,17 @@ git status --short data/raw data/interim data/reports data/processed artifacts/r
 
 ## Next Slice
 
-Slice 8F should implement the separately scoped indexing service with bounded
-batches, deterministic point IDs, payload preservation, retries, and
-checkpointing.
+Slice 8G should implement operational CLI hardening, retries, resumability,
+and Phase 7 gate integration:
 
-Before full indexing in Slice 8F, rerun a larger pilot or benchmark to estimate
+- resume from a validated checkpoint;
+- apply a bounded retry policy to failed batches;
+- ingest and enforce a fresh Phase 7 gate report;
+- record stronger run and environment metadata;
+- document a safe operational runbook;
+- verify idempotent reruns using deterministic point IDs;
+- run controlled limits of 10, 100, then 1,000 before considering full corpus;
+- reconcile report counts with Qdrant point counts.
+
+Before any full indexing run, rerun a larger pilot or benchmark to estimate
 full-corpus CPU runtime and determine a safe batch size.
