@@ -179,6 +179,9 @@ class IndexingService:
         chunks: Iterable[LegalChunk],
         *,
         input_path: str,
+        report_type: str = "indexing_report",
+        run_type: str = "development_indexing",
+        pipeline_stage: str = "embedding_indexing",
         text_template: EmbeddingTextTemplate | str = EmbeddingTextTemplate.TEXT_ONLY,
         law_id: str | None = None,
         limit: int | None = None,
@@ -350,6 +353,9 @@ class IndexingService:
         runtime_seconds = time.perf_counter() - started
         return self._build_report(
             input_path=input_path,
+            report_type=report_type,
+            run_type=run_type,
+            pipeline_stage=pipeline_stage,
             template=template,
             law_id=law_id,
             limit=limit,
@@ -689,6 +695,9 @@ class IndexingService:
         self,
         *,
         input_path: str,
+        report_type: str,
+        run_type: str,
+        pipeline_stage: str,
         template: EmbeddingTextTemplate,
         law_id: str | None,
         limit: int | None,
@@ -722,7 +731,9 @@ class IndexingService:
         )
         return IndexingReport(
             schema_version="0.1.0",
-            slice="8G",
+            report_type=report_type,
+            run_type=run_type,
+            pipeline_stage=pipeline_stage,
             status=status,
             processed_validation_status=processed_validation.status,
             processed_validation_report_path=processed_validation.report_path,

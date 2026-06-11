@@ -500,13 +500,14 @@ class CollectionSetupResult(BaseModel):
 
 
 class IndexingReport(BaseModel):
-    """Typed report contract for planned and executed Phase 8 indexing runs."""
+    """Typed operational report for planned and executed indexing runs."""
 
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field(..., min_length=1)
-    phase: Literal["8"] = "8"
-    slice: str = Field(..., min_length=1)
+    report_type: Literal["indexing_report"] = "indexing_report"
+    run_type: str = Field("development_indexing", min_length=1)
+    pipeline_stage: Literal["embedding_indexing"] = "embedding_indexing"
     status: Literal[
         "planned",
         "running",
@@ -772,13 +773,14 @@ class RetrievalSanityResult(BaseModel):
 
 
 class IndexValidationReport(BaseModel):
-    """Typed read-only validation report for Phase 8 Slice 8H."""
+    """Typed operational report for read-only index validation."""
 
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field("0.1.0", min_length=1)
-    phase: Literal["8"] = "8"
-    slice: Literal["8H"] = "8H"
+    report_type: Literal["index_validation_report"] = "index_validation_report"
+    run_type: str = Field("development_index_validation", min_length=1)
+    pipeline_stage: Literal["index_validation"] = "index_validation"
     status: Literal["success", "warning", "failed"]
     collection_name: str = Field(..., min_length=1)
     dense_vector_name: str = Field(..., min_length=1)

@@ -437,6 +437,63 @@ def test_cli_rejects_protected_paths(kind: str) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("output_path", "checkpoint_path"),
+    [
+        (
+            Path("artifacts/reports/indexing/20260611_bgem3_v1_full/indexing_report_1000.json"),
+            None,
+        ),
+        (
+            Path("/tmp/report.json"),
+            Path("artifacts/reports/indexing/20260611_bgem3_v1_full/checkpoint_1000.json"),
+        ),
+    ],
+)
+def test_cli_allows_official_indexing_run_artifacts(
+    output_path: Path,
+    checkpoint_path: Path | None,
+) -> None:
+    """Reports and checkpoints may live in one named official run directory."""
+    validate_cli_arguments(
+        output_path=output_path,
+        checkpoint_path=checkpoint_path,
+        limit=1000,
+        batch_size=4,
+        dry_run=False,
+        allow_full_corpus=False,
+        resume=False,
+        max_retries=0,
+        retry_backoff_seconds=0,
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        Path("artifacts/reports/random.json"),
+        Path("artifacts/reports/indexing/report.json"),
+        Path("artifacts/reports/chunking/indexing_report.json"),
+        Path("artifacts/reports/evaluation/indexing_report.json"),
+        Path("artifacts/reports/indexing/20260611_bgem3_v1_full/nested/indexing_report.json"),
+    ],
+)
+def test_cli_rejects_unrelated_report_artifact_paths(path: Path) -> None:
+    """The indexing allowlist does not open other report trees or layouts."""
+    with pytest.raises(ValueError, match="protected"):
+        validate_cli_arguments(
+            output_path=path,
+            checkpoint_path=None,
+            limit=3,
+            batch_size=2,
+            dry_run=False,
+            allow_full_corpus=False,
+            resume=False,
+            max_retries=0,
+            retry_backoff_seconds=0,
+        )
+
+
 def test_cli_requires_limit_for_real_indexing() -> None:
     """Unbounded real indexing requires an explicit operational override."""
     with pytest.raises(ValueError, match="requires --limit"):
@@ -746,6 +803,28 @@ async def test_no_processed_validation_report_records_not_run() -> None:
 def test_report_contract_has_no_ambiguous_phase7_fields() -> None:
     """Operational report fields use processed-validation-specific naming."""
     assert not any(name.startswith("phase7_") for name in IndexingReport.model_fields)
+
+
+@pytest.mark.asyncio
+async def test_official_indexing_report_uses_only_operational_metadata() -> None:
+    """Official reports contain operational labels without development slices."""
+    report = await _service().index_chunks(
+        [_chunk()],
+        input_path="data/processed/legal_chunks.jsonl",
+        report_type="indexing_report",
+        run_type="official_full_indexing",
+        pipeline_stage="embedding_indexing",
+        dry_run=True,
+    )
+
+    payload = report.model_dump(mode="json")
+    serialized = json.dumps(payload)
+    assert payload["report_type"] == "indexing_report"
+    assert payload["run_type"] == "official_full_indexing"
+    assert payload["pipeline_stage"] == "embedding_indexing"
+    assert "phase" not in payload
+    assert "slice" not in payload
+    assert all(label not in serialized for label in ("8F", "8G", "8H"))
 
 
 @pytest.mark.asyncio

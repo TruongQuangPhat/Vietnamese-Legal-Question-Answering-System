@@ -39,13 +39,14 @@ EXIT_FAILURE = 1
 DEFAULT_OUTPUT = Path("/tmp/vnlaw_phase8_8g_indexing_report.json")
 DEFAULT_DRY_RUN_LIMIT = 100
 MEASURED_BGE_M3_DIMENSION = 1024
-PROTECTED_PATHS = (
+PROTECTED_CORPUS_PATHS = (
     REPO_ROOT / "data/raw",
     REPO_ROOT / "data/interim",
     REPO_ROOT / "data/reports",
     REPO_ROOT / "data/processed",
-    REPO_ROOT / "artifacts/reports",
 )
+REPORTS_ROOT = REPO_ROOT / "artifacts/reports"
+OFFICIAL_INDEXING_REPORTS_ROOT = REPORTS_ROOT / "indexing"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -139,6 +140,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_OUTPUT,
         help="Experimental JSON report path.",
     )
+    parser.add_argument(
+        "--report-type",
+        choices=["indexing_report"],
+        default="indexing_report",
+        help="Operational report contract identifier.",
+    )
+    parser.add_argument(
+        "--run-type",
+        default="development_indexing",
+        help="Operational run classification.",
+    )
+    parser.add_argument(
+        "--pipeline-stage",
+        choices=["embedding_indexing"],
+        default="embedding_indexing",
+        help="Operational pipeline stage.",
+    )
     parser.add_argument("--quiet", action="store_true", help="Suppress completion summary.")
     return parser
 
@@ -229,6 +247,9 @@ async def run_indexing(argv: list[str] | None = None) -> int:
         report = await service.index_chunks(
             iter_legal_chunks(args.input),
             input_path=str(args.input),
+            report_type=args.report_type,
+            run_type=args.run_type,
+            pipeline_stage=args.pipeline_stage,
             text_template=template,
             law_id=args.law_id,
             limit=limit,
@@ -385,10 +406,29 @@ def validate_cli_arguments(
 
 
 def is_protected_output(path: Path) -> bool:
-    """Return whether a path is inside a protected repository tree."""
+    """Return whether a path violates corpus or report artifact boundaries."""
     resolved = path.expanduser().resolve()
-    return any(
-        resolved == protected or protected in resolved.parents for protected in PROTECTED_PATHS
+    if any(
+        resolved == protected or protected in resolved.parents
+        for protected in PROTECTED_CORPUS_PATHS
+    ):
+        return True
+    if resolved == REPORTS_ROOT or REPORTS_ROOT in resolved.parents:
+        return not is_allowed_official_indexing_artifact(resolved)
+    return False
+
+
+def is_allowed_official_indexing_artifact(path: Path) -> bool:
+    """Allow one file directly below a named official indexing run directory."""
+    resolved = path.expanduser().resolve()
+    try:
+        relative = resolved.relative_to(OFFICIAL_INDEXING_REPORTS_ROOT)
+    except ValueError:
+        return False
+    return (
+        len(relative.parts) == 2
+        and relative.parts[0] not in {"", ".", ".."}
+        and relative.parts[1] not in {"", ".", ".."}
     )
 
 

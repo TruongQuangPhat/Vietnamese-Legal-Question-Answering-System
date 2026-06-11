@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -538,6 +539,75 @@ def test_cli_rejects_protected_output() -> None:
             sample_limit=10,
             top_k=3,
         )
+
+
+def test_cli_allows_official_index_validation_artifact() -> None:
+    """Validation reports may use a named official indexing run directory."""
+    validate_cli_arguments(
+        output_path=Path(
+            "artifacts/reports/indexing/20260611_bgem3_v1_full/index_validation_report_1000.json"
+        ),
+        dense_dimension=1024,
+        expected_min_points=1,
+        sample_limit=10,
+        top_k=3,
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        Path("artifacts/reports/random.json"),
+        Path("artifacts/reports/indexing/index_validation_report.json"),
+        Path("artifacts/reports/chunking/index_validation_report.json"),
+        Path("artifacts/reports/evaluation/index_validation_report.json"),
+        Path(
+            "artifacts/reports/indexing/20260611_bgem3_v1_full/nested/index_validation_report.json"
+        ),
+        Path("data/processed/index_validation_report.json"),
+    ],
+)
+def test_cli_rejects_unrelated_or_protected_validation_paths(path: Path) -> None:
+    """The validation allowlist remains narrow and excludes corpus paths."""
+    with pytest.raises(ValueError, match="protected"):
+        validate_cli_arguments(
+            output_path=path,
+            dense_dimension=1024,
+            expected_min_points=1,
+            sample_limit=10,
+            top_k=3,
+        )
+
+
+@pytest.mark.asyncio
+async def test_official_validation_report_uses_only_operational_metadata() -> None:
+    """Official validation reports contain no development phase or slice labels."""
+    report = await validate_index(
+        FakeQdrantClient(),
+        report_type="index_validation_report",
+        run_type="official_full_index_validation",
+        pipeline_stage="index_validation",
+        collection_name="dev",
+        dense_vector_name="dense",
+        dense_dimension=1024,
+        expected_distance="Cosine",
+        expected_min_points=1,
+        sample_limit=1,
+        filters=[PayloadFilterCheck(name="law", field_name="law_id", match_value="BLDS_2015")],
+        queries=[],
+        top_k=3,
+        check_vectors=True,
+        embedding_model=None,
+    )
+
+    payload = report.model_dump(mode="json")
+    serialized = json.dumps(payload)
+    assert payload["report_type"] == "index_validation_report"
+    assert payload["run_type"] == "official_full_index_validation"
+    assert payload["pipeline_stage"] == "index_validation"
+    assert "phase" not in payload
+    assert "slice" not in payload
+    assert all(label not in serialized for label in ("8F", "8G", "8H"))
 
 
 @pytest.mark.asyncio

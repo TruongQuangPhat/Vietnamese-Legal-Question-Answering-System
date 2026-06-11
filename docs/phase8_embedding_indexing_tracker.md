@@ -634,6 +634,49 @@ Protected paths: unchanged
 - CUDA acceleration remains unavailable in the current environment; CPU is
   the validated path.
 
+## Official Indexing Artifact Policy
+
+Official full-run indexing artifacts may be written only beneath a named run
+directory:
+
+```text
+artifacts/reports/indexing/<run_id>/
+```
+
+This allowlist covers processed-validation reports, indexing reports,
+checkpoints, and index-validation reports for the same operational run.
+Indexing CLIs still reject corpus paths and any report path outside that
+layout, including files directly under `artifacts/reports/` or
+`artifacts/reports/indexing/`, and paths under the chunking or evaluation
+report trees.
+
+Official indexing reports use operational metadata:
+
+```json
+{
+  "schema_version": "0.1.0",
+  "report_type": "indexing_report",
+  "run_type": "official_full_indexing",
+  "pipeline_stage": "embedding_indexing"
+}
+```
+
+Official index-validation reports use:
+
+```json
+{
+  "schema_version": "0.1.0",
+  "report_type": "index_validation_report",
+  "run_type": "official_full_index_validation",
+  "pipeline_stage": "index_validation"
+}
+```
+
+Development milestone labels are intentionally excluded from these report
+contracts. The indexing and validation CLIs expose `--report-type`,
+`--run-type`, and `--pipeline-stage`; smoke/dev defaults remain operationally
+distinct from the official full-run values.
+
 ## Verification
 
 ```bash

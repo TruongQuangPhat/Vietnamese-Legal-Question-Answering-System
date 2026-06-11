@@ -514,6 +514,9 @@ async def run_retrieval_sanity_checks(
 async def validate_index(
     client: IndexValidationClient,
     *,
+    report_type: str = "index_validation_report",
+    run_type: str = "development_index_validation",
+    pipeline_stage: str = "index_validation",
     collection_name: str,
     dense_vector_name: str,
     dense_dimension: int,
@@ -582,6 +585,9 @@ async def validate_index(
         *retrieval.issues,
     ]
     return IndexValidationReport(
+        report_type=report_type,
+        run_type=run_type,
+        pipeline_stage=pipeline_stage,
         status=report_status,
         collection_name=collection_name,
         dense_vector_name=dense_vector_name,

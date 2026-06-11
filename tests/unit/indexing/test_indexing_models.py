@@ -263,7 +263,6 @@ class TestIndexingReport:
     def test_represents_planned_not_yet_run_report(self) -> None:
         report = IndexingReport(
             schema_version="0.1.0",
-            slice="8A",
             status="planned",
             processed_validation_status="pass_with_warnings",
             processed_validation_errors_total=0,
