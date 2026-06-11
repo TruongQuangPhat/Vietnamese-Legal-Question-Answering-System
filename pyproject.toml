@@ -29,6 +29,12 @@ dev = [
     "pytest-cov>=4.1.0",
     "respx>=0.21.0",
 ]
+embedding = [
+    "flagembedding==1.4.0",
+]
+qdrant = [
+    "qdrant-client>=1.18.0",
+]
 
 
 [build-system]

@@ -80,7 +80,7 @@ The project roadmap is:
 Current project state:
 
 ```text
-Phases 0-7.5 are complete.
+Phases 0-8 are complete.
 Phase 5 Legal Hierarchy Parsing is complete and hardened:
   52 hierarchy.json outputs
   0 parser failures
@@ -110,25 +110,32 @@ Phase 7 Processed Chunk Validation is complete:
 Warning follow-up W1-W3 is closed.
 Phase 7.5 read-only corpus audit is complete:
   decision: Go with watch items
+Phase 8 BGE-M3 embedding and Qdrant indexing is complete:
+  collection: vnlaw_chunks_bgem3_v1_full
+  points: 40,389
+  dense vector: dense, dimension 1024, Cosine
+  full indexing failures: 0
+  full index validation: pass
 
-Next phase, only when separately scoped:
-  Phase 8 — Baseline Embedding & Indexing
+Next work, only when separately scoped:
+  Phase 9 — Retrieval layer / Naive RAG baseline
 ```
 
 Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker
-exists. Before Phase 8 indexing, run the official Phase 7 validator. Do not
-start embedding, indexing, retrieval, RAG, Advanced RAG, GraphRAG, API, or
-deployment unless the task explicitly scopes that phase.
+exists. Do not start retrieval, RAG, Advanced RAG, GraphRAG, API, or deployment
+unless the task explicitly scopes that work.
 
-Phase 8 guardrails:
+Index and retrieval guardrails:
 
 - preserve original `text`, `parent_text`, IDs, citations, hierarchy, hashes,
   source metadata, warning visibility, and repeal flags;
 - do not drop short chunks or remove authority phrases lexically;
 - distinguish child text from parent Article context;
-- stop if Phase 7 reports hard errors or `embedding_ready=false`;
-- read `docs/phase75_llm_corpus_audit.md` and
-  `docs/phase7_warning_resolution_decision.md` before implementation.
+- do not mutate `data/processed/legal_chunks.jsonl`;
+- do not commit Qdrant storage or model caches;
+- store official indexing artifacts under
+  `artifacts/reports/indexing/<run_id>/`;
+- use operational report metadata and exclude development phase/slice labels.
 
 ## 4. Expected Repository Layout
 
@@ -278,7 +285,7 @@ The validated Phase 6 corpus is a single JSONL file:
 data/processed/legal_chunks.jsonl
 ```
 
-Future embedding/indexing should embed `text` only and keep `parent_text` as
+Embedding/indexing uses `text` only and keeps `parent_text` as
 Article context payload for retrieval/generation. Some Article parent contexts
 are very long; do not split them with arbitrary character or token windows.
 
@@ -288,7 +295,7 @@ Run the Phase 7 gate before indexing:
 uv run python scripts/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
-  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --output /tmp/processed_jsonl_validation_report.json \
   --pretty
 ```
 

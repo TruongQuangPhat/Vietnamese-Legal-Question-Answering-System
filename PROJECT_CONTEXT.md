@@ -98,9 +98,41 @@ Corpus Registry
 - Warning follow-up W1-W3 is closed. Warnings remain visible and were not
   resolved, suppressed, or reclassified.
 - **Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh is complete.**
-- Phase 7.5 result: **Go with watch items** for a separately scoped Phase 8
-  baseline. No corpus blocker was found.
-- Embedding, indexing, retrieval, and RAG have not started.
+- Phase 7.5 result: **Go with watch items**. No corpus blocker was found.
+- **Phase 8 — Embedding & Indexing is complete and validated.**
+- All 40,389 chunks were embedded with `BAAI/bge-m3` and upserted into
+  Qdrant collection `vnlaw_chunks_bgem3_v1_full`.
+- Dense schema: named vector `dense`, dimension 1024, cosine distance;
+  sparse indexing is disabled for v1.
+- Full indexing completed with 40,389 planned/embedded/upserted and 0 failed
+  chunks. Count reconciliation passed.
+- Full validation passed for collection schema, sampled payloads, stored
+  vectors, payload filters, and bounded retrieval sanity checks.
+- Official reports:
+  `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
+- Retrieval services and RAG answer generation have not started.
+
+### Current State
+
+- The processed corpus is validated and embedding-ready with accepted,
+  non-blocking warnings.
+- BGE-M3 dense embeddings are indexed in
+  `vnlaw_chunks_bgem3_v1_full`.
+- Official full indexing and validation reports are under
+  `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
+- The next major work is retrieval and the Naive RAG baseline.
+
+Operational rules:
+
+- Do not mutate `data/processed/legal_chunks.jsonl`.
+- Do not mutate `data/raw`, `data/interim`, `data/reports`, or
+  `data/processed` unless explicitly requested.
+- Do not commit Qdrant storage or model caches.
+- Use `artifacts/reports/indexing/<run_id>/` for official indexing artifacts.
+- Official report JSON uses operational metadata and must not expose internal
+  phase/slice labels.
+- Checkpoints are runtime/resume artifacts, not user-facing reports by
+  default.
 
 ## 4. Implemented Phases
 
@@ -215,6 +247,7 @@ Completed phases:
 Phase 6 — Parent-child Chunking
 Phase 7 — Processed Chunk Validation & Embedding Readiness
 Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh
+Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
 ```
 
 Validated inputs and reports:
@@ -225,26 +258,25 @@ artifacts/reports/chunking/chunking_report.json
 artifacts/reports/chunking/processed_jsonl_validation_report.json
 ```
 
-Current next phase:
+Current next work:
 
 ```text
-Phase 8 — Baseline Embedding & Indexing
+Phase 9 — Retrieval layer / Naive RAG baseline
 ```
 
-Phase 8 must be separately scoped. Before any indexing run, execute the
-official Phase 7 validator. Embed only `text`; preserve `parent_text` as
-traceable Article context and retain citation, hierarchy IDs, hashes, source
-metadata, warnings, and repeal flags.
+Start with BGE-M3 query embedding and dense top-k search against
+`vnlaw_chunks_bgem3_v1_full`. Assemble retrieval context from `text`,
+`parent_text`, citations, hierarchy, and law/source metadata. Validate
+retrieval behavior before adding LLM answer generation.
 
 ## 6. Next Immediate Tasks
 
-1. Scope Phase 8 baseline embedding/indexing as a separate task.
-2. Run Phase 7 validation before indexing and block if hard errors appear.
-3. Define the payload contract, including `parent_text`, warning metadata,
-   repeal flags, and deterministic legal-status/effective-date enrichment.
-4. Preserve short chunks and distinct citations for duplicate legal text.
-5. Do not claim RAG readiness until retrieval, generation, and evaluation
-   gates are implemented and validated.
+1. Build a typed dense retrieval service over `vnlaw_chunks_bgem3_v1_full`.
+2. Embed queries with the same BGE-M3 model and search named vector `dense`.
+3. Preserve citation and legal traceability in retrieval results and context.
+4. Evaluate retrieval sanity and relevance before adding generation.
+5. Keep sparse/hybrid retrieval, reranking, and answer generation separately
+   scoped.
 
 ## 7. Upcoming Phases
 
@@ -253,8 +285,8 @@ metadata, warnings, and repeal flags.
 | 6 | Parent-child Chunking | **Complete / Validated** |
 | 7 | Processed Chunk Validation & Embedding Readiness | **Complete** |
 | 7.5 | LLM-Assisted Corpus Audit & Context Refresh | **Complete / Go with watch items** |
-| 8 | Embedding & Indexing | **Next / Not started** |
-| 9 | Naive RAG | Future |
+| 8 | Embedding & Indexing | **Complete / Validated** |
+| 9 | Retrieval / Naive RAG | **Next / Not started** |
 | 10 | Advanced RAG | Future |
 | 11 | GraphRAG & Agents | Future |
 | 12 | Evaluation | Future |
@@ -265,12 +297,10 @@ metadata, warnings, and repeal flags.
 
 - Do not modify Phase 6 generated artifacts unless rerunning the official
   chunking command intentionally.
-- Do not implement embedding/indexing without a separately scoped Phase 8 task.
-- Do not index if a fresh Phase 7 run has hard errors or
-  `embedding_ready=false`.
-- Do not drop short chunks, remove authority phrases lexically, or discard
-  `parent_text`, citation, hierarchy, hashes, source metadata, or repeal flags.
-- Do not implement Naive RAG yet.
+- Do not mutate `data/processed/legal_chunks.jsonl`.
+- Do not commit Qdrant storage or the Hugging Face/model cache.
+- Do not modify the validated collection unless explicitly scoped.
+- Do not add LLM answer generation before retrieval evaluation is complete.
 - Do not implement Advanced RAG yet.
 - Do not implement GraphRAG or agents yet.
 - Do not build UI or API yet.
@@ -285,7 +315,7 @@ configs/laws/corpus_registry.yml
 data/raw/
 data/interim/
 data/processed/
-artifacts/reports/<phase>/
+artifacts/reports/indexing/<run_id>/
 src/core/
 src/ingestion/
 src/processing/
@@ -404,8 +434,8 @@ feature/raw-corpus-audit        done
 feature/cleaning-normalization  done
 feature/legal-parser-chunking   done
 feature/processed-jsonl         done
-feature/embedding-indexing      next / separately scoped
-feature/naive-rag               future
+feature/embedding-indexing      done
+feature/naive-rag               next / separately scoped
 feature/advanced-rag            future
 feature/graphrag-agents         future
 feature/evaluation              future

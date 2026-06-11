@@ -9,14 +9,15 @@ Use this skill to orient major work in the repository.
 
 This skill defines the mission, architecture direction, trusted corpus policy, and implementation priority.
 
-Current project status: Phases 0-7.5 are complete. Phase 7 validated all
+Current project status: Phases 0-8 are complete. Phase 7 validated all
 40,389 chunks with 0 invalid chunks, 0 hard errors, payload ready rate 1.0,
 and `embedding_ready=true` / `ready_with_warnings`. Its 8,206 warnings are
 accepted non-blocking quality signals under the closed W1-W3 decision.
 Phase 7.5 completed a read-only semantic corpus audit with a **Go with watch
-items** decision. Phase 8 baseline embedding/indexing is next but must be
-separately scoped and must rerun the Phase 7 gate before indexing. Retrieval,
-RAG, Advanced RAG, and GraphRAG have not started.
+items** decision. Phase 8 indexed all 40,389 chunks into Qdrant collection
+`vnlaw_chunks_bgem3_v1_full` with BGE-M3 1024-dimensional dense vectors and
+validated schema, payload, vectors, filters, and retrieval sanity. Retrieval
+services, RAG, Advanced RAG, and GraphRAG have not started.
 
 ## Mission
 
@@ -101,7 +102,8 @@ safety gates
 
 ## Core Architecture Decisions
 
-- Use Qdrant for dense/sparse vector search.
+- Use the existing Qdrant collection `vnlaw_chunks_bgem3_v1_full` for the
+  first dense retrieval baseline.
 - Use Neo4j for cross-reference and legal graph traversal.
 - Use parent-child chunking: index Clause/Point-level child nodes, provide Article-level parent context to the LLM.
 - Use BGE-M3-style dense+sparse embeddings where appropriate.
@@ -109,6 +111,15 @@ safety gates
 - Use RAGAS plus legal-specific metrics for evaluation.
 - Use FastAPI for API serving.
 - Use Pydantic V2 for schemas and configuration.
+
+## Operational Artifact Rules
+
+- Official indexing artifacts belong under
+  `artifacts/reports/indexing/<run_id>/`.
+- Official report metadata uses `report_type`, `run_type`, and
+  `pipeline_stage`, without internal development phase/slice labels.
+- Qdrant storage and model caches are runtime state and must not be committed.
+- Checkpoints are resume artifacts, not user-facing reports by default.
 
 ## Trusted Corpus Rule
 

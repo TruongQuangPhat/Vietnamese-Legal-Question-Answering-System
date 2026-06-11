@@ -11,7 +11,7 @@ This refresh supersedes older phase-status statements in the preserved mirror:
   8,206 accepted non-blocking warnings, payload ready rate 1.0, and
   `embedding_ready=true` / `ready_with_warnings`.
 - Phase 7.5 read-only corpus audit is complete with **Go with watch items**.
-- Phase 8 is next but not started and must be separately scoped.
+- Phase 8 is complete and validated; retrieval is the next scoped work.
 - Before indexing, run the official Phase 7 validator and read
   `docs/phase75_llm_corpus_audit.md`.
 - Preserve short chunks, authority phrases, parent context, IDs, citations,
@@ -105,8 +105,11 @@ Corpus Registry → Registry-driven Crawling → Raw Corpus Audit → Cleaning /
 - Phase 6 hardening result: 0 source-tail markers in chunk `text`, 0
   source-tail markers in `parent_text`, 180 empty/repealed chunks flagged, and
   max `parent_text` length reduced to 14,481 characters.
-- The next engineering phase is **Phase 7 — Processed Chunk Validation & Embedding Readiness /
-  embedding-readiness checks** over `data/processed/legal_chunks.jsonl`.
+- Phase 7 and Phase 7.5 are complete with 40,389 valid chunks, 0 invalid
+  chunks, 0 errors, 8,206 accepted warnings, and payload readiness 1.0.
+- Phase 8 is complete: all 40,389 chunks are indexed in Qdrant collection
+  `vnlaw_chunks_bgem3_v1_full` with BGE-M3 dense vectors (`dense`, 1024,
+  Cosine), 0 failed chunks, and passing full index validation.
 
 ## 4. Implemented Phases
 
@@ -221,36 +224,34 @@ Key requirements:
 Current next phase:
 
 ```text
-Phase 7 — Processed Chunk Validation & Embedding Readiness / embedding-readiness checks
+Phase 9 — Retrieval layer / Naive RAG baseline
 ```
 
 ## 6. Next Immediate Tasks
 
-1. Scope Phase 8 baseline embedding/indexing separately.
-2. Rerun Phase 7 before indexing and stop on hard errors.
-3. Preserve warning-aware payload, parent context, and legal traceability.
-4. Do not claim RAG readiness until retrieval, generation, and evaluation
-   gates are implemented and validated.
+1. Build BGE-M3 query embedding and dense top-k Qdrant retrieval.
+2. Preserve warning-aware payload, parent context, and legal traceability.
+3. Evaluate retrieval quality before adding answer generation.
+4. Keep sparse/hybrid retrieval and reranking separately scoped.
 
-## 7. Next Phase: Phase 8 Baseline Embedding & Indexing
+## 7. Next Phase: Retrieval / Naive RAG
 
-Phase 7 and Phase 7.5 are complete. Phase 8 is next but not started and must
-be separately scoped.
+Phase 8 is complete and validated. Retrieval is next and must be separately
+scoped.
 
 Key requirements:
 
-- rerun the Phase 7 validator before indexing;
-- embed `text`, not `parent_text`;
+- embed queries with BGE-M3;
+- search collection `vnlaw_chunks_bgem3_v1_full` using named vector `dense`;
 - retain `parent_text` as traceable Article context;
-- preserve IDs, citations, hierarchy, hashes, source metadata, warnings, and
-  repeal flags;
-- keep short chunks and distinct citations for duplicate text;
-- define deterministic legal-status/effective-date enrichment.
+- preserve IDs, citations, hierarchy, hashes, source metadata, and warnings;
+- evaluate retrieval before implementing answer generation.
 
 ## 8. Do Not Do Yet
 
-- Do not implement embedding/indexing until the processed JSONL validation gate passes.
-- Do not implement Naive RAG yet.
+- Do not mutate `data/processed/legal_chunks.jsonl`.
+- Do not commit Qdrant storage or model caches.
+- Do not implement answer generation before retrieval is evaluated.
 - Do not implement Advanced RAG yet.
 - Do not implement GraphRAG or agents yet.
 - Do not build UI yet.
@@ -267,7 +268,7 @@ configs/laws/corpus_registry.yml
 data/raw/
 data/interim/
 data/processed/
-artifacts/reports/<phase>/
+artifacts/reports/indexing/<run_id>/
 src/ingestion/
 src/processing/
 scripts/
@@ -450,18 +451,17 @@ Prefer **VBHN** consolidated documents when available. If no VBHN exists, crawl 
 
 ## 12. Next Phase Preparation
 
-Phase 8 baseline embedding/indexing is the next engineering focus, but it has
-not started and requires a separately scoped task.
+Phase 8 is complete and validated. Retrieval / Naive RAG is the next
+engineering focus and requires a separately scoped task.
 
 Key design constraints:
 
-- Must consume `data/processed/legal_chunks.jsonl`.
-- Must not mutate `data/raw/`.
+- Query collection `vnlaw_chunks_bgem3_v1_full`.
+- Must not mutate protected corpus paths.
 - Must preserve `Phần / Chương / Mục / Điều / Khoản / Điểm` traceability.
 - Must preserve Article parent context from `parent_text`.
-- Must rerun Phase 7 before indexing.
 - Must preserve accepted warning visibility and repeal metadata.
-- Must validate chunks before any embedding or retrieval work.
+- Must evaluate dense retrieval before adding answer generation.
 
 ## 13. Out-of-Scope Reminders
 

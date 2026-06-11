@@ -24,11 +24,11 @@ Codex should look first at `AGENTS.md`, then at the repo-scoped skills under
 - `.codex/context/skills_mirror/` is inactive reference only.
 - `.codex/skills` should not be used as an active skill folder in this repo.
 - `.claude/skills/` is Claude-only and must be preserved.
-- Current phase status: Phases 7 and 7.5 are complete. The corpus has 40,389
+- Current phase status: Phases 7, 7.5, and 8 are complete. The corpus has 40,389
   valid chunks, 0 invalid chunks, 0 hard errors, 8,206 accepted non-blocking
   warnings, payload ready rate 1.0, and `embedding_ready=true` /
-  `ready_with_warnings`. Phase 8 is next but not started; read
-  `docs/phase75_llm_corpus_audit.md` and rerun Phase 7 before indexing.
+  `ready_with_warnings`. All chunks are indexed in
+  `vnlaw_chunks_bgem3_v1_full`; retrieval / Naive RAG is next.
 
 ## Source-to-Codex Mapping
 

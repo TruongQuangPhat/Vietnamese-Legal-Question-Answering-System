@@ -458,7 +458,8 @@ chunks flagged, and 0 source-tail markers in `text`/`parent_text`.
 - Source traceability: each vector payload contains full `source_url` and `citation`
 - Index refresh strategy: incremental updates for new laws, periodic full reindex
 
-**Output**: Qdrant collection `vnlaw_qa_chunks` with 52 laws × ~chunks per law.
+**Output**: Qdrant collection `vnlaw_chunks_bgem3_v1_full` with 40,389 points
+across 52 legal documents.
 
 **Validation Criteria**:
 - Collection size matches total chunks (no missing vectors)
@@ -865,9 +866,14 @@ MAX_ARTICLE_NUMBER_MISMATCH.
 
 Decision: Go with watch items. See `docs/phase75_llm_corpus_audit.md`.
 
-### Phase 8 — Embedding & Indexing — Next, not started
+### Phase 8 — Embedding & Indexing — Complete and validated
 
-### Phase 9 — Naive RAG — Future extension
+All 40,389 validated chunks are indexed in Qdrant collection
+`vnlaw_chunks_bgem3_v1_full` using `BAAI/bge-m3`, named dense vector `dense`,
+dimension 1024, cosine distance, and deterministic UUIDv5 point IDs. Full
+schema, payload, vector, filter, and retrieval sanity validation passed.
+
+### Phase 9 — Retrieval / Naive RAG — Next
 
 ### Phase 10 — Advanced RAG — Future extension
 

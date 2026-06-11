@@ -3,17 +3,17 @@
 This file is a Codex-compatible mirror of `CLAUDE.md`. The original content is
 preserved below.
 
-## Current Status Refresh — June 10, 2026
+## Current Status Refresh — June 11, 2026
 
 This refresh supersedes older phase-status statements in the preserved mirror:
 
-- Phase 7 and Phase 7.5 are complete.
+- Phases 7, 7.5, and 8 are complete.
 - Current gate: 40,389 valid chunks, 0 invalid chunks, 0 hard errors,
   8,206 accepted warnings, and `embedding_ready=true`.
-- Phase 8 baseline embedding/indexing is next but has not started.
-- A separate Phase 8 task must rerun Phase 7 and preserve all legal
-  traceability and warning-aware context requirements documented in
-  `docs/phase75_llm_corpus_audit.md`.
+- All 40,389 chunks are indexed in `vnlaw_chunks_bgem3_v1_full` using
+  BGE-M3 dense vectors (`dense`, 1024, Cosine); full validation passed.
+- Retrieval / Naive RAG is next and must preserve legal traceability and
+  warning-aware context.
 
 # VnLaw-QA — Claude Code Project Instructions
 
@@ -97,33 +97,19 @@ The project roadmap is:
 Current project state:
 
 ```text
-Phases 0-6 are complete.
-Phase 5 Legal Hierarchy Parsing is complete and hardened:
-  52 hierarchy.json outputs
-  0 parser failures
-  0 validator failures
-  0 RED/ORANGE audit cases
-  0 source-tail leakage nodes
-Phase 6 Parent-child Chunking is complete and validated:
-  output: data/processed/legal_chunks.jsonl
-  report: artifacts/reports/chunking/chunking_report.json
-  34 laws successful
-  18 laws successful with warnings
-  0 failed laws
-  40,389 chunks
-  180 empty/repealed chunks flagged
-  0 source-tail markers in text
-  0 source-tail markers in parent_text
-  0 duplicate chunk IDs
-  0 bad JSONL lines
-
-Next phase:
-  Phase 7 — Processed Chunk Validation & Embedding Readiness
+Phases 0-8 are complete.
+Processed corpus: 40,389 valid chunks, 0 invalid, 0 errors.
+Accepted warnings: 8,206.
+Qdrant collection: vnlaw_chunks_bgem3_v1_full.
+Dense schema: BAAI/bge-m3, dense, 1024, Cosine.
+Indexed points: 40,389; failed chunks: 0.
+Full schema/payload/vector/filter/retrieval sanity validation: pass.
+Next work: retrieval layer / Naive RAG baseline.
 ```
 
 Do not redo crawling, cleaning, or hierarchy parsing unless a proven blocker
-exists. Do not jump to embedding, indexing, retrieval, RAG, Advanced RAG,
-GraphRAG, API, or deployment before the processed JSONL validation gate passes.
+exists. Do not start retrieval, RAG, Advanced RAG, GraphRAG, API, or
+deployment unless explicitly scoped.
 
 ## 4. Expected Repository Layout
 
@@ -298,9 +284,14 @@ The validated Phase 6 corpus is a single JSONL file:
 data/processed/legal_chunks.jsonl
 ```
 
-Future embedding/indexing should embed `text` only and keep `parent_text` as
+Embedding/indexing uses `text` only and keeps `parent_text` as
 Article context payload for retrieval/generation. Some Article parent contexts
 are very long; do not split them with arbitrary character or token windows.
+
+Official indexing artifacts belong under
+`artifacts/reports/indexing/<run_id>/`. Do not commit Qdrant storage or model
+caches. Official report JSON uses operational metadata rather than internal
+development phase/slice labels.
 
 Never split legal documents by arbitrary character count or token windows if that breaks legal clauses or points.
 

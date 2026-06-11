@@ -36,8 +36,8 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
   cleaning, registry, storage, and models.
 - `data/raw/` = immutable raw crawl artifacts unless explicitly asked.
 - `data/interim/` = derived corpus artifacts.
-- `artifacts/reports/<phase>/` = generated reports and diagnostics grouped by
-  pipeline phase.
+- `artifacts/reports/indexing/<run_id>/` = official indexing artifacts grouped
+  by operational run.
 - Preserve Vietnamese legal hierarchy: Phần / Chương / Mục / Điều / Khoản / Điểm.
 
 ## 4. Current Phase Status
@@ -62,16 +62,20 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
   40,389 valid chunks, 0 invalid chunks, 0 hard errors, payload ready rate
   1.0, and `embedding_ready=true`.
 - Phase 7 has 8,206 accepted non-blocking warnings:
-  4,645 short-text warnings and 3,561 authority-marker warnings.
+  4,645 short-text warnings and 3,561 contamination warning-only chunks.
 - Warning follow-up W1-W3 is closed. Warnings remain visible and were not
   resolved, suppressed, or reclassified.
 - Phase 7.5 LLM-assisted corpus audit is complete with a **Go with watch
   items** decision.
-- Embedding/RAG/Advanced RAG/GraphRAG has not started.
-- Phase 8 baseline embedding/indexing is next, but it must be separately
-  scoped and must rerun the Phase 7 gate before indexing.
-- Read `docs/phase75_llm_corpus_audit.md` and
-  `docs/phase7_warning_resolution_decision.md` before Phase 8 work.
+- Phase 8 BGE-M3 embedding and Qdrant indexing is complete.
+- Collection `vnlaw_chunks_bgem3_v1_full` contains 40,389 points using named
+  dense vector `dense`, dimension 1024, cosine distance, and `text_only`.
+- Full indexing completed with 0 failed chunks; schema, payload, vector,
+  filter, and retrieval sanity validation passed.
+- Official reports are under
+  `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
+- Retrieval / Naive RAG is next. Production retrieval and answer generation
+  have not been implemented.
 
 ## 5. Official Commands
 
@@ -91,13 +95,15 @@ uv run pytest tests/unit/ingestion -q
 Run only `--help` for crawl/clean commands unless explicitly asked to execute
 the pipeline.
 
-Before any separately scoped Phase 8 indexing work, run:
+For any future reindexing run, first generate and validate a fresh processed
+corpus report. Official indexing artifacts belong under
+`artifacts/reports/indexing/<run_id>/`.
 
 ```bash
 uv run python scripts/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
-  --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
+  --output /tmp/processed_jsonl_validation_report.json \
   --pretty
 ```
 
@@ -141,6 +147,7 @@ uv run python scripts/validate_processed_jsonl.py \
 - Use structured logs with request/user identifiers when available.
 - Never use `except Exception: pass` in production code.
 - Do not expose Neo4j, Redis, or Qdrant insecurely in production.
+- Do not commit Qdrant storage or model caches; both are runtime state.
 
 ## 9. Data and Chunking Rules
 
@@ -152,10 +159,10 @@ uv run python scripts/validate_processed_jsonl.py \
   - LLM context = parent article content
 - Phase 6 output is a single corpus-level JSONL file:
   `data/processed/legal_chunks.jsonl`.
-- Phase 8 embedding/indexing should embed `text` only; keep `parent_text` as
+- Phase 8 embedding/indexing embeds `text` only; keep `parent_text` as
   Article context payload for retrieval/generation.
 - Preserve chunk IDs, citations, hierarchy IDs, hashes, source metadata,
-  warning visibility, and repeal flags during Phase 8.
+  warning visibility, and repeal flags in retrieval.
 - Do not drop short chunks or remove authority phrases lexically.
 - Phase 6 hardening treats VBHN/source-law certification tail as excluded
   hierarchy content and flags `(được bãi bỏ)` source units in metadata.
@@ -203,11 +210,11 @@ After editing:
 - Do not modify `data/processed/legal_chunks.jsonl` unless explicitly rerunning
   the Phase 6 chunking command.
 - `data/reports/` is a historical/protected path only; active reports belong under
-  `artifacts/reports/{phase}/`.
+  the appropriate operational report directory.
 - Do not run full crawl, audit, or cleaning commands unless explicitly requested.
-- Before indexing, run the official Phase 7 validator and stop on hard errors
-  or `embedding_ready=false`.
-- Do not start embedding/indexing/retrieval unless a separate Phase 8 task is
-  explicitly scoped.
+- Official indexing report JSON must use `report_type`, `run_type`, and
+  `pipeline_stage`; do not expose development phase/slice labels.
+- Checkpoints are runtime/resume artifacts, not user-facing reports by default.
+- Do not start retrieval or RAG unless a separate task explicitly scopes it.
 - Do not delete `.claude/`, `.claude/skills/`, Claude settings files,
   `CLAUDE.md`, or `PROJECT_CONTEXT.md`.
