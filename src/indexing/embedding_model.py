@@ -156,6 +156,48 @@ class BgeM3EmbeddingModel:
                 ) from exc
         return embeddings
 
+    def embed_query(self, query_text: str, *, batch_size: int = 1) -> list[float]:
+        """Embed one query for a bounded dense retrieval sanity check.
+
+        Args:
+            query_text: Non-blank Vietnamese query text.
+            batch_size: Positive encoder batch size.
+
+        Returns:
+            One finite dense vector measured from model output.
+
+        Raises:
+            EmbeddingModelError: If loading, encoding, or vector validation
+                fails.
+            ValueError: If the query is blank or the batch size is invalid.
+        """
+        if not query_text.strip():
+            raise ValueError("query_text must not be blank")
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+
+        encoder = self._get_encoder()
+        encode_kwargs: dict[str, object] = {
+            "batch_size": batch_size,
+            "return_dense": True,
+            "return_sparse": False,
+            "return_colbert_vecs": False,
+        }
+        if self.max_length is not None:
+            encode_kwargs["max_length"] = self.max_length
+        try:
+            output = encoder.encode([query_text], **encode_kwargs)
+        except Exception as exc:
+            raise EmbeddingModelError(f"BGE-M3 query encoding failed: {exc}") from exc
+
+        rows = _extract_dense_rows(output, expected_count=1)
+        values = _normalize(rows[0]) if self.normalize_embeddings else rows[0]
+        if not values:
+            raise EmbeddingModelError("BGE-M3 query vector is empty")
+        if not all(math.isfinite(value) for value in values):
+            raise EmbeddingModelError("BGE-M3 query vector values must be finite")
+        return values
+
     def _get_encoder(self) -> DenseEncoder:
         """Return an injected encoder or lazily construct BGE-M3."""
         if self._encoder is not None:

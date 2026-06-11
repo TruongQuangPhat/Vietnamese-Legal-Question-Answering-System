@@ -52,7 +52,7 @@ remain null or empty until deterministic enrichment exists.
 | 8E | Qdrant collection setup | Done | Safe schema setup; no corpus points indexed |
 | 8F | Indexing service | Done | Bounded dense embed/upsert, dry-run, report, checkpoint |
 | 8G | Operational indexing hardening | Done | Resume/retry/validation integration complete; real 10-point smoke passed |
-| 8H | Index validation and retrieval sanity checks | Not started | Inspect/query the index without full RAG |
+| 8H | Index validation and retrieval sanity checks | Done | Read-only schema/payload/vector/filter/query validation passed on 10-point dev index |
 
 ## Slice 8A Summary
 
@@ -530,6 +530,110 @@ a separate dependency and environment compatibility task, not Slice 8G.
 - CUDA acceleration is unavailable in the current environment because the
   installed PyTorch CUDA build requires a newer NVIDIA driver.
 
+## Slice 8H Summary
+
+Slice 8H adds a read-only index validation layer and CLI:
+
+- Qdrant collection status, named dense-vector schema, dimension, distance,
+  point count, and payload-index validation;
+- bounded point scrolling for required legal payload field checks;
+- sampled named-vector presence, dimension, and finiteness validation without
+  persisting full vectors in reports;
+- exact payload filter checks for law, hierarchy level, chunk kind, and nested
+  repeal metadata;
+- bounded BGE-M3 CPU query embedding and named dense-vector search sanity
+  checks;
+- compact retrieval summaries containing scores, point IDs, chunk IDs,
+  citations, legal hierarchy fields, and short text previews;
+- a safe validation CLI with protected-output rejection, `/tmp` report
+  defaults, and flags to skip query retrieval or stored-vector inspection;
+- typed JSON report contracts for collection, sampled point, filter, and
+  retrieval outcomes.
+
+The validator exposes no collection recreation, deletion, point deletion, or
+upsert operation. It does not implement answer generation, prompt assembly,
+reranking, sparse/hybrid retrieval, RRF, GraphRAG, a production retrieval API,
+or a full evaluation benchmark.
+
+### Slice 8H Real Validation
+
+Read-only validation without query embedding passed:
+
+```text
+collection: vnlaw_chunks_bgem3_v1_dev
+status: success
+points_count: 10
+sampled points: 10
+collection schema: pass
+payload validation: pass
+vector validation: pass
+filter validation: pass
+retrieval sanity: not_run
+report: /tmp/vnlaw_phase8_8h_index_validation_no_retrieval.json
+```
+
+The full CPU retrieval sanity run also passed:
+
+```text
+status: success
+collection schema: pass
+payload validation: pass
+vector validation: pass
+filter validation: pass
+retrieval sanity: pass
+queries run: 3
+runtime seconds: 19.223963
+report: /tmp/vnlaw_phase8_8h_index_validation_report.json
+```
+
+Top-1 results matched the intended legal provisions:
+
+```text
+Phạm vi điều chỉnh của Bộ luật Dân sự là gì?
+  -> Bộ luật Dân sự 2015, Điều 1
+
+Quyền dân sự được công nhận và bảo vệ như thế nào?
+  -> Bộ luật Dân sự 2015, Khoản 1, Điều 2
+
+Quyền dân sự có thể bị hạn chế trong trường hợp nào?
+  -> Bộ luật Dân sự 2015, Khoản 2, Điều 2
+```
+
+Qdrant reported `indexed_vectors_count = 0`, which remains informational for
+this 10-point collection because it is below the server's vector-indexing
+threshold. The persisted `dense` vectors were present, finite, and
+1024-dimensional for all sampled points.
+
+No Qdrant mutation or full-corpus indexing occurred. Both validation reports
+remain temporary under `/tmp`, and protected paths were unchanged.
+
+### Slice 8H Verification
+
+```text
+Processed JSONL validation: pass_with_warnings
+Valid/invalid chunks: 40,389/0
+Validation errors/warnings: 0/8,206
+Payload ready rate: 1.0
+Indexing tests: 152 passed
+Processing tests: 351 passed
+Python compilation: passed
+Ruff lint and format check: passed
+uv lock --check: passed
+git diff --check: passed
+Protected paths: unchanged
+```
+
+### Known Limitations After Slice 8H
+
+- Validation covers only the currently indexed 10-point dev collection.
+- Retrieval checks are three bounded dense-query sanity checks, not a quality
+  benchmark or legal QA evaluation.
+- No sparse or hybrid retrieval, RRF, reranking, confidence scoring, or
+  time-aware filtering is implemented.
+- No LLM answer generation or production retrieval API is implemented.
+- CUDA acceleration remains unavailable in the current environment; CPU is
+  the validated path.
+
 ## Verification
 
 ```bash
@@ -572,12 +676,9 @@ git status --short data/raw data/interim data/reports data/processed artifacts/r
 
 ## Next Slice
 
-Slice 8H should perform index validation and retrieval sanity checks without
-expanding into full RAG. It should verify count reconciliation, vector and
-payload presence, deterministic-ID idempotency, legal metadata filters, and a
-small set of controlled dense-query inspections.
-
-Before any full indexing run, rerun a larger embedding/indexing benchmark and
-progress through controlled limits such as 10, 100, and 1,000 to estimate CPU
-runtime, select a safe batch size, and validate resumability and reconciliation
-between run reports and Qdrant counts.
+The next planned phase is Phase 9: the retrieval layer and Naive RAG baseline.
+That work should begin only after validating a sufficiently indexed collection,
+not solely the current 10-point dev sample. Before a production-scale
+transition, run larger controlled indexing and validation steps, reconcile
+report and Qdrant counts, and retain strict citation and evidence fallback
+requirements.

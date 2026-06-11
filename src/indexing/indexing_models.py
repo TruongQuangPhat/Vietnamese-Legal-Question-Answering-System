@@ -623,3 +623,181 @@ class IndexingCheckpoint(BaseModel):
         if self.upserted_count != len(self.processed_chunk_ids):
             raise ValueError("upserted_count must match processed_chunk_ids length")
         return self
+
+
+class CollectionValidationResult(BaseModel):
+    """Read-only validation result for one Qdrant collection schema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["pass", "warning", "failed"]
+    collection_status: str | None = None
+    points_count: int | None = Field(None, ge=0)
+    indexed_vectors_count: int | None = Field(None, ge=0)
+    dense_vector_name: str = Field(..., min_length=1)
+    dense_dimension: int = Field(..., gt=0)
+    distance: str = Field(..., min_length=1)
+    payload_indexes_present: list[str] = Field(default_factory=list)
+    payload_indexes_missing: list[str] = Field(default_factory=list)
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
+class SampledPointSummary(BaseModel):
+    """Non-vector diagnostic summary for one sampled Qdrant point."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    point_id: str = Field(..., min_length=1)
+    chunk_id: str | None = None
+    payload_complete: bool
+    vector_present: bool | None = None
+    vector_dimension: int | None = Field(None, ge=0)
+    vector_finite: bool | None = None
+    missing_payload_fields: list[str] = Field(default_factory=list)
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
+class PointValidationResult(BaseModel):
+    """Aggregate payload and dense-vector validation for sampled points."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["pass", "warning", "failed"]
+    payload_status: Literal["pass", "warning", "failed"]
+    vector_status: Literal["not_run", "pass", "warning", "failed"]
+    sampled_point_count: int = Field(0, ge=0)
+    points: list[SampledPointSummary] = Field(default_factory=list)
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
+class PayloadFilterCheck(BaseModel):
+    """One exact-match payload filter to validate against Qdrant."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(..., min_length=1)
+    field_name: str = Field(..., min_length=1)
+    match_value: str | bool | int | float
+
+
+class PayloadFilterCheckResult(BaseModel):
+    """Read-only result for one exact-match payload filter."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., min_length=1)
+    field_name: str = Field(..., min_length=1)
+    match_value: str | bool | int | float
+    returned_count: int = Field(0, ge=0)
+    status: Literal["pass", "warning", "failed"]
+    sample_point_ids: list[str] = Field(default_factory=list)
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
+class FilterValidationResult(BaseModel):
+    """Aggregate validation result for deterministic payload filters."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["pass", "warning", "failed"]
+    checks: list[PayloadFilterCheckResult] = Field(default_factory=list)
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
+class RetrievalSanityQuery(BaseModel):
+    """One bounded dense-query sanity check and its expected hint terms."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query_text: str = Field(..., min_length=1)
+    expected_hint_terms: list[str] = Field(default_factory=list)
+
+    @field_validator("query_text")
+    @classmethod
+    def validate_query_text(cls, value: str) -> str:
+        """Reject blank query text without rewriting Vietnamese content."""
+        if not value.strip():
+            raise ValueError("query_text must not be blank")
+        return value
+
+    @field_validator("expected_hint_terms")
+    @classmethod
+    def validate_hint_terms(cls, values: list[str]) -> list[str]:
+        """Reject blank expected terms while allowing an empty hint list."""
+        if any(not value.strip() for value in values):
+            raise ValueError("expected_hint_terms must not contain blank values")
+        return values
+
+
+class RetrievalHitSummary(BaseModel):
+    """Compact retrieval result that excludes vector values."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    point_id: str = Field(..., min_length=1)
+    score: float
+    chunk_id: str | None = None
+    citation: str | None = None
+    law_id: str | None = None
+    level: str | None = None
+    chunk_kind: str | None = None
+    text_preview: str | None = None
+
+
+class RetrievalSanityQueryResult(BaseModel):
+    """Result of embedding and searching one bounded sanity query."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query_text: str = Field(..., min_length=1)
+    top_k: int = Field(..., gt=0)
+    returned_count: int = Field(0, ge=0)
+    query_vector_dimension: int | None = Field(None, ge=0)
+    expected_hint_terms: list[str] = Field(default_factory=list)
+    expected_hints_matched: bool | None = None
+    status: Literal["pass", "warning", "failed"]
+    results: list[RetrievalHitSummary] = Field(default_factory=list)
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
+class RetrievalSanityResult(BaseModel):
+    """Aggregate result for small dense retrieval sanity checks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["not_run", "pass", "warning", "failed"]
+    queries_run: int = Field(0, ge=0)
+    query_results: list[RetrievalSanityQueryResult] = Field(default_factory=list)
+    issues: list[IndexingIssue] = Field(default_factory=list)
+
+
+class IndexValidationReport(BaseModel):
+    """Typed read-only validation report for Phase 8 Slice 8H."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = Field("0.1.0", min_length=1)
+    phase: Literal["8"] = "8"
+    slice: Literal["8H"] = "8H"
+    status: Literal["success", "warning", "failed"]
+    collection_name: str = Field(..., min_length=1)
+    dense_vector_name: str = Field(..., min_length=1)
+    dense_dimension: int = Field(..., gt=0)
+    expected_distance: str = Field(..., min_length=1)
+    points_count: int | None = Field(None, ge=0)
+    indexed_vectors_count: int | None = Field(None, ge=0)
+    collection_schema_status: Literal["pass", "warning", "failed"]
+    sampled_point_count: int = Field(0, ge=0)
+    payload_validation_status: Literal["pass", "warning", "failed"]
+    vector_validation_status: Literal["not_run", "pass", "warning", "failed"]
+    filter_validation_status: Literal["pass", "warning", "failed"]
+    retrieval_sanity_status: Literal["not_run", "pass", "warning", "failed"]
+    queries_run: int = Field(0, ge=0)
+    collection: CollectionValidationResult
+    sampled_points: PointValidationResult
+    filters: FilterValidationResult
+    retrieval: RetrievalSanityResult
+    issues: list[IndexingIssue] = Field(default_factory=list)
+    started_at: str
+    finished_at: str
+    runtime_seconds: float = Field(..., ge=0)
