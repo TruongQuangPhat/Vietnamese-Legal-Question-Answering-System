@@ -383,7 +383,9 @@ async def test_checkpoint_written_after_successful_batch(tmp_path: Path) -> None
 
     checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
     assert checkpoint["indexing_run_id"] == "run-8f-test"
-    assert checkpoint["slice"] == "8G"
+    assert checkpoint["checkpoint_type"] == "indexing_checkpoint"
+    assert checkpoint["run_type"] == "development_indexing"
+    assert checkpoint["pipeline_stage"] == "embedding_indexing"
     assert checkpoint["dense_vector_name"] == "dense"
     assert checkpoint["embedding_model"] == "BAAI/bge-m3"
     assert checkpoint["text_template"] == "text_only"
@@ -391,6 +393,33 @@ async def test_checkpoint_written_after_successful_batch(tmp_path: Path) -> None
     assert checkpoint["processed_chunk_ids"] == ["chunk-1"]
     assert checkpoint["upserted_count"] == 1
     assert not checkpoint_path.with_name(f".{checkpoint_path.name}.tmp").exists()
+
+
+@pytest.mark.asyncio
+async def test_official_checkpoint_uses_only_operational_metadata(tmp_path: Path) -> None:
+    """Official checkpoint serialization excludes development milestone labels."""
+    checkpoint_path = tmp_path / "checkpoint.json"
+
+    await _service(
+        model=FakeEmbeddingModel(),
+        client=FakeQdrantClient(),
+        indexing_run_id="official-run",
+    ).index_chunks(
+        [_chunk(chunk_id="chunk-1")],
+        input_path="data/processed/legal_chunks.jsonl",
+        run_type="official_full_indexing",
+        pipeline_stage="embedding_indexing",
+        checkpoint_path=checkpoint_path,
+    )
+
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    serialized = json.dumps(checkpoint)
+    assert checkpoint["checkpoint_type"] == "indexing_checkpoint"
+    assert checkpoint["run_type"] == "official_full_indexing"
+    assert checkpoint["pipeline_stage"] == "embedding_indexing"
+    assert "phase" not in checkpoint
+    assert "slice" not in checkpoint
+    assert all(label not in serialized for label in ("8F", "8G", "8H"))
 
 
 @pytest.mark.asyncio
@@ -593,8 +622,13 @@ async def test_resume_does_not_skip_failed_checkpoint_ids() -> None:
     ("field", "value"),
     [
         ("collection_name", "other"),
+        ("dense_vector_name", "other"),
         ("dense_dimension", 768),
+        ("embedding_model", "other/model"),
         ("text_template", "citation_plus_text"),
+        ("input_path", "other.jsonl"),
+        ("law_id_filter", "LAW_2"),
+        ("payload_schema_version", "0.2.0"),
     ],
 )
 async def test_resume_rejects_incompatible_checkpoint(field: str, value: object) -> None:
@@ -612,8 +646,28 @@ async def test_resume_rejects_incompatible_checkpoint(field: str, value: object)
         )
 
 
-def test_checkpoint_loader_rejects_old_or_incomplete_schema(tmp_path: Path) -> None:
-    """8F checkpoints without compatibility metadata cannot be resumed."""
+def test_checkpoint_loader_accepts_legacy_phase_and_slice(tmp_path: Path) -> None:
+    """Complete legacy checkpoints remain resumable after metadata cleanup."""
+    path = tmp_path / "checkpoint.json"
+    payload = _checkpoint().model_dump(mode="json")
+    payload.pop("checkpoint_type")
+    payload.pop("run_type")
+    payload.pop("pipeline_stage")
+    payload.update({"phase": "8", "slice": "8G"})
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    checkpoint = load_indexing_checkpoint(path)
+
+    assert checkpoint.indexing_run_id == "run-resume"
+    assert checkpoint.checkpoint_type == "indexing_checkpoint"
+    assert checkpoint.run_type == "development_indexing"
+    assert checkpoint.pipeline_stage == "embedding_indexing"
+    assert "phase" not in checkpoint.model_dump()
+    assert "slice" not in checkpoint.model_dump()
+
+
+def test_checkpoint_loader_rejects_legacy_incomplete_schema(tmp_path: Path) -> None:
+    """Legacy checkpoints still require every resume compatibility field."""
     path = tmp_path / "checkpoint.json"
     path.write_text(
         json.dumps(
@@ -633,7 +687,7 @@ def test_checkpoint_loader_rejects_old_or_incomplete_schema(tmp_path: Path) -> N
         encoding="utf-8",
     )
 
-    with pytest.raises(IndexingServiceError, match="incompatible with Slice 8G"):
+    with pytest.raises(IndexingServiceError, match="incompatible with indexing resume"):
         load_indexing_checkpoint(path)
 
 
@@ -822,9 +876,10 @@ async def test_official_indexing_report_uses_only_operational_metadata() -> None
     assert payload["report_type"] == "indexing_report"
     assert payload["run_type"] == "official_full_indexing"
     assert payload["pipeline_stage"] == "embedding_indexing"
+    assert "readiness_for_phase9" not in payload
     assert "phase" not in payload
     assert "slice" not in payload
-    assert all(label not in serialized for label in ("8F", "8G", "8H"))
+    assert all(label not in serialized for label in ("Phase", "Slice", "8F", "8G", "8H", "phase9"))
 
 
 @pytest.mark.asyncio

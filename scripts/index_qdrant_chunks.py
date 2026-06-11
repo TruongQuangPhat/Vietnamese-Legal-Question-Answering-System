@@ -32,6 +32,12 @@ from src.indexing.indexing_service import (
     IndexingServiceError,
     load_indexing_checkpoint,
 )
+from src.indexing.official_artifacts import (
+    OfficialArtifactError,
+    assert_clean_official_payload,
+    build_processed_corpus_validation_summary_from_path,
+    write_json_atomic,
+)
 from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
 
 EXIT_SUCCESS = 0
@@ -210,6 +216,15 @@ async def run_indexing(argv: list[str] | None = None) -> int:
                 args.processed_validation_report,
                 expected_input_path=args.input,
             )
+            if args.run_type == "official_full_indexing":
+                summary_path = args.output.parent / "processed_corpus_validation_summary.json"
+                summary = build_processed_corpus_validation_summary_from_path(
+                    args.processed_validation_report
+                )
+                write_json_atomic(summary_path, summary.model_dump(mode="json"))
+                processed_validation = processed_validation.model_copy(
+                    update={"report_path": str(summary_path)}
+                )
 
         resume_checkpoint = None
         if args.resume:
@@ -274,6 +289,7 @@ async def run_indexing(argv: list[str] | None = None) -> int:
         ChunkLoaderError,
         EmbeddingModelError,
         IndexingServiceError,
+        OfficialArtifactError,
         QdrantCollectionError,
     ) as exc:
         print(f"Qdrant chunk indexing failed: {exc}", file=sys.stderr)
@@ -434,13 +450,10 @@ def is_allowed_official_indexing_artifact(path: Path) -> bool:
 
 def write_report(path: Path, report: IndexingReport) -> None:
     """Write an indexing report atomically as UTF-8 JSON."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(
-        json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(path)
+    payload = report.model_dump(mode="json")
+    if report.run_type == "official_full_indexing":
+        assert_clean_official_payload(payload)
+    write_json_atomic(path, payload)
 
 
 if __name__ == "__main__":

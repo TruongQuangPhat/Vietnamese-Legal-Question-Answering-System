@@ -306,6 +306,8 @@ class IndexingService:
                     self._write_checkpoint(
                         checkpoint_path,
                         input_path=input_path,
+                        run_type=run_type,
+                        pipeline_stage=pipeline_stage,
                         template=template,
                         law_id=law_id,
                         processed_chunk_ids=processed_chunk_ids,
@@ -334,6 +336,8 @@ class IndexingService:
             self._write_checkpoint(
                 checkpoint_path,
                 input_path=input_path,
+                run_type=run_type,
+                pipeline_stage=pipeline_stage,
                 template=template,
                 law_id=law_id,
                 processed_chunk_ids=processed_chunk_ids,
@@ -665,6 +669,8 @@ class IndexingService:
         path: Path | str,
         *,
         input_path: str,
+        run_type: str,
+        pipeline_stage: str,
         template: EmbeddingTextTemplate,
         law_id: str | None,
         processed_chunk_ids: list[str],
@@ -672,6 +678,8 @@ class IndexingService:
         started_at: str,
     ) -> None:
         checkpoint = IndexingCheckpoint(
+            run_type=run_type,
+            pipeline_stage=pipeline_stage,
             indexing_run_id=self.indexing_run_id,
             collection_name=self.collection_name,
             dense_vector_name=self.dense_vector_name,
@@ -756,7 +764,6 @@ class IndexingService:
             failed_chunks=failed_count,
             issues=issues,
             payload_completeness_rate=payload_rate,
-            readiness_for_phase9=False,
             text_template=template,
             law_id_filter=law_id,
             limit=limit,
@@ -799,7 +806,7 @@ class IndexingService:
 
 
 def load_indexing_checkpoint(path: Path | str) -> IndexingCheckpoint:
-    """Load a compatible 8G checkpoint from UTF-8 JSON."""
+    """Load a current or legacy compatible checkpoint from UTF-8 JSON."""
     checkpoint_path = Path(path)
     try:
         payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
@@ -812,7 +819,7 @@ def load_indexing_checkpoint(path: Path | str) -> IndexingCheckpoint:
         ) from exc
     except ValidationError as exc:
         raise IndexingServiceError(
-            f"checkpoint {checkpoint_path} is incompatible with Slice 8G: {exc}"
+            f"checkpoint {checkpoint_path} is incompatible with indexing resume: {exc}"
         ) from exc
 
 

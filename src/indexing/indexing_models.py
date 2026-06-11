@@ -422,6 +422,37 @@ class ProcessedValidationSummary(BaseModel):
     payload_ready_rate: float = Field(0.0, ge=0.0, le=1.0)
 
 
+class ProcessedCorpusValidationSummary(BaseModel):
+    """Operational processed-corpus validation facts for official indexing."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: str = Field("0.1.0", min_length=1)
+    report_type: Literal["processed_corpus_validation_summary"] = (
+        "processed_corpus_validation_summary"
+    )
+    run_type: Literal["official_full_indexing"] = "official_full_indexing"
+    pipeline_stage: Literal["corpus_validation"] = "corpus_validation"
+    input_path: str = Field(..., min_length=1)
+    total_lines: int = Field(..., ge=0)
+    valid_chunks: int = Field(..., ge=0)
+    invalid_chunks: int = Field(..., ge=0)
+    errors_total: int = Field(..., ge=0)
+    warnings_total: int = Field(..., ge=0)
+    embedding_ready: bool
+    readiness_status: str = Field(..., min_length=1)
+    payload_ready_rate: float = Field(..., ge=0.0, le=1.0)
+    contamination_warnings: int = Field(..., ge=0)
+    short_text_warnings: int = Field(..., ge=0)
+    chunks_by_level: dict[str, int]
+    chunks_by_law: dict[str, int]
+    text_length_summary: dict[str, Any]
+    parent_text_length_summary: dict[str, Any]
+    repealed_metadata_summary: dict[str, Any]
+    warning_distribution_summary: dict[str, Any]
+    blocking_reasons: list[str] = Field(default_factory=list)
+
+
 class PayloadIndexSpec(BaseModel):
     """One deterministic Qdrant payload index requested during collection setup."""
 
@@ -544,7 +575,6 @@ class IndexingReport(BaseModel):
     failed_chunks: int = Field(0, ge=0)
     issues: list[IndexingIssue] = Field(default_factory=list)
     payload_completeness_rate: float = Field(0.0, ge=0.0, le=1.0)
-    readiness_for_phase9: bool = False
     text_template: EmbeddingTextTemplate = EmbeddingTextTemplate.TEXT_ONLY
     law_id_filter: str | None = None
     limit: int | None = Field(None, ge=0)
@@ -589,8 +619,9 @@ class IndexingCheckpoint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field("0.1.0", min_length=1)
-    phase: Literal["8"] = "8"
-    slice: Literal["8G"] = "8G"
+    checkpoint_type: Literal["indexing_checkpoint"] = "indexing_checkpoint"
+    run_type: str = Field("development_indexing", min_length=1)
+    pipeline_stage: Literal["embedding_indexing"] = "embedding_indexing"
     indexing_run_id: str = Field(..., min_length=1)
     collection_name: str = Field(..., min_length=1)
     dense_vector_name: str = Field(..., min_length=1)
@@ -607,6 +638,23 @@ class IndexingCheckpoint(BaseModel):
     failed_chunk_ids: list[str] = Field(default_factory=list)
     started_at: str | None = None
     updated_at: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_metadata(cls, value: Any) -> Any:
+        """Accept legacy development labels without retaining them on output."""
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        legacy_phase = normalized.pop("phase", None)
+        legacy_slice = normalized.pop("slice", None)
+        if (legacy_phase is None) != (legacy_slice is None):
+            raise ValueError("legacy checkpoint phase and slice must appear together")
+        if legacy_phase is not None and legacy_phase != "8":
+            raise ValueError(f"unsupported legacy checkpoint phase {legacy_phase!r}")
+        if legacy_slice is not None and legacy_slice not in {"8F", "8G"}:
+            raise ValueError(f"unsupported legacy checkpoint slice {legacy_slice!r}")
+        return normalized
 
     @model_validator(mode="after")
     def validate_progress_consistency(self) -> IndexingCheckpoint:
@@ -794,6 +842,7 @@ class IndexValidationReport(BaseModel):
     vector_validation_status: Literal["not_run", "pass", "warning", "failed"]
     filter_validation_status: Literal["pass", "warning", "failed"]
     retrieval_sanity_status: Literal["not_run", "pass", "warning", "failed"]
+    retrieval_baseline_ready: bool = False
     queries_run: int = Field(0, ge=0)
     collection: CollectionValidationResult
     sampled_points: PointValidationResult

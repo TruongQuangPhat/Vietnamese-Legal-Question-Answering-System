@@ -283,11 +283,9 @@ class TestIndexingReport:
             failed_chunks=0,
             issues=[],
             payload_completeness_rate=0.0,
-            readiness_for_phase9=False,
         )
 
         assert report.status == "planned"
         assert report.dense_dimension is None
         assert report.indexed_points == 0
-        assert report.readiness_for_phase9 is False
         assert report.processed_validation_status == "pass_with_warnings"

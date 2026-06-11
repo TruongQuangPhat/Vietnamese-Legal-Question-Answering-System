@@ -525,6 +525,7 @@ async def test_aggregate_skip_retrieval_does_not_embed_or_mutate() -> None:
 
     assert report.status == "success"
     assert report.retrieval_sanity_status == "not_run"
+    assert report.retrieval_baseline_ready is False
     assert client.query_calls == []
     assert client.mutation_calls == []
 
@@ -607,7 +608,36 @@ async def test_official_validation_report_uses_only_operational_metadata() -> No
     assert payload["pipeline_stage"] == "index_validation"
     assert "phase" not in payload
     assert "slice" not in payload
-    assert all(label not in serialized for label in ("8F", "8G", "8H"))
+    assert all(label not in serialized for label in ("Phase", "Slice", "8F", "8G", "8H", "phase9"))
+
+
+@pytest.mark.asyncio
+async def test_validation_report_marks_retrieval_baseline_ready() -> None:
+    """All passing read-only checks mark the dense retrieval baseline ready."""
+    report = await validate_index(
+        FakeQdrantClient(),
+        report_type="index_validation_report",
+        run_type="official_full_index_validation",
+        pipeline_stage="index_validation",
+        collection_name="dev",
+        dense_vector_name="dense",
+        dense_dimension=1024,
+        expected_distance="Cosine",
+        expected_min_points=1,
+        sample_limit=1,
+        filters=[PayloadFilterCheck(name="law", field_name="law_id", match_value="BLDS_2015")],
+        queries=[
+            RetrievalSanityQuery(
+                query_text="Phạm vi điều chỉnh?",
+                expected_hint_terms=["Phạm vi điều chỉnh"],
+            )
+        ],
+        top_k=1,
+        check_vectors=True,
+        embedding_model=FakeEmbeddingModel(),
+    )
+
+    assert report.retrieval_baseline_ready is True
 
 
 @pytest.mark.asyncio

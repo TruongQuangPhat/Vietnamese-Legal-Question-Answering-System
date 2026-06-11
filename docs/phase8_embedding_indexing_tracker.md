@@ -677,6 +677,43 @@ contracts. The indexing and validation CLIs expose `--report-type`,
 `--run-type`, and `--pipeline-stage`; smoke/dev defaults remain operationally
 distinct from the official full-run values.
 
+New indexing checkpoints use the same operational policy:
+
+```json
+{
+  "schema_version": "0.1.0",
+  "checkpoint_type": "indexing_checkpoint",
+  "run_type": "official_full_indexing",
+  "pipeline_stage": "embedding_indexing"
+}
+```
+
+They retain all deterministic resume compatibility fields but exclude
+development phase and slice labels. The loader normalizes complete legacy
+checkpoints containing the older labels, so existing resumable runs remain
+compatible without writing those labels into new checkpoint artifacts.
+
+Official indexing reports now contain indexing facts only. The legacy
+development-readiness field was removed from the report contract. Official
+index-validation reports instead expose `retrieval_baseline_ready`, which is
+true only when collection schema, payload, vector, filter, and retrieval
+sanity checks all pass.
+
+The official package uses
+`processed_corpus_validation_summary.json` rather than exposing the raw
+processed-JSONL validation report. The clean summary preserves corpus counts,
+readiness, warning distributions, length statistics, and repeal metadata
+without internal workflow labels. Indexing reports reference this summary.
+Existing packages can be normalized safely with:
+
+```bash
+uv run python scripts/sanitize_official_indexing_reports.py \
+  --run-dir artifacts/reports/indexing/<run_id>
+```
+
+The sanitizer performs JSON-only artifact updates. It does not read or mutate
+Qdrant and does not modify the processed corpus.
+
 ## Verification
 
 ```bash

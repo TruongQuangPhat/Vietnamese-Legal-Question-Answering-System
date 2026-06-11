@@ -27,6 +27,7 @@ from src.indexing.indexing_models import (
     PayloadFilterCheck,
     RetrievalSanityQuery,
 )
+from src.indexing.official_artifacts import assert_clean_official_payload, write_json_atomic
 from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
 
 EXIT_SUCCESS = 0
@@ -328,13 +329,10 @@ def is_allowed_official_indexing_artifact(path: Path) -> bool:
 
 def write_report(path: Path, report: IndexValidationReport) -> None:
     """Write the validation report atomically as UTF-8 JSON."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(
-        json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(path)
+    payload = report.model_dump(mode="json")
+    if report.run_type == "official_full_index_validation":
+        assert_clean_official_payload(payload)
+    write_json_atomic(path, payload)
 
 
 if __name__ == "__main__":

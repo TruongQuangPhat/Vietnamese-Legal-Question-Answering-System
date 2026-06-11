@@ -601,6 +601,16 @@ async def validate_index(
         vector_validation_status=sampled_points.vector_status,
         filter_validation_status=filter_result.status,
         retrieval_sanity_status=retrieval.status,
+        retrieval_baseline_ready=all(
+            status == "pass"
+            for status in (
+                collection.status,
+                sampled_points.payload_status,
+                sampled_points.vector_status,
+                filter_result.status,
+                retrieval.status,
+            )
+        ),
         queries_run=retrieval.queries_run,
         collection=collection,
         sampled_points=sampled_points,
