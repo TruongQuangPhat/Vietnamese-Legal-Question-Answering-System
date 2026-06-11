@@ -407,6 +407,21 @@ class IndexingIssue(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class ProcessedValidationSummary(BaseModel):
+    """Validated readiness facts from the processed JSONL validation report."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: Literal["not_run", "pass", "pass_with_warnings", "fail"] = "not_run"
+    report_path: str | None = None
+    input_path: str | None = None
+    errors_total: int = Field(0, ge=0)
+    invalid_chunks: int = Field(0, ge=0)
+    warnings_total: int = Field(0, ge=0)
+    embedding_ready: bool = False
+    payload_ready_rate: float = Field(0.0, ge=0.0, le=1.0)
+
+
 class PayloadIndexSpec(BaseModel):
     """One deterministic Qdrant payload index requested during collection setup."""
 
@@ -502,7 +517,18 @@ class IndexingReport(BaseModel):
         "partial_success",
         "failed",
     ] = "planned"
-    phase7_gate_status: Literal["not_run", "pass", "pass_with_warnings", "fail"] = "not_run"
+    processed_validation_status: Literal[
+        "not_run",
+        "pass",
+        "pass_with_warnings",
+        "fail",
+    ] = "not_run"
+    processed_validation_report_path: str | None = None
+    processed_validation_errors_total: int = Field(0, ge=0)
+    processed_validation_invalid_chunks: int = Field(0, ge=0)
+    processed_validation_warnings_total: int = Field(0, ge=0)
+    processed_validation_embedding_ready: bool = False
+    processed_validation_payload_ready_rate: float = Field(0.0, ge=0.0, le=1.0)
     input_chunks_path: str = Field(..., min_length=1)
     input_path: str | None = None
     input_chunk_count: int = Field(0, ge=0)
@@ -535,20 +561,65 @@ class IndexingReport(BaseModel):
     failed_chunk_ids: list[str] = Field(default_factory=list)
     runtime_seconds: float = Field(0.0, ge=0.0)
     throughput_chunks_per_second: float = Field(0.0, ge=0.0)
+    device: str | None = None
+    allow_full_corpus: bool = False
+    resume: bool = False
+    checkpoint_path: str | None = None
+    checkpoint_processed_count: int = Field(0, ge=0)
+    skipped_due_to_checkpoint_count: int = Field(0, ge=0)
+    resumed_from_indexing_run_id: str | None = None
+    max_retries: int = Field(0, ge=0)
+    retry_backoff_seconds: float = Field(0.0, ge=0.0)
+    retry_attempts_total: int = Field(0, ge=0)
+    retried_batch_count: int = Field(0, ge=0)
+    permanently_failed_batch_count: int = Field(0, ge=0)
+    started_at: str | None = None
+    finished_at: str | None = None
+    qdrant_points_count_before: int | None = Field(None, ge=0)
+    qdrant_points_count_after: int | None = Field(None, ge=0)
+    qdrant_indexed_vectors_count_after: int | None = Field(None, ge=0)
+    expected_min_points_after: int | None = Field(None, ge=0)
+    count_reconciliation_status: Literal["not_run", "pass", "warning"] = "not_run"
 
 
 class IndexingCheckpoint(BaseModel):
-    """Minimal resumability record written after successful indexing batches."""
+    """Compatibility-bound progress record for a resumable indexing run."""
 
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field("0.1.0", min_length=1)
     phase: Literal["8"] = "8"
-    slice: Literal["8F"] = "8F"
+    slice: Literal["8G"] = "8G"
     indexing_run_id: str = Field(..., min_length=1)
     collection_name: str = Field(..., min_length=1)
+    dense_vector_name: str = Field(..., min_length=1)
     dense_dimension: int = Field(..., gt=0)
+    embedding_model: str = Field(..., min_length=1)
+    embedding_revision: str | None = None
+    text_template: EmbeddingTextTemplate
+    input_path: str = Field(..., min_length=1)
+    law_id_filter: str | None = None
+    payload_schema_version: str = Field(..., min_length=1)
     processed_chunk_ids: list[str] = Field(default_factory=list)
     processed_count: int = Field(0, ge=0)
     upserted_count: int = Field(0, ge=0)
     failed_chunk_ids: list[str] = Field(default_factory=list)
+    started_at: str | None = None
+    updated_at: str | None = None
+
+    @model_validator(mode="after")
+    def validate_progress_consistency(self) -> IndexingCheckpoint:
+        """Reject internally inconsistent or ambiguous resume progress."""
+        processed_ids = set(self.processed_chunk_ids)
+        failed_ids = set(self.failed_chunk_ids)
+        if len(processed_ids) != len(self.processed_chunk_ids):
+            raise ValueError("processed_chunk_ids must not contain duplicates")
+        if len(failed_ids) != len(self.failed_chunk_ids):
+            raise ValueError("failed_chunk_ids must not contain duplicates")
+        if processed_ids & failed_ids:
+            raise ValueError("processed and failed chunk IDs must be disjoint")
+        if self.processed_count != len(self.processed_chunk_ids):
+            raise ValueError("processed_count must match processed_chunk_ids length")
+        if self.upserted_count != len(self.processed_chunk_ids):
+            raise ValueError("upserted_count must match processed_chunk_ids length")
+        return self

@@ -51,8 +51,8 @@ remain null or empty until deterministic enrichment exists.
 | 8D | Payload builder | Done | Typed payload mapping and deterministic UUIDv5 point IDs |
 | 8E | Qdrant collection setup | Done | Safe schema setup; no corpus points indexed |
 | 8F | Indexing service | Done | Bounded dense embed/upsert, dry-run, report, checkpoint |
-| 8G | Official CLI | Not started | `build_embedding_index.py` |
-| 8H | Index validation | Not started | Count/vector/payload/filter/idempotency |
+| 8G | Operational indexing hardening | Done | Resume/retry/validation integration complete; real 10-point smoke passed |
+| 8H | Index validation and retrieval sanity checks | Not started | Inspect/query the index without full RAG |
 
 ## Slice 8A Summary
 
@@ -410,17 +410,125 @@ final checks. They included a missing `python` command, restricted uv cache
 access, initial pytest import failures for `src` and `scripts`, sandboxed curl
 access to local Qdrant, and one Ruff formatting correction.
 
-### Known Limitations
+### Limitations at Slice 8F Completion
 
 - No retrieval service or query embedding CLI exists.
 - Sparse indexing remains unimplemented and disabled.
-- Failed batches are reported, but automatic retries are not implemented.
-- Checkpoints record progress but cannot resume a run yet.
+- Failed batches were reported, but automatic retries were not implemented.
+- Checkpoints recorded progress but could not resume a run.
 - The indexing service does not create or recreate collections.
 - No official production indexing report was generated.
-- The CLI does not ingest the Phase 7 report directly, so run reports
-  conservatively record the gate status as `not_run`.
+- The CLI did not ingest the processed JSONL validation report, so run reports
+  conservatively recorded `processed_validation_status = "not_run"`.
 - No full-corpus indexing was performed.
+
+## Slice 8G Summary
+
+Slice 8G adds operational safeguards for larger controlled indexing runs:
+
+- explicit `--resume` support using a supplied, compatible checkpoint;
+- checkpoint compatibility validation for collection, dense vector, model,
+  template, input, law filter, and payload schema settings;
+- successful-chunk skipping while failed checkpoint chunks remain eligible;
+- bounded retry and backoff for Qdrant upsert failures only;
+- processed JSONL validation report ingestion through
+  `--processed-validation-report`;
+- fail-fast readiness checks for errors, invalid chunks, embedding readiness,
+  and payload readiness;
+- task-specific `processed_validation_*` report fields, with `not_run` retained
+  when no validation report is supplied;
+- optional Qdrant point-count reconciliation before and after a real run;
+- stronger report and checkpoint metadata for run identity, timing, device,
+  retry policy, resume state, and reconciliation;
+- atomic checkpoints with internally consistent processed and failed ID sets.
+
+Dry-run remains non-mutating and does not load BGE-M3 or contact Qdrant.
+Real runs still require `--limit` unless `--allow-full-corpus` is explicit.
+Reports and checkpoints remain blocked from protected paths.
+
+Retry is deliberately conservative: deterministic embedding, dimension,
+ordering, and payload validation failures are not retried. Only Qdrant upsert
+exceptions enter the bounded retry loop. Count reconciliation treats
+`indexed_vectors_count = 0` as acceptable for tiny collections when
+`points_count` satisfies the conservative expected minimum.
+
+No retrieval, sparse indexing, collection recreation, corpus mutation, or
+full-corpus indexing was implemented or run. Protected paths remain
+unchanged.
+
+### Slice 8G Verification
+
+Final verification passed:
+
+```text
+Processed JSONL validation: pass_with_warnings
+Validation errors/invalid chunks: 0/0
+Validation warnings: 8,206
+Embedding ready: true
+Payload ready rate: 1.0
+Indexing tests: 129 passed
+Processing tests: 351 passed
+Python compilation: passed
+Ruff lint and format check: passed
+uv lock --check: passed
+git diff --check: passed
+Protected paths: unchanged
+```
+
+A three-chunk CLI dry-run ingested
+`/tmp/processed_jsonl_validation_report.json` and wrote
+`/tmp/vnlaw_phase8_8g_dry_run_report_3.json`. It planned three chunks with
+`embedded_count = 0` and `upserted_count = 0`; BGE-M3 and Qdrant were not
+loaded or contacted.
+
+### Real Qdrant Smoke
+
+A bounded real CPU indexing smoke completed successfully:
+
+```text
+collection: vnlaw_chunks_bgem3_v1_dev
+limit: 10
+model: BAAI/bge-m3, loaded from the local cache in offline mode
+processed validation status: pass_with_warnings
+embedded/upserted/failed: 10/10/0
+count reconciliation status: pass
+Qdrant points_count: 10
+dense vector: dense, size 1024, distance Cosine
+report: /tmp/vnlaw_phase8_8g_indexing_report_10.json
+checkpoint: /tmp/vnlaw_phase8_8g_checkpoint_10.json
+```
+
+This smoke confirmed that the operational CLI could ingest the processed
+JSONL validation report, load cached BGE-M3 embeddings, upsert deterministic
+points, write a resumable checkpoint, and reconcile the resulting Qdrant
+point count. No full-corpus indexing was performed, and the temporary report
+and checkpoint remain under `/tmp`.
+
+### CUDA Environment Note
+
+WSL can detect an NVIDIA GeForce GTX 1650 with 4 GB VRAM through
+`nvidia-smi`. The reported driver is `555.97`, with CUDA capability shown as
+12.5. The current Python environment contains `torch 2.12.0+cu130`.
+
+`torch.cuda.is_available()` returns `false` because this PyTorch CUDA 13.0
+build requires a newer NVIDIA driver than the installed 555.97 driver. CPU is
+therefore the validated indexing path. Resolving GPU acceleration belongs in
+a separate dependency and environment compatibility task, not Slice 8G.
+
+### Known Limitations After Slice 8G
+
+- Checkpoint resume is single-process and does not provide distributed locks.
+- Retry covers Qdrant upsert failures only; embedding failures are not retried.
+- Count reconciliation is conservative and does not scan all existing point
+  IDs to prove exact collection equality.
+- No retrieval service, query embedding CLI, or retrieval-quality evaluation
+  exists.
+- Sparse indexing remains unimplemented and disabled.
+- The indexing service does not create or recreate collections.
+- No official production indexing report was generated.
+- No full-corpus indexing was performed.
+- CUDA acceleration is unavailable in the current environment because the
+  installed PyTorch CUDA build requires a newer NVIDIA driver.
 
 ## Verification
 
@@ -464,17 +572,12 @@ git status --short data/raw data/interim data/reports data/processed artifacts/r
 
 ## Next Slice
 
-Slice 8G should implement operational CLI hardening, retries, resumability,
-and Phase 7 gate integration:
+Slice 8H should perform index validation and retrieval sanity checks without
+expanding into full RAG. It should verify count reconciliation, vector and
+payload presence, deterministic-ID idempotency, legal metadata filters, and a
+small set of controlled dense-query inspections.
 
-- resume from a validated checkpoint;
-- apply a bounded retry policy to failed batches;
-- ingest and enforce a fresh Phase 7 gate report;
-- record stronger run and environment metadata;
-- document a safe operational runbook;
-- verify idempotent reruns using deterministic point IDs;
-- run controlled limits of 10, 100, then 1,000 before considering full corpus;
-- reconcile report counts with Qdrant point counts.
-
-Before any full indexing run, rerun a larger pilot or benchmark to estimate
-full-corpus CPU runtime and determine a safe batch size.
+Before any full indexing run, rerun a larger embedding/indexing benchmark and
+progress through controlled limits such as 10, 100, and 1,000 to estimate CPU
+runtime, select a safe batch size, and validate resumability and reconciliation
+between run reports and Qdrant counts.

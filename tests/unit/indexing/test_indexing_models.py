@@ -265,7 +265,12 @@ class TestIndexingReport:
             schema_version="0.1.0",
             slice="8A",
             status="planned",
-            phase7_gate_status="pass_with_warnings",
+            processed_validation_status="pass_with_warnings",
+            processed_validation_errors_total=0,
+            processed_validation_invalid_chunks=0,
+            processed_validation_warnings_total=8206,
+            processed_validation_embedding_ready=True,
+            processed_validation_payload_ready_rate=1.0,
             input_chunks_path="data/processed/legal_chunks.jsonl",
             input_chunk_count=40389,
             expected_chunk_count=40389,
@@ -286,3 +291,4 @@ class TestIndexingReport:
         assert report.dense_dimension is None
         assert report.indexed_points == 0
         assert report.readiness_for_phase9 is False
+        assert report.processed_validation_status == "pass_with_warnings"
