@@ -1,0 +1,19 @@
+schema_version: "0.1.0"
+
+embedding:
+  model_name: "BAAI/bge-m3"
+  model_revision: null
+  device: "cpu"
+  batch_size: 1
+  max_length: 8192
+  normalize_embeddings: true
+
+qdrant:
+  url: "http://localhost:6333"
+  collection_name: "vnlaw_chunks_bgem3_v1_full"
+  timeout_seconds: 60
+
+dense_retrieval:
+  vector_name: "dense"
+  expected_vector_dim: 1024
+  top_k: 10

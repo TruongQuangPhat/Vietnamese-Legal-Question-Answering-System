@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 8 complete — retrieval baseline is next
+Current phase: Phase 9A complete — dense retrieval baseline implemented
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -24,10 +24,11 @@ Completed:
   Phase 7 — Processed Chunk Validation & Embedding Readiness
   Phase 7.5 — LLM-assisted corpus audit
   Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
+  Phase 9A — Dense Retrieval Baseline
 
 Next:
-  Build a dense retrieval baseline over the validated Qdrant collection
-  Evaluate query embedding, top-k search, filters, and context assembly
+  Run manual retrieval quality checks over the validated Qdrant collection
+  Design evidence/context packing for Naive RAG generation
   Add answer generation only when separately scoped
 ```
 
@@ -104,6 +105,9 @@ complete. Phase 8 indexed all 40,389 chunks into Qdrant collection
 `BAAI/bge-m3` dense vectors, named vector `dense`, cosine distance, and the
 `text_only` template. All points were upserted successfully and full index
 validation passed for schema, payload, vectors, filters, and retrieval sanity.
+Phase 9A adds a read-only dense retrieval baseline that embeds Vietnamese
+queries with BGE-M3, searches named vector `dense`, and returns typed
+payload-backed legal evidence. It does not generate answers.
 
 Official reports:
 
@@ -183,8 +187,8 @@ VnLaw-QA/
 │   ├── core/
 │   ├── ingestion/    # implemented ingestion and cleaning domain logic
 │   ├── processing/   # implemented parser and chunking domain logic
-│   ├── indexing/     # future indexing logic
-│   ├── retrieval/    # future retrieval logic
+│   ├── indexing/     # implemented embedding and Qdrant indexing logic
+│   ├── retrieval/    # implemented dense retrieval baseline logic
 │   ├── generation/   # future generation/RAG logic
 │   ├── services/     # orchestration/reporting
 │   ├── api/          # future API
@@ -710,7 +714,8 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
 | `docs/phase8_embedding_indexing_tracker.md` | Completed Phase 8 implementation, indexing, and validation record |
 | `docs/embedding_indexing.md` | Phase 8 design background |
-| `docs/naive_rag.md` | Retrieval-first handoff and future Naive RAG design |
+| `docs/phase9_retrieval_naive_rag_tracker.md` | Phase 9A dense retrieval status and next steps |
+| `docs/naive_rag.md` | Implemented dense retrieval baseline and future Naive RAG design |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries

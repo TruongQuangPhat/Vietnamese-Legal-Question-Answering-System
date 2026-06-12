@@ -110,7 +110,10 @@ Corpus Registry
   vectors, payload filters, and bounded retrieval sanity checks.
 - Official reports:
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- Retrieval services and RAG answer generation have not started.
+- **Phase 9A — Dense Retrieval Baseline is implemented.**
+- Phase 9A adds typed retrieval models, safe exact-match filters, read-only
+  dense Qdrant search, a retrieval service wrapper, CLI, config, and unit tests.
+- RAG answer generation has not started.
 
 ### Current State
 
@@ -118,9 +121,12 @@ Corpus Registry
   non-blocking warnings.
 - BGE-M3 dense embeddings are indexed in
   `vnlaw_chunks_bgem3_v1_full`.
+- Dense retrieval can query the validated collection and return typed
+  payload-backed legal evidence.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- The next major work is retrieval and the Naive RAG baseline.
+- The next major work is retrieval quality review, context/evidence packing,
+  and the Naive RAG answer-generation baseline when separately scoped.
 
 Operational rules:
 
@@ -248,6 +254,7 @@ Phase 6 — Parent-child Chunking
 Phase 7 — Processed Chunk Validation & Embedding Readiness
 Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh
 Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
+Phase 9A — Dense Retrieval Baseline
 ```
 
 Validated inputs and reports:
@@ -261,20 +268,21 @@ artifacts/reports/chunking/processed_jsonl_validation_report.json
 Current next work:
 
 ```text
-Phase 9 — Retrieval layer / Naive RAG baseline
+Phase 9B — Naive RAG answer-generation baseline
 ```
 
-Start with BGE-M3 query embedding and dense top-k search against
-`vnlaw_chunks_bgem3_v1_full`. Assemble retrieval context from `text`,
-`parent_text`, citations, hierarchy, and law/source metadata. Validate
-retrieval behavior before adding LLM answer generation.
+Phase 9A already starts retrieval with BGE-M3 query embedding and dense top-k
+search against `vnlaw_chunks_bgem3_v1_full`. It returns typed evidence from
+`text`, `parent_text`, citations, hierarchy, law/source metadata, warning
+metadata, and indexing provenance. Validate retrieval behavior before adding
+LLM answer generation.
 
 ## 6. Next Immediate Tasks
 
-1. Build a typed dense retrieval service over `vnlaw_chunks_bgem3_v1_full`.
-2. Embed queries with the same BGE-M3 model and search named vector `dense`.
-3. Preserve citation and legal traceability in retrieval results and context.
-4. Evaluate retrieval sanity and relevance before adding generation.
+1. Run manual retrieval quality checks against local Qdrant.
+2. Review top-k relevance and safe filter behavior.
+3. Design citation-preserving evidence/context packing.
+4. Add answer generation only after retrieval behavior is understood.
 5. Keep sparse/hybrid retrieval, reranking, and answer generation separately
    scoped.
 
@@ -286,7 +294,8 @@ retrieval behavior before adding LLM answer generation.
 | 7 | Processed Chunk Validation & Embedding Readiness | **Complete** |
 | 7.5 | LLM-Assisted Corpus Audit & Context Refresh | **Complete / Go with watch items** |
 | 8 | Embedding & Indexing | **Complete / Validated** |
-| 9 | Retrieval / Naive RAG | **Next / Not started** |
+| 9A | Dense Retrieval Baseline | **Complete / Implemented** |
+| 9B | Naive RAG Answer Generation | Next / Not started |
 | 10 | Advanced RAG | Future |
 | 11 | GraphRAG & Agents | Future |
 | 12 | Evaluation | Future |

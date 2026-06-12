@@ -14,7 +14,7 @@ Distance: Cosine
 Sparse indexing: disabled
 ```
 
-The next implementation should begin with retrieval only:
+Phase 9A now begins with retrieval only:
 
 1. Embed Vietnamese queries with the same BGE-M3 model.
 2. Run dense top-k Qdrant search against named vector `dense`.
@@ -26,6 +26,35 @@ The next implementation should begin with retrieval only:
 
 Do not introduce sparse/hybrid retrieval, RRF, reranking, GraphRAG, or a
 production API in the first retrieval slice.
+
+## Phase 9A Implemented Baseline
+
+The current implemented retrieval slice is read-only dense search:
+
+```text
+Vietnamese query
+→ BGE-M3 query embedding
+→ query-vector validation
+→ Qdrant named-vector search using dense
+→ typed payload-backed retrieval candidates
+→ safe CLI summary / optional JSON report
+```
+
+Implemented files:
+
+```text
+configs/retrieval/retrieval.yml
+src/retrieval/models.py
+src/retrieval/filters.py
+src/retrieval/dense_retriever.py
+src/services/retrieval_service.py
+scripts/run_dense_retrieval.py
+tests/unit/retrieval/
+```
+
+Phase 9A does not call an LLM, generate answers, validate generated citations,
+perform hybrid retrieval, run RRF, rerank, expose a FastAPI endpoint, or mutate
+Qdrant/corpus artifacts.
 
 ## Overview
 
@@ -43,34 +72,21 @@ This phase runs only after embedding & indexing is complete and validated.
 
 ## Quick Start
 
-**Intended API endpoint** (design phase, not yet implemented):
+Run one read-only dense retrieval query:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/qa" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Quyền về đất đai của hộ gia đình là gì?",
-    "max_chunks": 10,
-    "confidence_threshold": 0.75
-  }'
+uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
+  --query "Quyền sử dụng đất của hộ gia đình là gì?" \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 10 \
+  --device cpu \
+  --output artifacts/reports/retrieval/manual_query_result.json
 ```
 
-**Expected response**:
-```json
-{
-  "answer": "Theo Điều 98 Luật Đất đai (VBHN 2025), hộ gia đình có quyền sử dụng đất...",
-  "citations": [
-    {
-      "chunk_id": "LDD_VBHN__article_98__clause_1",
-      "citation": "Luật Đất đai (VBHN 2025), Điều 98, Khoản 1",
-      "source_url": "https://thuvienphapluat.vn/..."
-    }
-  ],
-  "confidence": 0.89,
-  "retrieved_chunks": [...],
-  "fallback": false
-}
-```
+The console summary includes rank, score, chunk ID, citation, law metadata,
+hierarchy labels, source URL, and a text preview. The optional JSON report
+includes typed result metadata and text/parent-text previews, not an answer.
 
 ## Architecture
 
@@ -90,6 +106,20 @@ curl -X POST "http://localhost:8000/api/v1/qa" \
 │  Top-k               │
 │  Retrieval           │
 │  (dense search)      │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Typed Evidence      │
+│  Results             │
+└──────────────────────┘
+```
+
+Future Naive RAG answer generation will extend this retrieval baseline:
+
+```
+┌──────────────────────┐
+│  Retrieved Evidence  │
 └──────────┬───────────┘
            │
            ▼
@@ -160,7 +190,7 @@ results = client.search(
 
 **Output**: List of `ScoredPoint` with `chunk_id`, `score`, `payload`.
 
-### 3. Context Packing
+### 3. Context Packing (future)
 
 **Goal**: Assemble retrieved chunks into a coherent context for the LLM.
 
@@ -176,7 +206,7 @@ results = client.search(
 
 **Output**: Single `context` string.
 
-### 4. Strict Legal Prompt
+### 4. Strict Legal Prompt (future)
 
 **Goal**: Force LLM to ground answer in provided context only.
 
@@ -204,7 +234,7 @@ I could not find a specific regulation for this issue in the current legal corpu
 
 **LLM**: Claude API (Haiku or Sonnet for cost/speed trade-off). Temperature = 0 for determinism.
 
-### 5. LLM Generation
+### 5. LLM Generation (future)
 
 **Goal**: Produce Vietnamese legal answer grounded in context.
 
@@ -215,7 +245,7 @@ I could not find a specific regulation for this issue in the current legal corpu
 
 **Output**: Generated answer string.
 
-### 6. Citation Validator
+### 6. Citation Validator (future)
 
 **Goal**: Verify that answer mentions exist in retrieved context.
 
@@ -237,16 +267,27 @@ I could not find a specific regulation for this issue in the current legal corpu
 
 ## Pipeline Execution Flow
 
-1. Receive query via API (`/api/v1/qa`).
-2. Generate query embedding (dense + sparse).
-3. Perform hybrid retrieval from Qdrant (`k=10`).
-4. Pack context with citation anchors.
-5. Construct strict legal prompt.
-6. Call Claude API → generate answer.
-7. Run citation validator on answer vs retrieved chunks.
-8. Compute confidence score.
-9. If confidence ≥ threshold and citations valid → return answer with metadata.
-10. Else → return fallback response.
+Implemented Phase 9A flow:
+
+1. Receive one query via `scripts/run_dense_retrieval.py`.
+2. Validate non-empty query and positive `top_k`.
+3. Generate a BGE-M3 dense query embedding.
+4. Validate that the query vector is numeric, finite, non-empty, and
+   1024-dimensional.
+5. Query Qdrant collection `vnlaw_chunks_bgem3_v1_full` using named vector
+   `dense`, `with_payload=True`, and `with_vectors=False`.
+6. Map Qdrant results into typed `RetrievedChunk` objects.
+7. Preserve citation, hierarchy, source metadata, warning metadata, repealed
+   flags, and indexing provenance where present.
+8. Print a safe summary and optionally write a retrieval JSON report.
+
+Future Naive RAG generation flow:
+
+1. Pack retrieved evidence with citation anchors.
+2. Construct a strict legal prompt.
+3. Call an LLM with temperature 0.
+4. Validate generated citations against retrieved chunks.
+5. Compute confidence and return either a cited answer or the safe fallback.
 
 ## Data Models / Output Schema
 
@@ -300,34 +341,50 @@ I could not find a specific regulation for this issue in the current legal corpu
 
 ## CLI Reference
 
-### Intended CLI for testing
+### Implemented Dense Retrieval CLI
 
 ```bash
-# Single query
-uv run python scripts/run_naive_rag.py \
+uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
   --query "Quyền về đất đai của hộ gia đình?" \
-  --qdrant-url http://localhost:6333 \
-  --collection-name vnlaw_chunks_bgem3_v1_full
+  --url http://localhost:6333 \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --top-k 10 \
+  --device cpu
+```
 
-# Batch evaluation (with golden QA)
-uv run python scripts/run_naive_rag.py \
-  --eval-dataset data/eval/golden_qa.jsonl \
-  --output-dir data/eval/naive_rag_results
+Supported safe filters:
+
+```text
+--law-id
+--chunk-kind
+--level
+--article-number
+--source-domain
+--exclude-repealed
 ```
 
 ## Testing
 
-**Unit tests**:
-- `test_context_packing()`: retrieved chunks formatted with citation anchors.
-- `test_prompt_template()`: prompt contains context and query; fallback instruction present.
-- `test_citation_validator()`: exact citation match detected; unsupported citation rejected.
-- `test_confidence_scoring()`: confidence < threshold triggers fallback.
+**Implemented Phase 9A unit tests**:
+- retrieval query validation and top-k validation;
+- dense vector dimension and finite-value validation;
+- Qdrant result mapping into typed retrieval objects;
+- missing optional payload fields tolerated;
+- missing critical payload fields reported as typed issues;
+- Qdrant called with named vector `dense`, `with_payload=True`, and
+  `with_vectors=False`;
+- safe filter construction over indexed payload fields;
+- CLI parser and output-path safety helpers.
+
+**Future generation unit tests**:
+- context packing with citation anchors;
+- strict prompt template;
+- generated citation validator;
+- confidence policy and fallback behavior.
 
 **Integration test**:
-- End-to-end: query → retrieval → generation → answer.
-- Verify answer contains at least one citation from retrieved context.
-- Latency < 2 seconds (p95) for simple queries.
-- Fallback triggered for out-of-corpus questions.
+- Phase 9A: query → embedding → Qdrant dense retrieval → typed evidence.
+- Future Naive RAG: query → retrieval → generation → answer.
 
 **Golden QA evaluation** (separate phase 12):
 - Dataset of (query, expected answer, expected citation).
@@ -335,12 +392,16 @@ uv run python scripts/run_naive_rag.py \
 
 ## Error Handling
 
-- **Qdrant search failure**: Log error, return fallback with `confidence=0`, include error in response for debugging.
-- **LLM API failure**: Retry with exponential backoff (max 3 attempts); after failures, return fallback.
-- **Timeout**: If retrieval or generation exceeds timeout (e.g., 5s), abort and fallback.
-- **Malformed response**: If LLM returns non-text or empty, treat as failure → fallback.
+- **Empty query**: rejected before embedding.
+- **Invalid `top_k`**: rejected before embedding.
+- **Embedding failure**: returned as a retrieval error.
+- **Vector dimension mismatch or non-finite values**: rejected before Qdrant.
+- **Qdrant search failure**: returned as a retrieval error.
+- **Missing optional payload fields**: tolerated.
+- **Missing critical payload fields**: reported in typed retrieval issues.
 
-All errors logged with structured context; API returns 200 even for fallback (business logic error, not HTTP error).
+Future API/generation error handling will add fallback responses, retry policy,
+and citation-validation failures.
 
 ## Troubleshooting
 
@@ -364,10 +425,19 @@ All errors logged with structured context; API returns 200 even for fallback (bu
 
 ## Changelog
 
+### Version 0.2 (2026-06-12)
+
+- Implemented Phase 9A dense retrieval baseline.
+- Added typed retrieval models, safe filters, a read-only dense retriever,
+  service wrapper, config, CLI, and unit tests.
+- Kept answer generation, prompt templates, citation validation, hybrid search,
+  RRF, reranking, FastAPI, and evaluation out of scope.
+
 ### Version 0.1 (2026-05-21)
 
 - Created initial Naive RAG baseline documentation.
-- Defined pipeline: query embedding → hybrid retrieval → context packing → strict prompt → LLM → citation validator → answer/fallback.
+- Defined initial future pipeline: query embedding → retrieval → context
+  packing → strict prompt → LLM → citation validator → answer/fallback.
 - Specified API request/response schema with citations and confidence.
 - Provided fallback policy and confidence threshold mechanism.
 - Documented testing strategy and golden QA evaluation.

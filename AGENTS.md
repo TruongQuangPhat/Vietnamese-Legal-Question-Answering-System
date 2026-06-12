@@ -74,8 +74,10 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
   filter, and retrieval sanity validation passed.
 - Official reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- Retrieval / Naive RAG is next. Production retrieval and answer generation
-  have not been implemented.
+- Phase 9A Dense Retrieval Baseline is implemented with typed retrieval
+  models, safe filters, read-only dense Qdrant search, CLI, config, and unit
+  tests.
+- Naive RAG answer generation has not been implemented.
 
 ## 5. Official Commands
 
