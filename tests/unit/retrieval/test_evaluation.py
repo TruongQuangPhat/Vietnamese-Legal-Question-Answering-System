@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from scripts import evaluate_dense_retrieval as eval_cli
 from src.retrieval.evaluation import (
     ExpectedTarget,
     ManualRetrievalQuery,
@@ -29,6 +28,7 @@ from src.retrieval.evaluation import (
     target_match_result,
 )
 from src.retrieval.models import RetrievalFilters, RetrievalResult, RetrievedChunk
+from src.retrieval.workflows import dense_evaluation as eval_cli
 
 
 def make_target(

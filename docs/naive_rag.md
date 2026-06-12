@@ -246,6 +246,35 @@ selection blockers.
 This smoke test does not call an LLM, generate an answer, create prompts, fix
 ranking, perform hybrid retrieval, rerank, or mutate Qdrant/corpus artifacts.
 
+## Phase 9A.5 Workflow Boundary
+
+Phase 9A.5 moves executable workflow logic from top-level scripts into reusable
+modules:
+
+```text
+src/retrieval/workflows/common.py
+src/retrieval/workflows/dense_retrieval.py
+src/retrieval/workflows/dense_evaluation.py
+src/retrieval/workflows/selection_smoke.py
+```
+
+The existing commands are preserved through thin wrappers:
+
+```text
+scripts/run_dense_retrieval.py
+scripts/evaluate_dense_retrieval.py
+scripts/run_selection_smoke.py
+```
+
+The workflow modules own argument parsing, config loading, dependency
+construction, path safety checks, report writing, and console summaries. The
+scripts only bootstrap imports and call the workflow `main()` function.
+
+No retrieval behavior, evaluation metrics, evidence safety rules, selection
+decisions, report schemas, or command-line flags were intentionally changed.
+Future Phase 9B scripts should follow the same boundary: reusable workflow
+logic under `src/`, top-level `scripts/` as compatibility wrappers only.
+
 ## Overview
 
 The Naive RAG phase will establish the first baseline question-answering
@@ -553,6 +582,14 @@ Implemented Phase 9A.4 selection smoke flow:
 6. Write a JSON smoke report with selected/rejected evidence summaries and a
    rendered selected-context preview.
 
+Implemented Phase 9A.5 workflow boundary:
+
+1. Keep the same user-facing script commands.
+2. Route each script into a `src/retrieval/workflows/` module.
+3. Keep shared path and JSON report helpers in
+   `src/retrieval/workflows/common.py`.
+4. Leave retrieval, evaluation, evidence, and selection semantics unchanged.
+
 Future Naive RAG generation flow:
 
 1. Use selected evidence only from `EvidenceSelectionResult`.
@@ -668,6 +705,11 @@ Supported safe filters:
 - enum serialization for selected/rejected evidence summaries;
 - smoke CLI parser and path validation.
 
+**Implemented Phase 9A.5 workflow tests**:
+- wrapper scripts import workflow `main()` functions;
+- workflow parsers preserve existing command flags;
+- shared JSON writer creates parent directories and writes UTF-8 JSON.
+
 **Future generation unit tests**:
 - context packing with citation anchors;
 - strict prompt template;
@@ -743,6 +785,13 @@ and citation-validation failures.
   evidence rendering, and JSON smoke reports for known manual retrieval cases.
 - Kept LLM answer generation, prompt templates, generated-citation validation,
   hybrid retrieval, RRF, and reranking out of scope.
+
+### Version 0.5 (2026-06-12)
+
+- Moved retrieval workflow logic into `src/retrieval/workflows/`.
+- Kept top-level retrieval scripts as backward-compatible thin wrappers.
+- Preserved command flags, report paths, and retrieval-side behavior.
+- Documented the workflow boundary for future Phase 9B entrypoints.
 
 ### Version 0.1 (2026-05-21)
 

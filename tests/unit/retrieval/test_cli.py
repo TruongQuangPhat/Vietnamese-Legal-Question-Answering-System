@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from scripts import run_dense_retrieval
 from src.retrieval.models import RetrievalFilters, RetrievalResult, RetrievedChunk
+from src.retrieval.workflows import dense_retrieval
 
 
 def test_parser_requires_query() -> None:
     """The CLI exposes the expected single-query arguments."""
-    parser = run_dense_retrieval.build_arg_parser()
+    parser = dense_retrieval.build_arg_parser()
 
     args = parser.parse_args(["--query", "Quyền sử dụng đất là gì?", "--top-k", "5"])
 
@@ -23,7 +23,7 @@ def test_parser_requires_query() -> None:
 def test_validate_cli_rejects_blank_query() -> None:
     """Blank queries fail at CLI validation."""
     with pytest.raises(ValueError, match="query"):
-        run_dense_retrieval.validate_cli_arguments(
+        dense_retrieval.validate_cli_arguments(
             query=" ",
             top_k=1,
             output_path=None,
@@ -34,7 +34,7 @@ def test_validate_cli_rejects_blank_query() -> None:
 def test_validate_cli_rejects_bad_top_k() -> None:
     """top-k must be positive."""
     with pytest.raises(ValueError, match="top-k"):
-        run_dense_retrieval.validate_cli_arguments(
+        dense_retrieval.validate_cli_arguments(
             query="test",
             top_k=0,
             output_path=None,
@@ -44,7 +44,7 @@ def test_validate_cli_rejects_bad_top_k() -> None:
 
 def test_validate_cli_allows_retrieval_report_output() -> None:
     """Manual retrieval reports may be written under retrieval reports."""
-    run_dense_retrieval.validate_cli_arguments(
+    dense_retrieval.validate_cli_arguments(
         query="test",
         top_k=1,
         output_path=Path("artifacts/reports/retrieval/manual_query_result.json"),
@@ -55,7 +55,7 @@ def test_validate_cli_allows_retrieval_report_output() -> None:
 def test_validate_cli_rejects_corpus_output() -> None:
     """CLI output cannot write into protected corpus paths."""
     with pytest.raises(ValueError, match="protected"):
-        run_dense_retrieval.validate_cli_arguments(
+        dense_retrieval.validate_cli_arguments(
             query="test",
             top_k=1,
             output_path=Path("data/processed/result.json"),
@@ -89,7 +89,7 @@ def test_build_cli_report_uses_previews_and_law_title_alias() -> None:
         ],
     )
 
-    report = run_dense_retrieval.build_cli_report(result, preview_chars=12)
+    report = dense_retrieval.build_cli_report(result, preview_chars=12)
 
     assert report["results"][0]["law_title"] == "Bộ luật Dân sự 2015"
     assert report["results"][0]["text_preview"] == "Một hai b..."
@@ -123,7 +123,7 @@ def test_print_summary_accepts_report(capsys: pytest.CaptureFixture[str]) -> Non
         ],
     }
 
-    run_dense_retrieval.print_summary(report)
+    dense_retrieval.print_summary(report)
 
     captured = capsys.readouterr()
     assert "#1 score=0.900000 chunk_id=chunk-1" in captured.out

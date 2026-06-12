@@ -8,6 +8,7 @@ Phase 9A.1 — Retrieval Sanity Evaluation & Evidence Risk Audit: implemented
 Phase 9A.2 — Evidence Safety and Context Assembly Rules: implemented
 Phase 9A.3 — Evidence Selection and Fallback Rules: implemented
 Phase 9A.4 — Selection Integration Smoke Test: implemented
+Phase 9A.5 — Workflow Boundary Cleanup: implemented
 Phase 9B — Naive RAG Answer Generation: not implemented
 ```
 
@@ -248,6 +249,38 @@ structural evidence rules drive the selection decision.
 This slice still does not call an LLM, generate answers, create final prompts,
 improve retrieval ranking, perform hybrid retrieval, rerank, or mutate
 Qdrant/corpus data.
+
+## Phase 9A.5 Implemented
+
+Phase 9A.5 moves executable retrieval workflow logic out of top-level
+`scripts/` and into reusable modules:
+
+```text
+src/retrieval/workflows/
+  __init__.py
+  common.py
+  dense_retrieval.py
+  dense_evaluation.py
+  selection_smoke.py
+```
+
+The top-level scripts remain backward-compatible wrappers:
+
+```text
+scripts/run_dense_retrieval.py
+scripts/evaluate_dense_retrieval.py
+scripts/run_selection_smoke.py
+```
+
+These wrappers only bootstrap repository imports and call the corresponding
+workflow `main()` function. Argument parsing, dependency construction, report
+writing, path safety checks, and console summaries now live under
+`src/retrieval/workflows/`.
+
+No retrieval, evaluation, evidence, selection, ranking, scoring, risk flag, or
+output schema behavior was intentionally changed. Future Phase 9B executable
+entrypoints should follow the same rule: reusable workflow logic belongs under
+`src/`, while `scripts/` remains a compatibility layer for commands.
 
 ## Selection Smoke Command
 

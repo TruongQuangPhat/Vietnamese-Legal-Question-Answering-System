@@ -7,7 +7,6 @@ from typing import Any
 
 import pytest
 
-from scripts import run_selection_smoke as smoke_cli
 from src.retrieval.evaluation import ExpectedTarget, ManualRetrievalQuery
 from src.retrieval.evidence import (
     CitationScope,
@@ -34,6 +33,7 @@ from src.retrieval.selection import (
     RejectedEvidence,
     SelectedEvidence,
 )
+from src.retrieval.workflows import selection_smoke as smoke_cli
 
 
 class FakeRetriever:
