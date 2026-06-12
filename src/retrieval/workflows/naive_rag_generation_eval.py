@@ -24,6 +24,7 @@ from src.retrieval.evaluation import (
 from src.retrieval.evidence import ContextAssemblyConfig
 from src.retrieval.generation import RagAnswerResult, RagGenerationConfig
 from src.retrieval.generation_evaluation import (
+    DEFAULT_EVIDENCE_PREVIEW_CHARS,
     GenerationEvalCaseResult,
     GenerationEvalQuery,
     GenerationEvalReport,
@@ -92,6 +93,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-tokens", type=int, default=1024)
     parser.add_argument("--timeout-s", type=float, default=30.0)
     parser.add_argument(
+        "--include-evidence-preview",
+        action="store_true",
+        help="Include short safe-citable child evidence previews in the report.",
+    )
+    parser.add_argument(
+        "--evidence-preview-chars",
+        type=int,
+        default=DEFAULT_EVIDENCE_PREVIEW_CHARS,
+        help="Maximum characters per selected evidence preview.",
+    )
+    parser.add_argument(
         "--no-auxiliary-context",
         action="store_true",
         help="Suppress auxiliary parent context in generation prompts.",
@@ -125,6 +137,7 @@ async def run_naive_rag_generation_eval(argv: list[str] | None = None) -> int:
             temperature=args.temperature,
             max_tokens=args.max_tokens,
             timeout_s=args.timeout_s,
+            evidence_preview_chars=args.evidence_preview_chars,
         )
         retrieval_config = load_retrieval_config(args.config)
         cases = load_generation_eval_queries(args.queries)
@@ -199,6 +212,8 @@ async def run_naive_rag_generation_eval(argv: list[str] | None = None) -> int:
             top_k=args.top_k,
             provider=args.provider,
             model=openrouter.model,
+            include_evidence_preview=args.include_evidence_preview,
+            evidence_preview_chars=args.evidence_preview_chars,
         )
         write_report(args.output, report)
     except (
@@ -233,6 +248,8 @@ async def run_generation_eval_suite(
     top_k: int,
     provider: str,
     model: str,
+    include_evidence_preview: bool = False,
+    evidence_preview_chars: int = DEFAULT_EVIDENCE_PREVIEW_CHARS,
 ) -> GenerationEvalReport:
     """Run injected Naive RAG cases and aggregate deterministic validation."""
     if not cases:
@@ -241,7 +258,14 @@ async def run_generation_eval_suite(
     results: list[GenerationEvalCaseResult] = []
     for case in cases:
         result = await runner(case)
-        results.append(validate_generation_result(case, result))
+        results.append(
+            validate_generation_result(
+                case,
+                result,
+                include_evidence_preview=include_evidence_preview,
+                evidence_preview_chars=evidence_preview_chars,
+            )
+        )
     return build_generation_eval_report(
         cases=results,
         started_at=started_at,
@@ -263,6 +287,7 @@ def validate_cli_arguments(
     temperature: float,
     max_tokens: int,
     timeout_s: float,
+    evidence_preview_chars: int,
 ) -> None:
     """Validate Phase 9C paths and bounded generation settings."""
     if not queries_path.is_file():
@@ -282,6 +307,8 @@ def validate_cli_arguments(
         raise ValueError("max-tokens must be positive")
     if timeout_s <= 0:
         raise ValueError("timeout-s must be positive")
+    if evidence_preview_chars <= 0:
+        raise ValueError("evidence-preview-chars must be positive")
     if not 0 <= temperature <= 2:
         raise ValueError("temperature must be between 0 and 2")
 
@@ -310,6 +337,8 @@ def print_summary(report: GenerationEvalReport) -> None:
     print(f"Citation ID coverage rate: {report.citation_id_coverage_rate:.3f}")
     print(f"Unknown citation IDs: {report.unknown_citation_id_count}")
     print(f"Missing citation IDs: {report.missing_citation_id_count}")
+    print(f"Evidence previews: {report.evidence_preview_total_count}")
+    print(f"Missing cited evidence previews: {report.evidence_preview_missing_count}")
     print(f"Secret leak failures: {report.secret_leak_failures}")
 
 

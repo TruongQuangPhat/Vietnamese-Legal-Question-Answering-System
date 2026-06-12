@@ -149,6 +149,11 @@ async def test_answer_allowed_selection_calls_llm_once_and_maps_citation() -> No
     assert len(llm.requests) == 1
     assert result.citations[0].evidence_id == "E1"
     assert result.citations[0].citation == "Điểm d, Khoản 3, Điều 16, Luật Bảo hiểm y tế"
+    assert result.used_evidence[0].safe_citable_text == "d) Trẻ em dưới 6 tuổi..."
+    assert result.used_evidence[0].citation_scope == "child_exact"
+    assert result.used_evidence[0].is_directly_citable is True
+    assert result.used_evidence[0].parent_context_included_in_prompt is False
+    assert "safe_citable_text" not in result.model_dump()["used_evidence"][0]
 
 
 @pytest.mark.asyncio

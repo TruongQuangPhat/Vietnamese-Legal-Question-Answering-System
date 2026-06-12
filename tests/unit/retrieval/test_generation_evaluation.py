@@ -13,9 +13,11 @@ from src.retrieval.generation import (
     CitationIssueSeverity,
     RagAnswerResult,
     RagCitation,
+    UsedEvidence,
 )
 from src.retrieval.generation_evaluation import (
     GenerationEvalQuery,
+    build_evidence_preview,
     build_generation_eval_report,
     is_likely_vietnamese,
     load_generation_eval_queries,
@@ -293,6 +295,99 @@ def test_manual_review_and_caution_metrics_are_aggregated() -> None:
     assert report.selection_warning_count == 1
 
 
+def test_evidence_preview_uses_only_redacted_bounded_citable_text() -> None:
+    """Preview excludes parent content, redacts secrets, and records truncation."""
+    preview = build_evidence_preview(
+        _used_evidence(
+            safe_citable_text="sk-or-example " + ("x" * 80),
+            auxiliary_context_present=True,
+            parent_context_included_in_prompt=True,
+        ),
+        max_chars=40,
+    )
+
+    assert preview.text_preview_truncated is True
+    assert len(preview.text_preview or "") == 43
+    assert "sk-or-" not in (preview.text_preview or "")
+    assert "[REDACTED]" in (preview.text_preview or "")
+    assert preview.auxiliary_context_present is True
+    assert preview.parent_context_included_in_prompt is True
+    assert "parent_text" not in preview.model_dump()
+
+
+def test_case_maps_cited_ids_to_evidence_previews() -> None:
+    """Generated [E#] IDs map to selected preview records."""
+    evaluated = validate_generation_result(
+        _allowed_case(),
+        _result(
+            answer="Nội dung hợp lệ [E1].",
+            citations=[_citation()],
+            used_evidence=[_used_evidence()],
+        ),
+        include_evidence_preview=True,
+        evidence_preview_chars=500,
+    )
+
+    assert evaluated.evidence_preview_count == 1
+    assert evaluated.cited_evidence_preview_count == 1
+    assert evaluated.all_cited_ids_have_preview is True
+    assert evaluated.evidence_preview_missing_count == 0
+    assert evaluated.cited_evidence_previews[0].evidence_id == "E1"
+
+
+def test_missing_cited_evidence_preview_is_readiness_metric_only() -> None:
+    """A missing preview is reported without weakening citation validation."""
+    evaluated = validate_generation_result(
+        _allowed_case(),
+        _result(
+            answer="Nội dung hợp lệ [E1].",
+            citations=[_citation()],
+            used_evidence=[],
+        ),
+        include_evidence_preview=True,
+    )
+
+    assert evaluated.passed is True
+    assert evaluated.all_cited_ids_have_preview is False
+    assert evaluated.evidence_preview_missing_count == 1
+
+
+def test_evidence_preview_report_metrics_are_aggregated() -> None:
+    """Report readiness metrics summarize available and missing previews."""
+    available = validate_generation_result(
+        _allowed_case(),
+        _result(
+            answer="Nội dung [E1].",
+            citations=[_citation()],
+            used_evidence=[_used_evidence()],
+        ),
+        include_evidence_preview=True,
+    )
+    missing = validate_generation_result(
+        _allowed_case(case_id="missing-preview"),
+        _result(answer="Nội dung [E1].", citations=[_citation()]),
+        include_evidence_preview=True,
+    )
+
+    report = build_generation_eval_report(
+        cases=[available, missing],
+        started_at=datetime.now(UTC),
+        dataset_path=Path("data/eval/test.jsonl"),
+        collection_name="collection",
+        vector_name="dense",
+        top_k=20,
+        provider="openrouter",
+        model="test/model",
+    )
+
+    assert report.evidence_preview_case_count == 1
+    assert report.evidence_preview_total_count == 1
+    assert report.cited_evidence_preview_total_count == 1
+    assert report.evidence_preview_missing_count == 1
+    assert report.all_cited_ids_have_preview_rate == 0.5
+    assert report.cases_missing_evidence_preview == ["missing-preview"]
+
+
 def _allowed_case(
     *,
     case_id: str = "allowed",
@@ -348,13 +443,14 @@ def _result(
     citation_issues: list[CitationIssue] | None = None,
     selection_metadata: dict[str, object] | None = None,
     selection_warnings: list[str] | None = None,
+    used_evidence: list[UsedEvidence] | None = None,
 ) -> RagAnswerResult:
     return RagAnswerResult(
         query="Câu hỏi",
         decision=decision,
         answer=answer,
         citations=citations,
-        used_evidence=[],
+        used_evidence=used_evidence or [],
         fallback_reasons=[],
         selection_warnings=selection_warnings or [],
         citation_issues=citation_issues or [],
@@ -386,4 +482,28 @@ def _citation_issue(code: str) -> CitationIssue:
             else CitationIssueSeverity.WARNING
         ),
         message="citation validation issue",
+    )
+
+
+def _used_evidence(
+    *,
+    safe_citable_text: str = "Quyền dân sự được pháp luật bảo vệ.",
+    auxiliary_context_present: bool = False,
+    parent_context_included_in_prompt: bool = False,
+) -> UsedEvidence:
+    return UsedEvidence(
+        evidence_id="E1",
+        packet_id="P1",
+        chunk_id="chunk-1",
+        citation="Điều 1",
+        law_id="BLDS_2015",
+        law_title="Bộ luật Dân sự 2015",
+        article_number="1",
+        source_url="https://thuvienphapluat.vn/test",
+        citation_scope="child_exact",
+        safety_level="caution",
+        is_directly_citable=True,
+        safe_citable_text=safe_citable_text,
+        auxiliary_context_present=auxiliary_context_present,
+        parent_context_included_in_prompt=parent_context_included_in_prompt,
     )

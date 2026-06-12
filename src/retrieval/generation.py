@@ -53,7 +53,18 @@ class UsedEvidence(BaseModel):
     packet_id: str
     chunk_id: str | None = None
     citation: str | None = None
+    law_id: str | None = None
+    law_title: str | None = None
+    article_number: str | None = None
+    clause_number: str | None = None
+    point_label: str | None = None
     source_url: str | None = None
+    citation_scope: str | None = None
+    safety_level: str | None = None
+    is_directly_citable: bool | None = None
+    safe_citable_text: str | None = Field(None, exclude=True)
+    auxiliary_context_present: bool = False
+    parent_context_included_in_prompt: bool = False
 
 
 class CitationIssue(BaseModel):
@@ -189,7 +200,18 @@ def used_evidence_from_prompt(prompt_evidence: list[PromptEvidence]) -> list[Use
             packet_id=item.packet_id,
             chunk_id=item.chunk_id,
             citation=item.citation,
+            law_id=item.law_id,
+            law_title=item.law_title,
+            article_number=item.article_number,
+            clause_number=item.clause_number,
+            point_label=item.point_label,
             source_url=item.source_url,
+            citation_scope=item.citation_scope,
+            safety_level=item.safety_level,
+            is_directly_citable=item.is_directly_citable,
+            safe_citable_text=item.citable_text,
+            auxiliary_context_present=item.auxiliary_context is not None,
+            parent_context_included_in_prompt=item.auxiliary_context is not None,
         )
         for item in prompt_evidence
     ]

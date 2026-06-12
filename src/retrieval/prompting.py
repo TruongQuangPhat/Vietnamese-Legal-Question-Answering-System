@@ -22,6 +22,9 @@ class PromptEvidence(BaseModel):
     clause_number: str | None = None
     point_label: str | None = None
     source_url: str | None = None
+    citation_scope: str | None = None
+    safety_level: str | None = None
+    is_directly_citable: bool = True
     citable_text: str
     auxiliary_context: str | None = None
 
@@ -119,6 +122,9 @@ def _prompt_evidence(
         clause_number=packet.clause_number,
         point_label=packet.point_label,
         source_url=packet.source_url,
+        citation_scope=selected.citation_scope.value,
+        safety_level=selected.safety_level.value,
+        is_directly_citable=True,
         citable_text=packet.safe_citable_text.text,
         auxiliary_context=(
             packet.auxiliary_context.text

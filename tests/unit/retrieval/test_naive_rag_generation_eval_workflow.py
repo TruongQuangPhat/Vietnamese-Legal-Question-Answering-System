@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, RagCitation
+from src.retrieval.generation import (
+    FALLBACK_ANSWER_VI,
+    RagAnswerResult,
+    RagCitation,
+    UsedEvidence,
+)
 from src.retrieval.generation_evaluation import (
     GenerationEvalQuery,
     load_generation_eval_queries,
@@ -162,6 +167,47 @@ async def test_report_write_does_not_expose_environment_key(
     assert json.loads(serialized)["citation_id_coverage_rate"] == 1.0
 
 
+@pytest.mark.asyncio
+async def test_suite_can_include_evidence_previews_without_external_calls() -> None:
+    """Opt-in preview mode serializes selected child evidence from fake results."""
+
+    async def runner(case: GenerationEvalQuery) -> RagAnswerResult:
+        del case
+        return _result(
+            decision=AnswerabilityDecision.ANSWER_ALLOWED,
+            answer="Nội dung hợp lệ [E1].",
+            llm_called=True,
+            citations=[_citation()],
+            used_evidence=[
+                UsedEvidence(
+                    evidence_id="E1",
+                    packet_id="P1",
+                    citation="Điều 1",
+                    safe_citable_text="Nội dung Điều 1.",
+                    citation_scope="child_exact",
+                    safety_level="safe",
+                    is_directly_citable=True,
+                )
+            ],
+        )
+
+    report = await naive_rag_generation_eval.run_generation_eval_suite(
+        [_allowed_case()],
+        runner,
+        dataset_path=Path("queries.jsonl"),
+        collection_name="collection",
+        vector_name="dense",
+        top_k=20,
+        provider="openrouter",
+        model="test/model",
+        include_evidence_preview=True,
+        evidence_preview_chars=500,
+    )
+
+    assert report.evidence_preview_total_count == 1
+    assert report.cases[0].evidence_previews[0].text_preview == "Nội dung Điều 1."
+
+
 def test_parser_accepts_documented_generation_eval_flags() -> None:
     """The workflow parser accepts the documented live command."""
     args = naive_rag_generation_eval.build_arg_parser().parse_args(
@@ -182,11 +228,16 @@ def test_parser_accepts_documented_generation_eval_flags() -> None:
             "google/gemini-2.5-flash-lite",
             "--output",
             "artifacts/reports/retrieval/naive_rag_generation_eval.json",
+            "--include-evidence-preview",
+            "--evidence-preview-chars",
+            "500",
         ]
     )
 
     assert args.model == "google/gemini-2.5-flash-lite"
     assert args.top_k == 20
+    assert args.include_evidence_preview is True
+    assert args.evidence_preview_chars == 500
 
 
 def test_script_is_thin_workflow_wrapper() -> None:
@@ -224,13 +275,14 @@ def _result(
     answer: str,
     llm_called: bool,
     citations: list[RagCitation],
+    used_evidence: list[UsedEvidence] | None = None,
 ) -> RagAnswerResult:
     return RagAnswerResult(
         query="Câu hỏi",
         decision=decision,
         answer=answer,
         citations=citations,
-        used_evidence=[],
+        used_evidence=used_evidence or [],
         fallback_reasons=[],
         selection_warnings=[],
         citation_issues=[],

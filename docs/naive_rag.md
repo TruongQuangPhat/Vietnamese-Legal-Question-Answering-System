@@ -718,6 +718,64 @@ manual review. Citation ID coverage and all deterministic policy rates were
 leaks. The report recorded 16 selected caution items, two all-caution cases,
 and 31 selection warnings for human review.
 
+### Phase 9C.2 Manual Faithfulness Review
+
+Phase 9C.2 exports the expanded JSON report to a human-readable Markdown
+worksheet:
+
+```bash
+uv run python scripts/export_naive_rag_manual_review.py \
+  --input artifacts/reports/retrieval/naive_rag_generation_eval_expanded.json \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval_expanded_manual_review.md
+```
+
+The worksheet separates generated-answer review from fallback review and
+provides unchecked claim-to-citation rows. All-caution cases require special
+attention. Citation summaries and selected evidence text are not available in
+the Phase 9C.1 report, so the current status is `manual_review_partial`;
+reviewers must consult the underlying evidence before recording a verdict.
+
+The exporter performs no retrieval, generation, OpenRouter, or Qdrant
+operation. It does not alter prompt, citation guard, selection, fallback, or
+Phase 10 behavior. The annual-leave case remains a known dense-only fallback.
+
+### Phase 9C.3 Evidence Previews
+
+Evidence previews are opt-in through `--include-evidence-preview`; each preview
+is limited by `--evidence-preview-chars`, defaulting to 500 characters. The
+preview comes only from selected safe-citable child text already used by the
+generation prompt. It is redacted before report serialization.
+
+Reports include selected and cited preview records plus:
+
+- `evidence_preview_case_count`;
+- `evidence_preview_total_count`;
+- `cited_evidence_preview_total_count`;
+- `evidence_preview_missing_count`;
+- `all_cited_ids_have_preview_rate`;
+- `cases_missing_evidence_preview`.
+
+Parent Article text is not serialized. The report records only whether
+auxiliary context existed and whether it was included in the prompt. This
+supports human claim-to-citation review but does not establish semantic
+faithfulness or legal correctness.
+
+The manual review exporter renders:
+
+```text
+Evidence ID | Citation | Scope | Safety | Text Preview | Source
+```
+
+Answers and evidence previews are bounded and visibly marked when truncated.
+All semantic verdicts remain unchecked for a human reviewer.
+
+The live evidence-preview report passed 5/5 cases. It contains 20 selected
+evidence previews across four generated answers, 14 cited preview mappings,
+zero missing cited previews, and
+`all_cited_ids_have_preview_rate=1.0`. The generated Markdown worksheet has
+status `evidence_preview_review_ready`; this means the evidence is available
+for manual inspection, not that faithfulness has been proven.
+
 ## Data Models / Output Schema
 
 ### API Request

@@ -142,6 +142,20 @@ Corpus Registry
   policy rates at 1.0 and zero unknown/missing citation IDs or secret leaks.
   Two all-caution cases and 31 selection warnings remain explicit manual-review
   signals.
+- Phase 9C.2 provides an offline Markdown worksheet for human
+  claim-to-citation review. Its status is `manual_review_partial` because the
+  Phase 9C.1 report contains answer previews and citation IDs but not selected
+  evidence text or citation summaries.
+- Phase 9C.2 changes no retrieval, selection, prompting, generation, citation
+  guard, OpenRouter, Qdrant, indexing, or corpus behavior.
+- Phase 9C.3 adds opt-in, bounded, redacted safe-citable child evidence
+  previews to generation evaluation reports and manual-review worksheets.
+  Parent text is excluded and auxiliary context is represented only by flags.
+- Evidence-preview coverage improves traceability for human review but does
+  not prove semantic faithfulness or legal correctness.
+- The live Phase 9C.3 report contains 20 selected evidence previews and 14
+  cited preview mappings across four generated answers, with zero missing
+  cited previews. The manual worksheet is `evidence_preview_review_ready`.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
 - The next work is reviewing Phase 9C generation evaluation output before any

@@ -16,7 +16,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult
+from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, UsedEvidence
 from src.retrieval.selection import AnswerabilityDecision
 
 GenerationEvalLanguage = Literal["vi"]
@@ -43,7 +43,8 @@ _VIETNAMESE_LEGAL_TERMS = (
     "quyền dân sự",
 )
 _CITATION_ID_RE = re.compile(r"\[E[1-9][0-9]*\]")
-_ANSWER_PREVIEW_LIMIT = 600
+_ANSWER_PREVIEW_LIMIT = 2000
+DEFAULT_EVIDENCE_PREVIEW_CHARS = 500
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("openrouter-key-name", re.compile(r"OPENROUTER_API_KEY", re.IGNORECASE)),
     ("authorization-marker", re.compile(r"\bAuthorization\b", re.IGNORECASE)),
@@ -63,6 +64,30 @@ class GenerationValidationIssue(BaseModel):
     code: str = Field(..., min_length=1)
     severity: ValidationSeverity
     message: str = Field(..., min_length=1)
+
+
+class EvidencePreview(BaseModel):
+    """Short, traceable preview of selected directly citable evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    evidence_id: str
+    packet_id: str | None = None
+    chunk_id: str | None = None
+    citation: str | None = None
+    law_id: str | None = None
+    law_title: str | None = None
+    article_number: str | None = None
+    clause_number: str | None = None
+    point_label: str | None = None
+    source_url: str | None = None
+    citation_scope: str | None = None
+    safety_level: str | None = None
+    is_directly_citable: bool | None = None
+    text_preview: str | None = None
+    text_preview_truncated: bool = False
+    auxiliary_context_present: bool = False
+    parent_context_included_in_prompt: bool = False
 
 
 class GenerationEvalQuery(BaseModel):
@@ -156,8 +181,17 @@ class GenerationEvalCaseResult(BaseModel):
     all_selected_evidence_caution: bool
     manual_review_required: bool
     blocking: bool
+    evidence_previews: list[EvidencePreview] = Field(default_factory=list)
+    cited_evidence_previews: list[EvidencePreview] = Field(default_factory=list)
+    all_cited_ids_have_preview: bool = True
+    evidence_preview_count: int = Field(0, ge=0)
+    cited_evidence_preview_count: int = Field(0, ge=0)
+    evidence_preview_missing_count: int = Field(0, ge=0)
+    caution_evidence_ids: list[str] = Field(default_factory=list)
+    all_caution_evidence_ids: list[str] = Field(default_factory=list)
     validation_issues: list[GenerationValidationIssue] = Field(default_factory=list)
     answer_preview: str = ""
+    answer_preview_truncated: bool = False
     model: str | None = None
     provider: str | None = None
     pipeline_error_count: int = Field(..., ge=0)
@@ -200,6 +234,12 @@ class GenerationEvalReport(BaseModel):
     total_caution_selected_count: int = Field(..., ge=0)
     cases_with_all_caution_evidence: int = Field(..., ge=0)
     selection_warning_count: int = Field(..., ge=0)
+    evidence_preview_case_count: int = Field(0, ge=0)
+    evidence_preview_total_count: int = Field(0, ge=0)
+    cited_evidence_preview_total_count: int = Field(0, ge=0)
+    evidence_preview_missing_count: int = Field(0, ge=0)
+    all_cited_ids_have_preview_rate: float = Field(1.0, ge=0.0, le=1.0)
+    cases_missing_evidence_preview: list[str] = Field(default_factory=list)
     cases: list[GenerationEvalCaseResult] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
 
@@ -225,8 +265,13 @@ def load_generation_eval_queries(path: Path) -> list[GenerationEvalQuery]:
 def validate_generation_result(
     case: GenerationEvalQuery,
     result: RagAnswerResult,
+    *,
+    include_evidence_preview: bool = False,
+    evidence_preview_chars: int = DEFAULT_EVIDENCE_PREVIEW_CHARS,
 ) -> GenerationEvalCaseResult:
     """Validate one existing Naive RAG result without external calls."""
+    if evidence_preview_chars <= 0:
+        raise ValueError("evidence_preview_chars must be positive")
     issues: list[GenerationValidationIssue] = []
 
     decision_passed = result.decision in case.allowed_decisions
@@ -317,6 +362,34 @@ def validate_generation_result(
     citation_id_coverage_applicable = (
         case.requires_citation_ids and result.decision == AnswerabilityDecision.ANSWER_ALLOWED
     )
+    evidence_previews = (
+        [
+            build_evidence_preview(item, max_chars=evidence_preview_chars)
+            for item in result.used_evidence
+        ]
+        if include_evidence_preview
+        else []
+    )
+    preview_by_id = {preview.evidence_id: preview for preview in evidence_previews}
+    cited_ids = _citation_ids(result.answer)
+    cited_evidence_previews = [
+        preview_by_id[evidence_id] for evidence_id in cited_ids if evidence_id in preview_by_id
+    ]
+    evidence_preview_missing_count = sum(
+        evidence_id not in preview_by_id for evidence_id in cited_ids
+    )
+    caution_evidence_ids = [
+        preview.evidence_id for preview in evidence_previews if preview.safety_level == "caution"
+    ]
+    all_caution_evidence_ids = (
+        caution_evidence_ids
+        if evidence_previews and len(caution_evidence_ids) == len(evidence_previews)
+        else []
+    )
+    answer_preview, answer_preview_truncated = build_text_preview(
+        result.answer,
+        max_chars=_ANSWER_PREVIEW_LIMIT,
+    )
     passed = not any(issue.severity == "error" for issue in issues)
     return GenerationEvalCaseResult(
         id=case.id,
@@ -346,8 +419,17 @@ def validate_generation_result(
         all_selected_evidence_caution=all_selected_evidence_caution,
         manual_review_required=case.manual_review_required,
         blocking=case.blocking,
+        evidence_previews=evidence_previews,
+        cited_evidence_previews=cited_evidence_previews,
+        all_cited_ids_have_preview=evidence_preview_missing_count == 0,
+        evidence_preview_count=len(evidence_previews),
+        cited_evidence_preview_count=len(cited_evidence_previews),
+        evidence_preview_missing_count=evidence_preview_missing_count,
+        caution_evidence_ids=caution_evidence_ids,
+        all_caution_evidence_ids=all_caution_evidence_ids,
         validation_issues=issues,
-        answer_preview=redact_answer_preview(result.answer),
+        answer_preview=answer_preview,
+        answer_preview_truncated=answer_preview_truncated,
         model=result.model,
         provider=result.provider,
         pipeline_error_count=len(result.errors),
@@ -377,6 +459,12 @@ def build_generation_eval_report(
         case for case in case_list if case.decision != AnswerabilityDecision.ANSWER_ALLOWED
     ]
     blocking_cases = [case for case in case_list if case.blocking]
+    cited_preview_cases = [
+        case
+        for case in case_list
+        if case.decision == AnswerabilityDecision.ANSWER_ALLOWED
+        and (case.cited_evidence_preview_count or case.evidence_preview_missing_count)
+    ]
     return GenerationEvalReport(
         status=(
             "expanded_generation_eval_passed"
@@ -424,6 +512,21 @@ def build_generation_eval_report(
             case.all_selected_evidence_caution for case in case_list
         ),
         selection_warning_count=sum(len(case.selection_warnings) for case in case_list),
+        evidence_preview_case_count=sum(bool(case.evidence_previews) for case in case_list),
+        evidence_preview_total_count=sum(case.evidence_preview_count for case in case_list),
+        cited_evidence_preview_total_count=sum(
+            case.cited_evidence_preview_count for case in case_list
+        ),
+        evidence_preview_missing_count=sum(
+            case.evidence_preview_missing_count for case in case_list
+        ),
+        all_cited_ids_have_preview_rate=_rate(
+            sum(case.all_cited_ids_have_preview for case in cited_preview_cases),
+            len(cited_preview_cases),
+        ),
+        cases_missing_evidence_preview=[
+            case.id for case in case_list if case.evidence_preview_missing_count
+        ],
         cases=case_list,
         notes=[
             "citation_id_coverage_rate validates [E#] ID integrity only",
@@ -453,14 +556,65 @@ def find_secret_leak_labels(text: str) -> list[str]:
     return [label for label, pattern in _SECRET_PATTERNS if pattern.search(text)]
 
 
-def redact_answer_preview(answer: str) -> str:
-    """Build a bounded answer preview with secret-like content redacted."""
-    redacted = answer
+def redact_secret_like_text(text: str) -> str:
+    """Redact provider-authentication markers from report preview text."""
+    redacted = text
     for _, pattern in _SECRET_PATTERNS:
         redacted = pattern.sub("[REDACTED]", redacted)
-    if len(redacted) <= _ANSWER_PREVIEW_LIMIT:
-        return redacted
-    return f"{redacted[:_ANSWER_PREVIEW_LIMIT]}..."
+    return redacted
+
+
+def build_text_preview(text: str, *, max_chars: int) -> tuple[str, bool]:
+    """Build a redacted bounded preview and return its truncation state."""
+    if max_chars <= 0:
+        raise ValueError("max_chars must be positive")
+    redacted = redact_secret_like_text(text)
+    if len(redacted) <= max_chars:
+        return redacted, False
+    return f"{redacted[:max_chars]}...", True
+
+
+def redact_answer_preview(answer: str) -> str:
+    """Build a bounded answer preview with secret-like content redacted."""
+    return build_text_preview(answer, max_chars=_ANSWER_PREVIEW_LIMIT)[0]
+
+
+def build_evidence_preview(
+    evidence: UsedEvidence,
+    *,
+    max_chars: int = DEFAULT_EVIDENCE_PREVIEW_CHARS,
+) -> EvidencePreview:
+    """Build a safe preview from selected child evidence only.
+
+    Auxiliary parent context is represented only by booleans and is never
+    copied into ``text_preview``.
+    """
+    text_preview: str | None = None
+    text_preview_truncated = False
+    if evidence.safe_citable_text:
+        text_preview, text_preview_truncated = build_text_preview(
+            evidence.safe_citable_text,
+            max_chars=max_chars,
+        )
+    return EvidencePreview(
+        evidence_id=evidence.evidence_id,
+        packet_id=evidence.packet_id,
+        chunk_id=evidence.chunk_id,
+        citation=evidence.citation,
+        law_id=evidence.law_id,
+        law_title=evidence.law_title,
+        article_number=evidence.article_number,
+        clause_number=evidence.clause_number,
+        point_label=evidence.point_label,
+        source_url=evidence.source_url,
+        citation_scope=evidence.citation_scope,
+        safety_level=evidence.safety_level,
+        is_directly_citable=evidence.is_directly_citable,
+        text_preview=text_preview,
+        text_preview_truncated=text_preview_truncated,
+        auxiliary_context_present=evidence.auxiliary_context_present,
+        parent_context_included_in_prompt=evidence.parent_context_included_in_prompt,
+    )
 
 
 def _fallback_policy_passed(
@@ -513,6 +667,10 @@ def _metadata_count(metadata: dict[str, object], key: str) -> int:
 
 def _citation_issue_count(result: RagAnswerResult, code: str) -> int:
     return sum(issue.code == code for issue in result.citation_issues)
+
+
+def _citation_ids(text: str) -> list[str]:
+    return list(dict.fromkeys(match[1:-1] for match in _CITATION_ID_RE.findall(text)))
 
 
 def _issue(code: str, message: str) -> GenerationValidationIssue:

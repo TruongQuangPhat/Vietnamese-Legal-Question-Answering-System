@@ -490,6 +490,103 @@ selection_warning_count = 31
 The caution and warning totals require human inspection; they are not
 automated legal-correctness failures.
 
+## Phase 9C.2 Manual Faithfulness Review
+
+Phase 9C.2 adds an offline manual-review export layer. It reads the existing
+expanded JSON report and produces:
+
+```text
+artifacts/reports/retrieval/
+naive_rag_generation_eval_expanded_manual_review.md
+```
+
+Run:
+
+```bash
+uv run python scripts/export_naive_rag_manual_review.py \
+  --input artifacts/reports/retrieval/naive_rag_generation_eval_expanded.json \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval_expanded_manual_review.md
+```
+
+The worksheet includes case metadata, answer previews, citation IDs,
+selection warnings, fallback checks, and unchecked claim-to-citation tables.
+It prioritizes `health_insurance_children_under_6_generation` and
+`marriage_conditions_generation` because all selected evidence is caution
+marked. `civil_rights_protection_generation` is also prioritized because it is
+explicitly a manual-review case.
+
+Phase 9C.2 status is `manual_review_partial`. The Phase 9C.1 report does not
+contain selected evidence text or citation summaries, and one answer preview
+is truncated. A human reviewer must inspect the underlying selected evidence
+before assigning `pass`, `partial`, `fail`, or `needs_more_evidence`.
+`annual_leave_days_generation` remains a separately reviewed dense-only
+fallback with no LLM call.
+
+The exporter is offline: it does not call OpenRouter, Qdrant, retrieval, or
+generation. It does not change retrieval or generation behavior and does not
+introduce Phase 10 features.
+
+## Phase 9C.3 Evidence Preview Support
+
+Phase 9C.3 adds opt-in evidence previews to the existing generation evaluation:
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash-lite \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json \
+  --include-evidence-preview \
+  --evidence-preview-chars 500
+```
+
+Each preview preserves the evidence ID, packet/chunk metadata, legal
+hierarchy, citation, source URL, citation scope, safety level, and a bounded
+redacted preview of the safe-citable child text. Full parent text is never
+written. Auxiliary context is represented only by boolean indicators and is
+not treated as directly citable evidence.
+
+The report adds evidence-preview coverage totals and maps generated `[E#]`
+IDs to cited preview records. Missing previews remain manual-review readiness
+signals rather than generation failures. `citation_id_coverage_rate` remains
+unchanged and does not measure semantic faithfulness.
+
+Export the evidence-backed worksheet:
+
+```bash
+uv run python scripts/export_naive_rag_manual_review.py \
+  --input artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval_expanded_manual_review_with_evidence.md
+```
+
+The worksheet includes an evidence table and keeps all claim-level reviewer
+verdicts unchecked. No retrieval ranking, selection, fallback, prompt,
+generation, citation guard, OpenRouter, Qdrant, indexing, or corpus behavior
+changes in Phase 9C.3. Phase 10 remains out of scope.
+
+Live Phase 9C.3 result:
+
+```text
+status = expanded_generation_eval_passed
+passed_cases = 5 / 5
+evidence_preview_case_count = 4
+evidence_preview_total_count = 20
+cited_evidence_preview_total_count = 14
+evidence_preview_missing_count = 0
+all_cited_ids_have_preview_rate = 1.0
+cases_missing_evidence_preview = []
+manual review status = evidence_preview_review_ready
+```
+
+All four generated-answer cases now contain selected evidence previews. The
+annual-leave fallback has no prompt evidence preview because generation was
+not allowed and the LLM was not called. The two all-caution cases remain
+priority manual-review cases.
+
 ## Evaluation Command
 
 ```bash
