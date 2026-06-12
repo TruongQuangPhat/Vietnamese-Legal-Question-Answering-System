@@ -92,6 +92,11 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - The expanded Phase 9C.1 live run passed 5/5 deterministic cases. Two
   all-caution cases and 31 selection warnings remain visible for manual legal
   review.
+- Phase 9C.2 and Phase 9C.3 provide a reusable offline review exporter and
+  bounded safe-citable evidence previews. Generated review reports are runtime
+  artifacts; citation coverage still does not prove semantic faithfulness.
+- Phase 9D human claim-to-citation verdict review is next. Phase 10 retrieval
+  improvements remain separately scoped.
 
 ## 5. Official Commands
 

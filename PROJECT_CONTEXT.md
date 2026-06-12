@@ -130,18 +130,11 @@ Corpus Registry
 - Phase 9C runs a small manual generation dataset and reports decision policy,
   LLM call policy, fallback policy, citation ID coverage, likely Vietnamese
   output, forbidden phrases, and secret-like leakage.
-- The initial live Phase 9C run passed 3/3 cases with
-  `citation_id_coverage_rate=1.0`, zero unknown/missing citation IDs, and zero
-  secret leak failures.
 - Phase 9C.1 expands the reviewed generation dataset from three to five unique
   cases. The two variable-decision additions are non-blocking and require
   manual legal review; no new legal expectations were invented.
 - Phase 9C.1 reports manual-review, caution-evidence, and selection-warning
   signals without treating them as semantic-faithfulness checks.
-- The expanded live Phase 9C.1 run passed 5/5 cases with all deterministic
-  policy rates at 1.0 and zero unknown/missing citation IDs or secret leaks.
-  Two all-caution cases and 31 selection warnings remain explicit manual-review
-  signals.
 - Phase 9C.2 provides an offline Markdown worksheet for human
   claim-to-citation review. Its status is `manual_review_partial` because the
   Phase 9C.1 report contains answer previews and citation IDs but not selected
@@ -153,13 +146,13 @@ Corpus Registry
   Parent text is excluded and auxiliary context is represented only by flags.
 - Evidence-preview coverage improves traceability for human review but does
   not prove semantic faithfulness or legal correctness.
-- The live Phase 9C.3 report contains 20 selected evidence previews and 14
-  cited preview mappings across four generated answers, with zero missing
-  cited previews. The manual worksheet is `evidence_preview_review_ready`.
+- Phase 9C.3 is `evidence_preview_review_ready`: generated-answer cases expose
+  selected and cited evidence previews for human review. Generated JSON and
+  Markdown reports remain runtime artifacts and are not source-of-truth data.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- The next work is reviewing Phase 9C generation evaluation output before any
-  separately scoped Phase 10 retrieval improvements.
+- Phase 9D human claim-to-citation verdict review is next. Phase 10 retrieval
+  improvements remain separately scoped.
 
 Operational rules:
 
@@ -301,7 +294,7 @@ artifacts/reports/chunking/processed_jsonl_validation_report.json
 Current next work:
 
 ```text
-Phase 9C — Review repeatable Naive RAG generation evaluation
+Phase 9D — Human claim-to-citation verdict review
 ```
 
 Phase 9A already starts retrieval with BGE-M3 query embedding and dense top-k
@@ -312,8 +305,8 @@ selected citation-safe evidence.
 
 ## 6. Next Immediate Tasks
 
-1. Review Phase 9C aggregate metrics and failed case details.
-2. Manually inspect generated answers for semantic faithfulness.
+1. Record human verdicts for each material claim and cited evidence item.
+2. Resolve all-caution and insufficient-evidence review findings.
 3. Keep citation ID coverage distinct from semantic faithfulness.
 4. Keep sparse/hybrid retrieval and reranking separately scoped for Phase 10.
 

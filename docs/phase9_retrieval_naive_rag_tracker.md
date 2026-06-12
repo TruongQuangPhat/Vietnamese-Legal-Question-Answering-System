@@ -446,49 +446,13 @@ It is never written to the report. The report includes aggregate rates and
 case-level redacted answer previews. The annual-leave case may continue to
 fallback until retrieval quality is improved in a separately scoped phase.
 
-Initial live result using `google/gemini-2.5-flash-lite`:
-
-```text
-status = validated_generation_eval_passed
-passed_cases = 3 / 3
-decision_pass_rate = 1.0
-llm_call_policy_pass_rate = 1.0
-citation_id_coverage_rate = 1.0
-fallback_policy_pass_rate = 1.0
-vietnamese_language_pass_rate = 1.0
-unknown_citation_id_count = 0
-missing_citation_id_count = 0
-forbidden_phrase_failures = 0
-secret_leak_failures = 0
-```
-
 The expanded Phase 9C.1 command writes
 `artifacts/reports/retrieval/naive_rag_generation_eval_expanded.json`. Manual
 legal review remains required even when all deterministic checks pass.
 
-Expanded live result using `google/gemini-2.5-flash-lite`:
-
-```text
-status = expanded_generation_eval_passed
-passed_cases = 5 / 5
-blocking_cases = 3
-manual_review_required_cases = 2
-decision_pass_rate = 1.0
-llm_call_policy_pass_rate = 1.0
-citation_id_coverage_rate = 1.0
-fallback_policy_pass_rate = 1.0
-vietnamese_language_pass_rate = 1.0
-unknown_citation_id_count = 0
-missing_citation_id_count = 0
-forbidden_phrase_failures = 0
-secret_leak_failures = 0
-total_caution_selected_count = 16
-cases_with_all_caution_evidence = 2
-selection_warning_count = 31
-```
-
-The caution and warning totals require human inspection; they are not
-automated legal-correctness failures.
+Live validation passed for the baseline and expanded dataset. Aggregate
+metrics remain available in runtime reports; caution and warning signals
+require human inspection and are not automated legal-correctness failures.
 
 ## Phase 9C.2 Manual Faithfulness Review
 
@@ -568,24 +532,11 @@ verdicts unchecked. No retrieval ranking, selection, fallback, prompt,
 generation, citation guard, OpenRouter, Qdrant, indexing, or corpus behavior
 changes in Phase 9C.3. Phase 10 remains out of scope.
 
-Live Phase 9C.3 result:
-
-```text
-status = expanded_generation_eval_passed
-passed_cases = 5 / 5
-evidence_preview_case_count = 4
-evidence_preview_total_count = 20
-cited_evidence_preview_total_count = 14
-evidence_preview_missing_count = 0
-all_cited_ids_have_preview_rate = 1.0
-cases_missing_evidence_preview = []
-manual review status = evidence_preview_review_ready
-```
-
-All four generated-answer cases now contain selected evidence previews. The
-annual-leave fallback has no prompt evidence preview because generation was
-not allowed and the LLM was not called. The two all-caution cases remain
-priority manual-review cases.
+Phase 9C.3 is `evidence_preview_review_ready`: generated-answer cases contain
+selected evidence previews and cited-ID mappings for human review. Runtime
+JSON and Markdown reports are reproducible outputs, not source-controlled
+project state. The annual-leave fallback still avoids an LLM call, and
+all-caution cases remain priority review items.
 
 ## Evaluation Command
 
@@ -613,8 +564,8 @@ uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
 
 ## Next Work
 
-1. Review Phase 9C failed cases and aggregate safety metrics.
-2. Manually inspect semantic faithfulness; citation ID coverage is not enough.
-3. Decide operational thresholds for when `needs_review` should become fallback.
+1. Phase 9D: record human claim-to-citation verdicts.
+2. Resolve all-caution and insufficient-evidence review findings.
+3. Keep citation ID coverage distinct from semantic faithfulness.
 4. Expand the generation dataset only with reviewed legal expectations.
 5. Keep hybrid retrieval, RRF, and reranking for Phase 10.

@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 9C.1 complete — reviewed generation evaluation expanded
+Current phase: Phase 9C.3 complete — evidence-backed manual review ready
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -28,11 +28,13 @@ Completed:
   Phase 9B — Fallback-aware Naive RAG Generation
   Phase 9C — Naive RAG Generation Evaluation & Safety Hardening
   Phase 9C.1 — Reviewed Generation Dataset Expansion
+  Phase 9C.2 — Manual Faithfulness Review Export
+  Phase 9C.3 — Evidence Preview Support
 
 Next:
-  Review repeatable Phase 9C generation evaluation reports
-  Manually inspect semantic faithfulness separately from citation ID coverage
-  Keep Phase 10 retrieval improvements separately scoped
+  Phase 9D — Human claim-to-citation verdict review
+  Keep citation ID coverage distinct from semantic faithfulness
+  Do not begin Phase 10 during Phase 9 review cleanup
 ```
 
 Phase 9B loads `.env` automatically for `scripts/run_naive_rag.py`.
@@ -68,9 +70,10 @@ because their allowed retrieval decisions vary. The expanded report adds
 caution-evidence and selection-warning review signals. These metrics do not
 establish semantic faithfulness or legal correctness.
 
-The expanded live run completed with `expanded_generation_eval_passed`: 5/5
-cases passed, citation ID coverage was 1.0, no unknown/missing citation IDs or
-secret leaks were detected, and two all-caution cases remain for human review.
+Phase 9C.3 adds opt-in, bounded evidence previews for repeatable manual review.
+Generated JSON and Markdown reports are runtime artifacts and should not be
+committed. Citation ID coverage remains distinct from semantic faithfulness,
+and human claim-to-citation verdicts are Phase 9D work.
 
 Phase 4 is gate-ready:
 

@@ -681,10 +681,6 @@ coverage is not semantic faithfulness. The baseline is not production-ready,
 does not provide professional legal advice, and does not include Phase 10
 retrieval improvements or an LLM judge.
 
-The initial live run with `google/gemini-2.5-flash-lite` passed all three cases
-with citation ID coverage 1.0, fallback policy pass rate 1.0, and zero
-unknown/missing citation IDs, forbidden phrases, or secret leaks.
-
 ### Phase 9C.1 Dataset Expansion
 
 Phase 9C.1 expands the dataset from three to five unique cases using all
@@ -710,13 +706,6 @@ Use the same command with:
 Passing deterministic checks does not make an answer legally authoritative or
 replace professional legal review. Phase 10 retrieval changes remain out of
 scope.
-
-The expanded live run passed 5/5 cases with status
-`expanded_generation_eval_passed`. Three cases are blocking and two require
-manual review. Citation ID coverage and all deterministic policy rates were
-1.0, with zero unknown/missing citation IDs, forbidden phrases, or secret
-leaks. The report recorded 16 selected caution items, two all-caution cases,
-and 31 selection warnings for human review.
 
 ### Phase 9C.2 Manual Faithfulness Review
 
@@ -769,12 +758,11 @@ Evidence ID | Citation | Scope | Safety | Text Preview | Source
 Answers and evidence previews are bounded and visibly marked when truncated.
 All semantic verdicts remain unchecked for a human reviewer.
 
-The live evidence-preview report passed 5/5 cases. It contains 20 selected
-evidence previews across four generated answers, 14 cited preview mappings,
-zero missing cited previews, and
-`all_cited_ids_have_preview_rate=1.0`. The generated Markdown worksheet has
-status `evidence_preview_review_ready`; this means the evidence is available
-for manual inspection, not that faithfulness has been proven.
+Generated JSON and Markdown outputs under `artifacts/reports/retrieval/` are
+runtime review artifacts and should not be committed. Phase 9C.3 makes the
+worksheet `evidence_preview_review_ready`; Phase 9D is the human
+claim-to-citation verdict step. This still does not prove semantic
+faithfulness.
 
 ## Data Models / Output Schema
 
