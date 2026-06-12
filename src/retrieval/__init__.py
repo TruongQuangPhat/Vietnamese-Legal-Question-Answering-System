@@ -35,6 +35,15 @@ from src.retrieval.generation import (
     build_fallback_result,
     check_generated_citations,
 )
+from src.retrieval.generation_evaluation import (
+    GenerationEvalCaseResult,
+    GenerationEvalQuery,
+    GenerationEvalReport,
+    GenerationValidationIssue,
+    build_generation_eval_report,
+    load_generation_eval_queries,
+    validate_generation_result,
+)
 from src.retrieval.integration import (
     SelectionSmokeAggregate,
     SelectionSmokeError,
@@ -106,6 +115,10 @@ __all__ = [
     "FALLBACK_OPENROUTER_BASE_URL",
     "FALLBACK_OPENROUTER_DEV_MODEL",
     "FALLBACK_OPENROUTER_MODEL",
+    "GenerationEvalCaseResult",
+    "GenerationEvalQuery",
+    "GenerationEvalReport",
+    "GenerationValidationIssue",
     "LLMClientError",
     "LLMMessage",
     "LLMRequest",
@@ -139,11 +152,13 @@ __all__ = [
     "build_evidence_bundle",
     "build_evidence_packet",
     "build_fallback_result",
+    "build_generation_eval_report",
     "build_naive_rag_prompt",
     "check_generated_citations",
     "evaluate_dense_retrieval",
     "filter_query_records",
     "load_manual_retrieval_queries",
+    "load_generation_eval_queries",
     "load_openrouter_config",
     "load_project_dotenv",
     "run_naive_rag",
@@ -151,5 +166,6 @@ __all__ = [
     "run_selection_smoke_suite",
     "resolve_openrouter_settings",
     "select_evidence_for_answer",
+    "validate_generation_result",
     "UsedEvidence",
 ]

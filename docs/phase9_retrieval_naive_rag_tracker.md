@@ -10,6 +10,7 @@ Phase 9A.3 — Evidence Selection and Fallback Rules: implemented
 Phase 9A.4 — Selection Integration Smoke Test: implemented
 Phase 9A.5 — Workflow Boundary Cleanup: implemented
 Phase 9B — Naive RAG Answer Generation: implemented
+Phase 9C — Naive RAG Generation Evaluation & Safety Hardening: validated
 ```
 
 Phase 9 starts from the validated Phase 8 Qdrant collection:
@@ -379,6 +380,72 @@ If the evidence gate returns fallback/review, the command writes a fallback
 JSON result without using `OPENROUTER_API_KEY`. If the gate allows generation,
 OpenRouter is called only when `OPENROUTER_API_KEY` is set.
 
+## Phase 9C Implemented
+
+Phase 9C turns the Phase 9B single-query smoke into a small repeatable
+generation evaluation baseline:
+
+```text
+manual generation queries
+-> existing run_naive_rag(...)
+-> deterministic validators
+-> comparable JSON report
+```
+
+The initial dataset contains three cases with unambiguous existing policy:
+
+- health insurance for children under six: `answer_allowed`, LLM required;
+- annual leave days: fallback/review, LLM forbidden while the exact target is
+  missing under dense-only retrieval;
+- Civil Code scope: `answer_allowed`, LLM required.
+
+Checks cover decision policy, LLM call policy, fallback behavior, valid `[E#]`
+citation IDs, likely Vietnamese output, forbidden phrases, and secret-like
+content. The safety invariant remains:
+
+```text
+decision != answer_allowed -> llm_called=false
+```
+
+`citation_id_coverage_rate` measures only whether generated citation IDs map to
+selected evidence. It does not establish semantic faithfulness, unsupported
+claim absence, or legal correctness. Phase 9C does not use an LLM judge.
+
+Run the lower-cost smoke/dev evaluation:
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash-lite \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval.json
+```
+
+`OPENROUTER_API_KEY` is loaded only from the environment or uncommitted `.env`.
+It is never written to the report. The report includes aggregate rates and
+case-level redacted answer previews. The annual-leave case may continue to
+fallback until retrieval quality is improved in a separately scoped phase.
+
+Initial live result using `google/gemini-2.5-flash-lite`:
+
+```text
+status = validated_generation_eval_passed
+passed_cases = 3 / 3
+decision_pass_rate = 1.0
+llm_call_policy_pass_rate = 1.0
+citation_id_coverage_rate = 1.0
+fallback_policy_pass_rate = 1.0
+vietnamese_language_pass_rate = 1.0
+unknown_citation_id_count = 0
+missing_citation_id_count = 0
+forbidden_phrase_failures = 0
+secret_leak_failures = 0
+```
+
 ## Evaluation Command
 
 ```bash
@@ -405,9 +472,8 @@ uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
 
 ## Next Work
 
-1. Run a live single-query OpenRouter smoke for an answer-allowed case.
-2. Manually inspect the generated answer and mapped citations.
-3. Decide operational thresholds for when `needs_review` should become fallback
-   in automated settings.
-4. Add a small generation evaluation set as a separately scoped follow-up.
+1. Review Phase 9C failed cases and aggregate safety metrics.
+2. Manually inspect semantic faithfulness; citation ID coverage is not enough.
+3. Decide operational thresholds for when `needs_review` should become fallback.
+4. Expand the generation dataset only with reviewed legal expectations.
 5. Keep hybrid retrieval, RRF, and reranking for Phase 10.

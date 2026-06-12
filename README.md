@@ -26,11 +26,12 @@ Completed:
   Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
   Phase 9A — Dense Retrieval Baseline
   Phase 9B — Fallback-aware Naive RAG Generation
+  Phase 9C — Naive RAG Generation Evaluation & Safety Hardening
 
 Next:
-  Run a live single-query OpenRouter smoke for an answer-allowed case
-  Keep generation gated by citation-safe selected evidence
-  Add generation evaluation only as a separately scoped follow-up
+  Review repeatable Phase 9C generation evaluation reports
+  Manually inspect semantic faithfulness separately from citation ID coverage
+  Keep Phase 10 retrieval improvements separately scoped
 ```
 
 Phase 9B loads `.env` automatically for `scripts/run_naive_rag.py`.
@@ -39,6 +40,25 @@ Non-secret OpenRouter defaults are stored in `configs/llm/openrouter.yml`;
 `.env`. Model precedence is `--model`, then `OPENROUTER_MODEL`, then YAML
 `default_model`, then the emergency fallback. Exported environment values are
 not overridden, and API keys must never be printed or written to reports.
+
+Run the Phase 9C generation baseline with the lower-cost smoke model:
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash-lite \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval.json
+```
+
+The report validates citation ID integrity, not full semantic faithfulness.
+The initial live baseline completed with status
+`validated_generation_eval_passed`: 3/3 cases passed, citation ID coverage was
+1.0, and no unknown/missing citation IDs or secret leaks were detected.
 
 Phase 4 is gate-ready:
 

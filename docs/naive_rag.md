@@ -644,6 +644,47 @@ shown only in a section labeled as not directly citable. Every selected packet
 receives an internal citation ID (`[E1]`, `[E2]`, ...), and generated citation
 IDs are mapped back to real source/citation metadata.
 
+## Phase 9C Generation Evaluation
+
+Phase 9C reuses the existing `run_naive_rag(...)` pipeline for a small manual
+dataset. It does not duplicate retrieval, evidence selection, prompting, or
+generation logic.
+
+Deterministic checks include:
+
+- actual decision is allowed for the case;
+- LLM calls match the expected policy;
+- fallback/review decisions do not call the LLM or return citations;
+- required answers contain valid mapped `[E#]` IDs;
+- missing and unknown citation IDs are counted;
+- answer text is likely Vietnamese;
+- configured unsafe/confidence phrases are absent;
+- secret-like provider authentication content is absent.
+
+Run:
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash-lite \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval.json
+```
+
+The report exposes `citation_id_coverage_rate`,
+`unknown_citation_id_count`, and `missing_citation_id_count`. Citation ID
+coverage is not semantic faithfulness. The baseline is not production-ready,
+does not provide professional legal advice, and does not include Phase 10
+retrieval improvements or an LLM judge.
+
+The initial live run with `google/gemini-2.5-flash-lite` passed all three cases
+with citation ID coverage 1.0, fallback policy pass rate 1.0, and zero
+unknown/missing citation IDs, forbidden phrases, or secret leaks.
+
 ## Data Models / Output Schema
 
 ### API Request
@@ -769,6 +810,16 @@ Supported safe filters:
 - health-insurance-style exact point evidence allows generation;
 - Naive RAG workflow parser and thin script wrapper.
 
+**Implemented Phase 9C unit tests**:
+- decision and LLM call policy;
+- fallback policy;
+- missing and unknown citation IDs;
+- likely Vietnamese output;
+- forbidden phrases and secret-like leakage;
+- aggregate report metrics;
+- injected workflow runner and secret-free report writing;
+- thin evaluation script wrapper.
+
 **Integration test**:
 - Phase 9A: query → embedding → Qdrant dense retrieval → typed evidence.
 - Phase 9B: query → retrieval → evidence selection → fallback or generation.
@@ -856,6 +907,13 @@ strict invalid citation failures are reported without exposing API keys.
   `src/retrieval/workflows/naive_rag.py`.
 - Kept hybrid retrieval, RRF, reranking, GraphRAG, agents, API endpoints, and
   production legal-advice claims out of scope.
+
+### Version 0.7 (2026-06-12)
+
+- Implemented Phase 9C repeatable Naive RAG generation evaluation.
+- Added a three-case manual dataset, deterministic safety validators, aggregate
+  JSON reporting, and a thin evaluation command.
+- Kept semantic faithfulness as a manual/separate evaluation concern.
 
 ### Version 0.1 (2026-05-21)
 

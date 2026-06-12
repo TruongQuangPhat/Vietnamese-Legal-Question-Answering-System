@@ -80,6 +80,11 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - Phase 9B fallback-aware Naive RAG generation is implemented with OpenRouter
   as the first concrete provider. Generation is gated by selected citation-safe
   evidence and falls back without an LLM call when evidence is insufficient.
+- Phase 9C repeatable Naive RAG generation evaluation is validated with
+  deterministic decision, LLM-call, fallback, citation-ID, language, forbidden
+  phrase, and secret-leak checks. The initial live baseline passed 3/3 cases
+  with zero unknown/missing citation IDs and zero secret leaks. Citation-ID
+  coverage is not semantic faithfulness.
 
 ## 5. Official Commands
 

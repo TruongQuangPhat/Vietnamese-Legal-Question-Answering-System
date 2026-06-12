@@ -114,6 +114,8 @@ Corpus Registry
 - Phase 9A adds typed retrieval models, safe exact-match filters, read-only
   dense Qdrant search, a retrieval service wrapper, CLI, config, and unit tests.
 - Fallback-aware RAG answer generation is implemented as the Phase 9B baseline.
+- Deterministic Naive RAG generation evaluation is implemented and validated
+  as Phase 9C.
 
 ### Current State
 
@@ -125,10 +127,16 @@ Corpus Registry
   payload-backed legal evidence.
 - Fallback-aware Naive RAG generation is implemented. It calls OpenRouter only
   when the evidence selection gate returns `answer_allowed`.
+- Phase 9C runs a small manual generation dataset and reports decision policy,
+  LLM call policy, fallback policy, citation ID coverage, likely Vietnamese
+  output, forbidden phrases, and secret-like leakage.
+- The initial live Phase 9C run passed 3/3 cases with
+  `citation_id_coverage_rate=1.0`, zero unknown/missing citation IDs, and zero
+  secret leak failures.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- The next work is a live single-query OpenRouter smoke for an answer-allowed
-  case, followed by separately scoped generation evaluation.
+- The next work is reviewing Phase 9C generation evaluation output before any
+  separately scoped Phase 10 retrieval improvements.
 
 Operational rules:
 
@@ -270,7 +278,7 @@ artifacts/reports/chunking/processed_jsonl_validation_report.json
 Current next work:
 
 ```text
-Phase 9B — Live single-query OpenRouter smoke
+Phase 9C — Review repeatable Naive RAG generation evaluation
 ```
 
 Phase 9A already starts retrieval with BGE-M3 query embedding and dense top-k
@@ -281,9 +289,9 @@ selected citation-safe evidence.
 
 ## 6. Next Immediate Tasks
 
-1. Run the existing Naive RAG command for one answer-allowed query.
-2. Manually inspect the generated answer and mapped citations.
-3. Add a small generation evaluation set only as a separately scoped task.
+1. Review Phase 9C aggregate metrics and failed case details.
+2. Manually inspect generated answers for semantic faithfulness.
+3. Keep citation ID coverage distinct from semantic faithfulness.
 4. Keep sparse/hybrid retrieval and reranking separately scoped for Phase 10.
 
 ## 7. Upcoming Phases
@@ -296,6 +304,7 @@ selected citation-safe evidence.
 | 8 | Embedding & Indexing | **Complete / Validated** |
 | 9A | Dense Retrieval Baseline | **Complete / Implemented** |
 | 9B | Naive RAG Answer Generation | **Complete / Baseline Implemented** |
+| 9C | Naive RAG Generation Evaluation & Safety Hardening | **Complete / Validated** |
 | 10 | Advanced RAG | Future |
 | 11 | GraphRAG & Agents | Future |
 | 12 | Evaluation | Future |

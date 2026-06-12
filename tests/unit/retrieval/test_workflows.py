@@ -21,6 +21,9 @@ def test_retrieval_scripts_are_thin_workflow_wrappers() -> None:
         "scripts/evaluate_dense_retrieval.py": "src.retrieval.workflows.dense_evaluation",
         "scripts/run_selection_smoke.py": "src.retrieval.workflows.selection_smoke",
         "scripts/run_naive_rag.py": "src.retrieval.workflows.naive_rag",
+        "scripts/evaluate_naive_rag_generation.py": (
+            "src.retrieval.workflows.naive_rag_generation_eval"
+        ),
     }
 
     for script_path, module_name in wrappers.items():

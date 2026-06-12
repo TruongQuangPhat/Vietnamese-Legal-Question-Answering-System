@@ -100,3 +100,4 @@ data/*
 !data/eval/
 data/eval/*
 !data/eval/manual_retrieval_queries.jsonl
+!data/eval/manual_naive_rag_generation_queries.jsonl
