@@ -22,8 +22,8 @@ from src.retrieval.selection import AnswerabilityDecision
 GenerationEvalLanguage = Literal["vi"]
 ValidationSeverity = Literal["warning", "error"]
 GenerationEvalStatus = Literal[
-    "validated_generation_eval_passed",
-    "validated_generation_eval_partial",
+    "expanded_generation_eval_passed",
+    "expanded_generation_eval_partial",
 ]
 
 _VIETNAMESE_DIACRITIC_RE = re.compile(
@@ -73,11 +73,13 @@ class GenerationEvalQuery(BaseModel):
     id: str = Field(..., min_length=1)
     query: str = Field(..., min_length=1)
     allowed_decisions: list[AnswerabilityDecision] = Field(..., min_length=1)
-    expected_llm_called: bool
+    expected_llm_called: bool | None
     requires_citation_ids: bool
     expected_language: GenerationEvalLanguage = "vi"
     must_not_contain: list[str] = Field(default_factory=list)
     manual_query_id: str | None = None
+    manual_review_required: bool = False
+    blocking: bool = True
     notes: str | None = None
 
     @field_validator("id", "query", "manual_query_id", "notes")
@@ -133,11 +135,12 @@ class GenerationEvalCaseResult(BaseModel):
     allowed_decisions: list[AnswerabilityDecision]
     decision: AnswerabilityDecision
     decision_passed: bool
-    expected_llm_called: bool
+    expected_llm_called: bool | None
     llm_called: bool
     llm_call_policy_passed: bool
     fallback_policy_passed: bool
     requires_citation_ids: bool
+    citation_id_coverage_applicable: bool
     citation_id_coverage_passed: bool
     citation_count: int = Field(..., ge=0)
     citation_issue_count: int = Field(..., ge=0)
@@ -148,6 +151,11 @@ class GenerationEvalCaseResult(BaseModel):
     secret_leak_failures: list[str] = Field(default_factory=list)
     fallback_reasons: list[str] = Field(default_factory=list)
     selection_warnings: list[str] = Field(default_factory=list)
+    selected_evidence_count: int = Field(..., ge=0)
+    caution_selected_count: int = Field(..., ge=0)
+    all_selected_evidence_caution: bool
+    manual_review_required: bool
+    blocking: bool
     validation_issues: list[GenerationValidationIssue] = Field(default_factory=list)
     answer_preview: str = ""
     model: str | None = None
@@ -176,6 +184,10 @@ class GenerationEvalReport(BaseModel):
     total_cases: int = Field(..., ge=0)
     passed_cases: int = Field(..., ge=0)
     failed_cases: int = Field(..., ge=0)
+    blocking_case_count: int = Field(..., ge=0)
+    non_blocking_case_count: int = Field(..., ge=0)
+    blocking_failed_cases: int = Field(..., ge=0)
+    manual_review_required_count: int = Field(..., ge=0)
     decision_pass_rate: float = Field(..., ge=0.0, le=1.0)
     llm_call_policy_pass_rate: float = Field(..., ge=0.0, le=1.0)
     citation_id_coverage_rate: float = Field(..., ge=0.0, le=1.0)
@@ -185,6 +197,9 @@ class GenerationEvalReport(BaseModel):
     vietnamese_language_pass_rate: float = Field(..., ge=0.0, le=1.0)
     forbidden_phrase_failures: int = Field(..., ge=0)
     secret_leak_failures: int = Field(..., ge=0)
+    total_caution_selected_count: int = Field(..., ge=0)
+    cases_with_all_caution_evidence: int = Field(..., ge=0)
+    selection_warning_count: int = Field(..., ge=0)
     cases: list[GenerationEvalCaseResult] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
 
@@ -220,9 +235,7 @@ def validate_generation_result(
             _issue("decision_not_allowed", "actual decision is outside allowed_decisions")
         )
 
-    llm_call_policy_passed = result.llm_called == case.expected_llm_called
-    if result.decision != AnswerabilityDecision.ANSWER_ALLOWED and result.llm_called:
-        llm_call_policy_passed = False
+    llm_call_policy_passed = _llm_call_policy_passed(case, result)
     if not llm_call_policy_passed:
         issues.append(
             _issue("llm_call_policy_failed", "LLM call did not follow the expected policy")
@@ -290,6 +303,20 @@ def validate_generation_result(
             )
         )
 
+    selected_evidence_count = _metadata_count(
+        result.selection_metadata,
+        "selected_count",
+    )
+    caution_selected_count = _metadata_count(
+        result.selection_metadata,
+        "caution_selected_count",
+    )
+    all_selected_evidence_caution = (
+        selected_evidence_count > 0 and caution_selected_count == selected_evidence_count
+    )
+    citation_id_coverage_applicable = (
+        case.requires_citation_ids and result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    )
     passed = not any(issue.severity == "error" for issue in issues)
     return GenerationEvalCaseResult(
         id=case.id,
@@ -303,6 +330,7 @@ def validate_generation_result(
         llm_call_policy_passed=llm_call_policy_passed,
         fallback_policy_passed=fallback_policy_passed,
         requires_citation_ids=case.requires_citation_ids,
+        citation_id_coverage_applicable=citation_id_coverage_applicable,
         citation_id_coverage_passed=citation_id_coverage_passed,
         citation_count=len(result.citations),
         citation_issue_count=len(result.citation_issues),
@@ -313,6 +341,11 @@ def validate_generation_result(
         secret_leak_failures=secret_failures,
         fallback_reasons=result.fallback_reasons,
         selection_warnings=result.selection_warnings,
+        selected_evidence_count=selected_evidence_count,
+        caution_selected_count=caution_selected_count,
+        all_selected_evidence_caution=all_selected_evidence_caution,
+        manual_review_required=case.manual_review_required,
+        blocking=case.blocking,
         validation_issues=issues,
         answer_preview=redact_answer_preview(result.answer),
         model=result.model,
@@ -339,13 +372,16 @@ def build_generation_eval_report(
         raise ValueError("generation evaluation requires at least one case")
     total = len(case_list)
     passed_cases = sum(case.passed for case in case_list)
-    citation_cases = [case for case in case_list if case.requires_citation_ids]
-    fallback_cases = [case for case in case_list if not case.expected_llm_called]
+    citation_cases = [case for case in case_list if case.citation_id_coverage_applicable]
+    fallback_cases = [
+        case for case in case_list if case.decision != AnswerabilityDecision.ANSWER_ALLOWED
+    ]
+    blocking_cases = [case for case in case_list if case.blocking]
     return GenerationEvalReport(
         status=(
-            "validated_generation_eval_passed"
+            "expanded_generation_eval_passed"
             if passed_cases == total
-            else "validated_generation_eval_partial"
+            else "expanded_generation_eval_partial"
         ),
         started_at=started_at.astimezone(UTC).isoformat(),
         finished_at=datetime.now(UTC).isoformat(),
@@ -358,6 +394,10 @@ def build_generation_eval_report(
         total_cases=total,
         passed_cases=passed_cases,
         failed_cases=total - passed_cases,
+        blocking_case_count=len(blocking_cases),
+        non_blocking_case_count=total - len(blocking_cases),
+        blocking_failed_cases=sum(not case.passed for case in blocking_cases),
+        manual_review_required_count=sum(case.manual_review_required for case in case_list),
         decision_pass_rate=_rate(sum(case.decision_passed for case in case_list), total),
         llm_call_policy_pass_rate=_rate(
             sum(case.llm_call_policy_passed for case in case_list),
@@ -379,6 +419,11 @@ def build_generation_eval_report(
         ),
         forbidden_phrase_failures=sum(len(case.forbidden_phrase_failures) for case in case_list),
         secret_leak_failures=sum(len(case.secret_leak_failures) for case in case_list),
+        total_caution_selected_count=sum(case.caution_selected_count for case in case_list),
+        cases_with_all_caution_evidence=sum(
+            case.all_selected_evidence_caution for case in case_list
+        ),
+        selection_warning_count=sum(len(case.selection_warnings) for case in case_list),
         cases=case_list,
         notes=[
             "citation_id_coverage_rate validates [E#] ID integrity only",
@@ -422,7 +467,8 @@ def _fallback_policy_passed(
     case: GenerationEvalQuery,
     result: RagAnswerResult,
 ) -> bool:
-    if case.expected_llm_called:
+    del case
+    if result.decision == AnswerabilityDecision.ANSWER_ALLOWED:
         return True
     return (
         result.decision != AnswerabilityDecision.ANSWER_ALLOWED
@@ -441,9 +487,28 @@ def _citation_policy_passed(
 ) -> bool:
     if unknown_count or missing_count:
         return False
+    if result.decision != AnswerabilityDecision.ANSWER_ALLOWED:
+        return not result.citations
     if not case.requires_citation_ids:
         return True
     return bool(_CITATION_ID_RE.search(result.answer)) and bool(result.citations)
+
+
+def _llm_call_policy_passed(
+    case: GenerationEvalQuery,
+    result: RagAnswerResult,
+) -> bool:
+    decision_requires_llm = result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    if result.llm_called != decision_requires_llm:
+        return False
+    return case.expected_llm_called is None or result.llm_called == case.expected_llm_called
+
+
+def _metadata_count(metadata: dict[str, object], key: str) -> int:
+    value = metadata.get(key, 0)
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return 0
 
 
 def _citation_issue_count(result: RagAnswerResult, code: str) -> int:

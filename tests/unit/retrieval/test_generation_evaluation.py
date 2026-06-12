@@ -18,6 +18,7 @@ from src.retrieval.generation_evaluation import (
     GenerationEvalQuery,
     build_generation_eval_report,
     is_likely_vietnamese,
+    load_generation_eval_queries,
     validate_generation_result,
 )
 from src.retrieval.selection import AnswerabilityDecision
@@ -188,7 +189,108 @@ def test_aggregate_report_metrics_are_computed() -> None:
     assert report.failed_cases == 1
     assert report.citation_id_coverage_rate == 0.5
     assert report.missing_citation_id_count == 1
-    assert report.status == "validated_generation_eval_partial"
+    assert report.status == "expanded_generation_eval_partial"
+
+
+def test_repository_dataset_contains_five_reviewed_source_cases() -> None:
+    """The expanded dataset uses every established manual retrieval case once."""
+    cases = load_generation_eval_queries(
+        Path("data/eval/manual_naive_rag_generation_queries.jsonl")
+    )
+
+    assert len(cases) == 5
+    assert {case.id for case in cases} == {
+        "annual_leave_days_generation",
+        "civil_code_scope_generation",
+        "civil_rights_protection_generation",
+        "health_insurance_children_under_6_generation",
+        "marriage_conditions_generation",
+    }
+    assert sum(case.manual_review_required for case in cases) == 2
+    assert sum(not case.blocking for case in cases) == 2
+
+
+def test_optional_review_metadata_allows_decision_driven_llm_policy() -> None:
+    """Non-blocking review cases derive LLM policy from the actual decision."""
+    case = _review_case()
+    evaluated = validate_generation_result(
+        case,
+        _result(
+            decision=AnswerabilityDecision.NEEDS_REVIEW,
+            answer=FALLBACK_ANSWER_VI,
+            llm_called=False,
+            citations=[],
+        ),
+    )
+
+    assert evaluated.passed is True
+    assert evaluated.expected_llm_called is None
+    assert evaluated.manual_review_required is True
+    assert evaluated.blocking is False
+    assert evaluated.citation_id_coverage_applicable is False
+
+
+def test_citation_coverage_denominator_excludes_required_fallback_case() -> None:
+    """Coverage is measured only when a citation-required case generates."""
+    generated = validate_generation_result(
+        _allowed_case(),
+        _result(answer="Nội dung hợp lệ [E1].", citations=[_citation()]),
+    )
+    reviewed_fallback = validate_generation_result(
+        _review_case(),
+        _result(
+            decision=AnswerabilityDecision.NEEDS_REVIEW,
+            answer=FALLBACK_ANSWER_VI,
+            llm_called=False,
+            citations=[],
+        ),
+    )
+
+    report = build_generation_eval_report(
+        cases=[generated, reviewed_fallback],
+        started_at=datetime.now(UTC),
+        dataset_path=Path("data/eval/test.jsonl"),
+        collection_name="collection",
+        vector_name="dense",
+        top_k=20,
+        provider="openrouter",
+        model="test/model",
+    )
+
+    assert report.citation_id_coverage_rate == 1.0
+
+
+def test_manual_review_and_caution_metrics_are_aggregated() -> None:
+    """Review, caution, and selection warning signals remain non-semantic metrics."""
+    reviewed = validate_generation_result(
+        _review_case(),
+        _result(
+            answer="Quyền dân sự được pháp luật bảo vệ [E1].",
+            citations=[_citation()],
+            selection_metadata={
+                "selected_count": 2,
+                "caution_selected_count": 2,
+            },
+            selection_warnings=["all_selected_evidence_has_caution"],
+        ),
+    )
+
+    report = build_generation_eval_report(
+        cases=[reviewed],
+        started_at=datetime.now(UTC),
+        dataset_path=Path("data/eval/test.jsonl"),
+        collection_name="collection",
+        vector_name="dense",
+        top_k=20,
+        provider="openrouter",
+        model="test/model",
+    )
+
+    assert report.manual_review_required_count == 1
+    assert report.non_blocking_case_count == 1
+    assert report.total_caution_selected_count == 2
+    assert report.cases_with_all_caution_evidence == 1
+    assert report.selection_warning_count == 1
 
 
 def _allowed_case(
@@ -221,6 +323,22 @@ def _fallback_case() -> GenerationEvalQuery:
     )
 
 
+def _review_case() -> GenerationEvalQuery:
+    return GenerationEvalQuery(
+        id="review",
+        query="Quyền dân sự được công nhận và bảo vệ như thế nào?",
+        allowed_decisions=[
+            AnswerabilityDecision.ANSWER_ALLOWED,
+            AnswerabilityDecision.NEEDS_REVIEW,
+        ],
+        expected_llm_called=None,
+        requires_citation_ids=True,
+        expected_language="vi",
+        manual_review_required=True,
+        blocking=False,
+    )
+
+
 def _result(
     *,
     decision: AnswerabilityDecision = AnswerabilityDecision.ANSWER_ALLOWED,
@@ -228,6 +346,8 @@ def _result(
     llm_called: bool = True,
     citations: list[RagCitation],
     citation_issues: list[CitationIssue] | None = None,
+    selection_metadata: dict[str, object] | None = None,
+    selection_warnings: list[str] | None = None,
 ) -> RagAnswerResult:
     return RagAnswerResult(
         query="Câu hỏi",
@@ -236,10 +356,10 @@ def _result(
         citations=citations,
         used_evidence=[],
         fallback_reasons=[],
-        selection_warnings=[],
+        selection_warnings=selection_warnings or [],
         citation_issues=citation_issues or [],
         retrieval_metadata={},
-        selection_metadata={},
+        selection_metadata=selection_metadata or {},
         generation_metadata={},
         llm_called=llm_called,
         model="test/model",

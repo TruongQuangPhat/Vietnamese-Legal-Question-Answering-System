@@ -300,6 +300,11 @@ def print_summary(report: GenerationEvalReport) -> None:
     print("Naive RAG Generation Evaluation")
     print(f"Status: {report.status}")
     print(f"Cases: {report.passed_cases}/{report.total_cases} passed")
+    print(
+        "Manual review: "
+        f"{report.manual_review_required_count} cases "
+        f"({report.non_blocking_case_count} non-blocking)"
+    )
     print(f"Decision pass rate: {report.decision_pass_rate:.3f}")
     print(f"LLM call policy pass rate: {report.llm_call_policy_pass_rate:.3f}")
     print(f"Citation ID coverage rate: {report.citation_id_coverage_rate:.3f}")

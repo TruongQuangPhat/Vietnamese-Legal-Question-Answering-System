@@ -41,6 +41,33 @@ def test_load_generation_eval_queries_from_jsonl(tmp_path: Path) -> None:
     assert cases[0].id == "case-1"
 
 
+def test_load_generation_eval_queries_accepts_review_metadata(tmp_path: Path) -> None:
+    """Optional non-blocking review metadata remains schema-compatible."""
+    path = tmp_path / "queries.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "id": "review-case",
+                "query": "Quyền dân sự được bảo vệ như thế nào?",
+                "allowed_decisions": ["answer_allowed", "needs_review"],
+                "expected_llm_called": None,
+                "requires_citation_ids": True,
+                "manual_review_required": True,
+                "blocking": False,
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    case = load_generation_eval_queries(path)[0]
+
+    assert case.expected_llm_called is None
+    assert case.manual_review_required is True
+    assert case.blocking is False
+
+
 @pytest.mark.asyncio
 async def test_suite_calls_runner_once_per_case_and_aggregates() -> None:
     """Injected runner is called once per case without external dependencies."""
@@ -77,7 +104,7 @@ async def test_suite_calls_runner_once_per_case_and_aggregates() -> None:
     assert calls == ["allowed", "fallback"]
     assert report.total_cases == 2
     assert report.passed_cases == 2
-    assert report.status == "validated_generation_eval_passed"
+    assert report.status == "expanded_generation_eval_passed"
 
 
 @pytest.mark.asyncio

@@ -85,6 +85,13 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
   phrase, and secret-leak checks. The initial live baseline passed 3/3 cases
   with zero unknown/missing citation IDs and zero secret leaks. Citation-ID
   coverage is not semantic faithfulness.
+- Phase 9C.1 expands the reviewed dataset to five unique cases. Three are
+  blocking and two variable-decision cases are non-blocking manual-review
+  coverage. Caution-evidence and selection-warning counts are review signals,
+  not semantic-faithfulness claims.
+- The expanded Phase 9C.1 live run passed 5/5 deterministic cases. Two
+  all-caution cases and 31 selection warnings remain visible for manual legal
+  review.
 
 ## 5. Official Commands
 

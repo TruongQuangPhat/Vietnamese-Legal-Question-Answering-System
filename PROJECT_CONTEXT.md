@@ -133,6 +133,15 @@ Corpus Registry
 - The initial live Phase 9C run passed 3/3 cases with
   `citation_id_coverage_rate=1.0`, zero unknown/missing citation IDs, and zero
   secret leak failures.
+- Phase 9C.1 expands the reviewed generation dataset from three to five unique
+  cases. The two variable-decision additions are non-blocking and require
+  manual legal review; no new legal expectations were invented.
+- Phase 9C.1 reports manual-review, caution-evidence, and selection-warning
+  signals without treating them as semantic-faithfulness checks.
+- The expanded live Phase 9C.1 run passed 5/5 cases with all deterministic
+  policy rates at 1.0 and zero unknown/missing citation IDs or secret leaks.
+  Two all-caution cases and 31 selection warnings remain explicit manual-review
+  signals.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
 - The next work is reviewing Phase 9C generation evaluation output before any

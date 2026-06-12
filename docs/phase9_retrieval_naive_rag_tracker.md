@@ -399,6 +399,20 @@ The initial dataset contains three cases with unambiguous existing policy:
   missing under dense-only retrieval;
 - Civil Code scope: `answer_allowed`, LLM required.
 
+Phase 9C.1 expands the dataset from three to five cases by adding the two
+remaining queries already defined in the Phase 9A manual retrieval dataset:
+
+- marriage conditions;
+- civil-rights recognition and protection.
+
+Their retrieval decisions are intentionally variable, so both are marked
+`manual_review_required=true` and `blocking=false`. They still enforce the
+decision/LLM safety invariant, citation-ID integrity whenever generation is
+allowed, Vietnamese output, forbidden-phrase checks, and secret screening.
+The dataset stops at five because the current reviewed retrieval source has
+only five unique cases; no legal expectations were invented or duplicated to
+reach an arbitrary case count.
+
 Checks cover decision policy, LLM call policy, fallback behavior, valid `[E#]`
 citation IDs, likely Vietnamese output, forbidden phrases, and secret-like
 content. The safety invariant remains:
@@ -410,6 +424,8 @@ decision != answer_allowed -> llm_called=false
 `citation_id_coverage_rate` measures only whether generated citation IDs map to
 selected evidence. It does not establish semantic faithfulness, unsupported
 claim absence, or legal correctness. Phase 9C does not use an LLM judge.
+Phase 9C.1 also reports manual-review counts, selected caution-evidence counts,
+all-caution case counts, and selection-warning counts as review signals only.
 
 Run the lower-cost smoke/dev evaluation:
 
@@ -445,6 +461,34 @@ missing_citation_id_count = 0
 forbidden_phrase_failures = 0
 secret_leak_failures = 0
 ```
+
+The expanded Phase 9C.1 command writes
+`artifacts/reports/retrieval/naive_rag_generation_eval_expanded.json`. Manual
+legal review remains required even when all deterministic checks pass.
+
+Expanded live result using `google/gemini-2.5-flash-lite`:
+
+```text
+status = expanded_generation_eval_passed
+passed_cases = 5 / 5
+blocking_cases = 3
+manual_review_required_cases = 2
+decision_pass_rate = 1.0
+llm_call_policy_pass_rate = 1.0
+citation_id_coverage_rate = 1.0
+fallback_policy_pass_rate = 1.0
+vietnamese_language_pass_rate = 1.0
+unknown_citation_id_count = 0
+missing_citation_id_count = 0
+forbidden_phrase_failures = 0
+secret_leak_failures = 0
+total_caution_selected_count = 16
+cases_with_all_caution_evidence = 2
+selection_warning_count = 31
+```
+
+The caution and warning totals require human inspection; they are not
+automated legal-correctness failures.
 
 ## Evaluation Command
 

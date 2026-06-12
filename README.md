@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 9A complete — dense retrieval baseline implemented
+Current phase: Phase 9C.1 complete — reviewed generation evaluation expanded
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -27,6 +27,7 @@ Completed:
   Phase 9A — Dense Retrieval Baseline
   Phase 9B — Fallback-aware Naive RAG Generation
   Phase 9C — Naive RAG Generation Evaluation & Safety Hardening
+  Phase 9C.1 — Reviewed Generation Dataset Expansion
 
 Next:
   Review repeatable Phase 9C generation evaluation reports
@@ -59,6 +60,17 @@ The report validates citation ID integrity, not full semantic faithfulness.
 The initial live baseline completed with status
 `validated_generation_eval_passed`: 3/3 cases passed, citation ID coverage was
 1.0, and no unknown/missing citation IDs or secret leaks were detected.
+
+Phase 9C.1 expands the dataset to five unique cases using every currently
+reviewed Phase 9A manual query. Three cases remain blocking; marriage
+conditions and civil-rights protection are non-blocking manual-review cases
+because their allowed retrieval decisions vary. The expanded report adds
+caution-evidence and selection-warning review signals. These metrics do not
+establish semantic faithfulness or legal correctness.
+
+The expanded live run completed with `expanded_generation_eval_passed`: 5/5
+cases passed, citation ID coverage was 1.0, no unknown/missing citation IDs or
+secret leaks were detected, and two all-caution cases remain for human review.
 
 Phase 4 is gate-ready:
 

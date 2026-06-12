@@ -685,6 +685,39 @@ The initial live run with `google/gemini-2.5-flash-lite` passed all three cases
 with citation ID coverage 1.0, fallback policy pass rate 1.0, and zero
 unknown/missing citation IDs, forbidden phrases, or secret leaks.
 
+### Phase 9C.1 Dataset Expansion
+
+Phase 9C.1 expands the dataset from three to five unique cases using all
+currently reviewed entries in `data/eval/manual_retrieval_queries.jsonl`.
+Marriage conditions and civil-rights protection are manual-review,
+non-blocking cases because their allowed retrieval decisions are intentionally
+variable. No query or legal expectation was invented to reach the suggested
+8-10 case range.
+
+The expanded report adds `manual_review_required_count`,
+`non_blocking_case_count`, `total_caution_selected_count`,
+`cases_with_all_caution_evidence`, and `selection_warning_count`. These are
+human-review signals, not semantic-faithfulness metrics. Citation coverage is
+computed only for citation-required cases that actually reach
+`answer_allowed`.
+
+Use the same command with:
+
+```text
+--output artifacts/reports/retrieval/naive_rag_generation_eval_expanded.json
+```
+
+Passing deterministic checks does not make an answer legally authoritative or
+replace professional legal review. Phase 10 retrieval changes remain out of
+scope.
+
+The expanded live run passed 5/5 cases with status
+`expanded_generation_eval_passed`. Three cases are blocking and two require
+manual review. Citation ID coverage and all deterministic policy rates were
+1.0, with zero unknown/missing citation IDs, forbidden phrases, or secret
+leaks. The report recorded 16 selected caution items, two all-caution cases,
+and 31 selection warnings for human review.
+
 ## Data Models / Output Schema
 
 ### API Request
@@ -820,6 +853,13 @@ Supported safe filters:
 - injected workflow runner and secret-free report writing;
 - thin evaluation script wrapper.
 
+**Implemented Phase 9C.1 tests**:
+- five-case reviewed dataset loading;
+- optional manual-review/non-blocking metadata;
+- decision-driven LLM policy for variable-decision cases;
+- citation coverage denominator for generated citation-required cases only;
+- caution evidence and selection warning aggregation.
+
 **Integration test**:
 - Phase 9A: query → embedding → Qdrant dense retrieval → typed evidence.
 - Phase 9B: query → retrieval → evidence selection → fallback or generation.
@@ -914,6 +954,12 @@ strict invalid citation failures are reported without exposing API keys.
 - Added a three-case manual dataset, deterministic safety validators, aggregate
   JSON reporting, and a thin evaluation command.
 - Kept semantic faithfulness as a manual/separate evaluation concern.
+
+### Version 0.8 (2026-06-12)
+
+- Expanded Phase 9C generation evaluation from three to five reviewed cases.
+- Added non-blocking manual-review metadata and caution/selection review
+  metrics without changing retrieval or generation semantics.
 
 ### Version 0.1 (2026-05-21)
 
