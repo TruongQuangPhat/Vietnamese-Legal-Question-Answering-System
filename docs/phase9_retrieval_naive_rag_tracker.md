@@ -6,6 +6,7 @@
 Phase 9A — Dense Retrieval Baseline: implemented
 Phase 9A.1 — Retrieval Sanity Evaluation & Evidence Risk Audit: implemented
 Phase 9A.2 — Evidence Safety and Context Assembly Rules: implemented
+Phase 9A.3 — Evidence Selection and Fallback Rules: implemented
 Phase 9B — Naive RAG Answer Generation: not implemented
 ```
 
@@ -144,6 +145,51 @@ citation and separates auxiliary parent context under an explicit warning.
 This slice still does not generate answers, create prompts, validate generated
 citations, rerank, perform hybrid retrieval, or mutate Qdrant/corpus data.
 
+## Phase 9A.3 Implemented
+
+Phase 9A.3 adds a retrieval-side evidence gate:
+
+```text
+src/retrieval/selection.py
+tests/unit/retrieval/test_selection.py
+```
+
+The selection layer consumes an `EvidenceBundle` and returns an
+`EvidenceSelectionResult` with:
+
+```text
+decision: answer_allowed | fallback_required | needs_review
+selected_evidence
+rejected_evidence
+fallback_reasons
+selection warnings
+rendered selected context
+```
+
+Rules are conservative:
+
+- unsafe evidence is never selected;
+- safe evidence is preferred before caution evidence;
+- caution evidence can be selected only when it still has citation, law ID,
+  source URL, and citable child text;
+- parent Article context for child chunks remains auxiliary only and is never
+  treated as directly citable under the child citation;
+- selected context excludes unsafe evidence and keeps citation adjacent to
+  citable child text;
+- all-caution parent-context evidence defaults to fallback unless configured for
+  review;
+- optional evaluation-assisted mode can require selected packets to match
+  expected targets from Phase 9A.1.
+
+This means the `annual_leave_days` failure mode remains blocked in
+evaluation-assisted mode: sibling Article 113 chunks do not satisfy expected
+Clause 1 / Point a-b-c targets, so the result is fallback/review rather than a
+clean generation-allowed decision.
+
+This slice still does not generate legal answers, create final prompts, validate
+generated citations, perform hybrid retrieval, rerank, or mutate Qdrant/corpus
+data.
+
 ## Evaluation Command
 
 ```bash
@@ -170,12 +216,12 @@ uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
 
 ## Next Work
 
-1. Review Phase 9A.1 evaluation output together with Phase 9A.2 evidence
-   bundle safety classifications.
-2. Define minimum evidence selection rules for Naive RAG, including when
-   caution packets should trigger fallback.
-3. Design the future generation prompt around `EvidenceBundle.render_context()`
-   only after retrieval/evidence safety behavior is accepted.
+1. Review Phase 9A.1 evaluation output together with Phase 9A.2/9A.3 evidence
+   safety and answerability decisions.
+2. Decide operational thresholds for when `needs_review` should become fallback
+   in automated settings.
+3. Design future Phase 9B generation around `EvidenceSelectionResult`
+   selected context only after the evidence gate behavior is accepted.
 4. Delay answer generation until retrieval quality and citation risk are better
    understood.
 5. Keep hybrid retrieval, RRF, and reranking for Phase 10.

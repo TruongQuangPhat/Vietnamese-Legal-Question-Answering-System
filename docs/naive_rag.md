@@ -145,6 +145,50 @@ This layer does not fix dense ranking. It prevents future Naive RAG generation
 from silently citing a child chunk for claims found only in broader parent
 context.
 
+## Phase 9A.3 Evidence Selection Gate
+
+Phase 9A.3 adds answerability decisions without generating answers:
+
+```text
+EvidenceBundle
+→ EvidenceSelectionResult
+→ answer_allowed | fallback_required | needs_review
+```
+
+Implemented files:
+
+```text
+src/retrieval/selection.py
+tests/unit/retrieval/test_selection.py
+```
+
+The selector chooses only evidence that is safe enough for a future generation
+step and records why other packets were rejected. The result includes selected
+evidence, rejected evidence, fallback reasons, warnings, and a rendered context
+containing selected evidence only.
+
+Default rules:
+
+- unsafe packets are rejected;
+- safe packets sort before caution packets;
+- caution packets can be selected only when they still have citable child text,
+  citation, law ID, and source URL;
+- parent Article context is never promoted to directly citable text under a
+  child citation;
+- unsafe packets are never rendered into selected context;
+- if all selected evidence is caution because only auxiliary parent context is
+  available, fallback is required by default;
+- optional evaluation-assisted mode can require selected evidence to match
+  expected targets from the Phase 9A.1 manual evaluation dataset.
+
+For the annual-leave case, sibling Article 113 chunks remain insufficient in
+evaluation-assisted mode because they do not match Clause 1 or Points a/b/c.
+The gate returns fallback/review instead of allowing clean downstream answer
+generation from parent context alone.
+
+This gate prepares a future input surface for Phase 9B, but it is not a prompt
+template and it does not call an LLM.
+
 ## Overview
 
 The Naive RAG phase will establish the first baseline question-answering
@@ -316,7 +360,23 @@ any future LLM use.
 
 **Output**: `EvidenceBundle` plus a rendered context string.
 
-### 4. Strict Legal Prompt (future)
+### 4. Evidence Selection Gate
+
+**Goal**: Decide whether the assembled evidence is safe enough for future
+answer generation.
+
+**Process**:
+- Reject unsafe packets.
+- Prefer safe packets over caution packets.
+- Select caution packets only when child text remains citable.
+- Keep auxiliary parent context visibly separate from child citable text.
+- Return `fallback_required` or `needs_review` when evidence is insufficient or
+  structurally risky.
+
+**Output**: `EvidenceSelectionResult` with selected context or fallback/review
+reasons.
+
+### 5. Strict Legal Prompt (future)
 
 **Goal**: Force LLM to ground answer in provided context only.
 
