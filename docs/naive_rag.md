@@ -56,6 +56,44 @@ Phase 9A does not call an LLM, generate answers, validate generated citations,
 perform hybrid retrieval, run RRF, rerank, expose a FastAPI endpoint, or mutate
 Qdrant/corpus artifacts.
 
+## Phase 9A.1 Sanity Evaluation
+
+Live dense-retrieval smoke tests passed technically but showed quality and
+citation-risk limitations. The baseline can return the correct parent Article
+context while ranking a sibling child Clause/Point ahead of the exact provision
+needed for citation. This is especially risky for future generation because an
+LLM could use `parent_text` content while citing the retrieved child chunk.
+
+Phase 9A.1 adds:
+
+```text
+data/eval/manual_retrieval_queries.jsonl
+src/retrieval/evaluation.py
+scripts/evaluate_dense_retrieval.py
+tests/unit/retrieval/test_evaluation.py
+```
+
+The evaluator measures:
+
+- expected-target recall at 5/10/20 using explicit `match_level`
+  semantics;
+- Article-level hit at 5/10/20;
+- MRR@20;
+- best Article, Clause, Point, and exact-depth ranks;
+- metadata completeness and issue counts;
+- evidence/citation risk flags.
+
+Manual expected targets declare whether the expected depth is `article`,
+`clause`, or `point`. Article-level targets match any retrieved child chunk
+under the expected Article. Clause-level targets match any retrieved chunk under
+the expected Clause, including Point chunks. Point-level targets require the
+exact Point label. Null fields below the declared depth are not treated as
+exact-null requirements.
+
+Dense-only retrieval should not be treated as production-ready or safe for
+answer generation until these reports are reviewed and the citation risks are
+handled. Hybrid search, RRF, and reranking remain Phase 10 work.
+
 ## Overview
 
 The Naive RAG phase will establish the first baseline question-answering
@@ -87,6 +125,18 @@ uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
 The console summary includes rank, score, chunk ID, citation, law metadata,
 hierarchy labels, source URL, and a text preview. The optional JSON report
 includes typed result metadata and text/parent-text previews, not an answer.
+
+Run the manual sanity evaluation:
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/evaluate_dense_retrieval.py \
+  --queries data/eval/manual_retrieval_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --output artifacts/reports/retrieval/dense_retrieval_eval.json
+```
 
 ## Architecture
 
@@ -281,6 +331,16 @@ Implemented Phase 9A flow:
    flags, and indexing provenance where present.
 8. Print a safe summary and optionally write a retrieval JSON report.
 
+Implemented Phase 9A.1 evaluation flow:
+
+1. Load manual queries from `data/eval/manual_retrieval_queries.jsonl`.
+2. Run the existing dense retriever read-only for each query.
+3. Compare results against manual expected targets.
+4. Distinguish Article-level hits from exact provision hits.
+5. Compute recall/MRR and metadata completeness metrics.
+6. Emit conservative evidence/citation risk flags.
+7. Write a JSON evaluation report.
+
 Future Naive RAG generation flow:
 
 1. Pack retrieved evidence with citation anchors.
@@ -376,6 +436,17 @@ Supported safe filters:
 - safe filter construction over indexed payload fields;
 - CLI parser and output-path safety helpers.
 
+**Implemented Phase 9A.1 unit tests**:
+- manual query record parsing;
+- Article-level and exact provision matching;
+- recall and MRR computation;
+- empty result handling;
+- wrong-law and wrong-Article risk flags;
+- parent-context/child-provision mismatch risk flags;
+- aggregate metric computation;
+- evaluation report shape;
+- evaluation CLI parser and path validation.
+
 **Future generation unit tests**:
 - context packing with citation anchors;
 - strict prompt template;
@@ -432,6 +503,16 @@ and citation-validation failures.
   service wrapper, config, CLI, and unit tests.
 - Kept answer generation, prompt templates, citation validation, hybrid search,
   RRF, reranking, FastAPI, and evaluation out of scope.
+
+### Version 0.3 (2026-06-12)
+
+- Implemented Phase 9A.1 dense retrieval sanity evaluation and evidence-risk
+  audit.
+- Added a small manual query dataset, exact-vs-Article hit metrics, MRR@20,
+  metadata completeness metrics, risk flags, evaluation CLI, and mocked unit
+  tests.
+- Documented that dense-only retrieval is not yet reliable enough for answer
+  generation without further evidence handling.
 
 ### Version 0.1 (2026-05-21)
 

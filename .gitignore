@@ -93,3 +93,10 @@ htmlcov/
 .ipynb_checkpoints/
 
 .claude/*.json
+
+# --- Small versioned evaluation fixtures ---
+!data/
+data/*
+!data/eval/
+data/eval/*
+!data/eval/manual_retrieval_queries.jsonl
