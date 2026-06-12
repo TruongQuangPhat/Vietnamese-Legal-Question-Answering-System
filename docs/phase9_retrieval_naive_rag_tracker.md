@@ -7,6 +7,7 @@ Phase 9A — Dense Retrieval Baseline: implemented
 Phase 9A.1 — Retrieval Sanity Evaluation & Evidence Risk Audit: implemented
 Phase 9A.2 — Evidence Safety and Context Assembly Rules: implemented
 Phase 9A.3 — Evidence Selection and Fallback Rules: implemented
+Phase 9A.4 — Selection Integration Smoke Test: implemented
 Phase 9B — Naive RAG Answer Generation: not implemented
 ```
 
@@ -190,6 +191,76 @@ This slice still does not generate legal answers, create final prompts, validate
 generated citations, perform hybrid retrieval, rerank, or mutate Qdrant/corpus
 data.
 
+## Phase 9A.4 Implemented
+
+Phase 9A.4 adds a retrieval-side integration smoke test:
+
+```text
+manual query
+-> dense retrieval
+-> EvidenceBundle assembly
+-> EvidenceSelectionResult gate
+-> JSON smoke report
+```
+
+Implemented files:
+
+```text
+src/retrieval/integration.py
+scripts/run_selection_smoke.py
+tests/unit/retrieval/test_integration.py
+```
+
+The smoke layer reuses the Phase 9A.1 manual dataset. Each query can declare
+`expected_decision` and `allowed_decisions`, so the smoke report can check
+whether the current retrieval-side gate behaves as expected for known cases.
+For example:
+
+- `annual_leave_days` must not pass as clean `answer_allowed` because dense
+  retrieval currently misses the expected Clause 1 / Point a-b-c target;
+- `health_insurance_children_under_6` is expected to pass as `answer_allowed`
+  when exact point evidence is selected;
+- `civil_code_scope` is expected to pass as `answer_allowed` when Article 1
+  evidence is selected;
+- `marriage_conditions` remains permissive in the manual expectation because
+  Article 8 may rank lower and strictness is configurable;
+- `civil_rights_protection` may be `answer_allowed` or `needs_review` depending
+  on selected evidence safety.
+
+The smoke report includes run metadata, decision counts, pass/fail counts,
+selection/evidence config, per-query retrieval latency, evidence counts,
+selected/rejected evidence summaries, fallback reasons, selection warnings,
+risk flags, top-result summary, and a rendered selected-context preview.
+
+When expected targets are provided, the selection gate now prefers selectable
+packets that match those targets before unrelated packets. This is only an
+evaluation/smoke selection behavior; it does not change dense retrieval ranking.
+It validates cases such as `civil_rights_protection`, where Article 2 can be
+retrieved below an unrelated top result but still needs to be selected for the
+manual expectation to pass. Match semantics stay aligned with Phase 9A.1:
+Article targets match child chunks under the same Article, Clause targets match
+child chunks under the same Clause, and Point targets require the exact Point.
+
+`--strict` also passes Phase 9A.1 risk flags into the Phase 9A.3 selector. In
+non-strict mode the flags are still reported, but only exact-target gating and
+structural evidence rules drive the selection decision.
+
+This slice still does not call an LLM, generate answers, create final prompts,
+improve retrieval ranking, perform hybrid retrieval, rerank, or mutate
+Qdrant/corpus data.
+
+## Selection Smoke Command
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/run_selection_smoke.py \
+  --queries data/eval/manual_retrieval_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --output artifacts/reports/retrieval/selection_smoke_report.json
+```
+
 ## Evaluation Command
 
 ```bash
@@ -216,8 +287,8 @@ uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
 
 ## Next Work
 
-1. Review Phase 9A.1 evaluation output together with Phase 9A.2/9A.3 evidence
-   safety and answerability decisions.
+1. Review Phase 9A.4 smoke reports together with Phase 9A.1 risk flags and
+   Phase 9A.2/9A.3 evidence decisions.
 2. Decide operational thresholds for when `needs_review` should become fallback
    in automated settings.
 3. Design future Phase 9B generation around `EvidenceSelectionResult`

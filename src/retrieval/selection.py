@@ -247,11 +247,7 @@ def select_evidence_for_answer(
 
     selected = sorted(
         selected,
-        key=lambda item: (
-            0 if item.safety_level == EvidenceSafetyLevel.SAFE else 1,
-            item.rank,
-            -item.score,
-        ),
+        key=lambda item: _selection_sort_key(item, expected_targets or ()),
     )[: settings.max_selected_packets]
 
     for item in selected:
@@ -547,6 +543,22 @@ def _packet_matches_expected_target(packet: EvidencePacket, target: ExpectedTarg
     if target.match_level == "clause":
         return True
     return _same(packet.point_label, target.point_label)
+
+
+def _packet_matches_any_expected_target(
+    packet: EvidencePacket,
+    expected_targets: Sequence[ExpectedTarget],
+) -> bool:
+    return any(_packet_matches_expected_target(packet, target) for target in expected_targets)
+
+
+def _selection_sort_key(
+    item: SelectedEvidence,
+    expected_targets: Sequence[ExpectedTarget],
+) -> tuple[int, int, int, float]:
+    target_order = 0 if _packet_matches_any_expected_target(item.packet, expected_targets) else 1
+    safety_order = 0 if item.safety_level == EvidenceSafetyLevel.SAFE else 1
+    return (target_order, safety_order, item.rank, -item.score)
 
 
 def _has_high_citation_risk(

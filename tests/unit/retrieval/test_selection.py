@@ -347,6 +347,199 @@ def test_article_level_evidence_allows_answer() -> None:
     assert result.selected_count == 1
 
 
+def test_expected_target_safe_packet_is_selected_ahead_of_non_target_safe_packet() -> None:
+    """Evaluation-mode selection keeps the selectable expected target in context."""
+    non_target = make_packet(
+        rank=1,
+        chunk_id="article-11",
+        law_id="BLDS_2015",
+        article_number="11",
+        clause_number=None,
+        level="article",
+        chunk_kind="article",
+        citation="Điều 11, Bộ luật Dân sự 2015",
+        text="Điều 11. Các phương thức bảo vệ quyền dân sự...",
+        parent_text="Điều 11. Các phương thức bảo vệ quyền dân sự...",
+    )
+    target = make_packet(
+        rank=6,
+        chunk_id="article-2",
+        law_id="BLDS_2015",
+        article_number="2",
+        clause_number=None,
+        level="article",
+        chunk_kind="article",
+        citation="Điều 2, Bộ luật Dân sự 2015",
+        text="Điều 2. Công nhận, tôn trọng, bảo vệ và bảo đảm quyền dân sự...",
+        parent_text="Điều 2. Công nhận, tôn trọng, bảo vệ và bảo đảm quyền dân sự...",
+    )
+    expected = [
+        ExpectedTarget(
+            law_id="BLDS_2015",
+            article_number="2",
+            clause_number=None,
+            point_label=None,
+            match_level="article",
+        )
+    ]
+
+    result = select_evidence_for_answer(
+        make_bundle([non_target, target]),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+        expected_targets=expected,
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.selected_count == 1
+    assert result.selected_evidence[0].chunk_id == "article-2"
+
+
+def test_expected_target_caution_packet_can_be_selected_ahead_of_non_target_safe_packet() -> None:
+    """A valid caution target is not displaced by unrelated safe evidence."""
+    non_target = make_packet(
+        rank=1,
+        chunk_id="safe-other",
+        law_id="OTHER",
+        article_number="99",
+        clause_number=None,
+        level="article",
+        chunk_kind="article",
+        citation="Điều 99, Other",
+        text="Điều 99. Nội dung khác.",
+        parent_text="Điều 99. Nội dung khác.",
+    )
+    target = make_packet(
+        rank=8,
+        chunk_id="article-2-clause-1",
+        law_id="BLDS_2015",
+        article_number="2",
+        clause_number="1",
+        citation="Khoản 1, Điều 2, Bộ luật Dân sự 2015",
+        text="1. Ở nước Cộng hòa xã hội chủ nghĩa Việt Nam, các quyền dân sự...",
+        parent_text="Điều 2. Công nhận, tôn trọng, bảo vệ và bảo đảm quyền dân sự...",
+    )
+    expected = [
+        ExpectedTarget(
+            law_id="BLDS_2015",
+            article_number="2",
+            clause_number=None,
+            point_label=None,
+            match_level="article",
+        )
+    ]
+
+    result = select_evidence_for_answer(
+        make_bundle([non_target, target]),
+        config=EvidenceSelectionConfig(
+            max_selected_packets=1,
+            fallback_on_parent_context_only=False,
+            needs_review_on_all_evidence_caution=False,
+        ),
+        expected_targets=expected,
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.selected_count == 1
+    assert result.selected_evidence[0].chunk_id == "article-2-clause-1"
+    assert result.selected_evidence[0].safety_level == EvidenceSafetyLevel.CAUTION
+
+
+def test_expected_target_sorting_does_not_treat_sibling_clause_as_match() -> None:
+    """Annual-leave sibling clauses remain insufficient for Clause 1 targets."""
+    sibling = make_packet(
+        rank=1,
+        chunk_id="article-113-clause-4",
+        article_number="113",
+        clause_number="4",
+        citation="Khoản 4, Điều 113, Bộ luật Lao động",
+        text="4. Người sử dụng lao động có trách nhiệm quy định lịch nghỉ hằng năm.",
+        parent_text="Điều 113. Nghỉ hằng năm\n1. Người lao động được nghỉ...",
+    )
+    other = make_packet(
+        rank=2,
+        chunk_id="other-safe",
+        law_id="OTHER",
+        article_number="1",
+        clause_number=None,
+        level="article",
+        chunk_kind="article",
+        citation="Điều 1, Other",
+        text="Điều 1. Nội dung khác.",
+        parent_text="Điều 1. Nội dung khác.",
+    )
+    expected = [
+        ExpectedTarget(
+            law_id="BLLD_VBHN",
+            article_number="113",
+            clause_number="1",
+            point_label=None,
+            match_level="clause",
+        )
+    ]
+
+    result = select_evidence_for_answer(
+        make_bundle([sibling, other]),
+        config=EvidenceSelectionConfig(
+            max_selected_packets=2,
+            fallback_on_parent_context_only=False,
+            needs_review_on_all_evidence_caution=False,
+        ),
+        expected_targets=expected,
+    )
+
+    assert result.decision == AnswerabilityDecision.FALLBACK_REQUIRED
+    assert FallbackReasonCode.EXACT_TARGET_MISSING_IN_EVAL_MODE in {
+        reason.code for reason in result.fallback_reasons
+    }
+
+
+def test_civil_rights_article_target_can_pass_when_article_two_packet_is_present() -> None:
+    """Civil-rights Article 2 target can pass when selected evidence includes Article 2."""
+    wrong_top = make_packet(
+        rank=1,
+        chunk_id="article-11",
+        law_id="BLDS_2015",
+        article_number="11",
+        clause_number="1",
+        citation="Khoản 1, Điều 11, Bộ luật Dân sự 2015",
+        text="1. Công nhận, tôn trọng, bảo vệ và bảo đảm quyền dân sự của mình.",
+        parent_text="Điều 11. Các phương thức bảo vệ quyền dân sự...",
+    )
+    article_two = make_packet(
+        rank=2,
+        chunk_id="article-2",
+        law_id="BLDS_2015",
+        article_number="2",
+        clause_number=None,
+        level="article",
+        chunk_kind="article",
+        citation="Điều 2, Bộ luật Dân sự 2015",
+        text="Điều 2. Công nhận, tôn trọng, bảo vệ và bảo đảm quyền dân sự...",
+        parent_text="Điều 2. Công nhận, tôn trọng, bảo vệ và bảo đảm quyền dân sự...",
+    )
+    expected = [
+        ExpectedTarget(
+            law_id="BLDS_2015",
+            article_number="2",
+            clause_number=None,
+            point_label=None,
+            match_level="article",
+        )
+    ]
+
+    result = select_evidence_for_answer(
+        make_bundle([wrong_top, article_two]),
+        config=EvidenceSelectionConfig(
+            max_selected_packets=1,
+            fallback_on_parent_context_only=False,
+        ),
+        expected_targets=expected,
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.selected_evidence[0].chunk_id == "article-2"
+
+
 def test_rendered_context_includes_caution_warnings_when_selected() -> None:
     """Caution selected evidence renders safety issues for future review."""
     caution = make_packet(

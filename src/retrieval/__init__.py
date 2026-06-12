@@ -24,6 +24,17 @@ from src.retrieval.evidence import (
     build_evidence_bundle,
     build_evidence_packet,
 )
+from src.retrieval.integration import (
+    SelectionSmokeAggregate,
+    SelectionSmokeError,
+    SelectionSmokeEvidenceSummary,
+    SelectionSmokeQueryResult,
+    SelectionSmokeReport,
+    aggregate_smoke_results,
+    filter_query_records,
+    run_selection_smoke_for_query,
+    run_selection_smoke_suite,
+)
 from src.retrieval.models import RetrievalFilters, RetrievalQuery, RetrievalResult, RetrievedChunk
 from src.retrieval.selection import (
     AnswerabilityDecision,
@@ -67,9 +78,18 @@ __all__ = [
     "RetrievalResult",
     "SelectedEvidence",
     "SelectionWarning",
+    "SelectionSmokeAggregate",
+    "SelectionSmokeError",
+    "SelectionSmokeEvidenceSummary",
+    "SelectionSmokeQueryResult",
+    "SelectionSmokeReport",
+    "aggregate_smoke_results",
     "build_evidence_bundle",
     "build_evidence_packet",
     "evaluate_dense_retrieval",
+    "filter_query_records",
     "load_manual_retrieval_queries",
+    "run_selection_smoke_for_query",
+    "run_selection_smoke_suite",
     "select_evidence_for_answer",
 ]

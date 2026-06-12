@@ -189,6 +189,63 @@ generation from parent context alone.
 This gate prepares a future input surface for Phase 9B, but it is not a prompt
 template and it does not call an LLM.
 
+## Phase 9A.4 Selection Smoke Test
+
+Phase 9A.4 adds a read-only integration smoke test before any answer
+generation:
+
+```text
+manual query
+→ dense retrieval
+→ evidence bundle assembly
+→ evidence selection/fallback gate
+→ JSON smoke report
+```
+
+Implemented files:
+
+```text
+src/retrieval/integration.py
+scripts/run_selection_smoke.py
+tests/unit/retrieval/test_integration.py
+```
+
+The smoke test reuses `data/eval/manual_retrieval_queries.jsonl`, including
+`expected_decision` and `allowed_decisions` metadata for known manual cases. It
+checks whether the current retrieval-side pipeline returns an acceptable
+decision for each query:
+
+- `annual_leave_days` should be `fallback_required` or `needs_review`, not
+  clean `answer_allowed`, while exact Clause/Point evidence remains missing;
+- `health_insurance_children_under_6` should allow an answer when exact point
+  evidence is selected;
+- `civil_code_scope` should allow an answer when Article-level evidence is
+  selected;
+- `marriage_conditions` is reported with selected evidence and risk state
+  because Article 8 may rank lower;
+- `civil_rights_protection` can pass as `answer_allowed` or `needs_review`
+  depending on selected evidence safety.
+
+The report includes run metadata, aggregate decision/pass counts, evidence and
+selection config, per-query retrieval latency, decision, allowed decisions,
+fallback reasons, selection warnings, risk flags, top result, selected/rejected
+evidence summaries, and a rendered selected-context preview.
+
+In evaluation/smoke mode, expected-target-aware selection prefers selectable
+packets that match the manual expected targets before unrelated evidence. This
+does not alter dense retrieval ranking. It ensures a lower-ranked but valid
+expected Article/Clause/Point packet is not accidentally excluded by
+`max_selected_packets`. The `civil_rights_protection` case validates this for
+Article 2, while `annual_leave_days` remains blocked because sibling Article
+113 clauses do not match the expected Clause 1 / Point a-b-c targets.
+
+`--strict` additionally enforces Phase 9A.1 risk flags inside the selection
+gate. Non-strict mode still reports risk flags but does not use them as hard
+selection blockers.
+
+This smoke test does not call an LLM, generate an answer, create prompts, fix
+ranking, perform hybrid retrieval, rerank, or mutate Qdrant/corpus artifacts.
+
 ## Overview
 
 The Naive RAG phase will establish the first baseline question-answering
@@ -233,6 +290,18 @@ uv run --extra qdrant --extra embedding python scripts/evaluate_dense_retrieval.
   --output artifacts/reports/retrieval/dense_retrieval_eval.json
 ```
 
+Run the selection integration smoke test:
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/run_selection_smoke.py \
+  --queries data/eval/manual_retrieval_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --output artifacts/reports/retrieval/selection_smoke_report.json
+```
+
 ## Architecture
 
 ```
@@ -257,6 +326,18 @@ uv run --extra qdrant --extra embedding python scripts/evaluate_dense_retrieval.
 ┌──────────────────────┐
 │  Typed Evidence      │
 │  Results             │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  EvidenceBundle      │
+│  Assembly            │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Evidence Selection  │
+│  Gate                │
 └──────────────────────┘
 ```
 
@@ -461,12 +542,23 @@ Implemented Phase 9A.1 evaluation flow:
 6. Emit conservative evidence/citation risk flags.
 7. Write a JSON evaluation report.
 
+Implemented Phase 9A.4 selection smoke flow:
+
+1. Load manual queries and allowed decisions from
+   `data/eval/manual_retrieval_queries.jsonl`.
+2. Run the existing dense retriever read-only for each query.
+3. Build an `EvidenceBundle` from the retrieval result.
+4. Run the evidence selection/fallback gate.
+5. Compare the decision against the query's allowed decisions.
+6. Write a JSON smoke report with selected/rejected evidence summaries and a
+   rendered selected-context preview.
+
 Future Naive RAG generation flow:
 
-1. Pack retrieved evidence with citation anchors.
+1. Use selected evidence only from `EvidenceSelectionResult`.
 2. Construct a strict legal prompt.
 3. Call an LLM with temperature 0.
-4. Validate generated citations against retrieved chunks.
+4. Validate generated citations against selected evidence.
 5. Compute confidence and return either a cited answer or the safe fallback.
 
 ## Data Models / Output Schema
@@ -567,6 +659,15 @@ Supported safe filters:
 - evaluation report shape;
 - evaluation CLI parser and path validation.
 
+**Implemented Phase 9A.4 unit tests**:
+- smoke pipeline composition with mocked retriever/builder/selector;
+- decision pass/fail checks from `allowed_decisions`;
+- batch aggregation and per-query error capture;
+- case-id filtering;
+- report shape and rendered-context preview truncation;
+- enum serialization for selected/rejected evidence summaries;
+- smoke CLI parser and path validation.
+
 **Future generation unit tests**:
 - context packing with citation anchors;
 - strict prompt template;
@@ -633,6 +734,15 @@ and citation-validation failures.
   tests.
 - Documented that dense-only retrieval is not yet reliable enough for answer
   generation without further evidence handling.
+
+### Version 0.4 (2026-06-12)
+
+- Implemented Phase 9A.2 evidence safety/context assembly, Phase 9A.3 evidence
+  selection/fallback rules, and Phase 9A.4 selection integration smoke tests.
+- Added citation-safe evidence packets, answerability decisions, selected
+  evidence rendering, and JSON smoke reports for known manual retrieval cases.
+- Kept LLM answer generation, prompt templates, generated-citation validation,
+  hybrid retrieval, RRF, and reranking out of scope.
 
 ### Version 0.1 (2026-05-21)
 

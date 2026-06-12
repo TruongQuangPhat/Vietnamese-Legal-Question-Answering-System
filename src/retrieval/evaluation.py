@@ -27,6 +27,7 @@ DEFAULT_EVAL_CUTOFFS = (5, 10, 20)
 REQUIRED_METADATA_FIELDS = ("law_id", "citation", "source_url")
 MATCH_LEVELS = ("article", "clause", "point")
 MatchLevel = Literal["article", "clause", "point"]
+DecisionExpectation = Literal["answer_allowed", "fallback_required", "needs_review"]
 
 
 class RetrievalEvaluationError(ValueError):
@@ -84,6 +85,8 @@ class ManualRetrievalQuery(BaseModel):
     query_id: str = Field(..., min_length=1)
     query: str = Field(..., min_length=1)
     expected: list[ExpectedTarget] = Field(..., min_length=1)
+    expected_decision: DecisionExpectation | None = None
+    allowed_decisions: list[DecisionExpectation] | None = None
     notes: str | None = None
 
     @field_validator("query_id", "query", "notes")
@@ -96,6 +99,20 @@ class ManualRetrievalQuery(BaseModel):
         if not stripped:
             raise ValueError("text fields must be non-blank when provided")
         return stripped
+
+    @field_validator("allowed_decisions")
+    @classmethod
+    def validate_allowed_decisions(
+        cls,
+        value: list[DecisionExpectation] | None,
+    ) -> list[DecisionExpectation] | None:
+        """Require non-empty, de-duplicated allowed decision lists when present."""
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("allowed_decisions must not be empty when provided")
+        deduplicated = list(dict.fromkeys(value))
+        return deduplicated
 
 
 class TargetMatchResult(BaseModel):
