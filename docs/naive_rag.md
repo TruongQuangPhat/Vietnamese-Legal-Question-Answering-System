@@ -94,6 +94,57 @@ Dense-only retrieval should not be treated as production-ready or safe for
 answer generation until these reports are reviewed and the citation risks are
 handled. Hybrid search, RRF, and reranking remain Phase 10 work.
 
+## Phase 9A.2 Evidence Safety
+
+Phase 9A.2 adds evidence/context assembly rules without generating answers:
+
+```text
+RetrievalResult
+→ EvidenceBundle
+→ ordered EvidencePacket objects
+→ citation-safe rendered context for later use
+```
+
+Implemented files:
+
+```text
+src/retrieval/evidence.py
+tests/unit/retrieval/test_evidence.py
+```
+
+The evidence layer separates:
+
+- citable child text, which stays adjacent to the retrieved chunk citation;
+- article-level context, which is citable only for article-level chunks;
+- broader parent Article context for child chunks, which is auxiliary only.
+
+This directly handles the Article 113 annual-leave risk: if dense retrieval
+returns a sibling child chunk such as Clause 4, but that chunk's `parent_text`
+contains Clause 1, the packet remains citable only for Clause 4. The broader
+`parent_text` is rendered under:
+
+```text
+Auxiliary article context, not directly citable under this child citation:
+```
+
+Evidence packets carry structural safety metadata:
+
+```text
+citation_scope: child_exact | article_context | unsafe_parent_context | missing_citation
+safety_level: safe | caution | unsafe
+parent_context_policy: absent | excluded | auxiliary_only | citable_article_context |
+                       equivalent_to_child | deduplicated
+```
+
+Unsafe packets are used for missing citation, missing law/source metadata,
+missing child text, or empty/repealed flags. Caution packets are still citable
+at child level but require care because parent Article context, truncation, or
+other non-fatal issues are present.
+
+This layer does not fix dense ranking. It prevents future Naive RAG generation
+from silently citing a child chunk for claims found only in broader parent
+context.
+
 ## Overview
 
 The Naive RAG phase will establish the first baseline question-answering
@@ -240,21 +291,30 @@ results = client.search(
 
 **Output**: List of `ScoredPoint` with `chunk_id`, `score`, `payload`.
 
-### 3. Context Packing (future)
+### 3. Evidence Context Assembly
 
-**Goal**: Assemble retrieved chunks into a coherent context for the LLM.
+**Goal**: Assemble retrieved chunks into citation-safe evidence packets before
+any future LLM use.
 
 **Process**:
-- Sort retrieved chunks by score (highest first).
-- For each chunk, format as:
+- Preserve retrieval rank.
+- Deduplicate repeated chunk IDs.
+- Keep child `text` next to its retrieved citation.
+- Render broader child `parent_text` as auxiliary context unless the chunk is
+  article-level.
+- For each packet, format citable text separately from auxiliary context:
   ```
-  [Citation: Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c]
+  [E1]
+  Citation: Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c
+  Citable text:
   Nội dung của Điểm c...
-  ```
-- Concatenate up to `max_chunks` (e.g., 10) with newlines between.
-- Prepend with instruction header (see Strict Legal Prompt).
 
-**Output**: Single `context` string.
+  Auxiliary article context, not directly citable under this child citation:
+  Điều 123...
+  ```
+- Mark truncated text with an explicit truncation marker.
+
+**Output**: `EvidenceBundle` plus a rendered context string.
 
 ### 4. Strict Legal Prompt (future)
 
