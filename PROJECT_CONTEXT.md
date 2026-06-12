@@ -113,7 +113,7 @@ Corpus Registry
 - **Phase 9A — Dense Retrieval Baseline is implemented.**
 - Phase 9A adds typed retrieval models, safe exact-match filters, read-only
   dense Qdrant search, a retrieval service wrapper, CLI, config, and unit tests.
-- RAG answer generation has not started.
+- Fallback-aware RAG answer generation is implemented as the Phase 9B baseline.
 
 ### Current State
 
@@ -123,10 +123,12 @@ Corpus Registry
   `vnlaw_chunks_bgem3_v1_full`.
 - Dense retrieval can query the validated collection and return typed
   payload-backed legal evidence.
+- Fallback-aware Naive RAG generation is implemented. It calls OpenRouter only
+  when the evidence selection gate returns `answer_allowed`.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- The next major work is retrieval quality review, context/evidence packing,
-  and the Naive RAG answer-generation baseline when separately scoped.
+- The next work is a live single-query OpenRouter smoke for an answer-allowed
+  case, followed by separately scoped generation evaluation.
 
 Operational rules:
 
@@ -268,23 +270,21 @@ artifacts/reports/chunking/processed_jsonl_validation_report.json
 Current next work:
 
 ```text
-Phase 9B — Naive RAG answer-generation baseline
+Phase 9B — Live single-query OpenRouter smoke
 ```
 
 Phase 9A already starts retrieval with BGE-M3 query embedding and dense top-k
 search against `vnlaw_chunks_bgem3_v1_full`. It returns typed evidence from
 `text`, `parent_text`, citations, hierarchy, law/source metadata, warning
-metadata, and indexing provenance. Validate retrieval behavior before adding
-LLM answer generation.
+metadata, and indexing provenance. Phase 9B generation remains gated by
+selected citation-safe evidence.
 
 ## 6. Next Immediate Tasks
 
-1. Run manual retrieval quality checks against local Qdrant.
-2. Review top-k relevance and safe filter behavior.
-3. Design citation-preserving evidence/context packing.
-4. Add answer generation only after retrieval behavior is understood.
-5. Keep sparse/hybrid retrieval, reranking, and answer generation separately
-   scoped.
+1. Run the existing Naive RAG command for one answer-allowed query.
+2. Manually inspect the generated answer and mapped citations.
+3. Add a small generation evaluation set only as a separately scoped task.
+4. Keep sparse/hybrid retrieval and reranking separately scoped for Phase 10.
 
 ## 7. Upcoming Phases
 
@@ -295,7 +295,7 @@ LLM answer generation.
 | 7.5 | LLM-Assisted Corpus Audit & Context Refresh | **Complete / Go with watch items** |
 | 8 | Embedding & Indexing | **Complete / Validated** |
 | 9A | Dense Retrieval Baseline | **Complete / Implemented** |
-| 9B | Naive RAG Answer Generation | Next / Not started |
+| 9B | Naive RAG Answer Generation | **Complete / Baseline Implemented** |
 | 10 | Advanced RAG | Future |
 | 11 | GraphRAG & Agents | Future |
 | 12 | Evaluation | Future |
@@ -309,7 +309,7 @@ LLM answer generation.
 - Do not mutate `data/processed/legal_chunks.jsonl`.
 - Do not commit Qdrant storage or the Hugging Face/model cache.
 - Do not modify the validated collection unless explicitly scoped.
-- Do not add LLM answer generation before retrieval evaluation is complete.
+- Do not bypass the Phase 9A evidence gate for LLM answer generation.
 - Do not implement Advanced RAG yet.
 - Do not implement GraphRAG or agents yet.
 - Do not build UI or API yet.

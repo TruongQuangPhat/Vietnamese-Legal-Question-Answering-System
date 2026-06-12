@@ -186,8 +186,8 @@ evaluation-assisted mode because they do not match Clause 1 or Points a/b/c.
 The gate returns fallback/review instead of allowing clean downstream answer
 generation from parent context alone.
 
-This gate prepares a future input surface for Phase 9B, but it is not a prompt
-template and it does not call an LLM.
+This gate is the required input surface for Phase 9B, but it is not itself a
+prompt template and it does not call an LLM.
 
 ## Phase 9A.4 Selection Smoke Test
 
@@ -272,7 +272,7 @@ scripts only bootstrap imports and call the workflow `main()` function.
 
 No retrieval behavior, evaluation metrics, evidence safety rules, selection
 decisions, report schemas, or command-line flags were intentionally changed.
-Future Phase 9B scripts should follow the same boundary: reusable workflow
+Phase 9B scripts follow the same boundary: reusable workflow
 logic under `src/`, top-level `scripts/` as compatibility wrappers only.
 
 ## Overview
@@ -370,7 +370,7 @@ uv run --extra qdrant --extra embedding python scripts/run_selection_smoke.py \
 └──────────────────────┘
 ```
 
-Future Naive RAG answer generation will extend this retrieval baseline:
+Implemented Phase 9B Naive RAG generation extends this retrieval baseline:
 
 ```
 ┌──────────────────────┐
@@ -394,7 +394,7 @@ Future Naive RAG answer generation will extend this retrieval baseline:
 ┌──────────────────────┐
 │  LLM                 │
 │  Generation          │
-│  (Claude API)        │
+│  (OpenRouter)        │
 └──────────┬───────────┘
            │
            ▼
@@ -507,21 +507,23 @@ Question: {query}
 Answer:
 ```
 
-**Fallback message** (if no relevant context):
+**Fallback message** (if no selected citation-safe evidence):
 ```
-I could not find a specific regulation for this issue in the current legal corpus. Please check thuvienphapluat.vn directly or consult a qualified lawyer.
+Hiện tại hệ thống chưa tìm được căn cứ pháp lý đủ an toàn để trả lời chắc chắn.
 ```
 
-**LLM**: Claude API (Haiku or Sonnet for cost/speed trade-off). Temperature = 0 for determinism.
+**LLM**: OpenRouter chat completions. Default model:
+`google/gemini-2.5-flash`. Temperature = 0 by default.
 
-### 5. LLM Generation (future)
+### 5. LLM Generation
 
 **Goal**: Produce Vietnamese legal answer grounded in context.
 
 **Process**:
-- Send prompt to Anthropic API (`messages/create`).
-- Stream response or wait for completion.
-- Extract `content[0].text`.
+- Call OpenRouter only when `EvidenceSelectionResult.decision == answer_allowed`.
+- Use selected evidence only in the prompt.
+- Extract the first assistant message text.
+- Run the lightweight `[E#]` citation guard.
 
 **Output**: Generated answer string.
 
@@ -590,13 +592,57 @@ Implemented Phase 9A.5 workflow boundary:
    `src/retrieval/workflows/common.py`.
 4. Leave retrieval, evaluation, evidence, and selection semantics unchanged.
 
-Future Naive RAG generation flow:
+Implemented Phase 9B Naive RAG generation flow:
 
 1. Use selected evidence only from `EvidenceSelectionResult`.
 2. Construct a strict legal prompt.
-3. Call an LLM with temperature 0.
-4. Validate generated citations against selected evidence.
-5. Compute confidence and return either a cited answer or the safe fallback.
+3. If `decision != answer_allowed`, return deterministic fallback without
+   calling the LLM.
+4. If `decision == answer_allowed`, call OpenRouter with temperature 0 by
+   default.
+5. Run a lightweight citation ID guard over generated `[E#]` citations.
+6. Return either a cited answer result or a safe fallback result.
+
+Implemented Phase 9B files:
+
+```text
+src/retrieval/llm_client.py
+src/retrieval/prompting.py
+src/retrieval/generation.py
+src/retrieval/rag_pipeline.py
+src/retrieval/workflows/naive_rag.py
+scripts/run_naive_rag.py
+```
+
+OpenRouter is the first concrete provider. Non-secret defaults live in
+`configs/llm/openrouter.yml`:
+
+```text
+base_url=https://openrouter.ai/api/v1
+default_model=google/gemini-2.5-flash
+dev_model=google/gemini-2.5-flash-lite
+```
+
+`OPENROUTER_API_KEY` is required only when the evidence gate allows generation.
+It belongs only in the real environment or uncommitted project `.env`. The CLI
+loads `.env` automatically with exported environment values taking precedence.
+Fallback/review results do not call OpenRouter.
+
+Configuration precedence:
+
+```text
+model: --model > OPENROUTER_MODEL > config default_model > emergency fallback
+base URL: OPENROUTER_BASE_URL > config base_url > emergency fallback
+API key: OPENROUTER_API_KEY from environment/.env only; no fallback
+```
+
+Never commit `.env`, print the API key, or include it in reports.
+
+The prompt contains selected evidence only. Rejected evidence, unsafe evidence,
+and raw retrieval results are not included. Auxiliary parent Article context is
+shown only in a section labeled as not directly citable. Every selected packet
+receives an internal citation ID (`[E1]`, `[E2]`, ...), and generated citation
+IDs are mapped back to real source/citation metadata.
 
 ## Data Models / Output Schema
 
@@ -710,15 +756,22 @@ Supported safe filters:
 - workflow parsers preserve existing command flags;
 - shared JSON writer creates parent directories and writes UTF-8 JSON.
 
-**Future generation unit tests**:
-- context packing with citation anchors;
-- strict prompt template;
-- generated citation validator;
-- confidence policy and fallback behavior.
+**Implemented Phase 9B unit tests**:
+- OpenRouter missing-key handling and `MockLLMClient`;
+- selected-evidence-only prompt construction;
+- auxiliary context labeling as not directly citable;
+- deterministic fallback result construction;
+- lightweight `[E#]` citation guard;
+- fallback/needs-review decisions skip LLM calls;
+- answer-allowed decisions call the mock LLM exactly once;
+- rejected/unsafe evidence does not appear in the LLM prompt;
+- annual-leave-style exact target miss remains fallback;
+- health-insurance-style exact point evidence allows generation;
+- Naive RAG workflow parser and thin script wrapper.
 
 **Integration test**:
 - Phase 9A: query → embedding → Qdrant dense retrieval → typed evidence.
-- Future Naive RAG: query → retrieval → generation → answer.
+- Phase 9B: query → retrieval → evidence selection → fallback or generation.
 
 **Golden QA evaluation** (separate phase 12):
 - Dataset of (query, expected answer, expected citation).
@@ -734,8 +787,9 @@ Supported safe filters:
 - **Missing optional payload fields**: tolerated.
 - **Missing critical payload fields**: reported in typed retrieval issues.
 
-Future API/generation error handling will add fallback responses, retry policy,
-and citation-validation failures.
+Phase 9B generation errors return structured fallback results. Missing
+OpenRouter credentials, provider errors, prompt construction failures, and
+strict invalid citation failures are reported without exposing API keys.
 
 ## Troubleshooting
 
@@ -791,7 +845,17 @@ and citation-validation failures.
 - Moved retrieval workflow logic into `src/retrieval/workflows/`.
 - Kept top-level retrieval scripts as backward-compatible thin wrappers.
 - Preserved command flags, report paths, and retrieval-side behavior.
-- Documented the workflow boundary for future Phase 9B entrypoints.
+- Documented the workflow boundary for Phase 9B entrypoints.
+
+### Version 0.6 (2026-06-12)
+
+- Implemented Phase 9B fallback-aware Naive RAG generation.
+- Added OpenRouter and mock LLM clients, selected-evidence prompt building,
+  deterministic fallback results, and lightweight `[E#]` citation checks.
+- Added `scripts/run_naive_rag.py` as a thin wrapper around
+  `src/retrieval/workflows/naive_rag.py`.
+- Kept hybrid retrieval, RRF, reranking, GraphRAG, agents, API endpoints, and
+  production legal-advice claims out of scope.
 
 ### Version 0.1 (2026-05-21)
 

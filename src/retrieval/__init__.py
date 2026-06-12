@@ -24,6 +24,17 @@ from src.retrieval.evidence import (
     build_evidence_bundle,
     build_evidence_packet,
 )
+from src.retrieval.generation import (
+    CitationCheckResult,
+    CitationIssue,
+    CitationIssueSeverity,
+    RagAnswerResult,
+    RagCitation,
+    RagGenerationConfig,
+    UsedEvidence,
+    build_fallback_result,
+    check_generated_citations,
+)
 from src.retrieval.integration import (
     SelectionSmokeAggregate,
     SelectionSmokeError,
@@ -35,7 +46,28 @@ from src.retrieval.integration import (
     run_selection_smoke_for_query,
     run_selection_smoke_suite,
 )
+from src.retrieval.llm_client import (
+    LLMClientError,
+    LLMMessage,
+    LLMRequest,
+    LLMResponse,
+    LLMUsage,
+    MockLLMClient,
+    OpenRouterLLMClient,
+)
 from src.retrieval.models import RetrievalFilters, RetrievalQuery, RetrievalResult, RetrievedChunk
+from src.retrieval.openrouter_config import (
+    FALLBACK_OPENROUTER_BASE_URL,
+    FALLBACK_OPENROUTER_DEV_MODEL,
+    FALLBACK_OPENROUTER_MODEL,
+    OpenRouterConfig,
+    OpenRouterRuntimeSettings,
+    load_openrouter_config,
+    load_project_dotenv,
+    resolve_openrouter_settings,
+)
+from src.retrieval.prompting import PromptEvidence, RagPrompt, build_naive_rag_prompt
+from src.retrieval.rag_pipeline import run_naive_rag
 from src.retrieval.selection import (
     AnswerabilityDecision,
     EvidenceRejectionReason,
@@ -51,6 +83,9 @@ from src.retrieval.selection import (
 
 __all__ = [
     "AnswerabilityDecision",
+    "CitationCheckResult",
+    "CitationIssue",
+    "CitationIssueSeverity",
     "CitationScope",
     "ContextAssemblyConfig",
     "DenseRetrievalEvaluationReport",
@@ -68,9 +103,26 @@ __all__ = [
     "ExpectedTarget",
     "FallbackReason",
     "FallbackReasonCode",
+    "FALLBACK_OPENROUTER_BASE_URL",
+    "FALLBACK_OPENROUTER_DEV_MODEL",
+    "FALLBACK_OPENROUTER_MODEL",
+    "LLMClientError",
+    "LLMMessage",
+    "LLMRequest",
+    "LLMResponse",
+    "LLMUsage",
     "ManualRetrievalQuery",
+    "MockLLMClient",
+    "OpenRouterLLMClient",
+    "OpenRouterConfig",
+    "OpenRouterRuntimeSettings",
     "ParentContextPolicy",
     "PerQueryEvaluationResult",
+    "PromptEvidence",
+    "RagAnswerResult",
+    "RagCitation",
+    "RagGenerationConfig",
+    "RagPrompt",
     "RejectedEvidence",
     "RetrievedChunk",
     "RetrievalFilters",
@@ -86,10 +138,18 @@ __all__ = [
     "aggregate_smoke_results",
     "build_evidence_bundle",
     "build_evidence_packet",
+    "build_fallback_result",
+    "build_naive_rag_prompt",
+    "check_generated_citations",
     "evaluate_dense_retrieval",
     "filter_query_records",
     "load_manual_retrieval_queries",
+    "load_openrouter_config",
+    "load_project_dotenv",
+    "run_naive_rag",
     "run_selection_smoke_for_query",
     "run_selection_smoke_suite",
+    "resolve_openrouter_settings",
     "select_evidence_for_answer",
+    "UsedEvidence",
 ]

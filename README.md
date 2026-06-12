@@ -25,12 +25,20 @@ Completed:
   Phase 7.5 — LLM-assisted corpus audit
   Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
   Phase 9A — Dense Retrieval Baseline
+  Phase 9B — Fallback-aware Naive RAG Generation
 
 Next:
-  Run manual retrieval quality checks over the validated Qdrant collection
-  Design evidence/context packing for Naive RAG generation
-  Add answer generation only when separately scoped
+  Run a live single-query OpenRouter smoke for an answer-allowed case
+  Keep generation gated by citation-safe selected evidence
+  Add generation evaluation only as a separately scoped follow-up
 ```
+
+Phase 9B loads `.env` automatically for `scripts/run_naive_rag.py`.
+Non-secret OpenRouter defaults are stored in `configs/llm/openrouter.yml`;
+`OPENROUTER_API_KEY` must exist only in the real environment or uncommitted
+`.env`. Model precedence is `--model`, then `OPENROUTER_MODEL`, then YAML
+`default_model`, then the emergency fallback. Exported environment values are
+not overridden, and API keys must never be printed or written to reports.
 
 Phase 4 is gate-ready:
 
@@ -714,8 +722,8 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
 | `docs/phase8_embedding_indexing_tracker.md` | Completed Phase 8 implementation, indexing, and validation record |
 | `docs/embedding_indexing.md` | Phase 8 design background |
-| `docs/phase9_retrieval_naive_rag_tracker.md` | Phase 9A dense retrieval status and next steps |
-| `docs/naive_rag.md` | Implemented dense retrieval baseline and future Naive RAG design |
+| `docs/phase9_retrieval_naive_rag_tracker.md` | Phase 9 retrieval and fallback-aware Naive RAG status |
+| `docs/naive_rag.md` | Implemented dense retrieval and fallback-aware Naive RAG baseline |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries
@@ -725,8 +733,8 @@ Do not do yet:
 - Do not modify raw or interim corpus artifacts without explicit approval.
 - Do not mutate `data/processed/legal_chunks.jsonl`.
 - Do not commit Qdrant storage, model caches, or other runtime state.
-- Do not implement answer generation, Advanced RAG, or GraphRAG without a
-  separately scoped task.
+- Do not bypass the evidence gate, implement Advanced RAG, or implement
+  GraphRAG without a separately scoped task.
 - Do not mutate `data/raw/`.
 - Do not commit credentials, local provider tokens, `.env`, or machine-specific
   config.

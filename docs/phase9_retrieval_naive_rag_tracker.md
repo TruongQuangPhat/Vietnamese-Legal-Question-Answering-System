@@ -9,7 +9,7 @@ Phase 9A.2 — Evidence Safety and Context Assembly Rules: implemented
 Phase 9A.3 — Evidence Selection and Fallback Rules: implemented
 Phase 9A.4 — Selection Integration Smoke Test: implemented
 Phase 9A.5 — Workflow Boundary Cleanup: implemented
-Phase 9B — Naive RAG Answer Generation: not implemented
+Phase 9B — Naive RAG Answer Generation: implemented
 ```
 
 Phase 9 starts from the validated Phase 8 Qdrant collection:
@@ -294,6 +294,91 @@ uv run --extra qdrant --extra embedding python scripts/run_selection_smoke.py \
   --output artifacts/reports/retrieval/selection_smoke_report.json
 ```
 
+## Phase 9B Implemented
+
+Phase 9B adds fallback-aware Naive RAG generation while preserving the Phase 9A
+evidence gate:
+
+```text
+query
+-> dense retrieval
+-> EvidenceBundle assembly
+-> EvidenceSelectionResult gate
+-> if decision == answer_allowed: selected-evidence prompt + LLM
+-> otherwise: deterministic fallback without LLM call
+```
+
+Implemented files:
+
+```text
+src/retrieval/llm_client.py
+src/retrieval/prompting.py
+src/retrieval/generation.py
+src/retrieval/rag_pipeline.py
+src/retrieval/workflows/naive_rag.py
+scripts/run_naive_rag.py
+tests/unit/retrieval/test_llm_client.py
+tests/unit/retrieval/test_prompting.py
+tests/unit/retrieval/test_generation.py
+tests/unit/retrieval/test_rag_pipeline.py
+```
+
+OpenRouter is the first concrete LLM provider. The default model is
+`google/gemini-2.5-flash`; `google/gemini-2.5-flash-lite` is documented as a
+cheap smoke/dev option. Non-secret defaults live in
+`configs/llm/openrouter.yml`. The CLI loads the project `.env` automatically
+without overriding exported environment variables.
+
+Resolution order is:
+
+```text
+model: --model > OPENROUTER_MODEL > config default_model > emergency fallback
+base URL: OPENROUTER_BASE_URL > config base_url > emergency fallback
+API key: OPENROUTER_API_KEY from environment/.env only
+```
+
+Never commit `.env`. API keys are not stored in YAML, printed, logged, or
+serialized into reports.
+
+Generation is allowed only when the selector returns `answer_allowed`.
+`fallback_required` and `needs_review` produce a deterministic Vietnamese
+fallback result and do not call the LLM for legal answer generation. This keeps
+the known `annual_leave_days` failure mode blocked: sibling Article 113 chunks
+and unsafe parent context cannot be used to generate a confident answer.
+
+The prompt builder uses only `EvidenceSelectionResult.selected_evidence`.
+Rejected evidence, unsafe evidence, and unselected retrieval results are not
+included. Each selected packet receives an internal citation ID such as `[E1]`.
+Citable child text is separated from auxiliary parent context, and auxiliary
+context is explicitly marked as not directly citable.
+
+The lightweight citation guard extracts generated `[E#]` IDs, verifies that
+each ID exists in selected prompt evidence, maps valid IDs back to real citation
+metadata, reports unknown IDs, and warns when a non-empty generated answer has
+no citation IDs. This is not a full generated-citation validator.
+
+Phase 9B intentionally does not add hybrid retrieval, sparse retrieval, BM25,
+RRF, reranking, query rewriting, GraphRAG, agents, FastAPI endpoints, reindexing,
+or production legal-advice claims.
+
+## Naive RAG Command
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/run_naive_rag.py \
+  --query "Trẻ em dưới 6 tuổi được hưởng bảo hiểm y tế như thế nào?" \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash \
+  --output artifacts/reports/retrieval/naive_rag_single_query.json
+```
+
+If the evidence gate returns fallback/review, the command writes a fallback
+JSON result without using `OPENROUTER_API_KEY`. If the gate allows generation,
+OpenRouter is called only when `OPENROUTER_API_KEY` is set.
+
 ## Evaluation Command
 
 ```bash
@@ -320,12 +405,9 @@ uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
 
 ## Next Work
 
-1. Review Phase 9A.4 smoke reports together with Phase 9A.1 risk flags and
-   Phase 9A.2/9A.3 evidence decisions.
-2. Decide operational thresholds for when `needs_review` should become fallback
+1. Run a live single-query OpenRouter smoke for an answer-allowed case.
+2. Manually inspect the generated answer and mapped citations.
+3. Decide operational thresholds for when `needs_review` should become fallback
    in automated settings.
-3. Design future Phase 9B generation around `EvidenceSelectionResult`
-   selected context only after the evidence gate behavior is accepted.
-4. Delay answer generation until retrieval quality and citation risk are better
-   understood.
+4. Add a small generation evaluation set as a separately scoped follow-up.
 5. Keep hybrid retrieval, RRF, and reranking for Phase 10.

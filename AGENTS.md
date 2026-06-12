@@ -77,7 +77,9 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - Phase 9A Dense Retrieval Baseline is implemented with typed retrieval
   models, safe filters, read-only dense Qdrant search, CLI, config, and unit
   tests.
-- Naive RAG answer generation has not been implemented.
+- Phase 9B fallback-aware Naive RAG generation is implemented with OpenRouter
+  as the first concrete provider. Generation is gated by selected citation-safe
+  evidence and falls back without an LLM call when evidence is insufficient.
 
 ## 5. Official Commands
 
