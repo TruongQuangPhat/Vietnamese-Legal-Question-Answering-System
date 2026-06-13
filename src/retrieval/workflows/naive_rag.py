@@ -38,7 +38,7 @@ DEFAULT_OUTPUT = Path("artifacts/reports/retrieval/naive_rag_single_query.json")
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the fallback-aware Naive RAG CLI parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/run_naive_rag.py",
+        prog="scripts/retrieval/run_naive_rag.py",
         description="Run one fallback-aware Naive RAG legal QA query.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

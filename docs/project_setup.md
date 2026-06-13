@@ -26,7 +26,7 @@ uv run mypy src
 uv run pytest tests/unit -v
 
 # Run the crawler CLI
-uv run python scripts/crawl_raw_corpus.py --help
+uv run python scripts/corpus/crawl_raw_corpus.py --help
 ```
 
 **Important**: All development should use the `uv` package manager and the project's `pyproject.toml` configuration.
@@ -297,13 +297,13 @@ class CorpusEntry(BaseModel):
 
 ```bash
 # Show help for ingestion CLI
-uv run python scripts/crawl_raw_corpus.py --help
+uv run python scripts/corpus/crawl_raw_corpus.py --help
 
 # Current ingestion commands:
-# - Crawler: uv run python scripts/crawl_raw_corpus.py --help
-# - Raw audit: uv run python scripts/audit_raw_corpus.py --help
-# - Cleaning: uv run python scripts/clean_raw_corpus.py --help
-# - Cleaning audit: uv run python scripts/audit_cleaning_quality.py --help
+# - Crawler: uv run python scripts/corpus/crawl_raw_corpus.py --help
+# - Raw audit: uv run python scripts/corpus/audit_raw_corpus.py --help
+# - Cleaning: uv run python scripts/corpus/clean_raw_corpus.py --help
+# - Cleaning audit: uv run python scripts/corpus/audit_cleaning_quality.py --help
 #
 # Intended future commands should follow the same pattern:
 # scripts/<action>.py for CLI, src/services/ for orchestration,

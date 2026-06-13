@@ -8,7 +8,8 @@ VnLaw-QA is a Vietnamese Legal QA/RAG system. It is not a generic chatbot.
 
 ### Architecture
 
-- `scripts/` = CLI entrypoints (parse arguments, call services, print results)
+- `scripts/{corpus,indexing,retrieval}/` = domain-grouped CLI entrypoints
+  (parse arguments, call services, print results)
 - `src/services/` = pipeline orchestration (coordinate phase execution, build reports)
 - `src/ingestion/` = Phase 1-4 domain logic (crawler, audit, cleaning, storage)
 - `src/processing/` = Phase 5-7 domain logic (parsing, chunking, JSONL validation)
@@ -204,7 +205,7 @@ Relevant files:
 - `src/ingestion/storage.py`
 - `src/ingestion/rate_limiter.py`
 - `src/services/crawl_service.py`
-- `scripts/crawl_raw_corpus.py`
+- `scripts/corpus/crawl_raw_corpus.py`
 - `docs/raw_data_crawling.md`
 - `data/raw/`
 - `artifacts/reports/crawling/crawl_report.json`
@@ -219,7 +220,7 @@ Relevant files:
 
 - `src/ingestion/audit.py`
 - `src/services/raw_audit_service.py`
-- `scripts/audit_raw_corpus.py`
+- `scripts/corpus/audit_raw_corpus.py`
 - `tests/unit/ingestion/test_audit.py`
 - `docs/raw_corpus_audit.md`
 - `artifacts/reports/audit/raw_corpus_audit.json`
@@ -236,8 +237,8 @@ Relevant files:
 - `src/ingestion/cleaning_diagnostics.py`
 - `src/services/cleaning_service.py`
 - `src/services/cleaning_quality_audit_service.py`
-- `scripts/clean_raw_corpus.py`
-- `scripts/audit_cleaning_quality.py`
+- `scripts/corpus/clean_raw_corpus.py`
+- `scripts/corpus/audit_cleaning_quality.py`
 - `tests/unit/ingestion/test_cleaning.py`
 - `docs/cleaning_normalization.md`
 - `data/interim/`
@@ -260,7 +261,7 @@ Relevant files:
 - `src/processing/legal_tree_validator.py`
 - `src/processing/legal_parser.py`
 - `src/services/legal_parsing_service.py`
-- `scripts/parse_legal_hierarchy.py`
+- `scripts/corpus/parse_legal_hierarchy.py`
 - `tests/unit/processing/`
 - `tests/unit/services/test_legal_parsing_service.py`
 - `docs/legal_parsing.md`
@@ -382,7 +383,7 @@ docs/evaluation.md
 ### Phase 2 — Crawl
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -392,7 +393,7 @@ uv run python scripts/crawl_raw_corpus.py \
 ### Phase 3 — Audit
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -401,7 +402,7 @@ uv run python scripts/audit_raw_corpus.py \
 ### Phase 4 — Clean
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json
@@ -410,7 +411,7 @@ uv run python scripts/clean_raw_corpus.py \
 ### Phase 5 — Parse
 
 ```bash
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json
@@ -419,7 +420,7 @@ uv run python scripts/parse_legal_hierarchy.py \
 ### Phase 6 — Chunk
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \
@@ -431,7 +432,7 @@ uv run python scripts/chunk_legal_corpus.py \
 ### Phase 7 — Validate Processed JSONL
 
 ```bash
-uv run python scripts/validate_processed_jsonl.py \
+uv run python scripts/corpus/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
   --output artifacts/reports/chunking/processed_jsonl_validation_report.json \

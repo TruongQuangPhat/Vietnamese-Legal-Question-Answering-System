@@ -307,11 +307,7 @@ def _source_warning_codes(
 ) -> list[str]:
     """Return Phase 5 warning codes that directly affect this chunk."""
     node_ids = {source.node_id, article.node_id}
-    return [
-        warning.code.value
-        for warning in warnings
-        if warning.node_id in node_ids
-    ]
+    return [warning.code.value for warning in warnings if warning.node_id in node_ids]
 
 
 def _source_caveat_references(
@@ -410,7 +406,10 @@ def _source_integrity_warnings(
             )
         )
 
-    if source.level in {LegalNodeLevel.CLAUSE, LegalNodeLevel.POINT} and source.text not in article.text:
+    if (
+        source.level in {LegalNodeLevel.CLAUSE, LegalNodeLevel.POINT}
+        and source.text not in article.text
+    ):
         warnings.append(
             ChunkingIssue(
                 code=ChunkingIssueCode.CHILD_OUTSIDE_ARTICLE,

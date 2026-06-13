@@ -2,7 +2,7 @@
 """Raw legal corpus crawling CLI.
 
 Usage:
-    uv run python scripts/crawl_raw_corpus.py \
+    uv run python scripts/corpus/crawl_raw_corpus.py \
       --registry configs/laws/corpus_registry.yml \
       --output data/raw \
       --report artifacts/reports/crawling/crawl_report.json \
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import structlog
 from rich.console import Console
@@ -26,31 +26,32 @@ from src.services.crawl_service import CrawlPipelineConfig, run_crawl_pipeline
 
 console = Console()
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="scripts/crawl_raw_corpus.py",
+        prog="scripts/corpus/crawl_raw_corpus.py",
         description="Registry-Driven Legal Document Crawler for VnLaw-QA",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Batch crawl all pending
-  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --output data/raw --report artifacts/reports/crawling/crawl_report.json --only-status pending
+  uv run python scripts/corpus/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --output data/raw --report artifacts/reports/crawling/crawl_report.json --only-status pending
 
   # Crawl specific laws
-  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids BLDS_2015 HP_2013 --output data/raw
+  uv run python scripts/corpus/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids BLDS_2015 HP_2013 --output data/raw
 
   # Crawl by tier
-  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --tier 1 --output data/raw
+  uv run python scripts/corpus/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --tier 1 --output data/raw
 
   # Debug single URL
-  uv run python scripts/crawl_raw_corpus.py --url "https://thuvienphapluat.vn/..." --law-id "BLDS_2015" --output data/raw
+  uv run python scripts/corpus/crawl_raw_corpus.py --url "https://thuvienphapluat.vn/..." --law-id "BLDS_2015" --output data/raw
 
   # Dry run
-  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --only-status pending --dry-run
+  uv run python scripts/corpus/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --only-status pending --dry-run
 
   # Force refresh
-  uv run python scripts/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids LDD_VBHN --force --output data/raw
-        """
+  uv run python scripts/corpus/crawl_raw_corpus.py --registry configs/laws/corpus_registry.yml --law-ids LDD_VBHN --force --output data/raw
+        """,
     )
 
     # Mode selection
@@ -100,7 +101,16 @@ Examples:
         type=str,
         action="append",
         dest="only_statuses",
-        choices=["pending", "crawling", "crawled", "parsed", "ingested", "verified", "failed", "manual_review"],
+        choices=[
+            "pending",
+            "crawling",
+            "crawled",
+            "parsed",
+            "ingested",
+            "verified",
+            "failed",
+            "manual_review",
+        ],
         help="Filter by crawl status (can repeat)",
     )
     parser.add_argument(
@@ -180,6 +190,7 @@ Examples:
 
     # Set up logging
     from src.core.config import get_settings
+
     settings = get_settings()
     log_level = "DEBUG" if args.verbose else settings.log_level
 
@@ -228,8 +239,10 @@ Examples:
         console.print(f"[red]Unexpected error:[/] {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

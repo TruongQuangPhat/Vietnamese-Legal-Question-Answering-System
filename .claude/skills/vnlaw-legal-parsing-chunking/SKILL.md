@@ -187,7 +187,7 @@ Validated result:
 Official command:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \

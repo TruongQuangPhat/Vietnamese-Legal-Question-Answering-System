@@ -339,8 +339,7 @@ class TestLegalChunkModel:
         chunk = _metadata()
         assert chunk.text_hash == hashlib.sha256(chunk.text.encode("utf-8")).hexdigest()
         assert (
-            chunk.parent_text_hash
-            == hashlib.sha256(chunk.parent_text.encode("utf-8")).hexdigest()
+            chunk.parent_text_hash == hashlib.sha256(chunk.parent_text.encode("utf-8")).hexdigest()
         )
 
     def test_metadata_dict_is_validated_to_typed_model(self) -> None:
@@ -408,9 +407,7 @@ class TestChunkingIssue:
         assert dumped["context"] == {}
 
     def test_issue_context_roundtrip(self) -> None:
-        issue = _issue(
-            context={"expected": 10, "actual": 5, "node_id": "TEST__article_1"}
-        )
+        issue = _issue(context={"expected": 10, "actual": 5, "node_id": "TEST__article_1"})
         dumped = issue.model_dump(mode="json")
         assert dumped["context"]["expected"] == 10
         assert dumped["context"]["actual"] == 5

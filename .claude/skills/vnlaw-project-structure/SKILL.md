@@ -277,12 +277,12 @@ security   → PII redaction, audit logging
 ```text
 Phase 0  Setup           → pyproject.toml, CLAUDE.md, PROJECT_CONTEXT.md
 Phase 1  Registry        → configs/laws/, src/ingestion/registry.py
-Phase 2  Crawling        → src/ingestion/crawler.py, scripts/crawl_raw_corpus.py
-Phase 3  Audit           → src/ingestion/audit.py, scripts/audit_raw_corpus.py
-Phase 4  Cleaning        → src/ingestion/cleaning.py, scripts/clean_raw_corpus.py
-Phase 5  Parsing         → src/processing/, scripts/parse_legal_hierarchy.py
+Phase 2  Crawling        → src/ingestion/crawler.py, scripts/corpus/crawl_raw_corpus.py
+Phase 3  Audit           → src/ingestion/audit.py, scripts/corpus/audit_raw_corpus.py
+Phase 4  Cleaning        → src/ingestion/cleaning.py, scripts/corpus/clean_raw_corpus.py
+Phase 5  Parsing         → src/processing/, scripts/corpus/parse_legal_hierarchy.py
 Phase 6  Chunking        → src/processing/chunk_models.py, legal_chunker.py
-                            src/services/chunking_service.py, scripts/chunk_legal_corpus.py
+                            src/services/chunking_service.py, scripts/corpus/chunk_legal_corpus.py
 Phase 7  JSONL           → src/processing/processed_jsonl_writer.py
                             src/services/processed_jsonl_service.py
 Phase 8  Indexing        → src/indexing/, scripts/build_embedding_index.py

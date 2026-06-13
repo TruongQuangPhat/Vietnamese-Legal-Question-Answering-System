@@ -39,7 +39,7 @@ DEFAULT_OUTPUT = Path("artifacts/reports/retrieval/dense_retrieval_eval.json")
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the dense retrieval evaluation parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/evaluate_dense_retrieval.py",
+        prog="scripts/retrieval/evaluate_dense_retrieval.py",
         description="Run read-only dense retrieval evaluation over a manual JSONL dataset.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

@@ -2,7 +2,7 @@
 """Cleaning & Normalization CLI.
 
 Usage:
-    uv run python scripts/clean_raw_corpus.py \
+    uv run python scripts/corpus/clean_raw_corpus.py \
       --raw-dir data/raw \
       --output-dir data/interim \
       --report artifacts/reports/cleaning/cleaning_report.json
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from rich.console import Console
 from rich.panel import Panel
@@ -25,49 +25,46 @@ from services.cleaning_service import CleaningPipelineConfig, execute_cleaning_p
 
 console = Console()
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Clean and normalize raw legal HTML artifacts.",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--raw-dir",
         type=Path,
         default=Path("data/raw"),
-        help="Path to raw artifacts directory (default: data/raw)"
+        help="Path to raw artifacts directory (default: data/raw)",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("data/interim"),
-        help="Path to output normalized artifacts (default: data/interim)"
+        help="Path to output normalized artifacts (default: data/interim)",
     )
     parser.add_argument(
         "--report",
         type=Path,
         default=Path("artifacts/reports/cleaning/cleaning_report.json"),
-        help="Path to write the cleaning report (default: artifacts/reports/cleaning/cleaning_report.json)"
+        help="Path to write the cleaning report (default: artifacts/reports/cleaning/cleaning_report.json)",
     )
     parser.add_argument(
         "--min-text-length",
         type=int,
         default=10000,
-        help="Minimum normalized text length before a warning is issued (default: 10000)"
+        help="Minimum normalized text length before a warning is issued (default: 10000)",
     )
     parser.add_argument(
         "--write-txt",
         action="store_true",
-        help="Write optional cleaned.txt files for manual debugging"
+        help="Write optional cleaned.txt files for manual debugging",
     )
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Print detailed per-artifact results"
+        "--verbose", action="store_true", help="Print detailed per-artifact results"
     )
     parser.add_argument(
-        "--audit",
-        action="store_true",
-        help="Print a detailed quality audit table for all laws"
+        "--audit", action="store_true", help="Print a detailed quality audit table for all laws"
     )
 
     args = parser.parse_args()
@@ -91,11 +88,14 @@ def main() -> int:
 
         summary = report["summary"]
 
-
         summary_table = Table(title="Cleaning & Normalization Summary", show_header=False, box=None)
         summary_table.add_row("Input artifacts", f"{summary['total_artifacts']:4d}")
-        summary_table.add_row("Successfully cleaned", f"[green]{summary['successfully_cleaned']:4d}[/green]")
-        summary_table.add_row("Warning artifacts", f"[yellow]{summary['warning_artifacts']:4d}[/yellow]")
+        summary_table.add_row(
+            "Successfully cleaned", f"[green]{summary['successfully_cleaned']:4d}[/green]"
+        )
+        summary_table.add_row(
+            "Warning artifacts", f"[yellow]{summary['warning_artifacts']:4d}[/yellow]"
+        )
         summary_table.add_row("Failed artifacts", f"[red]{summary['failed']:4d}[/red]")
         summary_table.add_row("Suspiciously short", f"{summary['suspiciously_short_texts']:4d}")
         summary_table.add_row("Missing article marker", f"{summary['missing_article_marker']:4d}")
@@ -115,17 +115,13 @@ def main() -> int:
             audit_table.add_column("Has Art 1", justify="center")
 
             for item in report["items"]:
-                status_color = {
-                    "success": "green",
-                    "warning": "yellow",
-                    "failed": "red"
-                }.get(item["status"], "white")
+                status_color = {"success": "green", "warning": "yellow", "failed": "red"}.get(
+                    item["status"], "white"
+                )
 
-                status_icon = {
-                    "success": "✓",
-                    "warning": "⚠",
-                    "failed": "✗"
-                }.get(item["status"], "?")
+                status_icon = {"success": "✓", "warning": "⚠", "failed": "✗"}.get(
+                    item["status"], "?"
+                )
 
                 audit_table.add_row(
                     item["law_id"],
@@ -135,14 +131,16 @@ def main() -> int:
                     f"{item.get('article_reference_count', item.get('article_count_estimate', 0)):>3d}",
                     f"{item.get('max_heading_article_number', 'N/A'):>4}",
                     f"{item.get('heading_sequence_score', 0.0):.2f}",
-                    "Yes" if item.get("has_heading_article_1") else "No"
+                    "Yes" if item.get("has_heading_article_1") else "No",
                 )
             console.print("\n", audit_table)
 
         if args.verbose:
             console.print("\n[bold]Per-artifact details:[/bold]")
             for item in report["items"]:
-                status_color = {"success": "green", "warning": "yellow", "failed": "red"}.get(item["status"], "white")
+                status_color = {"success": "green", "warning": "yellow", "failed": "red"}.get(
+                    item["status"], "white"
+                )
                 console.print(
                     f"  [{status_color}]{item['status']}[/{status_color}] "
                     f"{item['law_id']:20s} chars={item['normalized_text_chars']:>6d} "
@@ -164,8 +162,10 @@ def main() -> int:
     except Exception as e:
         console.print(f"[bold red]Unexpected error: {e}[/bold red]", style="red")
         import traceback
+
         traceback.print_exc()
         return 2
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -37,7 +37,7 @@ Next:
   Do not begin Phase 10 during Phase 9 review cleanup
 ```
 
-Phase 9B loads `.env` automatically for `scripts/run_naive_rag.py`.
+Phase 9B loads `.env` automatically for `scripts/retrieval/run_naive_rag.py`.
 Non-secret OpenRouter defaults are stored in `configs/llm/openrouter.yml`;
 `OPENROUTER_API_KEY` must exist only in the real environment or uncommitted
 `.env`. Model precedence is `--model`, then `OPENROUTER_MODEL`, then YAML
@@ -47,7 +47,7 @@ not overridden, and API keys must never be printed or written to reports.
 Run the Phase 9C generation baseline with the lower-cost smoke model:
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_rag_generation.py \
   --queries data/eval/manual_naive_rag_generation_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -222,10 +222,9 @@ VnLaw-QA/
 │   ├── cleaning_normalization.md
 │   └── legal_parsing.md
 ├── scripts/
-│   ├── crawl_raw_corpus.py
-│   ├── audit_raw_corpus.py
-│   ├── clean_raw_corpus.py
-│   └── audit_cleaning_quality.py
+│   ├── corpus/       # Phase 2-7 corpus CLI entrypoints
+│   ├── indexing/     # Phase 8 embedding/Qdrant CLI entrypoints
+│   └── retrieval/    # Phase 9 retrieval/RAG CLI entrypoints
 ├── src/
 │   ├── core/
 │   ├── ingestion/    # implemented ingestion and cleaning domain logic
@@ -545,7 +544,7 @@ Phase 5 parses hierarchy only. It does not chunk or embed.
 Official command:
 
 ```bash
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json \
@@ -576,7 +575,7 @@ Audit:   artifacts/reports/chunking/full_corpus_validation_report.json
 Official command:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \
@@ -642,7 +641,7 @@ uv run ruff check .
 Validate processed chunks for a future controlled reindexing run:
 
 ```bash
-uv run python scripts/validate_processed_jsonl.py \
+uv run python scripts/corpus/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
   --output /tmp/processed_jsonl_validation_report.json \
@@ -655,13 +654,13 @@ with code 0 by default and code 2 in strict mode.
 Inspect crawler:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py --help
+uv run python scripts/corpus/crawl_raw_corpus.py --help
 ```
 
 Crawl raw corpus:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -671,7 +670,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Audit raw corpus:
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -680,7 +679,7 @@ uv run python scripts/audit_raw_corpus.py \
 Clean and normalize corpus:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
@@ -691,7 +690,7 @@ uv run python scripts/clean_raw_corpus.py \
 Run cleaning diagnostics:
 
 ```bash
-uv run python scripts/audit_cleaning_quality.py \
+uv run python scripts/corpus/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir artifacts/reports/cleaning \

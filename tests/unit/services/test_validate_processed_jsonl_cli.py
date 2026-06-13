@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import validate_processed_jsonl
+from scripts.corpus import validate_processed_jsonl
 from src.processing.legal_chunk_models import (
     ChunkingLevel,
     ChunkingMetadata,

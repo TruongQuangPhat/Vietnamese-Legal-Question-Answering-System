@@ -26,7 +26,7 @@ MLOps for VnLaw-QA is not only about model deployment. It is also about **legal 
 git checkout -b maintenance/corpus-refresh-YYYYMMDD
 
 # 2. Dry-run the crawl selection
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -34,7 +34,7 @@ uv run python scripts/crawl_raw_corpus.py \
   --dry-run
 
 # 3. Recrawl selected legal documents
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -44,25 +44,25 @@ uv run python scripts/crawl_raw_corpus.py \
   --retry 3
 
 # 4. Run raw corpus audit
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
 
 # 5. Re-run downstream processing after audit passes
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt \
   --audit
 
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json
 
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/chunking/chunking_report.json
@@ -413,7 +413,7 @@ Regression evaluation should run before promoting a new corpus or index version.
 ```bash
 uv run ruff check .
 uv run pytest tests/unit -v
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -650,7 +650,7 @@ uv run python scripts/switch_index_alias.py \
 
 ```bash
 # Dry-run recrawl selection
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -658,7 +658,7 @@ uv run python scripts/crawl_raw_corpus.py \
   --dry-run
 
 # Recrawl selected laws
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -672,7 +672,7 @@ uv run python scripts/crawl_raw_corpus.py \
 
 ```bash
 # Raw corpus audit
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json

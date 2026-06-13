@@ -15,13 +15,13 @@ from src.retrieval.workflows.common import write_json_report
 
 
 def test_retrieval_scripts_are_thin_workflow_wrappers() -> None:
-    """Top-level retrieval scripts should only bootstrap and call workflow main."""
+    """Retrieval scripts should only bootstrap and call workflow main."""
     wrappers = {
-        "scripts/run_dense_retrieval.py": "src.retrieval.workflows.dense_retrieval",
-        "scripts/evaluate_dense_retrieval.py": "src.retrieval.workflows.dense_evaluation",
-        "scripts/run_selection_smoke.py": "src.retrieval.workflows.selection_smoke",
-        "scripts/run_naive_rag.py": "src.retrieval.workflows.naive_rag",
-        "scripts/evaluate_naive_rag_generation.py": (
+        "scripts/retrieval/run_dense_retrieval.py": "src.retrieval.workflows.dense_retrieval",
+        "scripts/retrieval/evaluate_dense_retrieval.py": "src.retrieval.workflows.dense_evaluation",
+        "scripts/retrieval/run_selection_smoke.py": "src.retrieval.workflows.selection_smoke",
+        "scripts/retrieval/run_naive_rag.py": "src.retrieval.workflows.naive_rag",
+        "scripts/retrieval/evaluate_naive_rag_generation.py": (
             "src.retrieval.workflows.naive_rag_generation_eval"
         ),
     }

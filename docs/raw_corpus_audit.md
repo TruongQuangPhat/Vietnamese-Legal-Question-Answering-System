@@ -22,7 +22,7 @@ If these artifacts pass undetected, they will cause parsing failures, broken cit
 **Implemented CLI**:
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -31,7 +31,7 @@ uv run python scripts/audit_raw_corpus.py \
 The script reads the registry, scans `data/raw/{law_id}/latest/`, validates `main.html` and `metadata.json`, and produces an audit report.
 
 ## Architecture
-`scripts/audit_raw_corpus.py` (CLI) $\rightarrow$ `src/services/raw_audit_service.py` (Orchestration) $\rightarrow$ `src/ingestion/audit.py` (Domain Logic)
+`scripts/corpus/audit_raw_corpus.py` (CLI) $\rightarrow$ `src/services/raw_audit_service.py` (Orchestration) $\rightarrow$ `src/ingestion/audit.py` (Domain Logic)
 
 ```
 ┌──────────────────────┐
@@ -262,12 +262,12 @@ Any `invalid` items block progression to cleaning/normalization. `warning` items
 
 ## CLI Reference
 
-### `scripts/audit_raw_corpus.py`
+### `scripts/corpus/audit_raw_corpus.py`
 
 **Implemented interface**:
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json

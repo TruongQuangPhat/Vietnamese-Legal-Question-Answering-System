@@ -31,7 +31,7 @@ Sparse indexing: disabled
 - Read-only dense Qdrant retriever in `src/retrieval/dense_retriever.py`.
 - Thin service orchestration in `src/services/retrieval_service.py`.
 - Runtime defaults in `configs/retrieval/retrieval.yml`.
-- Manual single-query CLI in `scripts/run_dense_retrieval.py`.
+- Manual single-query CLI in `scripts/retrieval/run_dense_retrieval.py`.
 - Unit tests under `tests/unit/retrieval/`.
 
 The retriever embeds the user query with the existing BGE-M3 wrapper, validates
@@ -76,7 +76,7 @@ Phase 9A.1 adds a small read-only evaluation/audit layer:
 ```text
 data/eval/manual_retrieval_queries.jsonl
 src/retrieval/evaluation.py
-scripts/evaluate_dense_retrieval.py
+scripts/retrieval/evaluate_dense_retrieval.py
 tests/unit/retrieval/test_evaluation.py
 ```
 
@@ -209,7 +209,7 @@ Implemented files:
 
 ```text
 src/retrieval/integration.py
-scripts/run_selection_smoke.py
+scripts/retrieval/run_selection_smoke.py
 tests/unit/retrieval/test_integration.py
 ```
 
@@ -265,12 +265,12 @@ src/retrieval/workflows/
   selection_smoke.py
 ```
 
-The top-level scripts remain backward-compatible wrappers:
+The scripts remain backward-compatible wrappers under the retrieval domain:
 
 ```text
-scripts/run_dense_retrieval.py
-scripts/evaluate_dense_retrieval.py
-scripts/run_selection_smoke.py
+scripts/retrieval/run_dense_retrieval.py
+scripts/retrieval/evaluate_dense_retrieval.py
+scripts/retrieval/run_selection_smoke.py
 ```
 
 These wrappers only bootstrap repository imports and call the corresponding
@@ -281,12 +281,12 @@ writing, path safety checks, and console summaries now live under
 No retrieval, evaluation, evidence, selection, ranking, scoring, risk flag, or
 output schema behavior was intentionally changed. Future Phase 9B executable
 entrypoints should follow the same rule: reusable workflow logic belongs under
-`src/`, while `scripts/` remains a compatibility layer for commands.
+`src/`, while `scripts/retrieval/` remains a compatibility layer for commands.
 
 ## Selection Smoke Command
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/run_selection_smoke.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_selection_smoke.py \
   --queries data/eval/manual_retrieval_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -317,7 +317,7 @@ src/retrieval/prompting.py
 src/retrieval/generation.py
 src/retrieval/rag_pipeline.py
 src/retrieval/workflows/naive_rag.py
-scripts/run_naive_rag.py
+scripts/retrieval/run_naive_rag.py
 tests/unit/retrieval/test_llm_client.py
 tests/unit/retrieval/test_prompting.py
 tests/unit/retrieval/test_generation.py
@@ -365,7 +365,7 @@ or production legal-advice claims.
 ## Naive RAG Command
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/run_naive_rag.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_naive_rag.py \
   --query "Trẻ em dưới 6 tuổi được hưởng bảo hiểm y tế như thế nào?" \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -430,7 +430,7 @@ all-caution case counts, and selection-warning counts as review signals only.
 Run the lower-cost smoke/dev evaluation:
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_rag_generation.py \
   --queries data/eval/manual_naive_rag_generation_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -467,7 +467,7 @@ naive_rag_generation_eval_expanded_manual_review.md
 Run:
 
 ```bash
-uv run python scripts/export_naive_rag_manual_review.py \
+uv run python scripts/retrieval/export_naive_rag_manual_review.py \
   --input artifacts/reports/retrieval/naive_rag_generation_eval_expanded.json \
   --output artifacts/reports/retrieval/naive_rag_generation_eval_expanded_manual_review.md
 ```
@@ -495,7 +495,7 @@ introduce Phase 10 features.
 Phase 9C.3 adds opt-in evidence previews to the existing generation evaluation:
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_rag_generation.py \
   --queries data/eval/manual_naive_rag_generation_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -522,7 +522,7 @@ unchanged and does not measure semantic faithfulness.
 Export the evidence-backed worksheet:
 
 ```bash
-uv run python scripts/export_naive_rag_manual_review.py \
+uv run python scripts/retrieval/export_naive_rag_manual_review.py \
   --input artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json \
   --output artifacts/reports/retrieval/naive_rag_generation_eval_expanded_manual_review_with_evidence.md
 ```
@@ -541,7 +541,7 @@ all-caution cases remain priority review items.
 ## Evaluation Command
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/evaluate_dense_retrieval.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_dense_retrieval.py \
   --queries data/eval/manual_retrieval_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -553,7 +553,7 @@ uv run --extra qdrant --extra embedding python scripts/evaluate_dense_retrieval.
 ## Manual Command
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_dense_retrieval.py \
   --query "Quyền sử dụng đất của hộ gia đình là gì?" \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \

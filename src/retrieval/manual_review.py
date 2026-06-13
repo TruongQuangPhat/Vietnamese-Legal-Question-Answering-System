@@ -35,7 +35,7 @@ DEFAULT_MAX_EVIDENCE_PREVIEW_CHARS = 500
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the offline Phase 9C.2 export CLI parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/export_naive_rag_manual_review.py",
+        prog="scripts/retrieval/export_naive_rag_manual_review.py",
         description="Export an existing generation report as a manual review worksheet.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

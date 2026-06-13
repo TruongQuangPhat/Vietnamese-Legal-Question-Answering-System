@@ -32,7 +32,7 @@ EXIT_FAILURE = 1
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the Phase 9A dense retrieval CLI parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/run_dense_retrieval.py",
+        prog="scripts/retrieval/run_dense_retrieval.py",
         description="Run one read-only BGE-M3 dense retrieval query against Qdrant.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

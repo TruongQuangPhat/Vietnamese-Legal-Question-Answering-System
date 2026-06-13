@@ -213,7 +213,7 @@ Phase 2 does not audit legal content quality, clean HTML, normalize text, parse 
 
 ### Main Files
 
-- `scripts/crawl_raw_corpus.py`
+- `scripts/corpus/crawl_raw_corpus.py`
 - `src/services/crawl_service.py`
 - `src/ingestion/registry.py`
 - `src/ingestion/selector.py`
@@ -275,7 +275,7 @@ non-legal content.
 
 ### Main Files
 
-- `scripts/audit_raw_corpus.py`
+- `scripts/corpus/audit_raw_corpus.py`
 - `src/services/raw_audit_service.py`
 - `src/ingestion/audit.py`
 - `tests/unit/ingestion/test_audit.py`
@@ -285,7 +285,7 @@ non-legal content.
 ### User-Facing Command
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -351,8 +351,8 @@ point labels: a), b), c)
 
 ### Main Files
 
-- `scripts/clean_raw_corpus.py`
-- `scripts/audit_cleaning_quality.py`
+- `scripts/corpus/clean_raw_corpus.py`
+- `scripts/corpus/audit_cleaning_quality.py`
 - `src/services/cleaning_service.py`
 - `src/services/cleaning_quality_audit_service.py`
 - `src/ingestion/cleaning.py`
@@ -369,7 +369,7 @@ point labels: a), b), c)
 Clean corpus:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
@@ -380,7 +380,7 @@ uv run python scripts/clean_raw_corpus.py \
 Run cleaning diagnostics:
 
 ```bash
-uv run python scripts/audit_cleaning_quality.py \
+uv run python scripts/corpus/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir artifacts/reports/cleaning \
@@ -705,26 +705,26 @@ It should confirm embedding-readiness without starting embedding/indexing yet.
 Official commands used through the completed phases:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py --help
-uv run python scripts/audit_raw_corpus.py --help
-uv run python scripts/clean_raw_corpus.py --help
-uv run python scripts/audit_cleaning_quality.py --help
+uv run python scripts/corpus/crawl_raw_corpus.py --help
+uv run python scripts/corpus/audit_raw_corpus.py --help
+uv run python scripts/corpus/clean_raw_corpus.py --help
+uv run python scripts/corpus/audit_cleaning_quality.py --help
 uv run pytest tests/unit/ingestion -q
-uv run python scripts/parse_legal_hierarchy.py --help
-uv run python scripts/chunk_legal_corpus.py --help
+uv run python scripts/corpus/parse_legal_hierarchy.py --help
+uv run python scripts/corpus/chunk_legal_corpus.py --help
 ```
 
 Completed full validation commands:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
   --write-txt \
   --audit
 
-uv run python scripts/audit_cleaning_quality.py \
+uv run python scripts/corpus/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir artifacts/reports/cleaning \
@@ -734,7 +734,7 @@ uv run python scripts/audit_cleaning_quality.py \
 Phase 6 command:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \

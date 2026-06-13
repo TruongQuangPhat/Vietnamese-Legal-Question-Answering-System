@@ -2,7 +2,7 @@
 """Command-line entrypoint for Phase 5 legal hierarchy parsing.
 
 Usage:
-    uv run python scripts/parse_legal_hierarchy.py \
+    uv run python scripts/corpus/parse_legal_hierarchy.py \
       --input-dir data/interim \
       --output-dir data/interim \
       --report artifacts/reports/parsing/legal_parsing_report.json
@@ -17,7 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -47,7 +47,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         Configured `argparse.ArgumentParser` for Step 10 service invocation.
     """
     parser = argparse.ArgumentParser(
-        prog="scripts/parse_legal_hierarchy.py",
+        prog="scripts/corpus/parse_legal_hierarchy.py",
         description="Parse normalized Vietnamese legal documents into Phase 5 hierarchy JSON.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

@@ -30,7 +30,8 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 
 ## 3. Current Architecture
 
-- `scripts/` = CLI entrypoints, `argparse`, terminal summaries, and exit codes.
+- `scripts/{corpus,indexing,retrieval}/` = domain-grouped CLI entrypoints,
+  `argparse`, terminal summaries, and exit codes.
 - `src/services/` = pipeline orchestration and report building; no `argparse`.
 - `src/ingestion/` = reusable ingestion/domain logic such as crawler, audit,
   cleaning, registry, storage, and models.
@@ -103,13 +104,13 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 Use `uv run` for Python commands.
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py --help
-uv run python scripts/audit_raw_corpus.py --help
-uv run python scripts/clean_raw_corpus.py --help
-uv run python scripts/audit_cleaning_quality.py --help
-uv run python scripts/parse_legal_hierarchy.py --help
-uv run python scripts/chunk_legal_corpus.py --help
-uv run python scripts/validate_processed_jsonl.py --help
+uv run python scripts/corpus/crawl_raw_corpus.py --help
+uv run python scripts/corpus/audit_raw_corpus.py --help
+uv run python scripts/corpus/clean_raw_corpus.py --help
+uv run python scripts/corpus/audit_cleaning_quality.py --help
+uv run python scripts/corpus/parse_legal_hierarchy.py --help
+uv run python scripts/corpus/chunk_legal_corpus.py --help
+uv run python scripts/corpus/validate_processed_jsonl.py --help
 uv run pytest tests/unit/ingestion -q
 ```
 
@@ -121,7 +122,7 @@ corpus report. Official indexing artifacts belong under
 `artifacts/reports/indexing/<run_id>/`.
 
 ```bash
-uv run python scripts/validate_processed_jsonl.py \
+uv run python scripts/corpus/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
   --output /tmp/processed_jsonl_validation_report.json \

@@ -24,7 +24,7 @@ distribution, and repeal flags. Do not remove authority phrases lexically.
 Before indexing:
 
 ```bash
-uv run python scripts/validate_processed_jsonl.py \
+uv run python scripts/corpus/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
   --output /tmp/processed_jsonl_validation_report.json \

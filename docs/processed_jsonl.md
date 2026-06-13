@@ -251,7 +251,7 @@ Files to be created during Phase 7 implementation:
   validates each chunk, checks hashes, citations, contamination, uniqueness.
 - `src/services/processed_jsonl_validation_service.py` — Orchestration service:
   runs validator, reconciles with Phase 6 report, writes validation report.
-- `scripts/validate_processed_jsonl.py` — CLI entrypoint.
+- `scripts/corpus/validate_processed_jsonl.py` — CLI entrypoint.
 - `tests/unit/processing/test_processed_jsonl_validator.py` — Unit tests.
 - `tests/unit/services/test_processed_jsonl_validation_service.py` — Service tests.
 - `configs/processing/processed_jsonl_validation.yml` — Config: thresholds,
@@ -292,7 +292,7 @@ Files to be created during Phase 7 implementation:
 Run Phase 6 chunking first if outputs need to be regenerated:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \
@@ -304,7 +304,7 @@ uv run python scripts/chunk_legal_corpus.py \
 Run Phase 7 validation:
 
 ```bash
-uv run python scripts/validate_processed_jsonl.py \
+uv run python scripts/corpus/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
   --output artifacts/reports/chunking/processed_jsonl_validation_report.json \

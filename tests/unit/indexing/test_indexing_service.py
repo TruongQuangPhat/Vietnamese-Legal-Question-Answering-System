@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from scripts.index_qdrant_chunks import (
+from scripts.indexing.index_qdrant_chunks import (
     load_processed_validation_report,
     validate_cli_arguments,
 )

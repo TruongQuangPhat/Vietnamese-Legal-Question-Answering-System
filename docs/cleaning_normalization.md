@@ -35,7 +35,7 @@ This phase is deterministic and stateless. The same input should always produce 
 ### Intended CLI
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json
@@ -44,7 +44,7 @@ uv run python scripts/clean_raw_corpus.py \
 ### Optional Development Run
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
@@ -90,7 +90,7 @@ artifacts/reports/cleaning/cleaning_report.json
 ```
 
 ## Architecture
-`scripts/clean_raw_corpus.py` (CLI) $\rightarrow$ `src/services/cleaning_service.py` (Orchestration) $\rightarrow$ `src/ingestion/cleaning.py` (Core Logic)
+`scripts/corpus/clean_raw_corpus.py` (CLI) $\rightarrow$ `src/services/cleaning_service.py` (Orchestration) $\rightarrow$ `src/ingestion/cleaning.py` (Core Logic)
 
 ```text
 ┌──────────────────────────────┐
@@ -613,7 +613,7 @@ This file should contain only normalized legal text. It is useful for manual ins
 ### Main Command
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json
@@ -642,7 +642,7 @@ Print item-level details.
 ### Example: Process All Laws
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
@@ -652,7 +652,7 @@ uv run python scripts/clean_raw_corpus.py \
 ### Example: Development Run With Verbose Logging
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \

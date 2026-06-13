@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
-from scripts import validate_qdrant_index
-from scripts.validate_qdrant_index import validate_cli_arguments
+from scripts.indexing import validate_qdrant_index
+from scripts.indexing.validate_qdrant_index import validate_cli_arguments
 from src.indexing.embedding_model import BgeM3EmbeddingModel
 from src.indexing.index_validation import (
     DEFAULT_REQUIRED_PAYLOAD_FIELDS,

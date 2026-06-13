@@ -42,7 +42,7 @@ DEFAULT_OUTPUT = Path("artifacts/reports/retrieval/selection_smoke_report.json")
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the selection smoke CLI parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/run_selection_smoke.py",
+        prog="scripts/retrieval/run_selection_smoke.py",
         description=(
             "Run read-only dense retrieval, evidence assembly, and evidence "
             "selection smoke tests over the manual retrieval dataset."

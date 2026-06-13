@@ -15,7 +15,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -34,7 +34,7 @@ EXIT_FAILURE = 1
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the collection-only setup argument parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/setup_qdrant_collection.py",
+        prog="scripts/indexing/setup_qdrant_collection.py",
         description="Validate or create a Qdrant collection schema without indexing points.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

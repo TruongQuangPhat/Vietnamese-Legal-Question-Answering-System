@@ -200,7 +200,11 @@ class LegalTreeValidator:
                 },
             )
 
-        root = referenced_root if referenced_root is not None else (law_nodes[0] if law_nodes else None)
+        root = (
+            referenced_root
+            if referenced_root is not None
+            else (law_nodes[0] if law_nodes else None)
+        )
         if root is None:
             return None
 
@@ -247,7 +251,10 @@ class LegalTreeValidator:
                 code=ParsingIssueCode.TEXT_OFFSET_MISMATCH,
                 message="Root text must exactly equal normalized_text.",
                 node=root,
-                context={"expected_length": len(state.normalized_text), "actual_length": len(root.text)},
+                context={
+                    "expected_length": len(state.normalized_text),
+                    "actual_length": len(root.text),
+                },
             )
         return root
 
@@ -617,7 +624,11 @@ class LegalTreeValidator:
 
         expected_max = state.document.metadata.max_heading_article_number
         actual_max = max(
-            (number for number in (_article_number_prefix(article.number) for article in articles) if number),
+            (
+                number
+                for number in (_article_number_prefix(article.number) for article in articles)
+                if number
+            ),
             default=0,
         )
         if actual_max != expected_max:
@@ -683,7 +694,10 @@ class LegalTreeValidator:
     def _is_empty_article(article: LegalNode) -> bool:
         """Conservatively detect Articles with no body after heading text."""
         heading_end = article.metadata.get("heading_end_offset")
-        if isinstance(heading_end, int) and article.start_offset <= heading_end <= article.end_offset:
+        if (
+            isinstance(heading_end, int)
+            and article.start_offset <= heading_end <= article.end_offset
+        ):
             relative_heading_end = heading_end - article.start_offset
             return article.text[relative_heading_end:].strip() == ""
 
@@ -761,7 +775,9 @@ def _safe_issue_offsets(node: LegalNode | None) -> tuple[int | None, int | None]
     """Return issue offsets without violating `StructuredParsingIssue` constraints."""
     if node is None:
         return None, None
-    start = node.start_offset if isinstance(node.start_offset, int) and node.start_offset >= 0 else None
+    start = (
+        node.start_offset if isinstance(node.start_offset, int) and node.start_offset >= 0 else None
+    )
     end = node.end_offset if isinstance(node.end_offset, int) and node.end_offset >= 0 else None
     if start is not None and end is not None and end < start:
         end = None

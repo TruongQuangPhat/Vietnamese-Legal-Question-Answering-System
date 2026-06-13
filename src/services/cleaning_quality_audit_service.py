@@ -6,8 +6,8 @@ Argument parsing and terminal formatting belong to the CLI layer.
 
 from __future__ import annotations
 
-import json
 import datetime
+import json
 from pathlib import Path
 from typing import Any
 
@@ -67,7 +67,7 @@ def run_html_pattern_audit(raw_dir: Path, report_dir: Path) -> dict[str, Any]:
     report = {
         "metadata": {
             "audit_type": "html_pattern_audit",
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "audit_version": "1.0",
         },
         "total_records": len(profiles),

@@ -82,7 +82,9 @@ def main() -> int:
             (
                 "Selector candidate audit",
                 "selector_candidate_audit.json",
-                lambda: run_selector_candidate_audit(raw_dir=args.raw_dir, report_dir=args.report_dir),
+                lambda: run_selector_candidate_audit(
+                    raw_dir=args.raw_dir, report_dir=args.report_dir
+                ),
             ),
             (
                 "Cleaning quality audit",

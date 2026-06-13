@@ -80,7 +80,7 @@ Non-goals:
 
 | File | Role |
 |---|---|
-| `scripts/crawl_raw_corpus.py` | CLI entrypoint and argument parsing |
+| `scripts/corpus/crawl_raw_corpus.py` | CLI entrypoint and argument parsing |
 | `src/services/crawl_service.py` | Pipeline orchestration |
 | `src/ingestion/registry.py` | Registry loading and validation |
 | `src/ingestion/selector.py` | Target filtering and skip detection |
@@ -99,7 +99,7 @@ Non-goals:
 Dry run before any crawl:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -110,7 +110,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Actual batch crawl:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -121,7 +121,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Targeted crawl:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --law-ids BLDS_2015 HP_2013
@@ -130,7 +130,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Debug one URL:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --url "https://thuvienphapluat.vn/van-ban/..." \
   --law-id BLDS_2015 \
   --output data/raw
@@ -139,7 +139,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Inspect CLI options:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py --help
+uv run python scripts/corpus/crawl_raw_corpus.py --help
 ```
 
 ## 6. CLI Options
@@ -168,7 +168,7 @@ uv run python scripts/crawl_raw_corpus.py --help
 
 ```text
 ┌────────────────────────────────────────────┐
-│ scripts/crawl_raw_corpus.py                │
+│ scripts/corpus/crawl_raw_corpus.py                │
 │ CLI: argparse, console output, exit code   │
 └────────────────────┬───────────────────────┘
                      │ builds CrawlPipelineConfig
@@ -582,7 +582,7 @@ Phase 2 hands off raw artifacts to Raw Corpus Audit:
 data/raw/{LAW_ID}/latest/main.html
 data/raw/{LAW_ID}/latest/metadata.json
 artifacts/reports/crawling/crawl_report.json
-→ scripts/audit_raw_corpus.py
+→ scripts/corpus/audit_raw_corpus.py
 → artifacts/reports/audit/raw_corpus_audit.json
 ```
 

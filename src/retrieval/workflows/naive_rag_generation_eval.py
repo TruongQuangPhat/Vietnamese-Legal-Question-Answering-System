@@ -57,7 +57,7 @@ GenerationCaseRunner = Callable[[GenerationEvalQuery], Awaitable[RagAnswerResult
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the Phase 9C generation evaluation CLI parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/evaluate_naive_rag_generation.py",
+        prog="scripts/retrieval/evaluate_naive_rag_generation.py",
         description="Run deterministic safety evaluation over Naive RAG generation cases.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

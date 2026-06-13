@@ -186,9 +186,7 @@ class LegalHeadingRecognizer:
     _MALFORMED_DOT_CLAUSE_RE = re.compile(
         r"^\s*(?P<heading>(?P<number>\d+)\.(?!\d|\[\d+\]\s|\s)\S.*)\s*$"
     )
-    _MALFORMED_SPACE_CLAUSE_RE = re.compile(
-        r"^\s*(?P<heading>(?P<number>\d+)\s+\S.*)\s*$"
-    )
+    _MALFORMED_SPACE_CLAUSE_RE = re.compile(r"^\s*(?P<heading>(?P<number>\d+)\s+\S.*)\s*$")
     _POINT_RE = re.compile(
         r"^\s*(?P<heading>(?P<number>[a-zđ])\)(?:\[(?P<footnote>\d+)\])?\s+\S.*)\s*$"
     )
@@ -321,7 +319,9 @@ class LegalHeadingRecognizer:
 
             section = self._SECTION_RE.match(line.text)
             if section:
-                headings.append(self._build_same_line_heading(line, section, LegalNodeLevel.SECTION))
+                headings.append(
+                    self._build_same_line_heading(line, section, LegalNodeLevel.SECTION)
+                )
                 state.active_article_number = None
                 state.active_clause_number = None
                 continue
@@ -625,7 +625,11 @@ class LegalHeadingRecognizer:
             if not self._is_title_like(candidate.text):
                 return None
             start, end = _stripped_offsets(candidate)
-            return candidate.text[start - candidate.start_offset : end - candidate.start_offset], start, end
+            return (
+                candidate.text[start - candidate.start_offset : end - candidate.start_offset],
+                start,
+                end,
+            )
         return None
 
     def _is_title_like(self, line_text: str) -> bool:
@@ -727,7 +731,10 @@ class LegalHeadingRecognizer:
     @staticmethod
     def _is_repealed_missing_dot_clause(line_text: str) -> bool:
         """Return whether a missing-dot line is a repealed-Clause placeholder."""
-        return re.match(r"^\s*\d+\s+Khoản\s+này\s+được\s+bãi\s+bỏ\b", line_text, re.IGNORECASE) is not None
+        return (
+            re.match(r"^\s*\d+\s+Khoản\s+này\s+được\s+bãi\s+bỏ\b", line_text, re.IGNORECASE)
+            is not None
+        )
 
     @staticmethod
     def _is_excluded(state: _RecognitionState) -> bool:

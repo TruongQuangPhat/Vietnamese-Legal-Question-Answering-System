@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from scripts import pilot_bge_m3_embeddings
+from scripts.indexing import pilot_bge_m3_embeddings
 from src.indexing.embedding_model import (
     BgeM3EmbeddingModel,
     EmbeddingModelError,

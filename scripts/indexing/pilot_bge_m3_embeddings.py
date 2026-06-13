@@ -17,7 +17,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -47,7 +47,7 @@ PROTECTED_PATHS = (
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the constrained BGE-M3 pilot argument parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/pilot_bge_m3_embeddings.py",
+        prog="scripts/indexing/pilot_bge_m3_embeddings.py",
         description="Measure BGE-M3 dense embeddings without indexing or Qdrant.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

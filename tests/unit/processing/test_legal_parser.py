@@ -256,7 +256,7 @@ def test_quoted_source_note_article_does_not_fail_or_become_node(tmp_path: Path)
             "“Điều 3. Hiệu lực thi hành",
             "Luật này có hiệu lực thi hành từ ngày 01 tháng 7 năm 2025.",
             "Điều 4. Điều khoản chuyển tiếp",
-            "1. Nội dung chuyển tiếp trong ghi chú nguồn.\".",
+            '1. Nội dung chuyển tiếp trong ghi chú nguồn.".',
         ]
     )
 
@@ -323,9 +323,7 @@ def test_source_note_tail_subordinate_headings_remain_root_only(tmp_path: Path) 
     assert result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
     assert result.document is not None
     non_root_heading_texts = {
-        node.metadata.get("heading_text")
-        for node in result.document.nodes
-        if node.level != "law"
+        node.metadata.get("heading_text") for node in result.document.nodes if node.level != "law"
     }
     assert non_root_heading_texts == {"Điều 1. Main Article"}
     assert "Điều 11. Quy định chuyển tiếp" in result.document.nodes[0].text
@@ -388,9 +386,7 @@ def test_real_articles_after_table_like_amendment_section_are_preserved(
 
     assert result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
     assert result.document is not None
-    article_numbers = [
-        node.number for node in result.document.nodes if node.level == "article"
-    ]
+    article_numbers = [node.number for node in result.document.nodes if node.level == "article"]
     assert article_numbers == ["84", "85", "86"]
     assert result.parsing_result.article_heading_count_matches is True
     assert result.parsing_result.max_article_number_matches is True
@@ -512,9 +508,7 @@ def test_builder_and_validator_warnings_reach_final_result(tmp_path: Path) -> No
     metric_result = _parse_text(tmp_path / "metric", metric_text, article_count=2, max_article=1)
 
     assert collision_result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
-    assert ParsingIssueCode.NODE_ID_COLLISION_RESOLVED in _issue_codes(
-        collision_result.warnings
-    )
+    assert ParsingIssueCode.NODE_ID_COLLISION_RESOLVED in _issue_codes(collision_result.warnings)
     assert metric_result.status == LegalParsingStatus.SUCCESS_WITH_WARNINGS
     assert ParsingIssueCode.ARTICLE_COUNT_MISMATCH in _issue_codes(metric_result.warnings)
     assert metric_result.validation_summary.article_heading_mismatch == 1

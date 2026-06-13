@@ -2,7 +2,7 @@
 """Command-line entrypoint for Phase 6 parent-child legal chunking.
 
 Usage:
-    uv run python scripts/chunk_legal_corpus.py \
+    uv run python scripts/corpus/chunk_legal_corpus.py \
       --input-dir data/interim \
       --output data/processed/legal_chunks.jsonl \
       --report artifacts/reports/chunking/chunking_report.json
@@ -17,7 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -44,7 +44,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         Configured `argparse.ArgumentParser` for Phase 6 service invocation.
     """
     parser = argparse.ArgumentParser(
-        prog="scripts/chunk_legal_corpus.py",
+        prog="scripts/corpus/chunk_legal_corpus.py",
         description="Chunk Phase 5 Vietnamese legal hierarchy JSON into Phase 6 JSONL.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

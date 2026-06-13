@@ -2,7 +2,7 @@
 """Command-line entrypoint for Phase 7 processed JSONL validation.
 
 Usage:
-    uv run python scripts/validate_processed_jsonl.py \
+    uv run python scripts/corpus/validate_processed_jsonl.py \
       --input data/processed/legal_chunks.jsonl \
       --config configs/processing/processed_jsonl_validation.yml \
       --output artifacts/reports/chunking/processed_jsonl_validation_report.json \
@@ -22,7 +22,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -44,7 +44,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         Configured parser with official Phase 7 paths and warning policy.
     """
     parser = argparse.ArgumentParser(
-        prog="scripts/validate_processed_jsonl.py",
+        prog="scripts/corpus/validate_processed_jsonl.py",
         description="Validate Phase 6 legal chunk JSONL for Phase 8 readiness.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

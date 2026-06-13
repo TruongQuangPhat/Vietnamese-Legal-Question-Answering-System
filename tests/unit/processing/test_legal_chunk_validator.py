@@ -42,9 +42,7 @@ def test_existing_chunk_warnings_are_preserved_as_warnings() -> None:
         ChunkingIssueCode.TEXT_MISMATCH,
         ChunkingIssueCode.CHILD_OUTSIDE_ARTICLE,
     ]
-    assert [error.code for error in result.errors] == [
-        ChunkingIssueCode.CHILD_OUTSIDE_ARTICLE
-    ]
+    assert [error.code for error in result.errors] == [ChunkingIssueCode.CHILD_OUTSIDE_ARTICLE]
 
 
 def test_duplicate_chunk_id_fails() -> None:

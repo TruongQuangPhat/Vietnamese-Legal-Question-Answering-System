@@ -97,7 +97,7 @@ Validated result:
 Official command:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \
@@ -168,7 +168,7 @@ If a reference cannot be resolved safely, mark it unresolved instead of guessing
 Expected components:
 
 ```text
-scripts/parse_legal_hierarchy.py
+scripts/corpus/parse_legal_hierarchy.py
 src/services/legal_parsing_service.py
 src/processing/legal_parser.py
 tests/unit/processing/test_legal_parser.py
@@ -178,7 +178,7 @@ LegalChunk
 LegalChunker
 LegalChunkValidator
 ChunkingService
-scripts/chunk_legal_corpus.py
+scripts/corpus/chunk_legal_corpus.py
 ```
 
 Rules:

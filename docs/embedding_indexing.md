@@ -255,8 +255,8 @@ approved corpus registry, rather than inventing these values.
 ## Historical CLI Design
 
 The commands below are retained as design background and are not the current
-operational interface. Use `scripts/index_qdrant_chunks.py`,
-`scripts/setup_qdrant_collection.py`, and `scripts/validate_qdrant_index.py`
+operational interface. Use `scripts/indexing/index_qdrant_chunks.py`,
+`scripts/indexing/setup_qdrant_collection.py`, and `scripts/indexing/validate_qdrant_index.py`
 for maintained workflows. Do not rerun full indexing unless explicitly
 scoped.
 

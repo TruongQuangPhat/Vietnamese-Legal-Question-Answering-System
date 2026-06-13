@@ -153,7 +153,7 @@ artifacts from approved sources, stores immutable raw evidence under
 Implemented. Relevant files:
 
 - `src/ingestion/audit.py`
-- `scripts/audit_raw_corpus.py`
+- `scripts/corpus/audit_raw_corpus.py`
 - `tests/unit/ingestion/test_audit.py`
 - `docs/raw_corpus_audit.md`
 - `artifacts/reports/audit/raw_corpus_audit.json`
@@ -166,10 +166,10 @@ Implemented and gate-ready. Relevant files:
 
 - `src/ingestion/cleaning.py`
 - `src/services/cleaning_service.py`
-- `scripts/clean_raw_corpus.py`
+- `scripts/corpus/clean_raw_corpus.py`
 - `src/ingestion/cleaning_diagnostics.py`
 - `src/services/cleaning_quality_audit_service.py`
-- `scripts/audit_cleaning_quality.py`
+- `scripts/corpus/audit_cleaning_quality.py`
 - `tests/unit/ingestion/test_cleaning.py`
 - `docs/cleaning_normalization.md`
 - `data/interim/{LAW_ID}/normalized.json`
@@ -328,7 +328,7 @@ Phase 5 Legal Hierarchy Parsing:
 Phase 6 Parent-child Chunking:
   domain logic: src/processing/
   orchestration: src/services/
-  CLI: scripts/chunk_legal_corpus.py
+  CLI: scripts/corpus/chunk_legal_corpus.py
   output: data/processed/legal_chunks.jsonl
   report: artifacts/reports/chunking/chunking_report.json
 
@@ -365,7 +365,7 @@ Official user-facing commands for the ingestion pipeline:
 - Crawl raw legal corpus:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -375,7 +375,7 @@ uv run python scripts/crawl_raw_corpus.py \
 - Audit raw corpus:
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -384,7 +384,7 @@ uv run python scripts/audit_raw_corpus.py \
 - Clean and normalize corpus:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
@@ -395,7 +395,7 @@ uv run python scripts/clean_raw_corpus.py \
 - Audit cleaning quality:
 
 ```bash
-uv run python scripts/audit_cleaning_quality.py \
+uv run python scripts/corpus/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir artifacts/reports/cleaning \
@@ -405,7 +405,7 @@ uv run python scripts/audit_cleaning_quality.py \
 - Chunk legal corpus:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \

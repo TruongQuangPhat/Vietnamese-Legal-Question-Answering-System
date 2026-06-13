@@ -3,24 +3,22 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import pytest
 
 from src.ingestion.audit import (
+    ERROR_MARKERS,
+    LEGAL_MARKERS,
+    AuditError,
+    audit_raw_corpus,
+    audit_single_artifact,
     load_registry_law_ids,
     scan_raw_artifacts,
-    validate_metadata,
     validate_html,
-    audit_single_artifact,
-    audit_raw_corpus,
-    AuditError,
-    LEGAL_MARKERS,
-    ERROR_MARKERS
+    validate_metadata,
 )
-from src.ingestion.models import CrawlTarget
 
 
 @pytest.fixture
@@ -69,7 +67,9 @@ def valid_artifact_dir(tmp_path: Path) -> Path:
     artifact.mkdir(parents=True)
 
     # Create main.html (size > 10KB)
-    html_content = "<!DOCTYPE html><html><body>\n" + "Điều 1. Nội dung luật.\n" * 500 + "</body></html>"
+    html_content = (
+        "<!DOCTYPE html><html><body>\n" + "Điều 1. Nội dung luật.\n" * 500 + "</body></html>"
+    )
     (artifact / "main.html").write_text(html_content, encoding="utf-8")
 
     # Create metadata.json with all required fields as per MetadataSchema
@@ -86,7 +86,7 @@ def valid_artifact_dir(tmp_path: Path) -> Path:
         "crawled_at": "2026-05-22T10:00:00Z",
         "content_hash": "sha256:" + "a" * 64,
         "crawler_version": "v1.0.0",
-        "parser_hint": "tvpl_html"
+        "parser_hint": "tvpl_html",
     }
     (artifact / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
 
@@ -250,7 +250,7 @@ class TestValidateMetadata:
             "source_type": "html",
             "url": "https://example.com/test",
             "crawl_status": "success",
-            "content_hash": "abc123"
+            "content_hash": "abc123",
         }
         path = tmp_path / "meta.json"
         path.write_text(json.dumps(metadata))
@@ -267,7 +267,7 @@ class TestValidateMetadata:
             "source_type": "html",
             "url": "https://thuvienphapluat.vn/test",
             "crawl_status": "failed",
-            "content_hash": "abc123"
+            "content_hash": "abc123",
         }
         path = tmp_path / "meta.json"
         path.write_text(json.dumps(metadata))
@@ -283,7 +283,7 @@ class TestValidateMetadata:
             "source_domain": "thuvienphapluat.vn",
             "source_type": "html",
             "url": "https://thuvienphapluat.vn/test",
-            "crawl_status": "success"
+            "crawl_status": "success",
         }
         path = tmp_path / "meta.json"
         path.write_text(json.dumps(metadata))
@@ -298,7 +298,10 @@ class TestValidateHtml:
     def test_valid_html(self, tmp_path: Path) -> None:
         """Valid HTML passes."""
         html = tmp_path / "valid.html"
-        html.write_text("<!DOCTYPE html><html><body>\n" + "Điều 1. Nội dung.\n" * 500 + "</body></html>", encoding="utf-8")
+        html.write_text(
+            "<!DOCTYPE html><html><body>\n" + "Điều 1. Nội dung.\n" * 500 + "</body></html>",
+            encoding="utf-8",
+        )
         size, is_valid, issues = validate_html(html, min_html_size=1000)
         assert size > 1000
         assert is_valid
@@ -341,7 +344,7 @@ class TestValidateHtml:
         """Non-UTF8 encoding fails."""
         html = tmp_path / "bad_utf8.html"
         # Write bytes that are invalid UTF-8 (0xFF 0xFE is typical BOM for UTF-16/LE, not valid UTF-8 alone)
-        html.write_bytes(b"\xff\xfe\x00\x00" + "Some text".encode("utf-8")[0:10])
+        html.write_bytes(b"\xff\xfe\x00\x00" + b"Some text"[0:10])
         size, is_valid, issues = validate_html(html)
         assert not is_valid
         assert any("html_not_utf8" in i for i in issues)
@@ -373,7 +376,10 @@ class TestValidateHtml:
     def test_no_legal_markers_warning(self, tmp_path: Path) -> None:
         """Missing legal markers produces warning."""
         html = tmp_path / "no_legal.html"
-        html.write_text("<html><body>Just some random text without legal markers.</body></html>", encoding="utf-8")
+        html.write_text(
+            "<html><body>Just some random text without legal markers.</body></html>",
+            encoding="utf-8",
+        )
         size, is_valid, issues = validate_html(html, min_html_size=1000)
         assert is_valid  # warning doesn't invalidate
         assert "no_legal_markers" in issues
@@ -384,17 +390,14 @@ class TestAuditSingleArtifact:
 
     def test_valid_artifact(self, valid_artifact_dir: Path, tmp_path: Path) -> None:
         """Valid artifact passes audit."""
-        registry_entries: Dict[str, Any] = {
-            "BLDS_2015": {
-                "law_id": "BLDS_2015",
-                "name": "Bộ luật Dân sự 2015"
-            }
+        registry_entries: dict[str, Any] = {
+            "BLDS_2015": {"law_id": "BLDS_2015", "name": "Bộ luật Dân sự 2015"}
         }
         status = audit_single_artifact(
             law_id="BLDS_2015",
             artifact_dir=valid_artifact_dir,
             registry_entries=registry_entries,
-            min_html_size=1000
+            min_html_size=1000,
         )
         assert status.status == "valid"
         assert status.main_html_exists
@@ -409,12 +412,12 @@ class TestAuditSingleArtifact:
         artifact_dir.mkdir(parents=True)
         (artifact_dir / "metadata.json").write_text("{}")
 
-        registry_entries: Dict[str, Any] = {"TEST": {"law_id": "TEST"}}
+        registry_entries: dict[str, Any] = {"TEST": {"law_id": "TEST"}}
         status = audit_single_artifact(
             law_id="TEST",
             artifact_dir=artifact_dir,
             registry_entries=registry_entries,
-            min_html_size=1000
+            min_html_size=1000,
         )
         assert status.status == "invalid"
         assert not status.main_html_exists
@@ -426,12 +429,12 @@ class TestAuditSingleArtifact:
         artifact_dir.mkdir(parents=True)
         (artifact_dir / "main.html").write_text("test content")
 
-        registry_entries: Dict[str, Any] = {"TEST": {"law_id": "TEST"}}
+        registry_entries: dict[str, Any] = {"TEST": {"law_id": "TEST"}}
         status = audit_single_artifact(
             law_id="TEST",
             artifact_dir=artifact_dir,
             registry_entries=registry_entries,
-            min_html_size=1000
+            min_html_size=1000,
         )
         assert status.status == "invalid"
         assert not status.metadata_json_exists
@@ -444,12 +447,12 @@ class TestAuditSingleArtifact:
         (artifact_dir / "main.html").write_text("test content")
         (artifact_dir / "metadata.json").write_text("{ invalid json }")
 
-        registry_entries: Dict[str, Any] = {"TEST": {"law_id": "TEST"}}
+        registry_entries: dict[str, Any] = {"TEST": {"law_id": "TEST"}}
         status = audit_single_artifact(
             law_id="TEST",
             artifact_dir=artifact_dir,
             registry_entries=registry_entries,
-            min_html_size=1000
+            min_html_size=1000,
         )
         assert status.status == "invalid"
         assert status.metadata_valid is False
@@ -467,16 +470,16 @@ class TestAuditSingleArtifact:
             "source_type": "html",
             "url": "https://thuvienphapluat.vn/test",
             "crawl_status": "success",
-            "content_hash": "abc123"
+            "content_hash": "abc123",
         }
         (artifact_dir / "metadata.json").write_text(json.dumps(metadata))
 
-        registry_entries: Dict[str, Any] = {"TEST": {"law_id": "TEST"}}
+        registry_entries: dict[str, Any] = {"TEST": {"law_id": "TEST"}}
         status = audit_single_artifact(
             law_id="TEST",
             artifact_dir=artifact_dir,
             registry_entries=registry_entries,
-            min_html_size=10000
+            min_html_size=10000,
         )
         assert status.status == "warning"
         assert any("html_size_suspiciously_small" in w for w in status.warnings)
@@ -493,16 +496,16 @@ class TestAuditSingleArtifact:
             "source_type": "html",
             "url": "https://thuvienphapluat.vn/test",
             "crawl_status": "success",
-            "content_hash": "abc123"
+            "content_hash": "abc123",
         }
         (artifact_dir / "metadata.json").write_text(json.dumps(metadata))
 
-        registry_entries: Dict[str, Any] = {"TEST": {"law_id": "TEST"}}
+        registry_entries: dict[str, Any] = {"TEST": {"law_id": "TEST"}}
         status = audit_single_artifact(
             law_id="TEST",
             artifact_dir=artifact_dir,
             registry_entries=registry_entries,
-            min_html_size=1000
+            min_html_size=1000,
         )
         assert status.status == "invalid"
         assert any("likely_error_page" in i for i in status.issues)
@@ -519,16 +522,16 @@ class TestAuditSingleArtifact:
             "source_type": "html",
             "url": "https://thuvienphapluat.vn/test",
             "crawl_status": "success",
-            "content_hash": "abc123"
+            "content_hash": "abc123",
         }
         (artifact_dir / "metadata.json").write_text(json.dumps(metadata))
 
-        registry_entries: Dict[str, Any] = {"TEST": {"law_id": "TEST"}}
+        registry_entries: dict[str, Any] = {"TEST": {"law_id": "TEST"}}
         status = audit_single_artifact(
             law_id="TEST",
             artifact_dir=artifact_dir,
             registry_entries=registry_entries,
-            min_html_size=1000
+            min_html_size=1000,
         )
         assert status.status == "invalid"
         assert any("metadata_law_id_mismatch" in i for i in status.issues)
@@ -570,7 +573,9 @@ corpus:
         raw_dir.mkdir()
         artifact_dir = raw_dir / "BLDS_2015" / "latest"
         artifact_dir.mkdir(parents=True)
-        (artifact_dir / "main.html").write_text("<!DOCTYPE html><html><body>\n" + "Điều 1. Nội dung.\n" * 500 + "</body></html>")
+        (artifact_dir / "main.html").write_text(
+            "<!DOCTYPE html><html><body>\n" + "Điều 1. Nội dung.\n" * 500 + "</body></html>"
+        )
         metadata = {
             "law_id": "BLDS_2015",
             "name": "Bộ luật Dân sự 2015",
@@ -584,15 +589,11 @@ corpus:
             "crawled_at": "2026-05-22T10:00:00Z",
             "content_hash": "sha256:" + "a" * 64,
             "crawler_version": "v1.0.0",
-            "parser_hint": "tvpl_html"
+            "parser_hint": "tvpl_html",
         }
         (artifact_dir / "metadata.json").write_text(json.dumps(metadata))
 
-        report = audit_raw_corpus(
-            registry_path=registry,
-            raw_dir=raw_dir,
-            min_html_size=1000
-        )
+        report = audit_raw_corpus(registry_path=registry, raw_dir=raw_dir, min_html_size=1000)
 
         assert report["summary"]["registry_entries"] == 2
         assert report["summary"]["raw_artifacts_found"] == 1
@@ -636,7 +637,7 @@ corpus:
                 "crawl_status": "success",
                 "content_hash": "abc123",
                 "crawler_version": "v1.0.0",
-                "parser_hint": "tvpl_html"
+                "parser_hint": "tvpl_html",
             }
             (artifact_dir / "metadata.json").write_text(json.dumps(metadata))
 
@@ -656,11 +657,13 @@ class TestErrorMarkers:
             "captcha challenge",
             "VUI LÒNG ĐĂNG NHẬP",
             "Không tìm thấy trang",
-            "Cloudflare error"
+            "Cloudflare error",
         ]
         for marker in markers:
             content = f"Some text before {marker} after"
-            assert any(m in content.lower() for m in ERROR_MARKERS), f"Marker '{marker}' should be detected"
+            assert any(m in content.lower() for m in ERROR_MARKERS), (
+                f"Marker '{marker}' should be detected"
+            )
 
 
 class TestLegalMarkers:

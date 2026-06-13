@@ -210,9 +210,12 @@ class LegalSpanSegmenter:
                 boundary_offsets.append(boundary.start_offset)
                 continue
 
-            if boundary.kind == RecognitionBoundaryKind.SIGNATURE_FOOTER and self._is_trailing_boundary(
-                boundary,
-                headings,
+            if (
+                boundary.kind == RecognitionBoundaryKind.SIGNATURE_FOOTER
+                and self._is_trailing_boundary(
+                    boundary,
+                    headings,
+                )
             ):
                 boundary_offsets.append(boundary.start_offset)
 

@@ -1,4 +1,4 @@
-"""Executable retrieval workflows used by thin top-level scripts."""
+"""Executable retrieval workflows used by thin retrieval scripts."""
 
 from __future__ import annotations
 

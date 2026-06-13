@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from scripts import parse_legal_hierarchy
+from scripts.corpus import parse_legal_hierarchy
 from src.processing.legal_hierarchy_models import ParsingIssueCode, StructuredParsingIssue
 from src.services.legal_parsing_service import LegalParsingServiceError
 

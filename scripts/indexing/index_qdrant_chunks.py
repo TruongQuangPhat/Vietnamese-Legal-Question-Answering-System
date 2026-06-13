@@ -15,7 +15,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -58,7 +58,7 @@ OFFICIAL_INDEXING_REPORTS_ROOT = REPORTS_ROOT / "indexing"
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the operational indexing command parser."""
     parser = argparse.ArgumentParser(
-        prog="scripts/index_qdrant_chunks.py",
+        prog="scripts/indexing/index_qdrant_chunks.py",
         description="Run bounded or resumable dense indexing into an existing Qdrant collection.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

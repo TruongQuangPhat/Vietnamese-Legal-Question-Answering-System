@@ -48,7 +48,7 @@ src/retrieval/models.py
 src/retrieval/filters.py
 src/retrieval/dense_retriever.py
 src/services/retrieval_service.py
-scripts/run_dense_retrieval.py
+scripts/retrieval/run_dense_retrieval.py
 tests/unit/retrieval/
 ```
 
@@ -69,7 +69,7 @@ Phase 9A.1 adds:
 ```text
 data/eval/manual_retrieval_queries.jsonl
 src/retrieval/evaluation.py
-scripts/evaluate_dense_retrieval.py
+scripts/retrieval/evaluate_dense_retrieval.py
 tests/unit/retrieval/test_evaluation.py
 ```
 
@@ -206,7 +206,7 @@ Implemented files:
 
 ```text
 src/retrieval/integration.py
-scripts/run_selection_smoke.py
+scripts/retrieval/run_selection_smoke.py
 tests/unit/retrieval/test_integration.py
 ```
 
@@ -248,7 +248,7 @@ ranking, perform hybrid retrieval, rerank, or mutate Qdrant/corpus artifacts.
 
 ## Phase 9A.5 Workflow Boundary
 
-Phase 9A.5 moves executable workflow logic from top-level scripts into reusable
+Phase 9A.5 moves executable workflow logic from CLI scripts into reusable
 modules:
 
 ```text
@@ -261,9 +261,9 @@ src/retrieval/workflows/selection_smoke.py
 The existing commands are preserved through thin wrappers:
 
 ```text
-scripts/run_dense_retrieval.py
-scripts/evaluate_dense_retrieval.py
-scripts/run_selection_smoke.py
+scripts/retrieval/run_dense_retrieval.py
+scripts/retrieval/evaluate_dense_retrieval.py
+scripts/retrieval/run_selection_smoke.py
 ```
 
 The workflow modules own argument parsing, config loading, dependency
@@ -273,7 +273,7 @@ scripts only bootstrap imports and call the workflow `main()` function.
 No retrieval behavior, evaluation metrics, evidence safety rules, selection
 decisions, report schemas, or command-line flags were intentionally changed.
 Phase 9B scripts follow the same boundary: reusable workflow
-logic under `src/`, top-level `scripts/` as compatibility wrappers only.
+logic under `src/`, with `scripts/retrieval/` as compatibility wrappers only.
 
 ## Overview
 
@@ -294,7 +294,7 @@ This phase runs only after embedding & indexing is complete and validated.
 Run one read-only dense retrieval query:
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_dense_retrieval.py \
   --query "Quyền sử dụng đất của hộ gia đình là gì?" \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -310,7 +310,7 @@ includes typed result metadata and text/parent-text previews, not an answer.
 Run the manual sanity evaluation:
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/evaluate_dense_retrieval.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_dense_retrieval.py \
   --queries data/eval/manual_retrieval_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -322,7 +322,7 @@ uv run --extra qdrant --extra embedding python scripts/evaluate_dense_retrieval.
 Run the selection integration smoke test:
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/run_selection_smoke.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_selection_smoke.py \
   --queries data/eval/manual_retrieval_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -551,7 +551,7 @@ Hiện tại hệ thống chưa tìm được căn cứ pháp lý đủ an toàn
 
 Implemented Phase 9A flow:
 
-1. Receive one query via `scripts/run_dense_retrieval.py`.
+1. Receive one query via `scripts/retrieval/run_dense_retrieval.py`.
 2. Validate non-empty query and positive `top_k`.
 3. Generate a BGE-M3 dense query embedding.
 4. Validate that the query vector is numeric, finite, non-empty, and
@@ -611,7 +611,7 @@ src/retrieval/prompting.py
 src/retrieval/generation.py
 src/retrieval/rag_pipeline.py
 src/retrieval/workflows/naive_rag.py
-scripts/run_naive_rag.py
+scripts/retrieval/run_naive_rag.py
 ```
 
 OpenRouter is the first concrete provider. Non-secret defaults live in
@@ -664,7 +664,7 @@ Deterministic checks include:
 Run:
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/evaluate_naive_rag_generation.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_rag_generation.py \
   --queries data/eval/manual_naive_rag_generation_queries.jsonl \
   --collection-name vnlaw_chunks_bgem3_v1_full \
   --url http://localhost:6333 \
@@ -713,7 +713,7 @@ Phase 9C.2 exports the expanded JSON report to a human-readable Markdown
 worksheet:
 
 ```bash
-uv run python scripts/export_naive_rag_manual_review.py \
+uv run python scripts/retrieval/export_naive_rag_manual_review.py \
   --input artifacts/reports/retrieval/naive_rag_generation_eval_expanded.json \
   --output artifacts/reports/retrieval/naive_rag_generation_eval_expanded_manual_review.md
 ```
@@ -819,7 +819,7 @@ faithfulness.
 ### Implemented Dense Retrieval CLI
 
 ```bash
-uv run --extra qdrant --extra embedding python scripts/run_dense_retrieval.py \
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_dense_retrieval.py \
   --query "Quyền về đất đai của hộ gia đình?" \
   --url http://localhost:6333 \
   --collection-name vnlaw_chunks_bgem3_v1_full \
@@ -980,7 +980,8 @@ strict invalid citation failures are reported without exposing API keys.
 ### Version 0.5 (2026-06-12)
 
 - Moved retrieval workflow logic into `src/retrieval/workflows/`.
-- Kept top-level retrieval scripts as backward-compatible thin wrappers.
+- Kept retrieval scripts as backward-compatible thin wrappers under
+  `scripts/retrieval/`.
 - Preserved command flags, report paths, and retrieval-side behavior.
 - Documented the workflow boundary for Phase 9B entrypoints.
 
@@ -989,7 +990,7 @@ strict invalid citation failures are reported without exposing API keys.
 - Implemented Phase 9B fallback-aware Naive RAG generation.
 - Added OpenRouter and mock LLM clients, selected-evidence prompt building,
   deterministic fallback results, and lightweight `[E#]` citation checks.
-- Added `scripts/run_naive_rag.py` as a thin wrapper around
+- Added `scripts/retrieval/run_naive_rag.py` as a thin wrapper around
   `src/retrieval/workflows/naive_rag.py`.
 - Kept hybrid retrieval, RRF, reranking, GraphRAG, agents, API endpoints, and
   production legal-advice claims out of scope.

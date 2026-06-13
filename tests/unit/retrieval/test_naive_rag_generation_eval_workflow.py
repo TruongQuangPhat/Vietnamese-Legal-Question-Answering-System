@@ -242,7 +242,7 @@ def test_parser_accepts_documented_generation_eval_flags() -> None:
 
 def test_script_is_thin_workflow_wrapper() -> None:
     """The top-level Phase 9C script contains no evaluation business logic."""
-    source = Path("scripts/evaluate_naive_rag_generation.py").read_text(encoding="utf-8")
+    source = Path("scripts/retrieval/evaluate_naive_rag_generation.py").read_text(encoding="utf-8")
 
     assert "from src.retrieval.workflows.naive_rag_generation_eval import main" in source
     assert "def build_arg_parser" not in source

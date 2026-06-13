@@ -67,10 +67,10 @@ data/raw/{law_id}/latest/metadata.json
 data/interim/{law_id}/normalized.json
 data/interim/{law_id}/cleaned.txt
 
-scripts/crawl_raw_corpus.py
-scripts/audit_raw_corpus.py
-scripts/clean_raw_corpus.py
-scripts/audit_cleaning_quality.py
+scripts/corpus/crawl_raw_corpus.py
+scripts/corpus/audit_raw_corpus.py
+scripts/corpus/clean_raw_corpus.py
+scripts/corpus/audit_cleaning_quality.py
 
 tests/unit/ingestion/
 tests/unit/services/test_crawl_service.py
@@ -205,7 +205,7 @@ Rules:
 Crawl one law for debugging:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --url "https://thuvienphapluat.vn/..." \
   --law-id "LDD_VBHN" \
   --output data/raw
@@ -214,7 +214,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Crawl all pending laws:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -227,7 +227,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Crawl specific laws:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --law-ids HP_2013 BLDS_2015 LDD_VBHN \
   --output data/raw
@@ -236,7 +236,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Audit raw corpus:
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -245,7 +245,7 @@ uv run python scripts/audit_raw_corpus.py \
 Clean and normalize corpus:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json
@@ -254,7 +254,7 @@ uv run python scripts/clean_raw_corpus.py \
 Optional debug text output:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
@@ -264,7 +264,7 @@ uv run python scripts/clean_raw_corpus.py \
 Cleaning quality audit:
 
 ```bash
-uv run python scripts/audit_cleaning_quality.py \
+uv run python scripts/corpus/audit_cleaning_quality.py \
   --interim-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_quality_audit.json
 ```
