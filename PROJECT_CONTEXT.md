@@ -151,17 +151,18 @@ Corpus Registry
   selected and cited evidence previews for human review. Generated JSON and
   Markdown reports remain runtime artifacts and are not source-of-truth data.
 - Phase 9D records human claim-to-citation verdicts for the five-case expanded
-  baseline in `docs/phase9_retrieval_naive_rag_tracker.md`. Status is
-  `manual_faithfulness_review_partial`: one generated case passed, three
-  generated cases were partial because of too-broad or incomplete answers, and
-  the annual-leave control correctly remained fallback without an LLM call.
+  baseline in `docs/phase9_retrieval_naive_rag_tracker.md`. After prompt
+  scope hardening, three generated cases pass, one non-blocking generated case
+  remains partial because of completeness and foreign-element expansion
+  warnings, and the annual-leave control correctly remains fallback without an
+  LLM call.
 - Phase 9E adds an offline configurable QA gate in
   `src/retrieval/quality_gate.py` with thresholds in
   `configs/retrieval/quality_gate.yml` and reviewed verdicts in
   `data/eval/manual_faithfulness_verdicts.json`. Current status is
-  `quality_gate_partial`: hard safety/citation/fallback gates pass,
-  but blocking answer precision still has a partial verdict and too-broad
-  finding.
+  `quality_gate_passed` with two non-blocking warnings for
+  `marriage_conditions_generation`; hard safety/citation/fallback gates and
+  blocking answer precision gates pass.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
 - Phase 9F closure reporting and decision gate are next. Phase 10 retrieval

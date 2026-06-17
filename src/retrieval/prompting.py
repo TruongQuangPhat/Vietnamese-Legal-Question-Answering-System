@@ -1,4 +1,4 @@
-"""Prompt construction for fallback-aware Naive RAG fallback-aware Naive RAG."""
+"""Prompt construction for fallback-aware Naive RAG."""
 
 from __future__ import annotations
 
@@ -72,7 +72,10 @@ def build_naive_rag_prompt(
     system_message = (
         "Bạn là trợ lý hỗ trợ nghiên cứu pháp luật Việt Nam. "
         "Bạn chỉ được trả lời dựa trên phần Citable evidence được cung cấp. "
+        "Chỉ trả lời đúng phạm vi câu hỏi và bỏ qua quy định chỉ liên quan gián tiếp. "
+        "Không bắt buộc dùng mọi bằng chứng đã chọn; chỉ dùng bằng chứng trực tiếp hỗ trợ câu trả lời. "
         "Mỗi nhận định pháp lý phải có mã trích dẫn dạng [E1], [E2]. "
+        "Không trình bày danh sách đầy đủ nếu bằng chứng không chứng minh đầy đủ danh sách. "
         "Không bịa luật, điều, khoản, điểm, thủ tục, mức phạt hoặc nguồn. "
         "Không trích dẫn mã không có trong bằng chứng. "
         "Không xem Auxiliary context là căn cứ trích dẫn trực tiếp. "
@@ -89,8 +92,16 @@ def build_naive_rag_prompt(
             (
                 "Answer requirements:\n"
                 "- Trả lời ngắn gọn, có cấu trúc.\n"
+                "- Chỉ trả lời vấn đề pháp lý được hỏi; không mở rộng sang quy định liên quan gián tiếp.\n"
+                "- Không dùng mọi [E#] chỉ vì chúng được cung cấp; ưu tiên tập bằng chứng nhỏ nhất đủ trả lời.\n"
                 "- Mỗi câu chứa nhận định pháp lý phải có ít nhất một mã [E#].\n"
                 "- Chỉ dùng các mã [E#] đã cung cấp.\n"
+                '- Không dùng cách diễn đạt đầy đủ như "bao gồm" hoặc "gồm các điều kiện sau" '
+                "nếu bằng chứng không bao phủ toàn bộ danh sách.\n"
+                "- Nếu bằng chứng chỉ hỗ trợ một phần danh sách, nói rõ giới hạn đó và không tự bổ sung phần còn thiếu.\n"
+                "- Ưu tiên luật/điều trực tiếp khớp câu hỏi; tránh mở rộng sang luật khác, định nghĩa, "
+                "ngoại lệ, thủ tục hoặc trường hợp đặc biệt nếu không được hỏi hoặc không bắt buộc.\n"
+                "- Chỉ trích dẫn [E#] trực tiếp hỗ trợ nhận định; bỏ qua bằng chứng chỉ liên quan.\n"
                 "- Không dùng Auxiliary context làm căn cứ trích dẫn trực tiếp."
             ),
         ]

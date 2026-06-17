@@ -40,13 +40,6 @@
           "verdict": "supported",
           "cited_ids": ["E2"],
           "notes": "Children under six without a card must present other lawful papers."
-        },
-        {
-          "id": "health_05",
-          "type": "generated_claim",
-          "verdict": "supported",
-          "cited_ids": ["E2"],
-          "notes": "Emergency presentation before the treatment episode ends is supported as procedural context."
         }
       ]
     },
@@ -64,7 +57,7 @@
       "id": "civil_code_scope_generation",
       "blocking": true,
       "decision": "answer_allowed",
-      "case_verdict": "partial",
+      "case_verdict": "pass",
       "all_caution": false,
       "manual_review_completed": true,
       "substantive_legal_claims_present": true,
@@ -75,13 +68,6 @@
           "verdict": "supported",
           "cited_ids": ["E1"],
           "notes": "Article 1 scope claim is directly supported."
-        },
-        {
-          "id": "civil_scope_02",
-          "type": "generated_claim",
-          "verdict": "too_broad",
-          "cited_ids": ["E5"],
-          "notes": "Article 97 supports the statement but broadens beyond the scope-definition question."
         }
       ]
     },
@@ -112,29 +98,15 @@
           "id": "marriage_03",
           "type": "generated_claim",
           "verdict": "too_broad",
-          "cited_ids": ["E3"],
-          "notes": "Foreign-element marriage rule is supported but outside the general question."
+          "cited_ids": ["E3", "E5"],
+          "notes": "Foreign-element marriage rules are supported by the selected evidence but outside the general question."
         },
         {
           "id": "marriage_04",
-          "type": "generated_claim",
-          "verdict": "too_broad",
-          "cited_ids": ["E5"],
-          "notes": "Foreigners permanently residing in Vietnam rule is supported but outside the general question."
-        },
-        {
-          "id": "marriage_05",
-          "type": "generated_claim",
-          "verdict": "too_broad",
-          "cited_ids": ["E4"],
-          "notes": "Marriage definition is related but is not itself a marriage condition."
-        },
-        {
-          "id": "marriage_06",
           "type": "review_finding",
           "verdict": "missing_key_condition",
           "cited_ids": ["E1", "E2"],
-          "notes": "The answer presents conditions as complete while selected Article 8 previews cover only Point b and Point d."
+          "notes": "The answer still presents the listed conditions as complete while selected Article 8 previews cover only Point b and Point d."
         }
       ]
     },
@@ -142,7 +114,7 @@
       "id": "civil_rights_protection_generation",
       "blocking": false,
       "decision": "answer_allowed",
-      "case_verdict": "partial",
+      "case_verdict": "pass",
       "all_caution": false,
       "manual_review_completed": true,
       "substantive_legal_claims_present": true,
@@ -160,20 +132,6 @@
           "verdict": "supported",
           "cited_ids": ["E2"],
           "notes": "Civil-right restriction grounds are directly supported."
-        },
-        {
-          "id": "civil_rights_03",
-          "type": "generated_claim",
-          "verdict": "too_broad",
-          "cited_ids": ["E4"],
-          "notes": "Criminal-procedure protection of life, health, honor, dignity, and property broadens beyond the Civil Code target."
-        },
-        {
-          "id": "civil_rights_04",
-          "type": "generated_claim",
-          "verdict": "too_broad",
-          "cited_ids": ["E5"],
-          "notes": "Criminal-procedure authority duties broaden beyond the Civil Code target."
         }
       ]
     }

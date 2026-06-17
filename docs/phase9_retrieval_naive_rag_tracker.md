@@ -11,8 +11,8 @@ Phase 9A.4 — Selection Integration Smoke Test: implemented
 Phase 9A.5 — Workflow Boundary Cleanup: implemented
 Phase 9B — Naive RAG Answer Generation: implemented
 Phase 9C — Naive RAG Generation Evaluation & Safety Hardening: validated
-Phase 9D — Human Faithfulness Review & Baseline Hardening: partial
-Phase 9E — Regression Thresholds and QA Gate: partial
+Phase 9D — Human Faithfulness Review & Baseline Hardening: passed with warnings
+Phase 9E — Regression Thresholds and QA Gate: passed with warnings
 ```
 
 Phase 9 starts from the validated Phase 8 Qdrant collection:
@@ -337,7 +337,7 @@ Resolution order is:
 ```text
 model: --model > OPENROUTER_MODEL > config default_model > emergency fallback
 base URL: OPENROUTER_BASE_URL > config base_url > emergency fallback
-API key: OPENROUTER_API_KEY from environment/.env only
+API key: environment/.env only
 ```
 
 Never commit `.env`. API keys are not stored in YAML, printed, logged, or
@@ -379,8 +379,8 @@ uv run --extra qdrant --extra embedding python scripts/retrieval/run_naive_rag.p
 ```
 
 If the evidence gate returns fallback/review, the command writes a fallback
-JSON result without using `OPENROUTER_API_KEY`. If the gate allows generation,
-OpenRouter is called only when `OPENROUTER_API_KEY` is set.
+JSON result without using the OpenRouter secret. If the gate allows generation,
+OpenRouter is called only when the secret is set.
 
 ## Phase 9C Implemented
 
@@ -443,7 +443,7 @@ uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_
   --output artifacts/reports/retrieval/naive_rag_generation_eval.json
 ```
 
-`OPENROUTER_API_KEY` is loaded only from the environment or uncommitted `.env`.
+The OpenRouter secret is loaded only from the environment or uncommitted `.env`.
 It is never written to the report. The report includes aggregate rates and
 case-level redacted answer previews. The annual-leave case may continue to
 fallback until retrieval quality is improved in a separately scoped phase.
@@ -549,6 +549,10 @@ Phase 9C baseline. It changes no retrieval, selection, fallback, prompt,
 generation, citation guard, OpenRouter, Qdrant, indexing, corpus, source,
 script, test, or dependency behavior.
 
+After prompt scope hardening, a fresh five-case live run was reviewed. The
+blocking broadening findings were removed, while the non-blocking marriage
+case still has completeness and foreign-element expansion warnings.
+
 ### Method
 
 The review checks:
@@ -561,11 +565,12 @@ Input run:
 
 ```text
 Report: artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json
+Hardened report: artifacts/reports/retrieval/naive_rag_generation_eval_hardened.json
 Provider/model: openrouter / google/gemini-2.5-flash-lite
 Cases reviewed: 5
 Generated-answer cases: 4
 Fallback cases: 1
-Generated claim/finding rows: 17
+Generated claim/finding rows: 11
 ```
 
 Citation ID validity remains separate from semantic support. Parent context is
@@ -576,21 +581,21 @@ not treated as directly citable child evidence.
 ```text
 health_insurance_children_under_6_generation -> pass
 annual_leave_days_generation -> not_applicable_for_fallback
-civil_code_scope_generation -> partial
+civil_code_scope_generation -> pass
 marriage_conditions_generation -> partial
-civil_rights_protection_generation -> partial
+civil_rights_protection_generation -> pass
 ```
 
 ### Claim verdict summary
 
 ```text
-supported claims: 10
-too-broad claims: 6
+supported claims: 9
+too-broad claims: 1
 missing-key-condition findings: 1
 unsupported claims: 0
 irrelevant-citation findings: 0
 needs-more-evidence findings: 0
-case verdicts: 1 pass, 3 partial, 1 not_applicable_for_fallback
+case verdicts: 3 pass, 1 partial, 1 not_applicable_for_fallback
 ```
 
 ### Main findings
@@ -601,16 +606,18 @@ case verdicts: 1 pass, 3 partial, 1 not_applicable_for_fallback
   evidence being caution because direct child previews supported the reviewed
   claims.
 - `marriage_conditions_generation` remained partial because selected evidence
-  covered only part of the Article 8 condition set and added too-broad
-  foreign-element/definition material.
-- `civil_code_scope_generation` and `civil_rights_protection_generation`
-  included supported but question-broadening material.
+  covered only part of the Article 8 condition set and the answer still added
+  too-broad foreign-element material.
+- `civil_code_scope_generation` no longer includes Article 97 material and now
+  passes claim-to-citation review.
+- `civil_rights_protection_generation` no longer includes criminal-procedure
+  material and now passes claim-to-citation review.
 
 ### Items carried into Phase 9E
 
-- Convert unsupported and irrelevant-citation findings into hard gate blockers.
-- Convert blocking-case partial verdicts and too-broad claims into quality
-  gate violations.
+- Keep unsupported and irrelevant-citation findings as hard gate blockers.
+- Keep blocking-case partial verdicts and too-broad claims as quality gate
+  violations.
 - Keep non-blocking too-broad and missing-key-condition findings visible as
   warnings.
 
@@ -654,10 +661,10 @@ findings.
 
 ### Current gate result
 
-Current expected status is `quality_gate_partial`: hard gates pass, but
-`civil_code_scope_generation` is a blocking generated case with a partial
-verdict and a too-broad finding. Non-blocking too-broad and missing-key-condition
-findings remain warnings for Phase 9F.
+Current status after prompt scope hardening is `quality_gate_passed`: hard
+gates and quality gates pass. The gate still reports two warnings for
+`marriage_conditions_generation`: one non-blocking too-broad claim and one
+non-blocking missing-key-condition finding.
 
 ### Reusable command
 
@@ -672,9 +679,10 @@ uv run python scripts/retrieval/evaluate_quality_gate.py \
 ### Items carried into Phase 9F
 
 - Closure decision must state that hard gates pass while the quality gate is
-  partial.
+  passed with non-blocking warnings.
 - Closure decision must preserve the distinction between citation ID coverage
   and semantic faithfulness.
+- Closure decision must keep the marriage complete-list risk visible.
 - Phase 10 retrieval improvements remain separately scoped.
 
 ## Evaluation Command

@@ -1,4 +1,4 @@
-"""Unit tests for fallback-aware Naive RAG Naive RAG prompt construction."""
+"""Unit tests for fallback-aware Naive RAG prompt construction."""
 
 from __future__ import annotations
 
@@ -53,6 +53,53 @@ def test_prompt_labels_auxiliary_context_as_not_directly_citable() -> None:
     assert "Auxiliary context, not directly citable" in prompt.user_message
     assert "Điều cha rộng hơn" in prompt.user_message
     assert "Không xem Auxiliary context là căn cứ trích dẫn trực tiếp" in prompt.system_message
+
+
+def test_prompt_enforces_scope_and_precision_discipline() -> None:
+    """Prompt instructions discourage broad or exhaustive answers."""
+    selected = _selection_result(
+        [
+            _selected(_packet(text="Quy định trực tiếp", rank=1)),
+            _selected(_packet(text="Quy định liên quan nhưng không trực tiếp", rank=2)),
+        ]
+    )
+
+    prompt = build_naive_rag_prompt(
+        query="Phạm vi điều chỉnh của Bộ luật Dân sự là gì?",
+        selection_result=selected,
+    )
+
+    assert "Chỉ trả lời đúng phạm vi câu hỏi" in prompt.system_message
+    assert "bỏ qua quy định chỉ liên quan gián tiếp" in prompt.system_message
+    assert "Không bắt buộc dùng mọi bằng chứng đã chọn" in prompt.system_message
+    assert "không mở rộng sang quy định liên quan gián tiếp" in prompt.user_message
+    assert "ưu tiên tập bằng chứng nhỏ nhất đủ trả lời" in prompt.user_message
+    assert "trực tiếp hỗ trợ nhận định" in prompt.user_message
+    assert "bỏ qua bằng chứng chỉ liên quan" in prompt.user_message
+
+
+def test_prompt_enforces_complete_list_and_target_law_discipline() -> None:
+    """Prompt instructions prevent fabricated completeness and cross-law expansion."""
+    selected = _selection_result(
+        [
+            _selected(_packet(text="Một phần điều kiện kết hôn", rank=1)),
+            _selected(_packet(text="Quy định khác liên quan", rank=2)),
+        ]
+    )
+
+    prompt = build_naive_rag_prompt(
+        query="Điều kiện kết hôn là gì?",
+        selection_result=selected,
+    )
+
+    assert "Không trình bày danh sách đầy đủ" in prompt.system_message
+    assert '"bao gồm"' in prompt.user_message
+    assert '"gồm các điều kiện sau"' in prompt.user_message
+    assert "nếu bằng chứng không bao phủ toàn bộ danh sách" in prompt.user_message
+    assert "nói rõ giới hạn đó" in prompt.user_message
+    assert "không tự bổ sung phần còn thiếu" in prompt.user_message
+    assert "Ưu tiên luật/điều trực tiếp khớp câu hỏi" in prompt.user_message
+    assert "tránh mở rộng sang luật khác" in prompt.user_message
 
 
 def test_prompt_can_suppress_auxiliary_context() -> None:
