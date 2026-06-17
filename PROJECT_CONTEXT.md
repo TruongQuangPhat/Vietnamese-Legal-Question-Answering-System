@@ -151,11 +151,11 @@ Corpus Registry
   selected and cited evidence previews for human review. Generated JSON and
   Markdown reports remain runtime artifacts and are not source-of-truth data.
 - Phase 9D records human claim-to-citation verdicts for the five-case expanded
-  baseline in `docs/phase9_retrieval_naive_rag_tracker.md`. After prompt
-  scope hardening, three generated cases pass, one non-blocking generated case
-  remains partial because of completeness and foreign-element expansion
-  warnings, and the annual-leave control correctly remains fallback without an
-  LLM call.
+  baseline in `data/eval/manual_faithfulness_verdicts.json` and
+  `docs/naive_rag.md`. After prompt scope hardening, three generated cases
+  pass, one non-blocking generated case remains partial because of
+  completeness and foreign-element expansion warnings, and the annual-leave
+  control correctly remains fallback without an LLM call.
 - Phase 9E adds an offline configurable QA gate in
   `src/retrieval/quality_gate.py` with thresholds in
   `configs/retrieval/quality_gate.yml` and reviewed verdicts in
@@ -165,8 +165,10 @@ Corpus Registry
   blocking answer precision gates pass.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- Phase 9F closure reporting and decision gate are next. Phase 10 retrieval
-  improvements remain separately scoped.
+- Phase 9F closure decision: Phase 9 is closed with known limitations; the
+  quality gate passed; the next planned stage may begin. Phase 10 retrieval
+  improvements remain separately scoped and no production-readiness claim is
+  made from the five-case baseline.
 
 Operational rules:
 
@@ -295,6 +297,11 @@ Phase 7 — Processed Chunk Validation & Embedding Readiness
 Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh
 Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
 Phase 9A — Dense Retrieval Baseline
+Phase 9B — Fallback-aware Naive RAG Generation
+Phase 9C — Generation Evaluation and Manual Review Readiness
+Phase 9D — Human Faithfulness Review and Baseline Hardening
+Phase 9E — Offline Quality Gate
+Phase 9F — Closure Decision
 ```
 
 Validated inputs and reports:
@@ -308,7 +315,7 @@ artifacts/reports/chunking/processed_jsonl_validation_report.json
 Current next work:
 
 ```text
-Phase 9F — Phase 9 closure report and decision gate
+Next planned stage may begin; Phase 10 retrieval improvements remain separately scoped.
 ```
 
 Phase 9A already starts retrieval with BGE-M3 query embedding and dense top-k
@@ -319,9 +326,9 @@ selected citation-safe evidence.
 
 ## 6. Next Immediate Tasks
 
-1. Write the Phase 9F closure report and decision gate from Phase 9E findings.
-2. Resolve all-caution and insufficient-evidence review findings.
-3. Keep citation ID coverage distinct from semantic faithfulness.
+1. Keep citation ID coverage distinct from semantic faithfulness.
+2. Carry the non-blocking marriage-condition warnings into future QA review.
+3. Expand evaluation coverage only with reviewed legal expectations.
 4. Keep sparse/hybrid retrieval and reranking separately scoped for Phase 10.
 
 ## 7. Upcoming Phases

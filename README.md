@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 9E complete — quality gate partial
+Current phase: Phase 9 closed with known limitations — quality gate passed
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -32,11 +32,12 @@ Completed:
   Phase 9C.3 — Evidence Preview Support
   Phase 9D — Human Faithfulness Review & Baseline Hardening
   Phase 9E — Regression Thresholds and QA Gate
+  Phase 9F — Phase 9 Closure and Decision Gate
 
 Next:
-  Phase 9F — Phase 9 closure report and decision gate
+  Next planned stage may begin
   Keep citation ID coverage distinct from semantic faithfulness
-  Do not begin Phase 10 during Phase 9 review cleanup
+  Do not claim production readiness from the five-case baseline
 ```
 
 Phase 9B loads `.env` automatically for `scripts/retrieval/run_naive_rag.py`.
@@ -74,11 +75,10 @@ establish semantic faithfulness or legal correctness.
 
 Phase 9C.3 adds opt-in, bounded evidence previews for repeatable manual review.
 Generated JSON and Markdown reports are runtime artifacts and should not be
-committed. Citation ID coverage remains distinct from semantic faithfulness,
-and Phase 9D records the first human claim-to-citation verdicts in
-`docs/phase9_retrieval_naive_rag_tracker.md`. The Phase 9D status is partial:
-one generated case passed, three generated cases need hardening for too-broad
-or incomplete answers, and the annual-leave fallback control behaved correctly.
+committed. Citation ID coverage remains distinct from semantic faithfulness.
+After prompt hardening and manual claim-to-citation review, three generated
+cases pass, one non-blocking generated case remains partial, and the
+annual-leave fallback control behaves correctly.
 
 Run the offline quality gate:
 
@@ -90,10 +90,13 @@ uv run python scripts/retrieval/evaluate_quality_gate.py \
   --output artifacts/reports/retrieval/quality_gate.json
 ```
 
-The current expected gate status is `quality_gate_partial`: hard
-safety, fallback, citation-ID, and secret-leak gates pass, but reviewed answer
-precision still has too-broad or incomplete findings. The gate is offline and
-does not call OpenRouter or Qdrant.
+Current gate status is `quality_gate_passed`: hard gates and quality gates
+pass with two non-blocking warnings for `marriage_conditions_generation`.
+The gate is offline and does not call OpenRouter or Qdrant.
+
+Detailed Naive RAG architecture, safety invariants, evaluation commands,
+manual review results, quality-gate policy, closure decision, and known
+limitations are documented in `docs/naive_rag.md`.
 
 Phase 4 is gate-ready:
 
