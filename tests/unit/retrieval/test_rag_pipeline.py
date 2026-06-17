@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9B fallback-aware Naive RAG pipeline."""
+"""Unit tests for fallback-aware Naive RAG fallback-aware Naive RAG pipeline."""
 
 from __future__ import annotations
 

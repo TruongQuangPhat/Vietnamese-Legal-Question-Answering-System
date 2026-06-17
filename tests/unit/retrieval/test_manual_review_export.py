@@ -1,4 +1,4 @@
-"""Unit tests for the offline Phase 9C.2 manual review exporter."""
+"""Unit tests for the offline manual review manual review exporter."""
 
 from __future__ import annotations
 

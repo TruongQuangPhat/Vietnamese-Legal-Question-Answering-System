@@ -1,4 +1,4 @@
-"""Workflow for Phase 9A.1 dense retrieval sanity evaluation."""
+"""Workflow for dense retrieval evaluation dense retrieval sanity evaluation."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=DEFAULT_CONFIG,
-        help="Phase 9A retrieval configuration.",
+        help="dense retrieval baseline retrieval configuration.",
     )
     parser.add_argument(
         "--queries",

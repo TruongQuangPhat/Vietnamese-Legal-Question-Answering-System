@@ -40,7 +40,7 @@ class QueryEmbeddingModel(Protocol):
 
 
 class QdrantRetrievalClient(Protocol):
-    """Minimal read-only Qdrant surface used by Phase 9A retrieval."""
+    """Minimal read-only Qdrant surface used by dense retrieval baseline retrieval."""
 
     async def query_points(self, **kwargs: Any) -> Any:
         """Run a named-vector dense search."""
@@ -61,7 +61,7 @@ class DenseRetriever:
         embedding_batch_size: Query embedding batch size.
 
     Retrieval assumptions:
-        Phase 9A uses dense search only over the already indexed ``text`` vector.
+        dense retrieval baseline uses dense search only over the already indexed ``text`` vector.
         It does not mutate Qdrant, generate answers, rerank, or perform
         time-aware legal validity filtering.
     """

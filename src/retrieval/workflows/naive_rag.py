@@ -1,4 +1,4 @@
-"""Workflow for Phase 9B fallback-aware Naive RAG single-query generation."""
+"""Workflow for fallback-aware Naive RAG fallback-aware Naive RAG single-query generation."""
 
 from __future__ import annotations
 

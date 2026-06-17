@@ -1,4 +1,4 @@
-"""Workflow for running one safe read-only Phase 9A dense retrieval query."""
+"""Workflow for running one safe read-only dense retrieval baseline dense retrieval query."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ EXIT_FAILURE = 1
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build the Phase 9A dense retrieval CLI parser."""
+    """Build the dense retrieval baseline dense retrieval CLI parser."""
     parser = argparse.ArgumentParser(
         prog="scripts/retrieval/run_dense_retrieval.py",
         description="Run one read-only BGE-M3 dense retrieval query against Qdrant.",
@@ -40,7 +40,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=DEFAULT_CONFIG,
-        help="Phase 9A retrieval configuration.",
+        help="dense retrieval baseline retrieval configuration.",
     )
     parser.add_argument("--query", required=True, help="Vietnamese legal query text.")
     parser.add_argument(

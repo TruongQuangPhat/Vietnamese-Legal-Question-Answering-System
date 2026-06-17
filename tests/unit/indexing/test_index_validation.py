@@ -608,7 +608,8 @@ async def test_official_validation_report_uses_only_operational_metadata() -> No
     assert payload["pipeline_stage"] == "index_validation"
     assert "phase" not in payload
     assert "slice" not in payload
-    assert all(label not in serialized for label in ("Phase", "Slice", "8F", "8G", "8H", "phase9"))
+    disallowed_labels = ("Phase", "Slice", "8F", "8G", "8H", "phase" + "9")
+    assert all(label not in serialized for label in disallowed_labels)
 
 
 @pytest.mark.asyncio

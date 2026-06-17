@@ -24,7 +24,7 @@ RETRIEVAL_REPORTS_ROOT = REPORTS_ROOT / "retrieval"
 
 
 def load_retrieval_config(path: Path) -> RetrievalConfig:
-    """Load and validate the Phase 9A retrieval YAML configuration."""
+    """Load and validate the dense retrieval baseline retrieval YAML configuration."""
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("retrieval config root must be a YAML object")

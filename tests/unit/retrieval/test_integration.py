@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9A.4 selection smoke integration."""
+"""Unit tests for selection smoke selection smoke integration."""
 
 from __future__ import annotations
 

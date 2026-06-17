@@ -1,4 +1,4 @@
-"""Typed contracts for Phase 9A dense retrieval.
+"""Typed contracts for dense retrieval baseline dense retrieval.
 
 The models in this module represent query input, safe payload filters, retrieved
 legal evidence, and retrieval-level diagnostics. They preserve Phase 8 payload
@@ -70,7 +70,7 @@ class RetrievalFilters(BaseModel):
     """Safe exact-match filters supported by the Phase 8 payload schema.
 
     Legal assumptions:
-        These filters do not implement temporal validity. Phase 9A must not
+        These filters do not implement temporal validity. dense retrieval baseline must not
         claim point-in-time legal answering because the current indexed
         temporal metadata is intentionally nullable.
     """
@@ -268,7 +268,7 @@ class RetrievalResult(BaseModel):
 
 
 class RetrievalEmbeddingConfig(BaseModel):
-    """Embedding settings used by the Phase 9A query embedder."""
+    """Embedding settings used by the dense retrieval baseline query embedder."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -291,7 +291,7 @@ class RetrievalQdrantConfig(BaseModel):
 
 
 class DenseRetrievalConfig(BaseModel):
-    """Dense retriever defaults for Phase 9A."""
+    """Dense retriever defaults for dense retrieval baseline."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -301,7 +301,7 @@ class DenseRetrievalConfig(BaseModel):
 
 
 class RetrievalConfig(BaseModel):
-    """Complete Phase 9A retrieval configuration."""
+    """Complete dense retrieval baseline retrieval configuration."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -314,5 +314,5 @@ class RetrievalConfig(BaseModel):
     def validate_query_embedding_contract(self) -> RetrievalConfig:
         """Require the configured dense vector dimension to match BGE-M3 v1."""
         if self.dense_retrieval.expected_vector_dim != DEFAULT_DENSE_DIMENSION:
-            raise ValueError("Phase 9A expects 1024-dimensional BGE-M3 dense vectors")
+            raise ValueError("dense retrieval baseline expects 1024-dimensional BGE-M3 dense vectors")
         return self

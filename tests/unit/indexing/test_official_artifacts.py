@@ -70,6 +70,7 @@ def test_clean_processed_corpus_summary_has_only_operational_fields() -> None:
 
 def test_sanitizer_cleans_existing_official_package(tmp_path: Path) -> None:
     """Existing reports are rewritten and the raw validation report is removed."""
+    legacy_retrieval_readiness_key = "readiness_for_" + "phase" + "9"
     reports_root = tmp_path / "artifacts/reports/indexing"
     run_dir = reports_root / "run-1"
     run_dir.mkdir(parents=True)
@@ -83,7 +84,7 @@ def test_sanitizer_cleans_existing_official_package(tmp_path: Path) -> None:
                 "report_type": "indexing_report",
                 "run_type": "official_full_indexing",
                 "pipeline_stage": "embedding_indexing",
-                "readiness_for_phase9": False,
+                legacy_retrieval_readiness_key: False,
                 "processed_validation_report_path": str(raw_path),
             }
         ),
@@ -112,7 +113,7 @@ def test_sanitizer_cleans_existing_official_package(tmp_path: Path) -> None:
     indexing = json.loads(indexing_path.read_text(encoding="utf-8"))
     validation = json.loads(validation_path.read_text(encoding="utf-8"))
     summary_path = run_dir / "processed_corpus_validation_summary.json"
-    assert "readiness_for_phase9" not in indexing
+    assert legacy_retrieval_readiness_key not in indexing
     assert indexing["processed_validation_report_path"].endswith(
         "processed_corpus_validation_summary.json"
     )

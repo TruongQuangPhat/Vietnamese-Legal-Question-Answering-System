@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin wrapper for the offline Phase 9C.2 manual review exporter."""
+"""Thin wrapper for the offline manual review manual review exporter."""
 
 # ruff: noqa: E402
 

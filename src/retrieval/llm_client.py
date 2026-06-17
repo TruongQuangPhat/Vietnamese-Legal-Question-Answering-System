@@ -1,4 +1,4 @@
-"""LLM client abstractions and OpenRouter implementation for Phase 9B.
+"""LLM client abstractions and OpenRouter implementation for fallback-aware Naive RAG.
 
 This module is provider-facing only. It does not perform retrieval, select
 evidence, validate legal sufficiency, or know about Qdrant. API keys are read

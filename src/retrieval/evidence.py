@@ -1,6 +1,6 @@
 """Evidence safety and context assembly for retrieved legal chunks.
 
-This module turns Phase 9A retrieval results into citation-aware evidence
+This module turns dense retrieval baseline retrieval results into citation-aware evidence
 packets. It does not retrieve, rerank, call LLMs, mutate Qdrant, or mutate
 corpus files.
 """

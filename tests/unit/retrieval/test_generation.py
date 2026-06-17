@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9B generation result and citation guard helpers."""
+"""Unit tests for fallback-aware Naive RAG generation result and citation guard helpers."""
 
 from __future__ import annotations
 

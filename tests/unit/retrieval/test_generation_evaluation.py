@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9C deterministic generation validators."""
+"""Unit tests for generation evaluation deterministic generation validators."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def test_answer_allowed_with_valid_citation_passes() -> None:
 
 
 def test_answer_allowed_without_required_citation_fails() -> None:
-    """Missing citation IDs are report-blocking Phase 9C failures."""
+    """Missing citation IDs are report-blocking generation evaluation failures."""
     evaluated = validate_generation_result(
         _allowed_case(),
         _result(

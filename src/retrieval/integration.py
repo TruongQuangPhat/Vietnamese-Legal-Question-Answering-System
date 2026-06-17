@@ -1,4 +1,4 @@
-"""Integration smoke pipeline for Phase 9A retrieval-side components.
+"""Integration smoke pipeline for dense retrieval baseline retrieval-side components.
 
 The smoke pipeline composes dense retrieval, evidence assembly, and evidence
 selection. It is read-only and does not call LLMs, generate answers, mutate

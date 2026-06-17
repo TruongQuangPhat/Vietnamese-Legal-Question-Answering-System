@@ -1,6 +1,6 @@
-"""Offline Markdown export for Phase 9C.2 manual faithfulness review.
+"""Offline Markdown export for manual review manual faithfulness review.
 
-The exporter reads an existing Phase 9C.1 JSON report and creates a human
+The exporter reads an existing expanded generation evaluation JSON report and creates a human
 review worksheet. It does not retrieve evidence, call an LLM, or determine
 semantic faithfulness automatically.
 """
@@ -33,7 +33,7 @@ DEFAULT_MAX_EVIDENCE_PREVIEW_CHARS = 500
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build the offline Phase 9C.2 export CLI parser."""
+    """Build the offline manual review export CLI parser."""
     parser = argparse.ArgumentParser(
         prog="scripts/retrieval/export_naive_rag_manual_review.py",
         description="Export an existing generation report as a manual review worksheet.",
@@ -55,7 +55,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def load_generation_report(path: Path) -> GenerationEvalReport:
-    """Load a validated Phase 9C.1 report without external service calls.
+    """Load a validated expanded generation evaluation report without external service calls.
 
     Args:
         path: Existing expanded generation evaluation JSON report.
@@ -175,7 +175,7 @@ def write_manual_review(path: Path, content: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the offline Phase 9C.2 manual review export."""
+    """Run the offline manual review manual review export."""
     args = build_arg_parser().parse_args(argv)
     try:
         report = load_generation_report(args.input)

@@ -1,4 +1,4 @@
-"""Workflow for Phase 9A.4 retrieval-side evidence selection smoke tests."""
+"""Workflow for selection smoke retrieval-side evidence selection smoke tests."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=DEFAULT_CONFIG,
-        help="Phase 9A retrieval configuration.",
+        help="dense retrieval baseline retrieval configuration.",
     )
     parser.add_argument(
         "--queries",

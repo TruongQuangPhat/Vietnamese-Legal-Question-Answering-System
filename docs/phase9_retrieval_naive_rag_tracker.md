@@ -12,6 +12,7 @@ Phase 9A.5 — Workflow Boundary Cleanup: implemented
 Phase 9B — Naive RAG Answer Generation: implemented
 Phase 9C — Naive RAG Generation Evaluation & Safety Hardening: validated
 Phase 9D — Human Faithfulness Review & Baseline Hardening: partial
+Phase 9E — Regression Thresholds and QA Gate: partial
 ```
 
 Phase 9 starts from the validated Phase 8 Qdrant collection:
@@ -539,15 +540,24 @@ JSON and Markdown reports are reproducible outputs, not source-controlled
 project state. The annual-leave fallback still avoids an LLM call, and
 all-caution cases remain priority review items.
 
-## Phase 9D Manual Faithfulness Review
+## Phase 9D - Manual Faithfulness Review
+
+### Scope
 
 Phase 9D records human claim-to-citation verdicts for the five-case expanded
-Phase 9C baseline in `docs/phase9d_manual_faithfulness_review.md`. It changes
-no retrieval, selection, fallback, prompt, generation, citation guard,
-OpenRouter, Qdrant, indexing, corpus, source, script, test, or dependency
-behavior.
+Phase 9C baseline. It changes no retrieval, selection, fallback, prompt,
+generation, citation guard, OpenRouter, Qdrant, indexing, corpus, source,
+script, test, or dependency behavior.
 
-Review input:
+### Method
+
+The review checks:
+
+```text
+generated claim -> cited evidence ID -> safe child evidence preview -> verdict
+```
+
+Input run:
 
 ```text
 Report: artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json
@@ -558,7 +568,20 @@ Fallback cases: 1
 Generated claim/finding rows: 17
 ```
 
-Aggregate Phase 9D verdicts:
+Citation ID validity remains separate from semantic support. Parent context is
+not treated as directly citable child evidence.
+
+### Case verdict summary
+
+```text
+health_insurance_children_under_6_generation -> pass
+annual_leave_days_generation -> not_applicable_for_fallback
+civil_code_scope_generation -> partial
+marriage_conditions_generation -> partial
+civil_rights_protection_generation -> partial
+```
+
+### Claim verdict summary
 
 ```text
 supported claims: 10
@@ -566,22 +589,93 @@ too-broad claims: 6
 missing-key-condition findings: 1
 unsupported claims: 0
 irrelevant-citation findings: 0
+needs-more-evidence findings: 0
 case verdicts: 1 pass, 3 partial, 1 not_applicable_for_fallback
 ```
 
-All-caution cases reviewed:
+### Main findings
+
+- The annual-leave control remained `fallback_required`, did not call the LLM,
+  and made no substantive legal claim.
+- `health_insurance_children_under_6_generation` passed despite all selected
+  evidence being caution because direct child previews supported the reviewed
+  claims.
+- `marriage_conditions_generation` remained partial because selected evidence
+  covered only part of the Article 8 condition set and added too-broad
+  foreign-element/definition material.
+- `civil_code_scope_generation` and `civil_rights_protection_generation`
+  included supported but question-broadening material.
+
+### Items carried into Phase 9E
+
+- Convert unsupported and irrelevant-citation findings into hard gate blockers.
+- Convert blocking-case partial verdicts and too-broad claims into quality
+  gate violations.
+- Keep non-blocking too-broad and missing-key-condition findings visible as
+  warnings.
+
+## Phase 9E - Regression Thresholds and QA Gate
+
+### Purpose
+
+Phase 9E adds an offline regression gate that combines the Phase 9C generation
+report, the manual faithfulness verdict manifest, and configurable thresholds.
+The implementation uses functional names:
 
 ```text
-health_insurance_children_under_6_generation -> pass, with caution evidence review risk
-marriage_conditions_generation -> partial, incomplete selected Article 8 coverage and too-broad foreign-element material
+configs/retrieval/quality_gate.yml
+data/eval/manual_faithfulness_verdicts.json
+src/retrieval/quality_gate.py
+scripts/retrieval/evaluate_quality_gate.py
 ```
 
-The annual-leave control remained `fallback_required`, did not call the LLM,
-and made no substantive legal claim. Phase 9D status is
-`phase9d_faithfulness_review_partial`: citation IDs were valid, but three
-generated cases need baseline hardening because of too-broad or incomplete
-answers. Phase 9E should convert these findings into regression thresholds and
-QA gates.
+The gate does not call OpenRouter, Qdrant, retrieval, generation, indexing, or
+corpus processing.
+
+### Inputs
+
+- Generation report:
+  `artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json`
+- Manual verdict manifest: `data/eval/manual_faithfulness_verdicts.json`
+- Policy config: `configs/retrieval/quality_gate.yml`
+
+### Hard gates
+
+Hard gates cover required cases, decision/LLM/fallback policy rates,
+citation-ID integrity, secret leaks, unsupported claims, irrelevant citations,
+fallback behavior, and all-caution manual-review completion.
+
+### Quality gates
+
+Quality gates cover blocking generated case verdicts, too-broad claims, and
+missing-key-condition findings. Non-blocking partial cases are allowed but
+reported as warnings when they contain too-broad or missing-key-condition
+findings.
+
+### Current gate result
+
+Current expected status is `quality_gate_partial`: hard gates pass, but
+`civil_code_scope_generation` is a blocking generated case with a partial
+verdict and a too-broad finding. Non-blocking too-broad and missing-key-condition
+findings remain warnings for Phase 9F.
+
+### Reusable command
+
+```bash
+uv run python scripts/retrieval/evaluate_quality_gate.py \
+  --generation-report artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json \
+  --faithfulness-verdicts data/eval/manual_faithfulness_verdicts.json \
+  --policy configs/retrieval/quality_gate.yml \
+  --output artifacts/reports/retrieval/quality_gate.json
+```
+
+### Items carried into Phase 9F
+
+- Closure decision must state that hard gates pass while the quality gate is
+  partial.
+- Closure decision must preserve the distinction between citation ID coverage
+  and semantic faithfulness.
+- Phase 10 retrieval improvements remain separately scoped.
 
 ## Evaluation Command
 
@@ -609,7 +703,7 @@ uv run --extra qdrant --extra embedding python scripts/retrieval/run_dense_retri
 
 ## Next Work
 
-1. Phase 9E: define regression thresholds and QA gates from Phase 9D findings.
+1. Phase 9F: write the Phase 9 closure report and decision gate.
 2. Resolve all-caution and insufficient-evidence review findings.
 3. Keep citation ID coverage distinct from semantic faithfulness.
 4. Expand the generation dataset only with reviewed legal expectations.

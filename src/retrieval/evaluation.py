@@ -1,6 +1,6 @@
 """Manual dense retrieval evaluation and evidence-risk audit utilities.
 
-This module measures Phase 9A dense retrieval behavior. It does not call LLMs,
+This module measures dense retrieval baseline dense retrieval behavior. It does not call LLMs,
 modify retrieval ranking, mutate Qdrant, or write corpus artifacts.
 """
 

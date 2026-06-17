@@ -1,4 +1,4 @@
-"""Prompt construction for Phase 9B fallback-aware Naive RAG."""
+"""Prompt construction for fallback-aware Naive RAG fallback-aware Naive RAG."""
 
 from __future__ import annotations
 

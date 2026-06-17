@@ -1,4 +1,4 @@
-"""Safe Qdrant filter construction for Phase 9A dense retrieval."""
+"""Safe Qdrant filter construction for dense retrieval baseline dense retrieval."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def build_qdrant_filter(filters: RetrievalFilters) -> Any | None:
     """Build an exact-match Qdrant filter for supported indexed payload fields.
 
     Args:
-        filters: Validated Phase 9A retrieval filters.
+        filters: Validated dense retrieval baseline retrieval filters.
 
     Returns:
         A Qdrant ``Filter`` instance, or ``None`` when no conditions are set.

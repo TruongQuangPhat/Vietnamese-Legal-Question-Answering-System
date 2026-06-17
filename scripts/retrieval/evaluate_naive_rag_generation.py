@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin wrapper for Phase 9C Naive RAG generation evaluation."""
+"""Thin wrapper for generation evaluation Naive RAG generation evaluation."""
 
 # ruff: noqa: E402
 

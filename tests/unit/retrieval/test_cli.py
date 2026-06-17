@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 9A dense retrieval CLI helpers."""
+"""Unit tests for the dense retrieval baseline dense retrieval CLI helpers."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Workflow for Phase 9C repeatable Naive RAG generation evaluation."""
+"""Workflow for generation evaluation repeatable Naive RAG generation evaluation."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ GenerationCaseRunner = Callable[[GenerationEvalQuery], Awaitable[RagAnswerResult
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build the Phase 9C generation evaluation CLI parser."""
+    """Build the generation evaluation generation evaluation CLI parser."""
     parser = argparse.ArgumentParser(
         prog="scripts/retrieval/evaluate_naive_rag_generation.py",
         description="Run deterministic safety evaluation over Naive RAG generation cases.",
@@ -66,13 +66,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--queries",
         type=Path,
         default=DEFAULT_GENERATION_QUERIES,
-        help="Manual Phase 9C generation evaluation JSONL dataset.",
+        help="Manual generation evaluation generation evaluation JSONL dataset.",
     )
     parser.add_argument(
         "--manual-retrieval-queries",
         type=Path,
         default=DEFAULT_QUERIES,
-        help="Phase 9A manual dataset used for expected target hints.",
+        help="dense retrieval baseline manual dataset used for expected target hints.",
     )
     parser.add_argument("--collection-name", default=None, help="Existing Qdrant collection.")
     parser.add_argument("--url", default=None, help="Qdrant HTTP URL.")
@@ -119,7 +119,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Load project dotenv and run the asynchronous Phase 9C workflow."""
+    """Load project dotenv and run the asynchronous generation evaluation workflow."""
     load_project_dotenv()
     return asyncio.run(run_naive_rag_generation_eval(argv))
 
@@ -289,7 +289,7 @@ def validate_cli_arguments(
     timeout_s: float,
     evidence_preview_chars: int,
 ) -> None:
-    """Validate Phase 9C paths and bounded generation settings."""
+    """Validate generation evaluation paths and bounded generation settings."""
     if not queries_path.is_file():
         raise ValueError(f"generation evaluation dataset not found: {queries_path}")
     if not manual_retrieval_queries_path.is_file():
@@ -314,7 +314,7 @@ def validate_cli_arguments(
 
 
 def write_report(path: Path, report: GenerationEvalReport) -> None:
-    """Write a secret-screened Phase 9C JSON report."""
+    """Write a secret-screened generation evaluation JSON report."""
     payload = report.model_dump(mode="json")
     serialized = report.model_dump_json()
     if find_secret_leak_labels(serialized):
@@ -323,7 +323,7 @@ def write_report(path: Path, report: GenerationEvalReport) -> None:
 
 
 def print_summary(report: GenerationEvalReport) -> None:
-    """Print a compact secret-free Phase 9C summary."""
+    """Print a compact secret-free generation evaluation summary."""
     print("Naive RAG Generation Evaluation")
     print(f"Status: {report.status}")
     print(f"Cases: {report.passed_cases}/{report.total_cases} passed")

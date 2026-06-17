@@ -1,4 +1,4 @@
-"""Phase 9 retrieval domain components."""
+"""Retrieval domain components."""
 
 from __future__ import annotations
 

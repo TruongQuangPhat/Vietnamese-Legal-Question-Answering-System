@@ -151,13 +151,20 @@ Corpus Registry
   selected and cited evidence previews for human review. Generated JSON and
   Markdown reports remain runtime artifacts and are not source-of-truth data.
 - Phase 9D records human claim-to-citation verdicts for the five-case expanded
-  baseline in `docs/phase9d_manual_faithfulness_review.md`. Status is
-  `phase9d_faithfulness_review_partial`: one generated case passed, three
+  baseline in `docs/phase9_retrieval_naive_rag_tracker.md`. Status is
+  `manual_faithfulness_review_partial`: one generated case passed, three
   generated cases were partial because of too-broad or incomplete answers, and
   the annual-leave control correctly remained fallback without an LLM call.
+- Phase 9E adds an offline configurable QA gate in
+  `src/retrieval/quality_gate.py` with thresholds in
+  `configs/retrieval/quality_gate.yml` and reviewed verdicts in
+  `data/eval/manual_faithfulness_verdicts.json`. Current status is
+  `quality_gate_partial`: hard safety/citation/fallback gates pass,
+  but blocking answer precision still has a partial verdict and too-broad
+  finding.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- Phase 9E regression thresholds and QA gates are next. Phase 10 retrieval
+- Phase 9F closure reporting and decision gate are next. Phase 10 retrieval
   improvements remain separately scoped.
 
 Operational rules:
@@ -300,7 +307,7 @@ artifacts/reports/chunking/processed_jsonl_validation_report.json
 Current next work:
 
 ```text
-Phase 9E — Regression thresholds and QA gate
+Phase 9F — Phase 9 closure report and decision gate
 ```
 
 Phase 9A already starts retrieval with BGE-M3 query embedding and dense top-k
@@ -311,7 +318,7 @@ selected citation-safe evidence.
 
 ## 6. Next Immediate Tasks
 
-1. Define Phase 9E regression thresholds and QA gates from Phase 9D findings.
+1. Write the Phase 9F closure report and decision gate from Phase 9E findings.
 2. Resolve all-caution and insufficient-evidence review findings.
 3. Keep citation ID coverage distinct from semantic faithfulness.
 4. Keep sparse/hybrid retrieval and reranking separately scoped for Phase 10.
@@ -328,6 +335,7 @@ selected citation-safe evidence.
 | 9B | Naive RAG Answer Generation | **Complete / Baseline Implemented** |
 | 9C | Naive RAG Generation Evaluation & Safety Hardening | **Complete / Validated** |
 | 9D | Human Faithfulness Review & Baseline Hardening | **Complete / Partial Findings** |
+| 9E | Regression Thresholds and QA Gate | **Complete / Partial Gate** |
 | 10 | Advanced RAG | Future |
 | 11 | GraphRAG & Agents | Future |
 | 12 | Evaluation | Future |

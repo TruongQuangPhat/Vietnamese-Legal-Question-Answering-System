@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9A.5 retrieval workflow boundaries."""
+"""Unit tests for retrieval workflow boundary retrieval workflow boundaries."""
 
 from __future__ import annotations
 

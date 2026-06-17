@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9A.3 evidence selection and fallback rules."""
+"""Unit tests for evidence selection evidence selection and fallback rules."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def make_chunk(
 
 
 def make_packet(**kwargs: object) -> EvidencePacket:
-    """Build one evidence packet through the Phase 9A.2 classifier."""
+    """Build one evidence packet through the evidence safety classifier."""
     return build_evidence_packet(
         make_chunk(**kwargs),
         config=ContextAssemblyConfig(min_safety_level=EvidenceSafetyLevel.UNSAFE),

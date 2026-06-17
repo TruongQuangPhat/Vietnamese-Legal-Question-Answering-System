@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9A.2 evidence safety and context assembly."""
+"""Unit tests for evidence safety evidence safety and context assembly."""
 
 from __future__ import annotations
 

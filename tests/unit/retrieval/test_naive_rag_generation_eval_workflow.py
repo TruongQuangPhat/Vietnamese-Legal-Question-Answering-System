@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 9C generation evaluation workflow."""
+"""Unit tests for the generation evaluation generation evaluation workflow."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from src.retrieval.workflows import naive_rag_generation_eval
 
 
 def test_load_generation_eval_queries_from_jsonl(tmp_path: Path) -> None:
-    """The Phase 9C JSONL loader validates manual query records."""
+    """The generation evaluation JSONL loader validates manual query records."""
     path = tmp_path / "queries.jsonl"
     path.write_text(
         json.dumps(
@@ -241,7 +241,7 @@ def test_parser_accepts_documented_generation_eval_flags() -> None:
 
 
 def test_script_is_thin_workflow_wrapper() -> None:
-    """The top-level Phase 9C script contains no evaluation business logic."""
+    """The top-level generation evaluation script contains no evaluation business logic."""
     source = Path("scripts/retrieval/evaluate_naive_rag_generation.py").read_text(encoding="utf-8")
 
     assert "from src.retrieval.workflows.naive_rag_generation_eval import main" in source

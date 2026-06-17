@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 9D complete — human faithfulness review partial
+Current phase: Phase 9E complete — quality gate partial
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -31,9 +31,10 @@ Completed:
   Phase 9C.2 — Manual Faithfulness Review Export
   Phase 9C.3 — Evidence Preview Support
   Phase 9D — Human Faithfulness Review & Baseline Hardening
+  Phase 9E — Regression Thresholds and QA Gate
 
 Next:
-  Phase 9E — Regression thresholds and QA gate
+  Phase 9F — Phase 9 closure report and decision gate
   Keep citation ID coverage distinct from semantic faithfulness
   Do not begin Phase 10 during Phase 9 review cleanup
 ```
@@ -75,9 +76,24 @@ Phase 9C.3 adds opt-in, bounded evidence previews for repeatable manual review.
 Generated JSON and Markdown reports are runtime artifacts and should not be
 committed. Citation ID coverage remains distinct from semantic faithfulness,
 and Phase 9D records the first human claim-to-citation verdicts in
-`docs/phase9d_manual_faithfulness_review.md`. The Phase 9D status is partial:
+`docs/phase9_retrieval_naive_rag_tracker.md`. The Phase 9D status is partial:
 one generated case passed, three generated cases need hardening for too-broad
 or incomplete answers, and the annual-leave fallback control behaved correctly.
+
+Run the offline quality gate:
+
+```bash
+uv run python scripts/retrieval/evaluate_quality_gate.py \
+  --generation-report artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json \
+  --faithfulness-verdicts data/eval/manual_faithfulness_verdicts.json \
+  --policy configs/retrieval/quality_gate.yml \
+  --output artifacts/reports/retrieval/quality_gate.json
+```
+
+The current expected gate status is `quality_gate_partial`: hard
+safety, fallback, citation-ID, and secret-leak gates pass, but reviewed answer
+precision still has too-broad or incomplete findings. The gate is offline and
+does not call OpenRouter or Qdrant.
 
 Phase 4 is gate-ready:
 
@@ -760,7 +776,7 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
 | `docs/phase8_embedding_indexing_tracker.md` | Completed Phase 8 implementation, indexing, and validation record |
 | `docs/embedding_indexing.md` | Phase 8 design background |
-| `docs/phase9_retrieval_naive_rag_tracker.md` | Phase 9 retrieval and fallback-aware Naive RAG status |
+| `retrieval_naive_rag_tracker` | Phase 9 retrieval and fallback-aware Naive RAG status |
 | `docs/naive_rag.md` | Implemented dense retrieval and fallback-aware Naive RAG baseline |
 | `docs/evaluation.md` | Future evaluation strategy |
 

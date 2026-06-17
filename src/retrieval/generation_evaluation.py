@@ -1,4 +1,4 @@
-"""Deterministic validation for Phase 9C Naive RAG generation results.
+"""Deterministic validation for generation evaluation Naive RAG generation results.
 
 The checks cover decision policy, LLM call policy, citation-ID integrity,
 fallback behavior, likely Vietnamese output, forbidden phrases, and secret-like
@@ -57,7 +57,7 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 
 class GenerationValidationIssue(BaseModel):
-    """One deterministic Phase 9C validation issue."""
+    """One deterministic generation evaluation validation issue."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -199,7 +199,7 @@ class GenerationEvalCaseResult(BaseModel):
 
 
 class GenerationEvalReport(BaseModel):
-    """Comparable JSON report for a Phase 9C generation evaluation run."""
+    """Comparable JSON report for a generation evaluation generation evaluation run."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -245,7 +245,7 @@ class GenerationEvalReport(BaseModel):
 
 
 def load_generation_eval_queries(path: Path) -> list[GenerationEvalQuery]:
-    """Load and validate Phase 9C manual generation queries from JSONL."""
+    """Load and validate generation evaluation manual generation queries from JSONL."""
     records: list[GenerationEvalQuery] = []
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):

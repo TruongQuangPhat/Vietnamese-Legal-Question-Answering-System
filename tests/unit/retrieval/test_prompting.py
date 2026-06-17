@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9B Naive RAG prompt construction."""
+"""Unit tests for fallback-aware Naive RAG Naive RAG prompt construction."""
 
 from __future__ import annotations
 

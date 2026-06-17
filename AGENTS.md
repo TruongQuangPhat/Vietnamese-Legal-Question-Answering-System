@@ -40,6 +40,10 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - `artifacts/reports/indexing/<run_id>/` = official indexing artifacts grouped
   by operational run.
 - Preserve Vietnamese legal hierarchy: Phần / Chương / Mục / Điều / Khoản / Điểm.
+- Phase labels are documentation and project-management concepts only. Source
+  code, scripts, configs, datasets, tests, artifacts, schemas, statuses, and
+  APIs must use functional/domain names and must not encode roadmap phase
+  numbers.
 
 ## 4. Current Phase Status
 
@@ -96,7 +100,11 @@ According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}:
 - Phase 9C.2 and Phase 9C.3 provide a reusable offline review exporter and
   bounded safe-citable evidence previews. Generated review reports are runtime
   artifacts; citation coverage still does not prove semantic faithfulness.
-- Phase 9D human claim-to-citation verdict review is next. Phase 10 retrieval
+- Phase 9D human claim-to-citation verdict review is complete with partial
+  findings.
+- Phase 9E regression thresholds and the offline quality gate are complete with
+  status `quality_gate_partial`.
+- Phase 9F closure reporting and decision gate are next. Phase 10 retrieval
   improvements remain separately scoped.
 
 ## 5. Official Commands

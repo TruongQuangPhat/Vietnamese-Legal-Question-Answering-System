@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9A retrieval contracts."""
+"""Unit tests for dense retrieval baseline retrieval contracts."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def test_default_retrieval_config_loads() -> None:
 
 
 def test_retrieval_config_rejects_non_bge_m3_dimension() -> None:
-    """Phase 9A is pinned to the existing 1024-dimensional dense index."""
+    """dense retrieval baseline is pinned to the existing 1024-dimensional dense index."""
     payload = yaml.safe_load(Path("configs/retrieval/retrieval.yml").read_text())
     payload["dense_retrieval"]["expected_vector_dim"] = 768
 

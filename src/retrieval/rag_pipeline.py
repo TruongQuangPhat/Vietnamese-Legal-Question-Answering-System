@@ -1,4 +1,4 @@
-"""Fallback-aware Naive RAG pipeline for Phase 9B."""
+"""Fallback-aware Naive RAG pipeline for fallback-aware Naive RAG."""
 
 from __future__ import annotations
 
@@ -104,7 +104,7 @@ async def run_naive_rag(
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
                 timeout_s=config.timeout_s,
-                metadata={"pipeline": "phase9b_naive_rag"},
+                metadata={"pipeline": "naive_rag"},
             )
         )
     except (LLMClientError, ValueError) as exc:

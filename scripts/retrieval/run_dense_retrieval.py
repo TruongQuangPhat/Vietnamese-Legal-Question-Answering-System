@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backward-compatible wrapper for the Phase 9A dense retrieval workflow."""
+"""Backward-compatible wrapper for the dense retrieval baseline dense retrieval workflow."""
 
 # ruff: noqa: E402
 

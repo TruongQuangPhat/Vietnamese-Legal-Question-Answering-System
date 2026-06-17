@@ -1,4 +1,4 @@
-"""Generation result models, fallback policy, and citation guard for Phase 9B."""
+"""Generation result models, fallback policy, and citation guard for fallback-aware Naive RAG."""
 
 from __future__ import annotations
 

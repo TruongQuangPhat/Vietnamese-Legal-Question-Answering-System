@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9B LLM client contracts."""
+"""Unit tests for fallback-aware Naive RAG LLM client contracts."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Service orchestration for Phase 9A dense retrieval."""
+"""Service orchestration for dense retrieval baseline dense retrieval."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from src.retrieval.models import RetrievalFilters, RetrievalResult
 class RetrievalService:
     """Coordinate a single dense retrieval use case.
 
-    The service layer intentionally stays thin in Phase 9A: the domain
+    The service layer intentionally stays thin in dense retrieval baseline: the domain
     retriever owns query embedding, Qdrant search, and payload mapping, while
     scripts own CLI parsing and dependency construction.
     """

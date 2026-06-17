@@ -198,11 +198,11 @@ def select_evidence_for_answer(
     """Select citable evidence and decide if future generation may proceed.
 
     Args:
-        evidence_bundle: Evidence packets from Phase 9A.2.
+        evidence_bundle: Evidence packets from evidence safety.
         config: Optional selection settings.
         expected_targets: Optional manual/evaluation targets for stricter
             offline gating.
-        risk_flags: Optional Phase 9A.1 risk flags to surface in the decision.
+        risk_flags: Optional dense retrieval evaluation risk flags to surface in the decision.
 
     Returns:
         Structured answerability decision with selected/rejected evidence and

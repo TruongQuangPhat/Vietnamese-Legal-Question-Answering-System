@@ -1,4 +1,4 @@
-"""Unit tests for Phase 9A.1 dense retrieval evaluation."""
+"""Unit tests for dense retrieval evaluation dense retrieval evaluation."""
 
 from __future__ import annotations
 
