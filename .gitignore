@@ -94,7 +94,9 @@ htmlcov/
 # --- Jupyter ---
 .ipynb_checkpoints/
 
-.claude/*.json
+# Removed local assistant tooling
+.claude/
+CLAUDE.md
 
 # --- Small versioned evaluation fixtures ---
 !data/

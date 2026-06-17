@@ -36,7 +36,7 @@ uv run python scripts/corpus/crawl_raw_corpus.py --help
 ```
 ┌─────────────────────────────┐
 │  Project Repository         │
-│  (CLAUDE.md, pyproject.toml)│
+│  (AGENTS.md, pyproject.toml)│
 └──────────┬──────────────────┘
            │
            ▼
@@ -130,8 +130,7 @@ Current repository layout:
 ```
 VnLaw-QA/
 ├── .agents/skills/         # Active Codex repo skills
-├── .codex/context/         # Codex context and mirrors
-├── .claude/                # Claude-only settings and skills
+├── .codex/context/         # Codex instruction routing context
 ├── configs/                 # YAML configurations and phase config scaffold
 │   ├── laws/
 │   │   └── corpus_registry.yml
@@ -180,7 +179,6 @@ VnLaw-QA/
 │   ├── regression/
 │   └── fixtures/
 ├── AGENTS.md
-├── CLAUDE.md
 ├── PROJECT_CONTEXT.md
 ├── .env.example
 ├── .gitignore
@@ -254,7 +252,7 @@ folder only when a phase needs it, and keep the current `scripts/` →
 2. **Configuration loading**: Pydantic settings read from `.env` and environment
 3. **Development workflow**: Developer runs commands via `uv run <tool>`
 4. **Quality enforcement**: Pre-commit or CI runs ruff, mypy, pytest
-5. **Documentation**: CLAUDE.md and this docs/ directory serve as living references
+5. **Documentation**: AGENTS.md, PROJECT_CONTEXT.md, skills, and docs serve as living references
 
 ## Data Models / Output Schema
 
@@ -284,12 +282,10 @@ class CorpusEntry(BaseModel):
 
 ### Project Metadata Files
 
-- `CLAUDE.md`: Project-wide instructions for Claude Code
+- `AGENTS.md`: Canonical repository instructions for coding assistants
 - `PROJECT_CONTEXT.md`: Current status, completed phases, next tasks
 - `.agents/skills/`: Active Codex skills for this repository
-- `.codex/context/`: Codex context and compatibility mirrors
-- `.claude/`: Claude-only local settings and skills; do not copy secrets or
-  local settings into Codex context files
+- `.codex/context/`: Lightweight Codex instruction routing context
 
 ## CLI Reference
 

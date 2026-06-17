@@ -1,250 +1,269 @@
-# VnLaw-QA Codex Instructions
+# VnLaw-QA Repository Instructions
 
-## 1. Mission and Legal Accuracy
+## 1. Mission
 
-- VnLaw-QA is a Vietnamese legal QA/RAG project, not a generic chatbot.
-- Answer only from the trusted legal corpus.
-- Never fabricate laws, articles, clauses, points, penalties, procedures, or citations.
-- Preserve citation traceability down to Point / Clause / Article / Law / Year
-  or consolidated version.
-- Resolve legally effective document versions based on query date when that
-  capability is implemented.
-- State that the system supports legal research and does not replace
-  professional legal counsel when relevant.
-- If evidence is insufficient, use a safe fallback instead of guessing.
+VnLaw-QA is a Vietnamese legal question-answering and retrieval-augmented generation system. It is not a generic chatbot.
 
-Required answer citation style:
+The repository must prioritize:
+
+- legal source traceability;
+- citation integrity;
+- deterministic data processing;
+- safe fallback when evidence is insufficient;
+- reproducible evaluation;
+- clean separation between domain logic, orchestration, CLI entrypoints, and runtime artifacts.
+
+The system supports legal research. It must not be presented as a replacement for professional legal advice.
+
+## 2. Instruction Order
+
+Before making changes, read sources in this order:
+
+1. `AGENTS.md` — canonical repository rules.
+2. `PROJECT_CONTEXT.md` — canonical current project state and roadmap.
+3. `.codex/context/INSTRUCTION_INDEX.md` — instruction routing and source locations.
+4. `.agents/skills/SKILL_INDEX.md` — task-to-skill routing.
+5. Relevant `.agents/skills/<skill-name>/SKILL.md` files.
+6. Relevant implementation, tests, configs, and documentation.
+
+Do not treat generated reports, old mirrors, or stale phase notes as authoritative context.
+
+## 3. Core Legal Accuracy Rules
+
+- No trusted source means no confident legal answer.
+- No traceable citation means the answer is not a valid legal answer.
+- Never fabricate laws, articles, clauses, points, penalties, procedures, effective dates, or citations.
+- Preserve Vietnamese legal hierarchy: Phần → Chương → Mục → Điều → Khoản → Điểm.
+- Prefer consolidated documents (`VBHN`) when available.
+- Preserve document title, law ID, article, clause, point, source URL, effective metadata, and hierarchy identifiers.
+- Auxiliary parent context may support understanding, but it is not directly citable unless the selected child evidence explicitly supports the claim.
+- If evidence is insufficient, incomplete, unsafe, or not directly relevant, use the existing fallback path instead of guessing.
+- Citation-ID validity is not semantic faithfulness. A valid `[E#]` mapping does not prove that a claim is fully supported.
+
+Default trusted legal source:
 
 ```text
-According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}: "{quoted legal content}"
+https://thuvienphapluat.vn
 ```
 
-## 2. Trusted Source Rule
+Do not add another source unless the task explicitly scopes and documents that architectural decision.
 
-- Default trusted source: `https://thuvienphapluat.vn`.
-- Prefer VBHN consolidated documents when available.
-- If no VBHN exists, preserve original documents and amendments with accurate
-  effective date, expiry date, and status metadata.
-- Do not add new data sources unless explicitly requested and documented as an
-  approved architectural decision.
+## 4. Current Architecture
 
-## 3. Current Architecture
+### CLI entrypoints
 
-- `scripts/{corpus,indexing,retrieval}/` = domain-grouped CLI entrypoints,
-  `argparse`, terminal summaries, and exit codes.
-- `src/services/` = pipeline orchestration and report building; no `argparse`.
-- `src/ingestion/` = reusable ingestion/domain logic such as crawler, audit,
-  cleaning, registry, storage, and models.
-- `data/raw/` = immutable raw crawl artifacts unless explicitly asked.
-- `data/interim/` = derived corpus artifacts.
-- `artifacts/reports/indexing/<run_id>/` = official indexing artifacts grouped
-  by operational run.
-- Preserve Vietnamese legal hierarchy: Phần / Chương / Mục / Điều / Khoản / Điểm.
-- Phase labels are documentation and project-management concepts only. Source
-  code, scripts, configs, datasets, tests, artifacts, schemas, statuses, and
-  APIs must use functional/domain names and must not encode roadmap phase
-  numbers.
-
-## 4. Current Phase Status
-
-- Registry-driven crawling is implemented.
-- Raw corpus audit is implemented.
-- Phase 4 Cleaning & Normalization is complete/gate-ready.
-- Cleaned corpus outputs exist for 52/52 legal documents under `data/interim/`.
-- Encoded TVPL footer/watermark artifacts are removed from cleaned outputs.
-- Article metrics distinguish article references from real article headings.
-- Phase 5 Legal Hierarchy Parsing is complete and hardened with 52/52
-  generated `hierarchy.json` outputs, 0 failed documents, 0 validator
-  failures, 0 RED/ORANGE audit cases, and 0 source-tail leakage nodes.
-- Phase 6 Parent-child Chunking is complete and validated.
-- Chunk output exists at `data/processed/legal_chunks.jsonl`.
-- Chunking report exists at `artifacts/reports/chunking/chunking_report.json`.
-- Phase 6 full-corpus result after hardening: 34 successes, 18 successes with
-  warnings, 0 failures, 40,389 chunks, 0 duplicate chunk IDs, 0 bad JSONL
-  lines, 0 source-tail markers in `text`, 0 source-tail markers in
-  `parent_text`, and 180 empty/repealed chunks flagged.
-- Phase 7 Processed Chunk Validation & Embedding Readiness is complete:
-  40,389 valid chunks, 0 invalid chunks, 0 hard errors, payload ready rate
-  1.0, and `embedding_ready=true`.
-- Phase 7 has 8,206 accepted non-blocking warnings:
-  4,645 short-text warnings and 3,561 contamination warning-only chunks.
-- Warning follow-up W1-W3 is closed. Warnings remain visible and were not
-  resolved, suppressed, or reclassified.
-- Phase 7.5 LLM-assisted corpus audit is complete with a **Go with watch
-  items** decision.
-- Phase 8 BGE-M3 embedding and Qdrant indexing is complete.
-- Collection `vnlaw_chunks_bgem3_v1_full` contains 40,389 points using named
-  dense vector `dense`, dimension 1024, cosine distance, and `text_only`.
-- Full indexing completed with 0 failed chunks; schema, payload, vector,
-  filter, and retrieval sanity validation passed.
-- Official reports are under
-  `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- Phase 9A Dense Retrieval Baseline is implemented with typed retrieval
-  models, safe filters, read-only dense Qdrant search, CLI, config, and unit
-  tests.
-- Phase 9B fallback-aware Naive RAG generation is implemented with OpenRouter
-  as the first concrete provider. Generation is gated by selected citation-safe
-  evidence and falls back without an LLM call when evidence is insufficient.
-- Phase 9C repeatable Naive RAG generation evaluation is validated with
-  deterministic decision, LLM-call, fallback, citation-ID, language, forbidden
-  phrase, and secret-leak checks. The initial live baseline passed 3/3 cases
-  with zero unknown/missing citation IDs and zero secret leaks. Citation-ID
-  coverage is not semantic faithfulness.
-- Phase 9C.1 expands the reviewed dataset to five unique cases. Three are
-  blocking and two variable-decision cases are non-blocking manual-review
-  coverage. Caution-evidence and selection-warning counts are review signals,
-  not semantic-faithfulness claims.
-- The expanded Phase 9C.1 live run passed 5/5 deterministic cases. Two
-  all-caution cases and 31 selection warnings remain visible for manual legal
-  review.
-- Phase 9C.2 and Phase 9C.3 provide a reusable offline review exporter and
-  bounded safe-citable evidence previews. Generated review reports are runtime
-  artifacts; citation coverage still does not prove semantic faithfulness.
-- Phase 9D human claim-to-citation verdict review is complete with partial
-  findings.
-- Phase 9E regression thresholds and the offline quality gate are complete with
-  status `quality_gate_partial`.
-- Phase 9F closure reporting and decision gate are next. Phase 10 retrieval
-  improvements remain separately scoped.
-
-## 5. Official Commands
-
-Use `uv run` for Python commands.
-
-```bash
-uv run python scripts/corpus/crawl_raw_corpus.py --help
-uv run python scripts/corpus/audit_raw_corpus.py --help
-uv run python scripts/corpus/clean_raw_corpus.py --help
-uv run python scripts/corpus/audit_cleaning_quality.py --help
-uv run python scripts/corpus/parse_legal_hierarchy.py --help
-uv run python scripts/corpus/chunk_legal_corpus.py --help
-uv run python scripts/corpus/validate_processed_jsonl.py --help
-uv run pytest tests/unit/ingestion -q
+```text
+scripts/
+  corpus/
+  indexing/
+  retrieval/
 ```
 
-Run only `--help` for crawl/clean commands unless explicitly asked to execute
-the pipeline.
+Scripts must remain thin wrappers that:
 
-For any future reindexing run, first generate and validate a fresh processed
-corpus report. Official indexing artifacts belong under
-`artifacts/reports/indexing/<run_id>/`.
+- parse CLI arguments;
+- call reusable services or domain modules;
+- print concise summaries;
+- return documented exit codes.
 
-```bash
-uv run python scripts/corpus/validate_processed_jsonl.py \
-  --input data/processed/legal_chunks.jsonl \
-  --config configs/processing/processed_jsonl_validation.yml \
-  --output /tmp/processed_jsonl_validation_report.json \
-  --pretty
+Do not place reusable business logic in scripts.
+
+### Source layout
+
+- `src/ingestion/` — registry, crawling, raw audit, cleaning, storage.
+- `src/processing/` — legal hierarchy parsing, chunking, processed JSONL validation.
+- `src/indexing/` — embedding and Qdrant indexing/validation.
+- `src/retrieval/` — dense retrieval, evidence construction and selection, Naive RAG generation, evaluation, manual review export, and offline quality gate.
+- `src/services/` — orchestration where a service boundary already exists.
+- `src/api/`, `src/evaluation/`, `src/monitoring/`, `src/security/` — future or separately scoped functionality.
+
+Use the existing repository layout rather than introducing parallel abstractions.
+
+## 5. Current Baseline Status
+
+The Naive RAG baseline is closed and validated with known limitations.
+
+Current durable state:
+
+- 52 legal documents are registered, crawled, audited, cleaned, parsed, and chunked.
+- `data/processed/legal_chunks.jsonl` contains 40,389 validated chunks.
+- Qdrant collection `vnlaw_chunks_bgem3_v1_full` contains 40,389 BGE-M3 dense vectors.
+- Dense retrieval, evidence safety/selection, fallback-aware generation, citation guard, repeatable generation evaluation, evidence previews, manual claim-to-citation review, prompt precision hardening, and the offline quality gate are implemented.
+- The current offline gate status is `quality_gate_passed`.
+- The five-case suite is a small regression baseline, not a held-out benchmark proving broad Vietnamese legal QA quality.
+- `marriage_conditions_generation` remains a non-blocking partial case with completeness/scope warnings.
+- The annual-leave control remains a correct dense-only fallback case.
+
+See `PROJECT_CONTEXT.md` and `docs/naive_rag.md` for current status and technical details.
+
+## 6. Functional Naming Rule
+
+Phase labels are documentation and project-management concepts only.
+
+Do not encode roadmap phase numbers in:
+
+- source filenames;
+- script filenames;
+- config filenames;
+- dataset filenames;
+- artifact filenames;
+- test filenames;
+- class names;
+- function names;
+- variables;
+- statuses;
+- schemas;
+- report metadata;
+- CLI paths;
+- public APIs.
+
+Use functional or domain names such as:
+
+```text
+quality_gate.yml
+manual_faithfulness_verdicts.json
+evaluate_quality_gate.py
+QualityGateEvaluator
+quality_gate_passed
 ```
 
-## 6. Python/OOP Standards
+Phase labels may appear in `README.md`, `PROJECT_CONTEXT.md`, `docs/`, and roadmap/status descriptions.
+
+## 7. Python and OOP Standards
 
 - Use Python 3.11+.
-- Add `from __future__ import annotations` to new Python files unless there is a
-  clear reason not to.
-- Use complete type hints for public functions, public methods, class
-  attributes, and data boundaries.
-- Use Pydantic V2 for configs/schema boundaries where appropriate.
-- Use `async def` / `await` for I/O involving crawling, vector stores, graph
-  stores, Redis, LLM calls, HTTP clients, and API operations.
-- Do not pass untyped raw dictionaries across module boundaries; prefer
-  Pydantic models, dataclasses, or typed protocols.
-- Keep clear service/domain boundaries.
-- Prefer dependency injection; do not instantiate infrastructure clients deep
-  inside business logic.
+- Add `from __future__ import annotations` to new Python files unless there is a clear reason not to.
+- Use complete type hints at public boundaries.
+- Use Pydantic v2 for config and schema boundaries where appropriate.
+- Prefer typed models, dataclasses, or protocols over untyped dictionaries.
 - Keep classes small and single-purpose.
-- Avoid god classes that mix ingestion, retrieval, generation, evaluation, API,
-  and deployment.
-- Use custom exceptions and structured logging.
+- Prefer dependency injection for infrastructure clients.
+- Do not instantiate Qdrant, HTTP, or LLM clients deep inside domain logic.
+- Keep I/O boundaries explicit.
+- Use custom exceptions and structured logging where appropriate.
+- Do not use `except Exception: pass` in production code.
+- Keep scripts thin and reusable logic under `src/`.
+- Do not create duplicate modules for one-off experiments.
 
-## 7. Documentation and Docstrings
+## 8. Documentation Standards
 
-- Use Google-style docstrings for public classes, public functions, public
-  methods, Pydantic models, API endpoints, non-trivial algorithms, and legal/RAG
-  pipeline components.
-- Explain purpose, arguments, return values, raised exceptions, side effects,
-  legal assumptions, and retrieval assumptions.
-- Avoid vague docstrings such as `Process data` or `Handle query`.
+- Use Google-style docstrings for public classes, functions, methods, Pydantic models, non-trivial algorithms, and legal/RAG components.
+- Document purpose, arguments, return values, exceptions, side effects, legal assumptions, and retrieval assumptions.
+- Keep `README.md` high-level.
+- Keep `PROJECT_CONTEXT.md` current and concise.
+- Keep technical component documentation functional rather than phase-named where possible.
+- Do not create standalone phase trackers after a phase is closed.
+- Do not commit generated runtime reports unless the repository explicitly defines them as durable source artifacts.
 
-## 8. Security and Logging
+## 9. Data Protection and Protected Paths
 
-- Never hardcode API keys, passwords, tokens, connection strings, or credentials.
-- Do not copy `.env`, secrets, tokens, credentials, or local-only settings into
-  Codex instruction mirrors.
-- Read secrets from `.env` through `pydantic-settings`.
-- Do not log raw user legal questions in production; they may contain PII.
-- Sanitize external query inputs, including Cypher inputs.
-- Use structured logs with request/user identifiers when available.
-- Never use `except Exception: pass` in production code.
-- Do not expose Neo4j, Redis, or Qdrant insecurely in production.
-- Do not commit Qdrant storage or model caches; both are runtime state.
+Do not mutate these paths unless the task explicitly requires an official rerun:
 
-## 9. Data and Chunking Rules
+```text
+data/raw/
+data/interim/
+data/reports/
+data/processed/legal_chunks.jsonl
+```
 
-- Preserve legal hierarchy: Part -> Chapter -> Section -> Article -> Clause -> Point.
-- Parent-child chunking uses:
-  - child unit = Clause or Point
-  - parent unit = Article
-  - embedding content = child content
-  - LLM context = parent article content
-- Phase 6 output is a single corpus-level JSONL file:
-  `data/processed/legal_chunks.jsonl`.
-- Phase 8 embedding/indexing embeds `text` only; keep `parent_text` as
-  Article context payload for retrieval/generation.
-- Preserve chunk IDs, citations, hierarchy IDs, hashes, source metadata,
-  warning visibility, and repeal flags in retrieval.
-- Do not drop short chunks or remove authority phrases lexically.
-- Phase 6 hardening treats VBHN/source-law certification tail as excluded
-  hierarchy content and flags `(được bãi bỏ)` source units in metadata.
-- Never split legal text by arbitrary character or token windows if doing so
-  breaks clauses, points, or legal meaning.
-- Do not mutate `data/raw/`; write derived artifacts to separate directories.
+Additional rules:
 
-## 10. Required Workflow
+- Raw data is immutable.
+- Derived artifacts belong in their designated directories.
+- Do not commit Qdrant storage, model caches, virtual environments, or generated caches.
+- Do not remove accepted warnings merely to improve metrics.
+- Preserve IDs, citations, hierarchy metadata, hashes, source metadata, warning visibility, and repeal flags.
+- Do not split legal text by arbitrary character windows when that breaks legal meaning.
 
-Before editing:
+## 10. Qdrant and External-Service Safety
+
+Unless explicitly scoped:
+
+- do not recreate or delete collections;
+- do not upsert points;
+- do not update payloads;
+- do not re-index;
+- use Qdrant read-only for retrieval/evaluation;
+- do not call OpenRouter for tasks that can run offline;
+- never print or serialize API keys;
+- never dump environment variables;
+- never write Authorization headers or tokens to reports.
+
+Secrets must come from environment variables or `.env`. Non-secret provider configuration belongs in config files.
+
+## 11. Evaluation Rules
+
+The existing five-case suite is a development/regression suite.
+
+It may be used to verify:
+
+- decision policy;
+- LLM-call policy;
+- fallback behavior;
+- citation-ID integrity;
+- secret leakage;
+- answer precision regressions;
+- reviewed claim-to-citation verdicts.
+
+It must not be used to claim that an advanced system is broadly better than the Naive RAG baseline.
+
+Before comparing Naive RAG with advanced retrieval:
+
+1. Build a broader reviewed benchmark.
+2. Freeze a development split and a held-out test split.
+3. Use the development split for tuning.
+4. Keep the held-out test split untouched until configurations are fixed.
+5. Compare systems with the same corpus, chunking, generator, prompt, selection policy, and evaluation code unless a controlled ablation explicitly changes one component.
+
+If model training or fine-tuning is introduced, use train/validation/test splits.
+
+## 12. Required Workflow
+
+### Before editing
 
 1. Read `AGENTS.md`.
-2. Read `.codex/context/INSTRUCTION_INDEX.md` if relevant.
-3. Read `PROJECT_CONTEXT.md`.
-4. Read the relevant `.agents` skill.
-5. Inspect relevant files.
+2. Read `PROJECT_CONTEXT.md`.
+3. Read `.codex/context/INSTRUCTION_INDEX.md` when instruction routing matters.
+4. Read `.agents/skills/SKILL_INDEX.md` and the relevant skills.
+5. Inspect the relevant source, tests, configs, and docs.
 6. State a short plan.
-7. Identify tests/checks to run.
+7. Identify validation commands.
+8. Check `git status --short` before modifying files.
 
-After editing:
+### After editing
 
 1. Summarize changes.
 2. List changed files.
 3. Explain important design choices.
-4. Report tests/checks run.
-5. Report remaining risks.
+4. Report tests and checks.
+5. Report remaining risks or limitations.
+6. Confirm protected paths and secrets are clean.
+7. Do not claim success when tests fail.
 
-## 11. Skill and Context Locations
+## 13. Standard Validation
 
-- Active Codex repo skills: `.agents/skills/<skill-name>/SKILL.md`.
-- Codex context/reference: `.codex/context/`.
-- Inactive skill mirror/reference: `.codex/context/skills_mirror/*/SKILL.mirror.md`
-  if present.
-- Claude original skills: `.claude/skills/`.
-- Do not delete, rename, move, overwrite, or modify Claude files unless
-  explicitly asked.
-- `.codex/skills` should not be used as an active skill folder in this repo.
+Use relevant subsets of:
 
-## 12. Do-Not-List / Do-Not-Touch Rules
+```bash
+uv run python -m py_compile <touched-python-files>
+uv run pytest <relevant-tests> -q
+uv run ruff check src scripts tests
+uv run ruff format --check <touched-files-or-directories>
+uv lock --check
+git diff --check
+```
 
-- Do not list `.git`, `.venv`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`,
-  `__pycache__`, or huge generated folders.
-- Do not mutate `data/raw/`.
-- Do not modify `data/interim/` or generated `artifacts/` outputs unless explicitly asked.
-- Do not modify `data/processed/legal_chunks.jsonl` unless explicitly rerunning
-  the Phase 6 chunking command.
-- `data/reports/` is a historical/protected path only; active reports belong under
-  the appropriate operational report directory.
-- Do not run full crawl, audit, or cleaning commands unless explicitly requested.
-- Official indexing report JSON must use `report_type`, `run_type`, and
-  `pipeline_stage`; do not expose development phase/slice labels.
-- Checkpoints are runtime/resume artifacts, not user-facing reports by default.
-- Do not start retrieval or RAG unless a separate task explicitly scopes it.
-- Do not delete `.claude/`, `.claude/skills/`, Claude settings files,
-  `CLAUDE.md`, or `PROJECT_CONTEXT.md`.
+Do not reformat unrelated legacy files merely to make a broad check pass.
+
+## 14. Do Not Do Without Explicit Scope
+
+- Do not mutate protected corpus paths.
+- Do not re-index Qdrant.
+- Do not bypass evidence selection or fallback gates.
+- Do not let parent context become directly citable evidence.
+- Do not weaken quality-gate thresholds to force a pass.
+- Do not invent legal expectations for new evaluation cases.
+- Do not implement GraphRAG, agents, API, UI, deployment, fine-tuning, or MLOps as part of an unrelated task.
+- Do not introduce phase-labelled implementation names.
+- Do not create duplicate context mirrors.
+- Do not copy secrets or local settings into repository instructions.
