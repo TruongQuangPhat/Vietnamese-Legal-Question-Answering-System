@@ -226,7 +226,7 @@ if not filtered_chunks:
 6. Rerank top-20 with cross-encoder → top-5–10 chunks.
 7. Apply time-aware filtering using query date (today by default).
 8. Pack filtered chunks into context with citations.
-9. Construct strict legal prompt (from Naive RAG) and call Claude API.
+9. Construct strict legal prompt (from Naive RAG) and call the configured LLM provider.
 10. Run citation validator on generated answer.
 11. Compute confidence (base = average rerank scores).
 12. Return answer if confidence ≥ threshold and citations valid; else fallback.

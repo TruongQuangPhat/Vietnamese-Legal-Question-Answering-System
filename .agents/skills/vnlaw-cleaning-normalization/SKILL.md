@@ -80,8 +80,8 @@ src/ingestion/cleaning.py
 src/ingestion/cleaning_diagnostics.py
 src/services/cleaning_service.py
 src/services/cleaning_quality_audit_service.py
-scripts/clean_raw_corpus.py
-scripts/audit_cleaning_quality.py
+scripts/corpus/clean_raw_corpus.py
+scripts/corpus/audit_cleaning_quality.py
 tests/unit/ingestion/test_cleaning.py
 ```
 

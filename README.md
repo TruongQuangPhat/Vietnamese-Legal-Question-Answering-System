@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 8 complete — retrieval baseline is next
+Current phase: Phase 9 closed with known limitations — quality gate passed
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -24,12 +24,79 @@ Completed:
   Phase 7 — Processed Chunk Validation & Embedding Readiness
   Phase 7.5 — LLM-assisted corpus audit
   Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
+  Phase 9A — Dense Retrieval Baseline
+  Phase 9B — Fallback-aware Naive RAG Generation
+  Phase 9C — Naive RAG Generation Evaluation & Safety Hardening
+  Phase 9C.1 — Reviewed Generation Dataset Expansion
+  Phase 9C.2 — Manual Faithfulness Review Export
+  Phase 9C.3 — Evidence Preview Support
+  Phase 9D — Human Faithfulness Review & Baseline Hardening
+  Phase 9E — Regression Thresholds and QA Gate
+  Phase 9F — Phase 9 Closure and Decision Gate
 
 Next:
-  Build a dense retrieval baseline over the validated Qdrant collection
-  Evaluate query embedding, top-k search, filters, and context assembly
-  Add answer generation only when separately scoped
+  Next planned stage may begin
+  Keep citation ID coverage distinct from semantic faithfulness
+  Do not claim production readiness from the five-case baseline
 ```
+
+Phase 9B loads `.env` automatically for `scripts/retrieval/run_naive_rag.py`.
+Non-secret OpenRouter defaults are stored in `configs/llm/openrouter.yml`;
+`OPENROUTER_API_KEY` must exist only in the real environment or uncommitted
+`.env`. Model precedence is `--model`, then `OPENROUTER_MODEL`, then YAML
+`default_model`, then the emergency fallback. Exported environment values are
+not overridden, and API keys must never be printed or written to reports.
+
+Run the Phase 9C generation baseline with the lower-cost smoke model:
+
+```bash
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_rag_generation.py \
+  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash-lite \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval.json
+```
+
+The report validates citation ID integrity, not full semantic faithfulness.
+The initial live baseline completed with status
+`validated_generation_eval_passed`: 3/3 cases passed, citation ID coverage was
+1.0, and no unknown/missing citation IDs or secret leaks were detected.
+
+Phase 9C.1 expands the dataset to five unique cases using every currently
+reviewed Phase 9A manual query. Three cases remain blocking; marriage
+conditions and civil-rights protection are non-blocking manual-review cases
+because their allowed retrieval decisions vary. The expanded report adds
+caution-evidence and selection-warning review signals. These metrics do not
+establish semantic faithfulness or legal correctness.
+
+Phase 9C.3 adds opt-in, bounded evidence previews for repeatable manual review.
+Generated JSON and Markdown reports are runtime artifacts and should not be
+committed. Citation ID coverage remains distinct from semantic faithfulness.
+After prompt hardening and manual claim-to-citation review, three generated
+cases pass, one non-blocking generated case remains partial, and the
+annual-leave fallback control behaves correctly.
+
+Run the offline quality gate:
+
+```bash
+uv run python scripts/retrieval/evaluate_quality_gate.py \
+  --generation-report artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json \
+  --faithfulness-verdicts data/eval/manual_faithfulness_verdicts.json \
+  --policy configs/retrieval/quality_gate.yml \
+  --output artifacts/reports/retrieval/quality_gate.json
+```
+
+Current gate status is `quality_gate_passed`: hard gates and quality gates
+pass with two non-blocking warnings for `marriage_conditions_generation`.
+The gate is offline and does not call OpenRouter or Qdrant.
+
+Detailed Naive RAG architecture, safety invariants, evaluation commands,
+manual review results, quality-gate policy, closure decision, and known
+limitations are documented in `docs/naive_rag.md`.
 
 Phase 4 is gate-ready:
 
@@ -104,6 +171,9 @@ complete. Phase 8 indexed all 40,389 chunks into Qdrant collection
 `BAAI/bge-m3` dense vectors, named vector `dense`, cosine distance, and the
 `text_only` template. All points were upserted successfully and full index
 validation passed for schema, payload, vectors, filters, and retrieval sanity.
+Phase 9A adds a read-only dense retrieval baseline that embeds Vietnamese
+queries with BGE-M3, searches named vector `dense`, and returns typed
+payload-backed legal evidence. It does not generate answers.
 
 Official reports:
 
@@ -175,16 +245,15 @@ VnLaw-QA/
 │   ├── cleaning_normalization.md
 │   └── legal_parsing.md
 ├── scripts/
-│   ├── crawl_raw_corpus.py
-│   ├── audit_raw_corpus.py
-│   ├── clean_raw_corpus.py
-│   └── audit_cleaning_quality.py
+│   ├── corpus/       # Phase 2-7 corpus CLI entrypoints
+│   ├── indexing/     # Phase 8 embedding/Qdrant CLI entrypoints
+│   └── retrieval/    # Phase 9 retrieval/RAG CLI entrypoints
 ├── src/
 │   ├── core/
 │   ├── ingestion/    # implemented ingestion and cleaning domain logic
 │   ├── processing/   # implemented parser and chunking domain logic
-│   ├── indexing/     # future indexing logic
-│   ├── retrieval/    # future retrieval logic
+│   ├── indexing/     # implemented embedding and Qdrant indexing logic
+│   ├── retrieval/    # implemented dense retrieval baseline logic
 │   ├── generation/   # future generation/RAG logic
 │   ├── services/     # orchestration/reporting
 │   ├── api/          # future API
@@ -498,7 +567,7 @@ Phase 5 parses hierarchy only. It does not chunk or embed.
 Official command:
 
 ```bash
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json \
@@ -529,7 +598,7 @@ Audit:   artifacts/reports/chunking/full_corpus_validation_report.json
 Official command:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \
@@ -595,7 +664,7 @@ uv run ruff check .
 Validate processed chunks for a future controlled reindexing run:
 
 ```bash
-uv run python scripts/validate_processed_jsonl.py \
+uv run python scripts/corpus/validate_processed_jsonl.py \
   --input data/processed/legal_chunks.jsonl \
   --config configs/processing/processed_jsonl_validation.yml \
   --output /tmp/processed_jsonl_validation_report.json \
@@ -608,13 +677,13 @@ with code 0 by default and code 2 in strict mode.
 Inspect crawler:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py --help
+uv run python scripts/corpus/crawl_raw_corpus.py --help
 ```
 
 Crawl raw corpus:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -624,7 +693,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Audit raw corpus:
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -633,7 +702,7 @@ uv run python scripts/audit_raw_corpus.py \
 Clean and normalize corpus:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json \
@@ -644,7 +713,7 @@ uv run python scripts/clean_raw_corpus.py \
 Run cleaning diagnostics:
 
 ```bash
-uv run python scripts/audit_cleaning_quality.py \
+uv run python scripts/corpus/audit_cleaning_quality.py \
   --raw-dir data/raw \
   --interim-dir data/interim \
   --report-dir artifacts/reports/cleaning \
@@ -710,7 +779,8 @@ artifacts/reports/cleaning/pattern_groups.json
 | `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
 | `docs/phase8_embedding_indexing_tracker.md` | Completed Phase 8 implementation, indexing, and validation record |
 | `docs/embedding_indexing.md` | Phase 8 design background |
-| `docs/naive_rag.md` | Retrieval-first handoff and future Naive RAG design |
+| `retrieval_naive_rag_tracker` | Phase 9 retrieval and fallback-aware Naive RAG status |
+| `docs/naive_rag.md` | Implemented dense retrieval and fallback-aware Naive RAG baseline |
 | `docs/evaluation.md` | Future evaluation strategy |
 
 ## Development Boundaries
@@ -720,8 +790,8 @@ Do not do yet:
 - Do not modify raw or interim corpus artifacts without explicit approval.
 - Do not mutate `data/processed/legal_chunks.jsonl`.
 - Do not commit Qdrant storage, model caches, or other runtime state.
-- Do not implement answer generation, Advanced RAG, or GraphRAG without a
-  separately scoped task.
+- Do not bypass the evidence gate, implement Advanced RAG, or implement
+  GraphRAG without a separately scoped task.
 - Do not mutate `data/raw/`.
 - Do not commit credentials, local provider tokens, `.env`, or machine-specific
   config.

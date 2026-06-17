@@ -10,11 +10,12 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **Phase 6 Parent-child Chunking is complete and hardened**.
-The corpus has 52/52 raw artifacts, 52/52 normalized outputs, 52/52 hierarchy
-outputs, and `data/processed/legal_chunks.jsonl` with 40,389 validated chunks.
-The next engineering phase is **Phase 7 — Processed Chunk Validation & Embedding Readiness**. Embedding, indexing, retrieval, and RAG have not
-started.
+Current status: **Phase 9 is closed with known limitations**. The corpus has
+52/52 raw artifacts, 52/52 normalized outputs, 52/52 hierarchy outputs, and
+`data/processed/legal_chunks.jsonl` with 40,389 validated chunks. Phase 8
+indexing is complete, and the fallback-aware Naive RAG baseline has a passing
+offline quality gate. Benchmark construction with frozen development/test
+splits is required before claiming Advanced RAG improvement.
 
 ## 2. Quick Start
 
@@ -50,9 +51,8 @@ Evaluation (RAGAS, golden QA)
 API / Deployment
 ```
 
-**Important**: The next phase is not RAG. It is **Parent-child Chunking** over
-`data/interim/{law_id}/hierarchy.json`. Embedding, RAG, Advanced RAG, and
-GraphRAG remain blocked until chunk validation passes.
+**Important**: Phase 9 closure does not claim production readiness or broad
+Vietnamese legal QA quality. Advanced retrieval work remains separately scoped.
 
 ## 3. Full Architecture
 
@@ -131,7 +131,7 @@ End-to-end pipeline:
            ▼
 ┌─────────────────────────┐
 │  LLM Generator          │ → Vietnamese legal answer
-│  (Claude API)           │   with citations
+│  (LLM provider)         │   with citations
 └──────────┬──────────────┘
            │
            ▼
@@ -161,9 +161,9 @@ End-to-end pipeline:
 
 **Pipeline Summary**: Defines Python 3.11+, OOP standards, type hints, Pydantic V2, async I/O, Google-style docstrings, logging, security policies, and directory structure.
 
-**Output**: `AGENTS.md`, `CLAUDE.md`, `PROJECT_CONTEXT.md`,
-`pyproject.toml`, `.agents/skills/`, `.codex/context/`, and the repository
-layout used by `scripts/`, `src/`, `tests/`, `configs/`, and `docs/`.
+**Output**: `AGENTS.md`, `PROJECT_CONTEXT.md`, `pyproject.toml`,
+`.agents/skills/`, `.codex/context/`, and the repository layout used by
+`scripts/`, `src/`, `tests/`, `configs/`, and `docs/`.
 
 **Validation Criteria**:
 - Code follows PEP8 + type hints
@@ -173,7 +173,8 @@ layout used by `scripts/`, `src/`, `tests/`, `configs/`, and `docs/`.
 
 **Status**: Implemented
 
-**Detailed documentation**: See `CLAUDE.md` (full instruction set), `pyproject.toml` (tool config).
+**Detailed documentation**: See `AGENTS.md` (repository rules),
+`PROJECT_CONTEXT.md` (current state), and `pyproject.toml` (tool config).
 
 ---
 
@@ -487,7 +488,7 @@ across 52 legal documents.
   - "Answer using ONLY provided context"
   - "Cite every fact with exact citation format: Điều X, Khoản Y, Điểm Z"
   - "If context insufficient, respond with fallback message"
-- LLM Generator: Claude API with legal prompt
+- LLM Generator: configured LLM provider with legal prompt
 - Citation validator: check answer mentions exist in retrieved context
 - Fallback: if confidence < 0.75 or no retrieved chunks match query intent → fallback response
 
@@ -708,7 +709,7 @@ Each phase must pass its gate before proceeding to the next.
 
 | Gate | Required Evidence | Example Check | Why It Matters |
 |------|-------------------|---------------|----------------|
-| Setup gate | `pyproject.toml`, `CLAUDE.md`, `mypy`/`pytest` pass | `uv run mypy src` → 0 errors | Code quality baseline |
+| Setup gate | `pyproject.toml`, `AGENTS.md`, `mypy`/`pytest` pass | `uv run mypy src` → 0 errors | Code quality baseline |
 | Registry gate | `configs/laws/corpus_registry.yml` with 52 entries | `grep -c "law_id:" configs/laws/corpus_registry.yml` = 52 | Ensures corpus scope is accurate |
 | Crawling gate | 52 raw artifact directories | `ls data/raw/ | wc -l` = 52 | Raw data exists before processing |
 | Raw audit gate | `artifacts/reports/audit/raw_corpus_audit.json` zero critical errors | Audit script exits 0 | Detect corrupted/missing artifacts early |
@@ -873,7 +874,7 @@ All 40,389 validated chunks are indexed in Qdrant collection
 dimension 1024, cosine distance, and deterministic UUIDv5 point IDs. Full
 schema, payload, vector, filter, and retrieval sanity validation passed.
 
-### Phase 9 — Retrieval / Naive RAG — Next
+### Phase 9 — Retrieval / Naive RAG — Closed with known limitations
 
 ### Phase 10 — Advanced RAG — Future extension
 

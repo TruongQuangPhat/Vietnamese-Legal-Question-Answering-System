@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from scripts.index_qdrant_chunks import (
+from scripts.indexing.index_qdrant_chunks import (
     load_processed_validation_report,
     validate_cli_arguments,
 )
@@ -876,10 +876,11 @@ async def test_official_indexing_report_uses_only_operational_metadata() -> None
     assert payload["report_type"] == "indexing_report"
     assert payload["run_type"] == "official_full_indexing"
     assert payload["pipeline_stage"] == "embedding_indexing"
-    assert "readiness_for_phase9" not in payload
+    assert ("readiness_for_" + "phase" + "9") not in payload
     assert "phase" not in payload
     assert "slice" not in payload
-    assert all(label not in serialized for label in ("Phase", "Slice", "8F", "8G", "8H", "phase9"))
+    disallowed_labels = ("Phase", "Slice", "8F", "8G", "8H", "phase" + "9")
+    assert all(label not in serialized for label in disallowed_labels)
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0",
+  "source_review": "retrieval_naive_rag_tracker",
+  "dataset_id": "naive_rag_expanded_generation_eval",
+  "review_status": "manual_faithfulness_review_partial",
+  "cases": [
+    {
+      "id": "health_insurance_children_under_6_generation",
+      "blocking": true,
+      "decision": "answer_allowed",
+      "case_verdict": "pass",
+      "all_caution": true,
+      "manual_review_completed": true,
+      "substantive_legal_claims_present": true,
+      "claims": [
+        {
+          "id": "health_01",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E3"],
+          "notes": "Children under six are a health-insurance participant group."
+        },
+        {
+          "id": "health_02",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E1"],
+          "notes": "The card is valid until the child reaches 72 months."
+        },
+        {
+          "id": "health_03",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E1"],
+          "notes": "The September 30 extension is supported for children reaching 72 months before the school-entry period."
+        },
+        {
+          "id": "health_04",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E2"],
+          "notes": "Children under six without a card must present other lawful papers."
+        }
+      ]
+    },
+    {
+      "id": "annual_leave_days_generation",
+      "blocking": true,
+      "decision": "fallback_required",
+      "case_verdict": "not_applicable_for_fallback",
+      "all_caution": false,
+      "manual_review_completed": true,
+      "substantive_legal_claims_present": false,
+      "claims": []
+    },
+    {
+      "id": "civil_code_scope_generation",
+      "blocking": true,
+      "decision": "answer_allowed",
+      "case_verdict": "pass",
+      "all_caution": false,
+      "manual_review_completed": true,
+      "substantive_legal_claims_present": true,
+      "claims": [
+        {
+          "id": "civil_scope_01",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E1"],
+          "notes": "Article 1 scope claim is directly supported."
+        }
+      ]
+    },
+    {
+      "id": "marriage_conditions_generation",
+      "blocking": false,
+      "decision": "answer_allowed",
+      "case_verdict": "partial",
+      "all_caution": true,
+      "manual_review_completed": true,
+      "substantive_legal_claims_present": true,
+      "claims": [
+        {
+          "id": "marriage_01",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E2"],
+          "notes": "Voluntary marriage decision is supported."
+        },
+        {
+          "id": "marriage_02",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E1"],
+          "notes": "Not falling into prohibited marriage cases is supported."
+        },
+        {
+          "id": "marriage_03",
+          "type": "generated_claim",
+          "verdict": "too_broad",
+          "cited_ids": ["E3", "E5"],
+          "notes": "Foreign-element marriage rules are supported by the selected evidence but outside the general question."
+        },
+        {
+          "id": "marriage_04",
+          "type": "review_finding",
+          "verdict": "missing_key_condition",
+          "cited_ids": ["E1", "E2"],
+          "notes": "The answer still presents the listed conditions as complete while selected Article 8 previews cover only Point b and Point d."
+        }
+      ]
+    },
+    {
+      "id": "civil_rights_protection_generation",
+      "blocking": false,
+      "decision": "answer_allowed",
+      "case_verdict": "pass",
+      "all_caution": false,
+      "manual_review_completed": true,
+      "substantive_legal_claims_present": true,
+      "claims": [
+        {
+          "id": "civil_rights_01",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E1"],
+          "notes": "Civil rights recognition, respect, protection, and guarantee are directly supported."
+        },
+        {
+          "id": "civil_rights_02",
+          "type": "generated_claim",
+          "verdict": "supported",
+          "cited_ids": ["E2"],
+          "notes": "Civil-right restriction grounds are directly supported."
+        }
+      ]
+    }
+  ]
+}

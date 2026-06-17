@@ -13,7 +13,6 @@ Use this skill to enforce repository organization and module boundaries.
 VnLaw-QA/
 ├── .agents/skills/
 ├── .codex/context/
-├── .claude/skills/
 ├── configs/
 │   ├── laws/corpus_registry.yml
 │   ├── sources/.gitkeep
@@ -71,7 +70,6 @@ VnLaw-QA/
 │   └── fixtures/
 ├── docs/
 ├── AGENTS.md
-├── CLAUDE.md
 ├── PROJECT_CONTEXT.md
 ├── .env.example
 ├── .gitignore

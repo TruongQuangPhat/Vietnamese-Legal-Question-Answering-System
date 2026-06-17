@@ -53,8 +53,8 @@ src/ingestion/registry.py
 src/ingestion/storage.py
 src/services/crawl_service.py
 src/services/raw_audit_service.py
-scripts/crawl_raw_corpus.py
-scripts/audit_raw_corpus.py
+scripts/corpus/crawl_raw_corpus.py
+scripts/corpus/audit_raw_corpus.py
 
 data/raw/{law_id}/latest/main.html
 data/raw/{law_id}/latest/metadata.json
@@ -200,7 +200,7 @@ Rules:
 Crawl one law for debugging:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --url "https://thuvienphapluat.vn/..." \
   --law-id "LDD_VBHN" \
   --output data/raw/
@@ -209,7 +209,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Crawl all pending laws:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --output data/raw \
   --report artifacts/reports/crawling/crawl_report.json \
@@ -222,7 +222,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Crawl specific laws:
 
 ```bash
-uv run python scripts/crawl_raw_corpus.py \
+uv run python scripts/corpus/crawl_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --law-ids HP_2013 BLDS_2015 LDD_VBHN \
   --output data/raw
@@ -231,7 +231,7 @@ uv run python scripts/crawl_raw_corpus.py \
 Run raw corpus audit:
 
 ```bash
-uv run python scripts/audit_raw_corpus.py \
+uv run python scripts/corpus/audit_raw_corpus.py \
   --registry configs/laws/corpus_registry.yml \
   --raw-dir data/raw \
   --output artifacts/reports/audit/raw_corpus_audit.json
@@ -240,7 +240,7 @@ uv run python scripts/audit_raw_corpus.py \
 Run cleaning & normalization:
 
 ```bash
-uv run python scripts/clean_raw_corpus.py \
+uv run python scripts/corpus/clean_raw_corpus.py \
   --raw-dir data/raw \
   --output-dir data/interim \
   --report artifacts/reports/cleaning/cleaning_report.json

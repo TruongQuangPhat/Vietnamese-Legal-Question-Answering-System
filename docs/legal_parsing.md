@@ -36,7 +36,7 @@ occurrences in the full corpus: `AMBIGUOUS_CLAUSE_CANDIDATE`,
 Official full-corpus command:
 
 ```bash
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json \
@@ -47,7 +47,7 @@ uv run python scripts/parse_legal_hierarchy.py \
 Selected-law validation:
 
 ```bash
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json \
@@ -63,7 +63,7 @@ Workflow:
 4. The hierarchy JSON feeds into Phase 6 parent-child chunking.
 
 Implementation boundary:
-- `scripts/parse_legal_hierarchy.py`: CLI, argparse, console summaries, exit codes.
+- `scripts/corpus/parse_legal_hierarchy.py`: CLI, argparse, console summaries, exit codes.
 - `src/services/legal_parsing_service.py`: batch orchestration and report building.
 - `src/processing/legal_parser.py`: reusable parser/domain logic.
 - `src/processing/legal_heading_recognizer.py`: deterministic legal heading recognition.
@@ -309,14 +309,14 @@ resolution emits `NODE_ID_COLLISION_RESOLVED` warnings.
 
 ```bash
 # Parse all laws
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json \
   --overwrite
 
 # Parse specific laws
-uv run python scripts/parse_legal_hierarchy.py \
+uv run python scripts/corpus/parse_legal_hierarchy.py \
   --input-dir data/interim \
   --output-dir data/interim \
   --report artifacts/reports/parsing/legal_parsing_report.json \

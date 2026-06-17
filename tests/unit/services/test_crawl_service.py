@@ -21,7 +21,9 @@ from src.services.crawl_service import (
 )
 
 
-def _target(law_id: str = "TEST_LAW", url: str = "https://thuvienphapluat.vn/test.aspx") -> CrawlTarget:
+def _target(
+    law_id: str = "TEST_LAW", url: str = "https://thuvienphapluat.vn/test.aspx"
+) -> CrawlTarget:
     return CrawlTarget(
         law_id=law_id,
         name=f"{law_id} Name",

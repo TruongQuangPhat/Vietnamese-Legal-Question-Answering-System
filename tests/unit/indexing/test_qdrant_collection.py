@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from scripts import setup_qdrant_collection
+from scripts.indexing import setup_qdrant_collection
 from src.indexing.qdrant_collection import (
     QdrantCollectionError,
     build_collection_plan,

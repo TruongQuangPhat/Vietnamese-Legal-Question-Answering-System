@@ -163,11 +163,15 @@ class LegalChunkValidator:
         summary: ChunkValidationSummary,
     ) -> None:
         """Validate source node level and chunk level compatibility."""
-        if source.level not in {
-            LegalNodeLevel.ARTICLE,
-            LegalNodeLevel.CLAUSE,
-            LegalNodeLevel.POINT,
-        } or chunk.level.value != source.level.value:
+        if (
+            source.level
+            not in {
+                LegalNodeLevel.ARTICLE,
+                LegalNodeLevel.CLAUSE,
+                LegalNodeLevel.POINT,
+            }
+            or chunk.level.value != source.level.value
+        ):
             summary.invalid_chunk_levels += 1
             errors.append(
                 _issue(

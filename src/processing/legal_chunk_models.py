@@ -111,9 +111,7 @@ class ChunkingIssue(BaseModel):
     source_node_id: str | None = Field(None, description="Affected source node ID")
     start_offset: int | None = Field(None, ge=0, description="Inclusive source offset")
     end_offset: int | None = Field(None, ge=0, description="Exclusive source offset")
-    context: dict[str, Any] = Field(
-        default_factory=dict, description="Issue-specific context"
-    )
+    context: dict[str, Any] = Field(default_factory=dict, description="Issue-specific context")
 
     @model_validator(mode="after")
     def validate_offsets(self) -> ChunkingIssue:
@@ -239,60 +237,40 @@ class LegalChunk(BaseModel):
     parent_article_node_id: str = Field(
         ..., min_length=1, description="Parent Article LegalNode ID"
     )
-    parent_chunk_id: str = Field(
-        ..., min_length=1, description="Parent Article context chunk ID"
-    )
+    parent_chunk_id: str = Field(..., min_length=1, description="Parent Article context chunk ID")
     article_number: str | None = Field(None, description="Displayed article number")
     article_title: str | None = Field(None, description="Article title")
     clause_number: str | None = Field(None, description="Displayed clause number")
     point_label: str | None = Field(None, description="Displayed point label")
     citation: str = Field(..., min_length=1, description="Vietnamese legal citation")
-    hierarchy_path: str = Field(
-        "", min_length=0, description="Display hierarchy path"
-    )
+    hierarchy_path: str = Field("", min_length=0, description="Display hierarchy path")
     text: str = Field(..., min_length=1, description="Chunk embedding text")
-    parent_text: str = Field(
-        ..., min_length=1, description="Full Article text for LLM context"
-    )
+    parent_text: str = Field(..., min_length=1, description="Full Article text for LLM context")
     start_offset: int = Field(..., ge=0, description="Inclusive source offset")
     end_offset: int = Field(..., ge=0, description="Exclusive source offset")
-    article_start_offset: int = Field(
-        ..., ge=0, description="Inclusive parent Article offset"
-    )
-    article_end_offset: int = Field(
-        ..., ge=0, description="Exclusive parent Article offset"
-    )
+    article_start_offset: int = Field(..., ge=0, description="Inclusive parent Article offset")
+    article_end_offset: int = Field(..., ge=0, description="Exclusive parent Article offset")
     text_hash: str = Field("", min_length=0, description="SHA-256 of text")
-    parent_text_hash: str = Field(
-        "", min_length=0, description="SHA-256 of parent_text"
-    )
+    parent_text_hash: str = Field("", min_length=0, description="SHA-256 of parent_text")
     metadata: ChunkingMetadata = Field(
         default_factory=ChunkingMetadata, description="Typed chunk metadata"
     )
-    warnings: list[ChunkingIssue] = Field(
-        default_factory=list, description="Chunk-level issues"
-    )
+    warnings: list[ChunkingIssue] = Field(default_factory=list, description="Chunk-level issues")
 
     @model_validator(mode="after")
     def validate_offset_order(self) -> LegalChunk:
         """Validate that chunk offsets represent a non-empty slice."""
         if self.end_offset <= self.start_offset:
-            raise ValueError(
-                "end_offset must be greater than start_offset"
-            )
+            raise ValueError("end_offset must be greater than start_offset")
         return self
 
     @model_validator(mode="after")
     def validate_article_offsets(self) -> LegalChunk:
         """Validate that chunk offsets fit inside parent Article offsets."""
         if self.start_offset < self.article_start_offset:
-            raise ValueError(
-                "start_offset must be >= article_start_offset"
-            )
+            raise ValueError("start_offset must be >= article_start_offset")
         if self.end_offset > self.article_end_offset:
-            raise ValueError(
-                "end_offset must be <= article_end_offset"
-            )
+            raise ValueError("end_offset must be <= article_end_offset")
         return self
 
     def compute_hashes(self) -> LegalChunk:

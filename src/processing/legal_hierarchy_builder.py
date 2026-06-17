@@ -218,10 +218,14 @@ class LegalHierarchyBuilder:
         """Resolve deterministic sibling ID collisions and build warnings."""
         occurrence = occurrence_counts.get(base_node_id, 0) + 1
         occurrence_counts[base_node_id] = occurrence
-        resolved_node_id = base_node_id if occurrence == 1 else f"{base_node_id}__occurrence_{occurrence}"
+        resolved_node_id = (
+            base_node_id if occurrence == 1 else f"{base_node_id}__occurrence_{occurrence}"
+        )
 
         if resolved_node_id in existing_node_ids:
-            raise LegalHierarchyBuildError("Duplicate node ID could not be resolved deterministically")
+            raise LegalHierarchyBuildError(
+                "Duplicate node ID could not be resolved deterministically"
+            )
         if occurrence == 1:
             return resolved_node_id, None
 
@@ -345,9 +349,7 @@ def normalize_number_for_node_id(level: LegalNodeLevel, number: str) -> str:
 def _remove_vietnamese_tone_marks(text: str) -> str:
     """Remove combining tone marks while preserving Vietnamese `đ`."""
     return "".join(
-        char
-        for char in unicodedata.normalize("NFD", text)
-        if unicodedata.category(char) != "Mn"
+        char for char in unicodedata.normalize("NFD", text) if unicodedata.category(char) != "Mn"
     )
 
 

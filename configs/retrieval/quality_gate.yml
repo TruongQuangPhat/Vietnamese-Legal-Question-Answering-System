@@ -1,0 +1,42 @@
+schema_version: "1.0"
+
+required_case_ids:
+  - health_insurance_children_under_6_generation
+  - annual_leave_days_generation
+  - civil_code_scope_generation
+  - marriage_conditions_generation
+  - civil_rights_protection_generation
+
+hard_gates:
+  required_generation_report_status:
+    - expanded_generation_eval_passed
+  minimum_total_cases: 5
+  minimum_decision_pass_rate: 1.0
+  minimum_llm_call_policy_pass_rate: 1.0
+  minimum_fallback_policy_pass_rate: 1.0
+  minimum_citation_id_coverage_rate: 1.0
+  maximum_unknown_citation_id_count: 0
+  maximum_missing_citation_id_count: 0
+  maximum_secret_leak_failures: 0
+  maximum_forbidden_phrase_failures: 0
+  maximum_unsupported_claims: 0
+  maximum_irrelevant_citations: 0
+  fallback_cases_must_not_call_llm: true
+  fallback_cases_must_not_have_citations: true
+  fallback_cases_must_not_make_substantive_legal_claims: true
+  all_caution_answer_allowed_requires_manual_review: true
+
+quality_gates:
+  blocking_generated_cases_allowed_verdicts:
+    - pass
+  maximum_too_broad_claims_in_blocking_cases: 0
+  maximum_missing_key_conditions_in_blocking_cases: 0
+  allow_partial_non_blocking_cases: true
+  report_too_broad_claims_in_non_blocking_cases: true
+  report_missing_key_conditions_in_non_blocking_cases: true
+
+status_policy:
+  hard_gate_violation: quality_gate_failed
+  no_hard_violation_but_quality_violation: quality_gate_partial
+  all_gates_passed: quality_gate_passed
+  missing_required_input: blocked

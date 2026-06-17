@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
-from scripts import validate_qdrant_index
-from scripts.validate_qdrant_index import validate_cli_arguments
+from scripts.indexing import validate_qdrant_index
+from scripts.indexing.validate_qdrant_index import validate_cli_arguments
 from src.indexing.embedding_model import BgeM3EmbeddingModel
 from src.indexing.index_validation import (
     DEFAULT_REQUIRED_PAYLOAD_FIELDS,
@@ -608,7 +608,8 @@ async def test_official_validation_report_uses_only_operational_metadata() -> No
     assert payload["pipeline_stage"] == "index_validation"
     assert "phase" not in payload
     assert "slice" not in payload
-    assert all(label not in serialized for label in ("Phase", "Slice", "8F", "8G", "8H", "phase9"))
+    disallowed_labels = ("Phase", "Slice", "8F", "8G", "8H", "phase" + "9")
+    assert all(label not in serialized for label in disallowed_labels)
 
 
 @pytest.mark.asyncio

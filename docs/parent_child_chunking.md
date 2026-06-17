@@ -46,7 +46,7 @@ artifacts/reports/chunking/full_corpus_validation_report.json
 ## Official Command
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output data/processed/legal_chunks.jsonl \
   --report artifacts/reports/chunking/chunking_report.json \
@@ -58,7 +58,7 @@ uv run python scripts/chunk_legal_corpus.py \
 Useful priority-audit command:
 
 ```bash
-uv run python scripts/chunk_legal_corpus.py \
+uv run python scripts/corpus/chunk_legal_corpus.py \
   --input-dir data/interim \
   --output artifacts/runs/chunking/priority/legal_chunks.jsonl \
   --report artifacts/reports/chunking/priority_chunking_report.json \
@@ -98,7 +98,7 @@ src/processing/legal_chunk_models.py
 src/processing/legal_chunker.py
 src/processing/legal_chunk_validator.py
 src/services/chunking_service.py
-scripts/chunk_legal_corpus.py
+scripts/corpus/chunk_legal_corpus.py
 ```
 
 Tests:

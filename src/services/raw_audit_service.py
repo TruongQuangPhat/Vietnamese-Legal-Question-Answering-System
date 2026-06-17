@@ -7,16 +7,16 @@ registry loading, artifact scanning, and validation checks.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict
 
 from src.ingestion.audit import audit_raw_corpus
+
 
 def run_raw_audit_pipeline(
     registry_path: Path,
     raw_dir: Path,
     output_path: Path,
     min_html_size: int = 10000,
-) -> Dict:
+) -> dict:
     """High-level orchestration of the raw corpus audit pipeline.
 
     Args:

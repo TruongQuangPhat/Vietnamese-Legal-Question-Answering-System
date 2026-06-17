@@ -50,6 +50,8 @@ artifacts/**/*.ndjson
 artifacts/**/*.log
 artifacts/**/*.txt
 artifacts/**/*.csv
+artifacts/reports/retrieval/*quality_gate*.json
+artifacts/reports/retrieval/*manual_review*.md
 artifacts/**/*.html
 artifacts/**/*.parquet
 artifacts/**/*.zip
@@ -92,4 +94,15 @@ htmlcov/
 # --- Jupyter ---
 .ipynb_checkpoints/
 
-.claude/*.json
+# Removed local assistant tooling
+.claude/
+CLAUDE.md
+
+# --- Small versioned evaluation fixtures ---
+!data/
+data/*
+!data/eval/
+data/eval/*
+!data/eval/manual_retrieval_queries.jsonl
+!data/eval/manual_naive_rag_generation_queries.jsonl
+!data/eval/manual_faithfulness_verdicts.json

@@ -20,7 +20,6 @@ from bs4 import BeautifulSoup
 
 from src.ingestion.audit import scan_raw_artifacts
 
-
 ARTICLE_REFERENCE_RE = re.compile(r"\bĐiều\s+(\d+)\b", re.IGNORECASE)
 ARTICLE_HEADING_RE = re.compile(r"(?m)^\s*Điều\s+(\d+)\s*[\.:]?", re.IGNORECASE)
 CLAUSE_HEADING_RE = re.compile(r"(?m)^\s*\d+\.")
@@ -93,10 +92,10 @@ class HTMLPatternProfile:
 
     law_id: str
     raw_html_size_bytes: int
-    has_divContentDoc: bool
-    divContentDoc_count: int
+    has_divContentDoc: bool  # noqa: N815 - preserved report schema
+    divContentDoc_count: int  # noqa: N815 - preserved report schema
     content1_global_count: int
-    divContentDoc_content1_count: int
+    divContentDoc_content1_count: int  # noqa: N815 - preserved report schema
     raw_dieu_count: int
     has_dieu_1: bool
     first_position_of_dieu_1: int | None
@@ -252,7 +251,9 @@ def compute_selector_candidate_audit(raw_dir: Path) -> dict[str, Any]:
             for selector in SELECTOR_CANDIDATES:
                 records.append(_profile_selector(law_id, soup, selector))
         except Exception as exc:
-            errors.append({"law_id": law_id, "stage": "selector_candidate_audit", "error": str(exc)})
+            errors.append(
+                {"law_id": law_id, "stage": "selector_candidate_audit", "error": str(exc)}
+            )
 
     return _build_report("selector_candidate_audit", records, errors)
 
@@ -269,7 +270,9 @@ def compute_cleaning_quality_audit(interim_dir: Path) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
 
-    for normalized_path in sorted(interim_dir.rglob("normalized.json")) if interim_dir.exists() else []:
+    for normalized_path in (
+        sorted(interim_dir.rglob("normalized.json")) if interim_dir.exists() else []
+    ):
         law_id = normalized_path.parent.name
         try:
             data = _load_json(normalized_path)
@@ -344,15 +347,21 @@ def compute_raw_vs_cleaning_comparison(raw_dir: Path, interim_dir: Path) -> dict
                 raw_has_dieu_1=raw_metrics["has_reference_article_1"],
                 cleaned_has_article_1_heading=cleaned_metrics["has_heading_article_1"],
                 compression_ratio=compression_ratio,
-                possible_missing_body=_possible_missing_body(raw_metrics, cleaned_metrics, cleaned_chars),
-                possible_over_extraction=bool(compression_ratio is not None and compression_ratio > 0.85),
+                possible_missing_body=_possible_missing_body(
+                    raw_metrics, cleaned_metrics, cleaned_chars
+                ),
+                possible_over_extraction=bool(
+                    compression_ratio is not None and compression_ratio > 0.85
+                ),
                 possible_duplicate_extraction=duplicate_line_ratio > 0.20,
                 possible_wrong_start=_has_wrong_start(cleaned_text),
                 possible_wrong_end=_has_wrong_end(cleaned_text),
             )
             records.append(comparison.to_dict())
         except Exception as exc:
-            errors.append({"law_id": law_id, "stage": "raw_vs_cleaning_comparison", "error": str(exc)})
+            errors.append(
+                {"law_id": law_id, "stage": "raw_vs_cleaning_comparison", "error": str(exc)}
+            )
 
     return _build_report("raw_vs_cleaning_comparison", records, errors)
 
@@ -406,7 +415,9 @@ def compute_pattern_groups(registry_path: Path, raw_dir: Path, interim_dir: Path
         {"group": group_name, "law_count": len(laws), "laws": laws}
         for group_name, laws in groups.items()
     ]
-    return _build_report("pattern_groups", items, errors, total_records=sum(len(laws) for laws in groups.values()))
+    return _build_report(
+        "pattern_groups", items, errors, total_records=sum(len(laws) for laws in groups.values())
+    )
 
 
 def _build_report(
@@ -418,7 +429,7 @@ def _build_report(
     return {
         "metadata": {
             "audit_type": audit_type,
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "audit_version": "1.0",
         },
         "total_records": len(items) if total_records is None else total_records,
@@ -454,7 +465,9 @@ def _parse_html(content: str) -> BeautifulSoup:
 def _select_div_content_doc(soup: BeautifulSoup) -> list[Any]:
     nodes = list(soup.select("#divContentDoc"))
     seen = {id(node) for node in nodes}
-    for node in soup.find_all(attrs={"class": lambda value: value and "divContentDoc" in str(value)}):
+    for node in soup.find_all(
+        attrs={"class": lambda value: value and "divContentDoc" in str(value)}
+    ):
         if id(node) not in seen:
             nodes.append(node)
             seen.add(id(node))
@@ -554,7 +567,9 @@ def _split_vietnamese_word_count(text: str) -> int:
 def _estimated_noise_score(text: str) -> float:
     if not text:
         return 0.0
-    noise_hits = sum(text.lower().count(marker.lower()) for marker in START_NOISE_MARKERS + END_NOISE_MARKERS)
+    noise_hits = sum(
+        text.lower().count(marker.lower()) for marker in START_NOISE_MARKERS + END_NOISE_MARKERS
+    )
     duplicate_penalty = _duplicate_line_ratio(text)
     article_count = len(ARTICLE_HEADING_RE.findall(text))
     density_penalty = 1.0 if article_count == 0 and len(text) > 1000 else 0.0
@@ -602,7 +617,10 @@ def _possible_missing_body(
 ) -> bool:
     if cleaned_chars < 5000 and raw_metrics["article_reference_count"] >= 5:
         return True
-    if raw_metrics["max_article_reference_number"] >= 20 and cleaned_metrics["max_heading_article_number"] < 3:
+    if (
+        raw_metrics["max_article_reference_number"] >= 20
+        and cleaned_metrics["max_heading_article_number"] < 3
+    ):
         return True
     return False
 

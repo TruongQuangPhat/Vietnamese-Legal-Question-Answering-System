@@ -71,7 +71,9 @@ def _build_document(
         cleaner_version="v0.8.0",
         metadata=_metadata(
             article_count=article_count if article_count is not None else len(articles),
-            max_article=max_article if max_article is not None else max(numeric_articles, default=0),
+            max_article=max_article
+            if max_article is not None
+            else max(numeric_articles, default=0),
             has_article_1=has_article_1,
         ),
         segmented_units=segmented.units,
@@ -222,7 +224,9 @@ def test_root_validation_errors_are_reported() -> None:
     assert ParsingIssueCode.INVALID_TREE in _issue_codes(_validate(id_mismatch, text).errors)
     assert ParsingIssueCode.INVALID_TREE in _issue_codes(_validate(multiple_roots, text).errors)
     assert ParsingIssueCode.INVALID_TREE in _issue_codes(_validate(root_with_parent, text).errors)
-    assert ParsingIssueCode.INVALID_OFFSET in _issue_codes(_validate(root_wrong_offsets, text).errors)
+    assert ParsingIssueCode.INVALID_OFFSET in _issue_codes(
+        _validate(root_wrong_offsets, text).errors
+    )
     assert ParsingIssueCode.TEXT_OFFSET_MISMATCH in _issue_codes(
         _validate(root_text_mismatch, text).errors
     )
@@ -243,27 +247,51 @@ def test_duplicate_ids_and_reference_consistency_errors_are_detected() -> None:
     )
     missing_parent = _copy_document(
         document,
-        nodes=[node if node.node_id != clause.node_id else _copy_node(node, parent_id="missing") for node in document.nodes],
+        nodes=[
+            node if node.node_id != clause.node_id else _copy_node(node, parent_id="missing")
+            for node in document.nodes
+        ],
     )
     missing_child_reference = _copy_document(
         document,
-        nodes=[node if node.node_id != root.node_id else _copy_node(node, children=[*node.children, "missing_child"]) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != root.node_id
+            else _copy_node(node, children=[*node.children, "missing_child"])
+            for node in document.nodes
+        ],
     )
     bidirectional_mismatch = _copy_document(
         document,
-        nodes=[node if node.node_id != clause.node_id else _copy_node(node, parent_id=root.node_id) for node in document.nodes],
+        nodes=[
+            node if node.node_id != clause.node_id else _copy_node(node, parent_id=root.node_id)
+            for node in document.nodes
+        ],
     )
     duplicate_child_reference = _copy_document(
         document,
-        nodes=[node if node.node_id != article.node_id else _copy_node(node, children=[*node.children, clause.node_id]) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != article.node_id
+            else _copy_node(node, children=[*node.children, clause.node_id])
+            for node in document.nodes
+        ],
     )
     listed_by_multiple_parents = _copy_document(
         document,
-        nodes=[node if node.node_id != root.node_id else _copy_node(node, children=[*node.children, clause.node_id]) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != root.node_id
+            else _copy_node(node, children=[*node.children, clause.node_id])
+            for node in document.nodes
+        ],
     )
     missing_from_parent_children = _copy_document(
         document,
-        nodes=[node if node.node_id != article.node_id else _copy_node(node, children=[]) for node in document.nodes],
+        nodes=[
+            node if node.node_id != article.node_id else _copy_node(node, children=[])
+            for node in document.nodes
+        ],
     )
 
     assert ParsingIssueCode.UNRESOLVED_DUPLICATE_NODE_ID in _issue_codes(
@@ -296,7 +324,12 @@ def test_cycles_and_unreachable_nodes_are_detected_safely() -> None:
 
     self_cycle = _copy_document(
         document,
-        nodes=[node if node.node_id != article.node_id else _copy_node(node, parent_id=node.node_id, children=[node.node_id]) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != article.node_id
+            else _copy_node(node, parent_id=node.node_id, children=[node.node_id])
+            for node in document.nodes
+        ],
     )
     multi_cycle = _copy_document(
         document,
@@ -311,7 +344,12 @@ def test_cycles_and_unreachable_nodes_are_detected_safely() -> None:
     )
     unreachable = _copy_document(
         document,
-        nodes=[node if node.node_id != article.node_id else _copy_node(node, parent_id=document.root_node_id) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != article.node_id
+            else _copy_node(node, parent_id=document.root_node_id)
+            for node in document.nodes
+        ],
     )
     root = unreachable.nodes[0]
     root.children.remove(article.node_id)
@@ -340,7 +378,14 @@ def test_allowed_legal_parent_chains_are_enforced() -> None:
 
     clause_under_law = _copy_document(
         document,
-        nodes=[node if node.node_id != root.node_id else _copy_node(node, children=[*node.children, clause.node_id]) if node.node_id == root.node_id else node for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != root.node_id
+            else _copy_node(node, children=[*node.children, clause.node_id])
+            if node.node_id == root.node_id
+            else node
+            for node in document.nodes
+        ],
     )
     for node in clause_under_law.nodes:
         if node.node_id == clause.node_id:
@@ -360,7 +405,9 @@ def test_allowed_legal_parent_chains_are_enforced() -> None:
 
     assert valid.is_valid is True
     assert ParsingIssueCode.INVALID_TREE in _issue_codes(_validate(clause_under_law, text).errors)
-    assert ParsingIssueCode.INVALID_TREE in _issue_codes(_validate(point_under_article, text).errors)
+    assert ParsingIssueCode.INVALID_TREE in _issue_codes(
+        _validate(point_under_article, text).errors
+    )
     assert ParsingIssueCode.INVALID_TREE in _issue_codes(_validate(point_with_child, text).errors)
 
 
@@ -373,19 +420,35 @@ def test_offsets_text_slices_parent_containment_and_sibling_order_are_validated(
 
     negative_offset = _copy_document(
         document,
-        nodes=[node if node.node_id != article_1.node_id else _copy_node(node, start_offset=-1) for node in document.nodes],
+        nodes=[
+            node if node.node_id != article_1.node_id else _copy_node(node, start_offset=-1)
+            for node in document.nodes
+        ],
     )
     beyond_end = _copy_document(
         document,
-        nodes=[node if node.node_id != article_1.node_id else _copy_node(node, end_offset=len(text) + 1) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != article_1.node_id
+            else _copy_node(node, end_offset=len(text) + 1)
+            for node in document.nodes
+        ],
     )
     reversed_offset = _copy_document(
         document,
-        nodes=[node if node.node_id != article_1.node_id else _copy_node(node, start_offset=10, end_offset=5) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != article_1.node_id
+            else _copy_node(node, start_offset=10, end_offset=5)
+            for node in document.nodes
+        ],
     )
     text_mismatch = _copy_document(
         document,
-        nodes=[node if node.node_id != article_1.node_id else _copy_node(node, text="khác") for node in document.nodes],
+        nodes=[
+            node if node.node_id != article_1.node_id else _copy_node(node, text="khác")
+            for node in document.nodes
+        ],
     )
     hierarchy_text = _read_fixture("article_clause_point_spans.txt")
     hierarchy_document = _build_document(hierarchy_text)
@@ -402,7 +465,12 @@ def test_offsets_text_slices_parent_containment_and_sibling_order_are_validated(
     )
     sibling_overlap = _copy_document(
         document,
-        nodes=[node if node.node_id != article_2.node_id else _copy_node(node, start_offset=article_1.start_offset + 5) for node in document.nodes],
+        nodes=[
+            node
+            if node.node_id != article_2.node_id
+            else _copy_node(node, start_offset=article_1.start_offset + 5)
+            for node in document.nodes
+        ],
     )
     out_of_order = _copy_document(document)
     out_of_order.nodes[0].children = [article_2.node_id, article_1.node_id]
@@ -410,7 +478,9 @@ def test_offsets_text_slices_parent_containment_and_sibling_order_are_validated(
     assert ParsingIssueCode.INVALID_OFFSET in _issue_codes(_validate(negative_offset, text).errors)
     assert ParsingIssueCode.INVALID_OFFSET in _issue_codes(_validate(beyond_end, text).errors)
     assert ParsingIssueCode.INVALID_OFFSET in _issue_codes(_validate(reversed_offset, text).errors)
-    assert ParsingIssueCode.TEXT_OFFSET_MISMATCH in _issue_codes(_validate(text_mismatch, text).errors)
+    assert ParsingIssueCode.TEXT_OFFSET_MISMATCH in _issue_codes(
+        _validate(text_mismatch, text).errors
+    )
     assert ParsingIssueCode.INVALID_OFFSET in _issue_codes(
         _validate(child_outside_parent, hierarchy_text).errors
     )
@@ -458,7 +528,9 @@ def test_article_presence_metric_warnings_and_empty_article_detection() -> None:
     )
     empty_article = _build_document("Điều 1. Một", article_count=1, max_article=1)
 
-    assert ParsingIssueCode.NO_ARTICLES_FOUND in _issue_codes(_validate(root_only, root_only_text).errors)
+    assert ParsingIssueCode.NO_ARTICLES_FOUND in _issue_codes(
+        _validate(root_only, root_only_text).errors
+    )
     assert ParsingIssueCode.ARTICLE_COUNT_MISMATCH in _issue_codes(
         _validate(count_mismatch, count_mismatch.nodes[0].text).warnings
     )

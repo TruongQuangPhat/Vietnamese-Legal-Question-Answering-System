@@ -64,7 +64,7 @@ curl -X POST "http://localhost:8000/api/v1/qa" \
 │  Infrastructure      │
 │  Clients             │
 │  (Qdrant, Neo4j,    │
-│   Redis, Claude)    │
+│   Redis, LLM)       │
 └──────────┬───────────┘
            │
            ▼
@@ -150,9 +150,9 @@ class Settings(BaseSettings):
     redis_url: Optional[str] = None
 
     # LLM
-    anthropic_api_key: str  # required
-    anthropic_model: str = "claude-sonnet-4-6"
-    anthropic_timeout: int = 30
+    llm_provider_api_key: str  # required for generation providers
+    llm_provider_model: str
+    llm_provider_timeout: int = 30
 
     # Feature flags
     enable_graphrag: bool = False
@@ -162,7 +162,7 @@ class Settings(BaseSettings):
 ```
 
 **Environment files**:
-- `.env.dev` — local development (no secrets needed except Anthropic key)
+- `.env.dev` — local development with provider secrets only when generation is tested
 - `.env.staging` — staging deployment (real services, test data)
 - `.env.prod` — production deployment (restricted access, monitoring)
 
@@ -227,7 +227,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_PROVIDER_API_KEY=${LLM_PROVIDER_API_KEY}
       - QDRANT_URL=http://qdrant:6333
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_PASSWORD=secret
@@ -505,7 +505,7 @@ All errors logged with `request_id` for correlation. Responses do not expose int
 | 503 on all requests | Qdrant/Neo4j/LLM not running or credentials wrong | Check `/health/ready`; inspect logs for connection errors | Start dependencies; verify env vars; check network connectivity |
 | High latency p95 | LLM API slow OR retrieval not using filters | Profile request stages; check Qdrant query time | Enable caching; optimize retrieval filters; use faster LLM model; add timeouts |
 | 429 Too Many Requests | Rate limit too strict OR bot traffic | Check rate limit counters in logs | Increase rate limit; add allowlist for trusted IPs |
-| Container exits on start | Missing env vars (e.g., ANTHROPIC_API_KEY) OR port already in use | `docker logs` shows config error | Provide required env vars; free port 8000 |
+| Container exits on start | Missing provider env vars OR port already in use | `docker logs` shows config error | Provide required env vars; free port 8000 |
 | CORS errors in browser | `cors_origins` not including frontend origin | Browser console shows CORS block | Add frontend URL to `cors_origins` |
 | Memory leak / OOM | Large response objects cached OR unbounded retrieved_chunks stored | Monitor container memory; profile heap | Limit `max_chunks`; cap cache size; avoid storing large texts in memory |
 | HTTPS termination failing | Load balancer not configured with TLS cert | Browser shows connection not secure | Configure ALB/NGINX with valid TLS certificate; redirect HTTP → HTTPS |

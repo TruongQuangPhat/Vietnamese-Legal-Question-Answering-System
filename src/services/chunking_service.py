@@ -334,10 +334,7 @@ def load_hierarchy_document(path: Path) -> LegalHierarchyDocument:
 def write_legal_chunks_jsonl(path: Path, chunks: list[LegalChunk]) -> None:
     """Write legal chunks as UTF-8 JSONL with deterministic row order."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = [
-        json.dumps(chunk.model_dump(mode="json"), ensure_ascii=False)
-        for chunk in chunks
-    ]
+    lines = [json.dumps(chunk.model_dump(mode="json"), ensure_ascii=False) for chunk in chunks]
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
@@ -434,9 +431,7 @@ def _success_summary(
     return ChunkingSummary(
         law_id=item.law_id,
         status=(
-            ChunkingStatus.SUCCESS_WITH_WARNINGS
-            if validation.warnings
-            else ChunkingStatus.SUCCESS
+            ChunkingStatus.SUCCESS_WITH_WARNINGS if validation.warnings else ChunkingStatus.SUCCESS
         ),
         input_path=str(item.hierarchy_path),
         total_chunks=len(chunks),
@@ -444,9 +439,7 @@ def _success_summary(
         article_level_chunks=chunks_by_level.get("article", 0),
         clause_level_chunks=chunks_by_level.get("clause", 0),
         point_level_chunks=chunks_by_level.get("point", 0),
-        empty_or_repealed_chunks=sum(
-            1 for chunk in chunks if chunk.metadata.is_empty_or_repealed
-        ),
+        empty_or_repealed_chunks=sum(1 for chunk in chunks if chunk.metadata.is_empty_or_repealed),
         long_parent_text_chunks=sum(
             1 for chunk in chunks if len(chunk.parent_text) > LONG_PARENT_TEXT_CHARS
         ),

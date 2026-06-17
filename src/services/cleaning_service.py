@@ -9,13 +9,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
 from src.ingestion.audit import scan_raw_artifacts
 from src.ingestion.cleaning import (
     CLEANER_VERSION,
     CleaningStats,
-    LegalMarkersSummary,
     NormalizedArtifact,
     detect_legal_markers,
     extract_legal_text_from_html,
@@ -26,9 +24,11 @@ from src.ingestion.cleaning import (
     trim_to_legal_body,
 )
 
+
 @dataclass
 class CleaningPipelineConfig:
     """Configuration for the cleaning pipeline execution."""
+
     raw_dir: Path
     output_dir: Path
     report_path: Path
@@ -36,7 +36,8 @@ class CleaningPipelineConfig:
     write_txt: bool = False
     verbose: bool = False
 
-def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> Dict:
+
+def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> dict:
     """Orchestrates the full cleaning and normalization pipeline.
 
     Args:
@@ -55,7 +56,7 @@ def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> Dict:
         "failed": 0,
         "suspiciously_short_texts": 0,
         "missing_article_marker": 0,
-        "output_dir": str(config.output_dir)
+        "output_dir": str(config.output_dir),
     }
 
     for law_id, artifact_dir in sorted(artifacts.items()):
@@ -63,10 +64,7 @@ def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> Dict:
         meta_json = artifact_dir / "metadata.json"
 
         artifact, errors = clean_raw_artifact(
-            (main_html, meta_json),
-            config.output_dir,
-            config.min_text_length,
-            config.write_txt
+            (main_html, meta_json), config.output_dir, config.min_text_length, config.write_txt
         )
 
         if artifact:
@@ -81,46 +79,50 @@ def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> Dict:
             if "missing_article_marker" in artifact.warnings:
                 summary["missing_article_marker"] += 1
 
-            results.append({
-                "law_id": artifact.law_id,
-                "status": status,
-                "output_path": str(config.output_dir / artifact.law_id / "normalized.json"),
-                "normalized_text_chars": artifact.text_stats.normalized_text_chars,
-                "line_count": artifact.text_stats.line_count,
-                "article_reference_count": artifact.markers.article_reference_count,
-                "article_heading_count": artifact.markers.article_heading_count,
-                "max_heading_article_number": artifact.markers.max_heading_article_number,
-                "has_heading_article_1": artifact.markers.has_heading_article_1,
-                "heading_sequence_score": artifact.markers.heading_sequence_score,
-                "article_count_estimate": artifact.markers.article_count_estimate,
-                "warnings": artifact.warnings,
-                "errors": [],
-                "candidate_info": artifact.candidate_info
-            })
+            results.append(
+                {
+                    "law_id": artifact.law_id,
+                    "status": status,
+                    "output_path": str(config.output_dir / artifact.law_id / "normalized.json"),
+                    "normalized_text_chars": artifact.text_stats.normalized_text_chars,
+                    "line_count": artifact.text_stats.line_count,
+                    "article_reference_count": artifact.markers.article_reference_count,
+                    "article_heading_count": artifact.markers.article_heading_count,
+                    "max_heading_article_number": artifact.markers.max_heading_article_number,
+                    "has_heading_article_1": artifact.markers.has_heading_article_1,
+                    "heading_sequence_score": artifact.markers.heading_sequence_score,
+                    "article_count_estimate": artifact.markers.article_count_estimate,
+                    "warnings": artifact.warnings,
+                    "errors": [],
+                    "candidate_info": artifact.candidate_info,
+                }
+            )
         else:
             summary["failed"] += 1
-            results.append({
-                "law_id": law_id,
-                "status": "failed",
-                "output_path": None,
-                "normalized_text_chars": 0,
-                "line_count": 0,
-                "article_reference_count": 0,
-                "article_heading_count": 0,
-                "max_heading_article_number": 0,
-                "has_heading_article_1": False,
-                "heading_sequence_score": 0.0,
-                "article_count_estimate": 0,
-                "warnings": [],
-                "errors": errors
-            })
+            results.append(
+                {
+                    "law_id": law_id,
+                    "status": "failed",
+                    "output_path": None,
+                    "normalized_text_chars": 0,
+                    "line_count": 0,
+                    "article_reference_count": 0,
+                    "article_heading_count": 0,
+                    "max_heading_article_number": 0,
+                    "has_heading_article_1": False,
+                    "heading_sequence_score": 0.0,
+                    "article_count_estimate": 0,
+                    "warnings": [],
+                    "errors": errors,
+                }
+            )
 
     report = {
         "metadata": {
             "cleaner_version": CLEANER_VERSION,
         },
         "summary": summary,
-        "items": results
+        "items": results,
     }
 
     # Write the corpus-level report
@@ -131,12 +133,13 @@ def execute_cleaning_pipeline(config: CleaningPipelineConfig) -> Dict:
 
     return report
 
+
 def clean_raw_artifact(
-    artifact_paths: Tuple[Path, Path],
+    artifact_paths: tuple[Path, Path],
     output_dir: Path,
     min_text_length: int,
     write_txt: bool,
-) -> Tuple[Optional[NormalizedArtifact], List[str]]:
+) -> tuple[NormalizedArtifact | None, list[str]]:
     """Cleans a single raw legal artifact.
 
     Args:
@@ -179,7 +182,7 @@ def clean_raw_artifact(
             raw_html_size_bytes=raw_html_size,
             extracted_text_chars=extracted_chars,
             normalized_text_chars=len(text),
-            line_count=len(text.splitlines())
+            line_count=len(text.splitlines()),
         )
 
         warnings = list(uni_warnings)
@@ -189,15 +192,15 @@ def clean_raw_artifact(
             warnings.append("missing_article_marker")
 
         # Quality check for known long laws
-        LONG_LAWS_MIN_ARTICLES = {
+        long_laws_min_articles = {
             "BLDS_2015": 650,
             "BLHS_VBHN": 400,
             "BLTTDS_VBHN": 400,
             "BLTTHS_VBHN": 400,
         }
         actual_max_art = markers.max_heading_article_number
-        if law_id in LONG_LAWS_MIN_ARTICLES:
-            if actual_max_art < LONG_LAWS_MIN_ARTICLES[law_id]:
+        if law_id in long_laws_min_articles:
+            if actual_max_art < long_laws_min_articles[law_id]:
                 warnings.append("suspicious_low_max_article_number")
 
         # Metadata fallback logic
@@ -212,7 +215,7 @@ def clean_raw_artifact(
             text_stats=stats,
             markers=markers,
             warnings=warnings,
-            candidate_info=candidate_info
+            candidate_info=candidate_info,
         )
 
         law_out_dir = output_dir / artifact.law_id

@@ -121,7 +121,7 @@ def test_article_like_line_inside_quoted_source_note_is_not_promoted() -> None:
             "“Điều 3. Hiệu lực thi hành",
             "Luật này có hiệu lực thi hành từ ngày 01 tháng 7 năm 2025.",
             "Điều 4. Điều khoản chuyển tiếp",
-            "1. Nội dung chuyển tiếp trong ghi chú nguồn.\".",
+            '1. Nội dung chuyển tiếp trong ghi chú nguồn.".',
         ]
     )
 
@@ -484,9 +484,7 @@ def test_formula_and_decimal_table_codes_are_not_ambiguous_clauses() -> None:
 
     result = LegalHeadingRecognizer().recognize(text, law_id="TEST_LAW")
 
-    assert [
-        candidate.heading_text for candidate in result.ambiguous_candidates
-    ] == []
+    assert [candidate.heading_text for candidate in result.ambiguous_candidates] == []
     assert [
         warning.code
         for warning in result.warnings
@@ -678,9 +676,7 @@ def test_exact_clause_point_offsets_and_source_text_immutability() -> None:
         if heading.heading_text == "2.[3] Khoản chắc chắn có chú thích"
     )
     point = next(
-        heading
-        for heading in result.headings
-        if heading.heading_text == "đ) Điểm đ thuộc khoản 2"
+        heading for heading in result.headings if heading.heading_text == "đ) Điểm đ thuộc khoản 2"
     )
 
     assert text == original

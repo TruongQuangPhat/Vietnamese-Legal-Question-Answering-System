@@ -1,392 +1,238 @@
 # Naive RAG Baseline
 
-## Phase 8 Handoff
-
-The validated retrieval foundation is now available:
-
-```text
-Collection: vnlaw_chunks_bgem3_v1_full
-Points: 40,389
-Embedding model: BAAI/bge-m3
-Dense vector: dense
-Dimension: 1024
-Distance: Cosine
-Sparse indexing: disabled
-```
-
-The next implementation should begin with retrieval only:
-
-1. Embed Vietnamese queries with the same BGE-M3 model.
-2. Run dense top-k Qdrant search against named vector `dense`.
-3. Return payload-backed evidence using `text`, `parent_text`, citation,
-   hierarchy, law metadata, hashes, and source fields.
-4. Evaluate retrieval relevance and filtering behavior.
-5. Add LLM answer generation only when explicitly scoped after retrieval
-   quality is understood.
-
-Do not introduce sparse/hybrid retrieval, RRF, reranking, GraphRAG, or a
-production API in the first retrieval slice.
-
-## Overview
-
-The Naive RAG phase will establish the first baseline question-answering
-system. Its first slice is dense retrieval only; answer generation follows
-only after retrieval behavior is measured.
-
-Naive RAG is intentionally simple:
-- One dense retrieval pass against the existing Qdrant collection
-- No reranking
-- No query decomposition
-- Payload-backed citation and context assembly
-
-This phase runs only after embedding & indexing is complete and validated.
-
-## Quick Start
-
-**Intended API endpoint** (design phase, not yet implemented):
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/qa" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Quyền về đất đai của hộ gia đình là gì?",
-    "max_chunks": 10,
-    "confidence_threshold": 0.75
-  }'
-```
-
-**Expected response**:
-```json
-{
-  "answer": "Theo Điều 98 Luật Đất đai (VBHN 2025), hộ gia đình có quyền sử dụng đất...",
-  "citations": [
-    {
-      "chunk_id": "LDD_VBHN__article_98__clause_1",
-      "citation": "Luật Đất đai (VBHN 2025), Điều 98, Khoản 1",
-      "source_url": "https://thuvienphapluat.vn/..."
-    }
-  ],
-  "confidence": 0.89,
-  "retrieved_chunks": [...],
-  "fallback": false
-}
-```
+This document is the canonical technical reference for the completed dense
+retrieval and fallback-aware Naive RAG baseline.
 
 ## Architecture
 
-```
-┌──────────────────────┐
-│  User Query          │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Query               │
-│  Embedding           │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Top-k               │
-│  Retrieval           │
-│  (dense search)      │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Context             │
-│  Packing             │
-│  (with citations)    │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Strict Legal        │
-│  Prompt              │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  LLM                 │
-│  Generation          │
-│  (Claude API)        │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Citation            │
-│  Validator           │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Answer or           │
-│  Fallback            │
-└──────────────────────┘
+The baseline flow is:
+
+```text
+Vietnamese legal query
+-> BGE-M3 dense query embedding
+-> read-only Qdrant dense retrieval
+-> typed retrieval results
+-> EvidenceBundle assembly
+-> EvidenceSelectionResult gate
+-> fallback if decision != answer_allowed
+-> selected-evidence-only prompt if decision == answer_allowed
+-> OpenRouter generation
+-> citation-ID guard
+-> answer or deterministic fallback
 ```
 
-## Components
+Implemented retrieval/RAG entrypoints are thin wrappers under
+`scripts/retrieval/`; reusable logic lives under `src/retrieval/`.
 
-### 1. Query Embedding
+## Safety Invariants
 
-**Goal**: Convert user question into dense vector matching chunk embedding space.
+- Rejected, unsafe, or unselected evidence is never included in the generation
+  prompt.
+- Only `EvidenceSelectionResult.selected_evidence` can be used for generation.
+- Auxiliary parent context is marked as not directly citable and must not be
+  cited as direct legal support.
+- `decision != answer_allowed` implies `llm_called=false`.
+- Fallback answers do not contain substantive unsupported legal claims.
+- Generated `[E#]` citation IDs must map to selected prompt evidence.
+- Citation-ID integrity is not semantic faithfulness.
+- The system supports legal research and is not production legal advice.
 
-**Process**:
-- Use same embedding model as indexing (e.g., BGE-M3).
-- Normalize dense vector (if using cosine similarity).
+## Configuration
 
-**Output**: `query_vector` (list[float]).
+Non-secret OpenRouter defaults live in `configs/llm/openrouter.yml`.
+Provider secrets belong only in the real environment or an uncommitted `.env`.
+They are not stored in YAML, printed, logged, or serialized into reports.
 
-### 2. Top-k Retrieval
+Resolution order:
 
-**Goal**: Fetch most relevant chunks from Qdrant.
-
-**Retrieval method**: Dense cosine search using named vector `dense`.
-
-**Parameters**:
-- `k`: number of chunks to retrieve (default: 10)
-- `metadata_filters`: optional filters (e.g., `law_id`, `effective_date` range)
-
-**Query to Qdrant**:
-```python
-results = client.search(
-    collection_name="vnlaw_chunks_bgem3_v1_full",
-    query_vector=("dense", query_vector),
-    limit=k,
-    with_payload=True,
-    with_vectors=False
-)
+```text
+model: --model > OPENROUTER_MODEL > config default_model > emergency fallback
+base URL: OPENROUTER_BASE_URL > config base_url > emergency fallback
+API key: environment/.env only
 ```
 
-**Output**: List of `ScoredPoint` with `chunk_id`, `score`, `payload`.
+The CLI loads `.env` automatically without overriding already exported
+environment variables.
 
-### 3. Context Packing
+## Running the Baseline
 
-**Goal**: Assemble retrieved chunks into a coherent context for the LLM.
-
-**Process**:
-- Sort retrieved chunks by score (highest first).
-- For each chunk, format as:
-  ```
-  [Citation: Luật Đất đai (VBHN 2025), Điều 123, Khoản 2, Điểm c]
-  Nội dung của Điểm c...
-  ```
-- Concatenate up to `max_chunks` (e.g., 10) with newlines between.
-- Prepend with instruction header (see Strict Legal Prompt).
-
-**Output**: Single `context` string.
-
-### 4. Strict Legal Prompt
-
-**Goal**: Force LLM to ground answer in provided context only.
-
-**Template**:
-
-```
-You are a Vietnamese legal QA assistant. Answer the question using ONLY the provided context.
-If the context does not contain relevant information, respond with the fallback message.
-
-Cite every factual claim with the exact citation format: "Luật ..., Điều ..., Khoản ..., Điểm ..."
-Do NOT invent laws, articles, or citations.
-
-Context:
-{context}
-
-Question: {query}
-
-Answer:
-```
-
-**Fallback message** (if no relevant context):
-```
-I could not find a specific regulation for this issue in the current legal corpus. Please check thuvienphapluat.vn directly or consult a qualified lawyer.
-```
-
-**LLM**: Claude API (Haiku or Sonnet for cost/speed trade-off). Temperature = 0 for determinism.
-
-### 5. LLM Generation
-
-**Goal**: Produce Vietnamese legal answer grounded in context.
-
-**Process**:
-- Send prompt to Anthropic API (`messages/create`).
-- Stream response or wait for completion.
-- Extract `content[0].text`.
-
-**Output**: Generated answer string.
-
-### 6. Citation Validator
-
-**Goal**: Verify that answer mentions exist in retrieved context.
-
-**Process**:
-- Parse answer for citation patterns: `r"Luật .+, Điều \d+(, Khoản \d+(, Điểm [a-z])?)?"`
-- For each found citation:
-  - Check that at least one retrieved chunk has matching `citation` (exact string match).
-  - If citation not found → mark as unsupported.
-- If unsupported citations found OR answer length < threshold → trigger fallback.
-
-**Confidence scoring**:
-- Base confidence = average retrieval scores (from Qdrant).
-- Adjust down if citation validator finds unsupported claims.
-- Adjust down if answer is very short (< 50 chars) or generic.
-
-**Decision**:
-- If `confidence >= threshold` (default 0.75) and all citations supported → return answer.
-- Else → return fallback message with `fallback: true`.
-
-## Pipeline Execution Flow
-
-1. Receive query via API (`/api/v1/qa`).
-2. Generate query embedding (dense + sparse).
-3. Perform hybrid retrieval from Qdrant (`k=10`).
-4. Pack context with citation anchors.
-5. Construct strict legal prompt.
-6. Call Claude API → generate answer.
-7. Run citation validator on answer vs retrieved chunks.
-8. Compute confidence score.
-9. If confidence ≥ threshold and citations valid → return answer with metadata.
-10. Else → return fallback response.
-
-## Data Models / Output Schema
-
-### API Request
-
-```json
-{
-  "query": "Quyền sử dụng đất của hộ gia đình?",
-  "max_chunks": 10,
-  "confidence_threshold": 0.75
-}
-```
-
-### API Response (success)
-
-```json
-{
-  "answer": "Theo Điều 98 Luật Đất đai (VBHN 2025), hộ gia đình có quyền sử dụng đất để xây dựng nhà ở...",
-  "citations": [
-    {
-      "chunk_id": "LDD_VBHN__article_98__clause_1__point_a",
-      "citation": "Luật Đất đai (VBHN 2025), Điều 98, Khoản 1, Điểm a",
-      "source_url": "https://thuvienphapluat.vn/..."
-    }
-  ],
-  "confidence": 0.89,
-  "retrieved_chunks": [
-    {
-      "chunk_id": "LDD_VBHN__article_98__clause_1__point_a",
-      "score": 0.92,
-      "payload": { ... }
-    }
-  ],
-  "fallback": false,
-  "processing_time_ms": 1450
-}
-```
-
-### API Response (fallback)
-
-```json
-{
-  "answer": "I could not find a specific regulation for this issue in the current legal corpus. Please check thuvienphapluat.vn directly or consult a qualified lawyer.",
-  "citations": [],
-  "confidence": 0.0,
-  "retrieved_chunks": [...],  # still included for debugging
-  "fallback": true,
-  "processing_time_ms": 1200
-}
-```
-
-## CLI Reference
-
-### Intended CLI for testing
+Run a single Naive RAG query:
 
 ```bash
-# Single query
-uv run python scripts/run_naive_rag.py \
-  --query "Quyền về đất đai của hộ gia đình?" \
-  --qdrant-url http://localhost:6333 \
-  --collection-name vnlaw_chunks_bgem3_v1_full
-
-# Batch evaluation (with golden QA)
-uv run python scripts/run_naive_rag.py \
-  --eval-dataset data/eval/golden_qa.jsonl \
-  --output-dir data/eval/naive_rag_results
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_naive_rag.py \
+  --query "Trẻ em dưới 6 tuổi được hưởng bảo hiểm y tế như thế nào?" \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash \
+  --output artifacts/reports/retrieval/naive_rag_single_query.json
 ```
 
-## Testing
+Run the dense retrieval evaluation:
 
-**Unit tests**:
-- `test_context_packing()`: retrieved chunks formatted with citation anchors.
-- `test_prompt_template()`: prompt contains context and query; fallback instruction present.
-- `test_citation_validator()`: exact citation match detected; unsupported citation rejected.
-- `test_confidence_scoring()`: confidence < threshold triggers fallback.
+```bash
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_dense_retrieval.py \
+  --queries data/eval/manual_retrieval_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --output artifacts/reports/retrieval/dense_retrieval_eval.json
+```
 
-**Integration test**:
-- End-to-end: query → retrieval → generation → answer.
-- Verify answer contains at least one citation from retrieved context.
-- Latency < 2 seconds (p95) for simple queries.
-- Fallback triggered for out-of-corpus questions.
+Run the selection smoke test:
 
-**Golden QA evaluation** (separate phase 12):
-- Dataset of (query, expected answer, expected citation).
-- Metrics: answer relevance, citation accuracy, faithfulness, unsupported claim rate.
+```bash
+uv run --extra qdrant --extra embedding python scripts/retrieval/run_selection_smoke.py \
+  --queries data/eval/manual_retrieval_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --output artifacts/reports/retrieval/selection_smoke_report.json
+```
 
-## Error Handling
+## Generation Evaluation
 
-- **Qdrant search failure**: Log error, return fallback with `confidence=0`, include error in response for debugging.
-- **LLM API failure**: Retry with exponential backoff (max 3 attempts); after failures, return fallback.
-- **Timeout**: If retrieval or generation exceeds timeout (e.g., 5s), abort and fallback.
-- **Malformed response**: If LLM returns non-text or empty, treat as failure → fallback.
+The repeatable generation evaluation uses five reviewed cases:
 
-All errors logged with structured context; API returns 200 even for fallback (business logic error, not HTTP error).
+```text
+health_insurance_children_under_6_generation
+annual_leave_days_generation
+civil_code_scope_generation
+marriage_conditions_generation
+civil_rights_protection_generation
+```
 
-## Troubleshooting
+Run the evaluation with evidence previews:
 
-| Issue | Possible Cause | How to Check | Recommended Fix |
-|-------|----------------|--------------|-----------------|
-| No citations in answer | Prompt too weak OR LLM ignoring instruction | Inspect raw LLM response | Strengthen prompt: "Cite every fact with exact format"; add citation validator |
-| Hallucinated citations | LLM invented citations not in context | Compare answer citations with retrieved `citation` fields | Enforce citation validator to reject unsupported citations; trigger fallback |
-| Retrieval returns irrelevant chunks | Query embedding mismatch OR index not built correctly | Inspect retrieved `payload.text`; check embedding model | Verify embedding model matches indexing model; test with known similar queries |
-| High latency (>5s) | LLM API slow OR retrieval slow | Measure time per stage | Optimize Qdrant query (filters, k); use faster LLM model (Haiku); cache frequent queries |
-| Fallback for all queries | Confidence threshold too high OR validator too strict | Check confidence scores in logs | Lower threshold (e.g., 0.6); review validator logic; ensure retrieval returns relevant chunks |
-| Empty context sent to LLM | Retrieval returned zero results | Check `retrieved_chunks` length | Verify index has data; check query embedding; test Qdrant directly |
+```bash
+uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_rag_generation.py \
+  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --device cpu \
+  --provider openrouter \
+  --model google/gemini-2.5-flash-lite \
+  --output artifacts/reports/retrieval/naive_rag_generation_eval_hardened.json \
+  --include-evidence-preview \
+  --evidence-preview-chars 500
+```
 
-## Best Practices
+Deterministic checks cover decision policy, LLM-call policy, fallback policy,
+citation-ID coverage, likely Vietnamese output, forbidden phrases, and
+secret-like leakage. The latest hardened run passed all five deterministic
+cases with zero unknown citation IDs, zero missing citation IDs, and zero
+secret-leak failures.
 
-- **No source → fallback** — if retrieval returns zero chunks, immediately fallback; do not call LLM.
-- **Citation grounding** — every factual sentence must have a citation from context; validator enforces this.
-- **Deterministic prompts** — same query should produce same answer (temperature=0, fixed model).
-- **Latency budget** — target < 2s end-to-end; monitor p50/p95.
-- **Log full trace** — record query, retrieved chunk IDs, answer, confidence for debugging and evaluation.
-- **Keep fallback clear** — do not attempt to answer if confidence low; better to say "I don't know" than hallucinate.
+## Manual Faithfulness Review
 
-## Changelog
+Manual review checks:
 
-### Version 0.1 (2026-05-21)
+```text
+generated claim -> cited evidence ID -> safe child evidence preview -> verdict
+```
 
-- Created initial Naive RAG baseline documentation.
-- Defined pipeline: query embedding → hybrid retrieval → context packing → strict prompt → LLM → citation validator → answer/fallback.
-- Specified API request/response schema with citations and confidence.
-- Provided fallback policy and confidence threshold mechanism.
-- Documented testing strategy and golden QA evaluation.
-- Added troubleshooting for common retrieval/generation issues.
+The latest reviewed verdicts are stored in
+`data/eval/manual_faithfulness_verdicts.json`.
 
-## Related Documentation
+Current case verdicts:
 
-| Document | Status | Description |
-|----------|--------|-------------|
-| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
-| `docs/project_setup.md` | Implemented | Environment setup and coding standards |
-| `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
-| `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
-| `docs/embedding_indexing.md` | Future extension | Embedding model and Qdrant indexing |
-| `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, time-aware filtering |
-| `docs/graphrag_agents.md` | Future extension | Legal graph schema, traversal, agent orchestration |
-| `docs/evaluation.md` | Future extension | Evaluation metrics, golden QA dataset, CI gates |
-| `docs/api_deployment.md` | Future extension | FastAPI endpoints, Docker deployment, security |
+```text
+health_insurance_children_under_6_generation -> pass
+annual_leave_days_generation -> not_applicable_for_fallback
+civil_code_scope_generation -> pass
+marriage_conditions_generation -> partial
+civil_rights_protection_generation -> pass
+```
+
+Claim/finding counts after prompt hardening:
+
+```text
+supported claims: 9
+too-broad claims: 1
+missing-key-condition findings: 1
+unsupported claims: 0
+irrelevant-citation findings: 0
+needs-more-evidence findings: 0
+```
+
+`annual_leave_days_generation` remains the fallback control case:
+
+```text
+decision=fallback_required
+llm_called=false
+substantive legal claims generated=false
+```
+
+## Offline Quality Gate
+
+The offline quality gate combines the generation report, the reviewed manual
+verdict manifest, and `configs/retrieval/quality_gate.yml`.
+
+Run:
+
+```bash
+uv run python scripts/retrieval/evaluate_quality_gate.py \
+  --generation-report artifacts/reports/retrieval/naive_rag_generation_eval_hardened.json \
+  --faithfulness-verdicts data/eval/manual_faithfulness_verdicts.json \
+  --policy configs/retrieval/quality_gate.yml \
+  --output artifacts/reports/retrieval/quality_gate.json
+```
+
+Latest result:
+
+```text
+status: quality_gate_passed
+hard_gate_passed: true
+quality_gate_passed: true
+hard_violations: 0
+quality_violations: 0
+warnings: 2
+```
+
+Both warnings are from the non-blocking
+`marriage_conditions_generation` case: one too-broad foreign-element finding
+and one missing-key-condition finding caused by incomplete selected evidence
+coverage for the general condition-list question.
+
+The gate is offline. It does not call OpenRouter, Qdrant, retrieval,
+generation, indexing, or corpus processing.
+
+## Final Baseline Status
+
+Closure status: completed with known limitations.
+
+Quality gate: passed.
+
+Proceed to next planned stage: yes.
+
+Prompt hardening reduced too-broad findings from six to one.
+`civil_code_scope_generation` and `civil_rights_protection_generation`
+improved from partial to pass. `marriage_conditions_generation` remains
+partial and non-blocking.
+
+## Known Limitations
+
+1. The generation evaluation dataset contains only five reviewed cases.
+2. The dataset is a regression baseline, not broad proof of Vietnamese legal
+   QA quality.
+3. `marriage_conditions_generation` remains partial and non-blocking.
+4. Complete-list questions require fuller selected evidence coverage.
+5. Dense-only retrieval still falls back for the annual-leave control case.
+6. Citation-ID validity does not guarantee semantic faithfulness.
+7. Model output may vary across runs.
+8. The system is not production legal advice.
+
+## Next-Stage Boundary
+
+The completed baseline intentionally does not implement hybrid retrieval,
+sparse/BM25 retrieval, RRF, reranking, query rewriting, GraphRAG, agents,
+FastAPI endpoints, an LLM judge, corpus mutation, re-indexing, or production
+legal-advice claims.
+
+Future retrieval improvements must remain separately scoped and preserve the
+safety invariants above.

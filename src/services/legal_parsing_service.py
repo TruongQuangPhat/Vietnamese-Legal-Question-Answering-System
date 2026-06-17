@@ -297,9 +297,7 @@ class LegalParsingService:
             written_hierarchy_paths=written_paths,
             report_path=str(report_path),
             failed_law_ids=[
-                result.law_id
-                for result in results
-                if result.status == LegalParsingStatus.FAILED
+                result.law_id for result in results if result.status == LegalParsingStatus.FAILED
             ],
             skipped_law_ids=skipped_law_ids,
         )

@@ -326,13 +326,15 @@ def test_chunks_include_minimal_citation_path_offsets_and_hashes() -> None:
 
 def test_article_clause_and_point_citations_are_vietnamese() -> None:
     """Citation format follows Article, Clause, and Point legal hierarchy."""
-    article_chunk = LegalChunker().chunk_document(_load_document("sample_hierarchy_article_only.json"))[0]
+    article_chunk = LegalChunker().chunk_document(
+        _load_document("sample_hierarchy_article_only.json")
+    )[0]
     clause_chunk = LegalChunker().chunk_document(
         _load_document("sample_hierarchy_article_clause_only.json")
     )[0]
-    point_chunk = LegalChunker().chunk_document(_load_document("sample_hierarchy_clause_point.json"))[
-        0
-    ]
+    point_chunk = LegalChunker().chunk_document(
+        _load_document("sample_hierarchy_clause_point.json")
+    )[0]
 
     assert article_chunk.citation == "Luật Kiểm thử, Điều 1"
     assert clause_chunk.citation == "Luật Kiểm thử, Khoản 1, Điều 1"
@@ -396,9 +398,7 @@ def test_chunk_hashes_are_sha256_of_text_and_parent_text() -> None:
     chunk = LegalChunker().chunk_document(_full_hierarchy_document())[0]
 
     assert chunk.text_hash == hashlib.sha256(chunk.text.encode("utf-8")).hexdigest()
-    assert chunk.parent_text_hash == hashlib.sha256(
-        chunk.parent_text.encode("utf-8")
-    ).hexdigest()
+    assert chunk.parent_text_hash == hashlib.sha256(chunk.parent_text.encode("utf-8")).hexdigest()
 
 
 def test_source_slice_mismatch_adds_structured_warning() -> None:

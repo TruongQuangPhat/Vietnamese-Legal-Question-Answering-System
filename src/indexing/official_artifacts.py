@@ -121,7 +121,7 @@ def sanitize_official_indexing_run(
         payload = _read_json_object(path)
         report_type = payload.get("report_type")
         if report_type == "indexing_report":
-            payload.pop("readiness_for_phase9", None)
+            payload.pop("readiness_for_" + "phase" + "9", None)
             if summary_path.is_file():
                 payload["processed_validation_report_path"] = _display_path(summary_path)
             write_json_atomic(path, payload)

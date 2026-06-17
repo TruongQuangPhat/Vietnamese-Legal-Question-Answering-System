@@ -75,9 +75,7 @@ def _node(document: LegalHierarchyDocument, node_id: str) -> LegalNode:
 def _node_with_heading(document: LegalHierarchyDocument, heading_text: str) -> LegalNode:
     """Find one node by exact heading metadata."""
     return next(
-        node
-        for node in document.nodes
-        if node.metadata.get("heading_text") == heading_text
+        node for node in document.nodes if node.metadata.get("heading_text") == heading_text
     )
 
 
@@ -320,8 +318,7 @@ def test_deterministic_ids_preserve_legal_numbers_and_tokens() -> None:
     first = _build_document(text)
     second = _build_document(text)
     point_id = (
-        "TEST_LAW__root__part_thu_nhat__chapter_I__section_1"
-        "__article_217a__clause_1__point_đ"
+        "TEST_LAW__root__part_thu_nhat__chapter_I__section_1__article_217a__clause_1__point_đ"
     )
     point = _node(first, point_id)
 
@@ -400,18 +397,17 @@ def test_children_and_flat_nodes_are_source_ordered_without_synthetic_nodes() ->
     text = _read_fixture("mixed_hierarchy_spans.txt")
     document = _build_document(text)
     non_root_nodes = document.nodes[1:]
-    child_references = [
-        child_id
-        for node in document.nodes
-        for child_id in node.children
-    ]
+    child_references = [child_id for node in document.nodes for child_id in node.children]
 
     assert [node.start_offset for node in non_root_nodes] == sorted(
         node.start_offset for node in non_root_nodes
     )
     assert len(child_references) == len(set(child_references))
     assert set(child_references) == {node.node_id for node in non_root_nodes}
-    assert all(_node(document, child_id).level != LegalNodeLevel.CLAUSE for child_id in document.nodes[0].children)
+    assert all(
+        _node(document, child_id).level != LegalNodeLevel.CLAUSE
+        for child_id in document.nodes[0].children
+    )
     assert all(node.children == [] for node in document.nodes if node.level == LegalNodeLevel.POINT)
     assert LegalNodeLevel.SECTION in {node.level for node in document.nodes}
     assert LegalNodeLevel.CLAUSE not in {node.level for node in document.nodes}

@@ -333,9 +333,7 @@ class LegalParser:
             )
 
         status = (
-            LegalParsingStatus.SUCCESS_WITH_WARNINGS
-            if warnings
-            else LegalParsingStatus.SUCCESS
+            LegalParsingStatus.SUCCESS_WITH_WARNINGS if warnings else LegalParsingStatus.SUCCESS
         )
         return self._execution_result(
             law_id=artifact.law_id,
@@ -512,7 +510,11 @@ def _article_nodes(document: LegalHierarchyDocument | None) -> list[LegalNode]:
 def _max_article_number(articles: list[LegalNode]) -> int:
     """Return comparable maximum Article number using numeric prefixes."""
     return max(
-        (prefix for prefix in (_article_number_prefix(article.number) for article in articles) if prefix),
+        (
+            prefix
+            for prefix in (_article_number_prefix(article.number) for article in articles)
+            if prefix
+        ),
         default=0,
     )
 

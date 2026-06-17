@@ -17,42 +17,62 @@ Typical usage:
 from __future__ import annotations
 
 import json
-import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Any
+
 import yaml
 
 from .exceptions import AuditError
 from .models import CrawlTarget
 
 # Legal text markers to verify the file contains Vietnamese legal content
-LEGAL_MARKERS = {"điều", "khoản", "điểm", "luật", "bộ luật", "văn bản hợp nhất", "quốc hội", "căn cứ"}
+LEGAL_MARKERS = {
+    "điều",
+    "khoản",
+    "điểm",
+    "luật",
+    "bộ luật",
+    "văn bản hợp nhất",
+    "quốc hội",
+    "căn cứ",
+}
 
 # Error/blocked page indicators (case-insensitive)
 ERROR_MARKERS = {
-    "captcha", "access denied", "forbidden", "403", "404", "not found",
-    "bad gateway", "service unavailable", "cloudflare", "vui lòng đăng nhập",
-    "đăng nhập", "không tìm thấy", "truy cập bị từ chối"
+    "captcha",
+    "access denied",
+    "forbidden",
+    "403",
+    "404",
+    "not found",
+    "bad gateway",
+    "service unavailable",
+    "cloudflare",
+    "vui lòng đăng nhập",
+    "đăng nhập",
+    "không tìm thấy",
+    "truy cập bị từ chối",
 }
 
 
 @dataclass
 class ArtifactStatus:
     """Validation result for a single raw artifact."""
+
     law_id: str
     status: str  # "valid", "warning", "invalid", "missing"
-    artifact_dir: Optional[Path] = None
+    artifact_dir: Path | None = None
     main_html_exists: bool = False
     metadata_json_exists: bool = False
     html_size_bytes: int = 0
-    metadata_valid: Optional[bool] = None
-    source_url: Optional[str] = None
-    issues: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    metadata_valid: bool | None = None
+    source_url: str | None = None
+    issues: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
-def load_registry_law_ids(registry_path: Path) -> Set[str]:
+def load_registry_law_ids(registry_path: Path) -> set[str]:
     """Load all law_id values from the corpus registry YAML.
 
     Args:
@@ -99,7 +119,7 @@ def load_registry_law_ids(registry_path: Path) -> Set[str]:
     return law_ids
 
 
-def scan_raw_artifacts(raw_dir: Path) -> Dict[str, Path]:
+def scan_raw_artifacts(raw_dir: Path) -> dict[str, Path]:
     """Scan raw directory for artifact directories.
 
     Recognizes both layouts:
@@ -140,7 +160,10 @@ def scan_raw_artifacts(raw_dir: Path) -> Dict[str, Path]:
     return artifacts
 
 
-def validate_metadata(metadata_path: Path, expected_law_id: Optional[str] = None) -> Tuple[bool, Dict[str, any], List[str]]:
+def validate_metadata(
+    metadata_path: Path,
+    expected_law_id: str | None = None,
+) -> tuple[bool, dict[str, Any], list[str]]:
     """Validate metadata.json structure and fields.
 
     Args:
@@ -166,14 +189,16 @@ def validate_metadata(metadata_path: Path, expected_law_id: Optional[str] = None
 
     # Check required fields
     required_fields = ["law_id", "name", "source_domain", "source_type", "url", "crawl_status"]
-    for field in required_fields:
-        if field not in metadata:
-            issues.append(f"metadata_missing_field: {field}")
+    for required_field in required_fields:
+        if required_field not in metadata:
+            issues.append(f"metadata_missing_field: {required_field}")
 
     # Validate law_id match if expected provided
     if expected_law_id is not None and "law_id" in metadata:
         if metadata["law_id"] != expected_law_id:
-            issues.append(f"metadata_law_id_mismatch: expected {expected_law_id}, got {metadata['law_id']}")
+            issues.append(
+                f"metadata_law_id_mismatch: expected {expected_law_id}, got {metadata['law_id']}"
+            )
 
     # Validate source_domain contains thuvienphapluat.vn
     if "source_domain" in metadata:
@@ -194,10 +219,8 @@ def validate_metadata(metadata_path: Path, expected_law_id: Optional[str] = None
 
 
 def validate_html(
-    html_path: Path,
-    min_html_size: int = 10000,
-    sample_size: int = 2048
-) -> Tuple[int, bool, List[str]]:
+    html_path: Path, min_html_size: int = 10000, sample_size: int = 2048
+) -> tuple[int, bool, list[str]]:
     """Validate HTML file: size, UTF-8 encoding, error markers.
 
     Args:
@@ -228,7 +251,7 @@ def validate_html(
     # Check for null bytes in first sample (indicates binary/corruption)
     try:
         sample = html_path.read_bytes()[:sample_size]
-        if b'\x00' in sample:
+        if b"\x00" in sample:
             issues.append("html_contains_null_bytes")
     except OSError as e:
         issues.append(f"html_read_error: {e}")
@@ -256,7 +279,16 @@ def validate_html(
     if not legal_markers_found:
         issues.append("no_legal_markers")
 
-    is_valid = len([i for i in issues if not i.startswith("html_size_suspiciously_small") and i != "no_legal_markers"]) == 0
+    is_valid = (
+        len(
+            [
+                i
+                for i in issues
+                if not i.startswith("html_size_suspiciously_small") and i != "no_legal_markers"
+            ]
+        )
+        == 0
+    )
     return size, is_valid, issues
 
 
@@ -273,8 +305,8 @@ def check_legal_text_markers(html_path: Path, sample_size: int = 2048) -> bool:
 def audit_single_artifact(
     law_id: str,
     artifact_dir: Path,
-    registry_entries: Dict[str, CorpusRegistryEntry],
-    min_html_size: int
+    registry_entries: dict[str, CrawlTarget | dict[str, Any]],
+    min_html_size: int,
 ) -> ArtifactStatus:
     """Audit a single raw artifact.
 
@@ -318,8 +350,7 @@ def audit_single_artifact(
     if metadata_json.is_file():
         status.metadata_json_exists = True
         metadata_valid, metadata_dict, metadata_issues = validate_metadata(
-            metadata_json,
-            expected_law_id=law_id if expected_entry else None
+            metadata_json, expected_law_id=law_id if expected_entry else None
         )
         status.metadata_valid = metadata_valid
 
@@ -353,11 +384,8 @@ def audit_single_artifact(
 
 
 def audit_raw_corpus(
-    registry_path: Path,
-    raw_dir: Path,
-    min_html_size: int = 10000,
-    output_path: Optional[Path] = None
-) -> Dict:
+    registry_path: Path, raw_dir: Path, min_html_size: int = 10000, output_path: Path | None = None
+) -> dict:
     """Perform full raw corpus audit.
 
     Args:
@@ -376,18 +404,18 @@ def audit_raw_corpus(
     try:
         with registry_path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        registry_entries: Dict[str, CrawlTarget] = {}
+        registry_entries: dict[str, CrawlTarget | dict[str, Any]] = {}
         for entry in data.get("corpus", []):
             law_id = entry.get("law_id")
             if law_id:
                 try:
                     registry_entries[law_id] = CrawlTarget(**entry)
-                except Exception as e:
+                except Exception:
                     # Still include the law_id in the set, but the entry may be incomplete
                     # We'll handle validation issues in the metadata check
-                    registry_entries[law_id] = entry  # type: ignore
+                    registry_entries[law_id] = entry
     except Exception as e:
-        raise AuditError(f"Failed to load full registry entries: {e}")
+        raise AuditError(f"Failed to load full registry entries: {e}") from e
 
     # Scan raw artifacts
     raw_artifacts = scan_raw_artifacts(raw_dir)
@@ -403,10 +431,7 @@ def audit_raw_corpus(
         if law_id in missing_in_raw:
             # Artifact missing entirely
             item = ArtifactStatus(
-                law_id=law_id,
-                status="missing",
-                artifact_dir=None,
-                issues=["artifact_missing"]
+                law_id=law_id, status="missing", artifact_dir=None, issues=["artifact_missing"]
             )
         else:
             # Artifact exists, validate it
@@ -415,7 +440,7 @@ def audit_raw_corpus(
                 law_id=law_id,
                 artifact_dir=artifact_dir,
                 registry_entries=registry_entries,
-                min_html_size=min_html_size
+                min_html_size=min_html_size,
             )
         items.append(item)
 
@@ -431,8 +456,12 @@ def audit_raw_corpus(
         "missing_main_html": sum(1 for i in items if not i.main_html_exists),
         "missing_metadata_json": sum(1 for i in items if not i.metadata_json_exists),
         "invalid_metadata_json": sum(1 for i in items if i.metadata_valid is False),
-        "suspicious_small_html": sum(1 for i in items if any("html_size_suspiciously_small" in w for w in i.warnings)),
-        "possible_error_pages": sum(1 for i in items if any("likely_error_page" in iss for iss in i.issues))
+        "suspicious_small_html": sum(
+            1 for i in items if any("html_size_suspiciously_small" in w for w in i.warnings)
+        ),
+        "possible_error_pages": sum(
+            1 for i in items if any("likely_error_page" in iss for iss in i.issues)
+        ),
     }
 
     # Build report dict
@@ -451,10 +480,10 @@ def audit_raw_corpus(
                 "metadata_valid": item.metadata_valid,
                 "source_url": item.source_url,
                 "issues": item.issues,
-                "warnings": item.warnings
+                "warnings": item.warnings,
             }
             for item in items
-        ]
+        ],
     }
 
     # Write to output if specified

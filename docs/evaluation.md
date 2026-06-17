@@ -257,7 +257,7 @@ uv run python scripts/evaluate_rag.py \
 
 # Component-specific
 uv run python scripts/evaluate_rag.py --test retrieval --k 5 10 20
-uv run python scripts/evaluate_rag.py --test generation --judge-model claude-3-haiku
+uv run python scripts/evaluate_rag.py --test generation --judge-model provider/model-name
 uv run python scripts/evaluate_rag.py --test latency --num-queries 100
 
 # Generate regression report (CI)

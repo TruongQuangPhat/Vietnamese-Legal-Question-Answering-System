@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from scripts import chunk_legal_corpus
+from scripts.corpus import chunk_legal_corpus
 from src.processing.legal_chunk_models import (
     ChunkingIssue,
     ChunkingIssueCode,

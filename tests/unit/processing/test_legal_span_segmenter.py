@@ -25,7 +25,9 @@ def _segment_text(text: str) -> list[SegmentedLegalUnit]:
     return LegalSpanSegmenter().segment(text, recognition).units
 
 
-def _units_by_level(units: list[SegmentedLegalUnit], level: LegalNodeLevel) -> list[SegmentedLegalUnit]:
+def _units_by_level(
+    units: list[SegmentedLegalUnit], level: LegalNodeLevel
+) -> list[SegmentedLegalUnit]:
     """Filter segmented units by legal level."""
     return [unit for unit in units if unit.level == level]
 
@@ -103,9 +105,21 @@ def test_part_chapter_section_article_parent_inclusive_spans() -> None:
     article_1 = _unit_with_heading(units, "Điều 1. Phạm vi điều chỉnh")
 
     assert part_one.end_offset == part_two.start_offset
-    assert part_one.start_offset < chapter_i.start_offset < chapter_i.end_offset <= part_one.end_offset
-    assert chapter_i.start_offset < section_1.start_offset < section_1.end_offset <= chapter_i.end_offset
-    assert section_1.start_offset < article_1.start_offset < article_1.end_offset <= section_1.end_offset
+    assert (
+        part_one.start_offset < chapter_i.start_offset < chapter_i.end_offset <= part_one.end_offset
+    )
+    assert (
+        chapter_i.start_offset
+        < section_1.start_offset
+        < section_1.end_offset
+        <= chapter_i.end_offset
+    )
+    assert (
+        section_1.start_offset
+        < article_1.start_offset
+        < article_1.end_offset
+        <= section_1.end_offset
+    )
     assert "QUY ĐỊNH CHUNG" in part_one.text
     assert "NHỮNG QUY ĐỊNH CHUNG" in chapter_i.text
 
@@ -132,7 +146,12 @@ def test_missing_intermediate_levels_are_supported() -> None:
     part = _unit_with_heading(units, "Phần thứ nhất")
 
     assert [article.number for article in articles] == ["1", "2", "3"]
-    assert chapter.start_offset < articles[1].start_offset < articles[1].end_offset <= chapter.end_offset
+    assert (
+        chapter.start_offset
+        < articles[1].start_offset
+        < articles[1].end_offset
+        <= chapter.end_offset
+    )
     assert part.start_offset < articles[2].start_offset < articles[2].end_offset <= part.end_offset
 
 
@@ -146,11 +165,15 @@ def test_article_clause_and_point_spans_are_parent_inclusive() -> None:
     point_b = _unit_with_heading(units, "b) Điểm b thuộc khoản một")
     clause_2 = _unit_with_heading(units, "2. Khoản hai của Điều 1")
 
-    assert article_1.start_offset < clause_1.start_offset < clause_1.end_offset <= article_1.end_offset
+    assert (
+        article_1.start_offset < clause_1.start_offset < clause_1.end_offset <= article_1.end_offset
+    )
     assert clause_1.start_offset < point_a.start_offset < point_a.end_offset <= clause_1.end_offset
     assert point_a.end_offset == point_b.start_offset
     assert point_b.end_offset == clause_2.start_offset
-    assert clause_2.end_offset == _unit_with_heading(units, "Điều 2. Đối tượng áp dụng").start_offset
+    assert (
+        clause_2.end_offset == _unit_with_heading(units, "Điều 2. Đối tượng áp dụng").start_offset
+    )
 
 
 def test_point_context_resets_at_next_clause_and_article() -> None:
@@ -176,10 +199,13 @@ def test_exact_source_slicing_and_text_immutability() -> None:
     assert text == original
     assert "[3]" in footnoted_clause.text
     assert "[4]" in footnoted_point.text
-    assert "đ) Điểm đ thuộc khoản 2" in _unit_with_heading(
-        units,
-        "2.[3] Khoản chắc chắn có chú thích",
-    ).text
+    assert (
+        "đ) Điểm đ thuộc khoản 2"
+        in _unit_with_heading(
+            units,
+            "2.[3] Khoản chắc chắn có chú thích",
+        ).text
+    )
     _assert_exact_slices(text, units)
 
 

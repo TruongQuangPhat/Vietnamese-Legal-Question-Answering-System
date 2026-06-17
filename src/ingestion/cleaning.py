@@ -2,19 +2,39 @@ from __future__ import annotations
 
 import base64
 import binascii
+import html
 import re
 import unicodedata
-import html
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any
+
 from bs4 import BeautifulSoup, NavigableString, Tag
 
 # --- Constants ---
 
 CLEANER_VERSION = "v0.8.0"
 
-LEGAL_MARKERS_KEYWORDS = {"điều", "khoản", "điểm", "luật", "bộ luật", "văn bản hợp nhất", "quốc hội", "căn cứ"}
-STRONG_LEGAL_MARKERS = {"Điều", "Chương", "Mục", "Phần", "Văn bản hợp nhất", "QUỐC HỘI", "Căn cứ", "Bộ luật", "Luật"}
+LEGAL_MARKERS_KEYWORDS = {
+    "điều",
+    "khoản",
+    "điểm",
+    "luật",
+    "bộ luật",
+    "văn bản hợp nhất",
+    "quốc hội",
+    "căn cứ",
+}
+STRONG_LEGAL_MARKERS = {
+    "Điều",
+    "Chương",
+    "Mục",
+    "Phần",
+    "Văn bản hợp nhất",
+    "QUỐC HỘI",
+    "Căn cứ",
+    "Bộ luật",
+    "Luật",
+}
 
 PREFERRED_CONTENT_SELECTORS = [
     "#divContentDoc .content1",
@@ -74,18 +94,59 @@ END_MARKERS = [
 
 # Candidate scoring penalties
 BAD_ID_CLASS = {
-    'nav', 'navigation', 'menu', 'sidebar', 'header', 'footer', 'search', 'login',
-    'dangnhap', 'dangky', 'tracuu', 'danhmuc', 'hotro', 'widget', 'tukhoa', 'tomtat'
+    "nav",
+    "navigation",
+    "menu",
+    "sidebar",
+    "header",
+    "footer",
+    "search",
+    "login",
+    "dangnhap",
+    "dangky",
+    "tracuu",
+    "danhmuc",
+    "hotro",
+    "widget",
+    "tukhoa",
+    "tomtat",
 }
 METADATA_ID_CLASS = {
-    'tab', 'tabs', 'tooltip', 'related', 'relation', 'lienquan', 'lien-quan',
-    'hieuluc', 'hieu-luc', 'thuoc-tinh', 'thuoctinh', 'metadata', 'popup', 'modal'
+    "tab",
+    "tabs",
+    "tooltip",
+    "related",
+    "relation",
+    "lienquan",
+    "lien-quan",
+    "hieuluc",
+    "hieu-luc",
+    "thuoc-tinh",
+    "thuoctinh",
+    "metadata",
+    "popup",
+    "modal",
 }
 SITE_NOISE_PHRASES = {
-    'Đăng nhập', 'Đăng ký', 'Tra cứu', 'Danh mục', 'Hỗ trợ', 'Dịch vụ', 'Google',
-    'Widget', 'Từ khóa', 'Tóm tắt nội dung', 'Liên quan hiệu lực', 'Liên quan nội dung',
-    'Thuộc tính', 'Xem chi tiết', 'Văn bản liên quan', 'Văn bản gốc',
-    'CÁC NỘI DUNG ĐƯỢC SỬA ĐỔI, HƯỚNG DẪN', 'Tra cứu nhanh', 'Hỗ trợ Dịch Vụ'
+    "Đăng nhập",
+    "Đăng ký",
+    "Tra cứu",
+    "Danh mục",
+    "Hỗ trợ",
+    "Dịch vụ",
+    "Google",
+    "Widget",
+    "Từ khóa",
+    "Tóm tắt nội dung",
+    "Liên quan hiệu lực",
+    "Liên quan nội dung",
+    "Thuộc tính",
+    "Xem chi tiết",
+    "Văn bản liên quan",
+    "Văn bản gốc",
+    "CÁC NỘI DUNG ĐƯỢC SỬA ĐỔI, HƯỚNG DẪN",
+    "Tra cứu nhanh",
+    "Hỗ trợ Dịch Vụ",
 }
 
 # Unicode handling
@@ -100,17 +161,21 @@ ZERO_WIDTH_CHARS = {
 ENCODED_ARTIFACT_LINE_RE = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 TVPL_MARKER_RE = re.compile(r"^TVPL_\d{8}$", re.I)
 
+
 @dataclass
 class CleaningStats:
     """Text statistics for a normalized document."""
+
     raw_html_size_bytes: int = 0
     extracted_text_chars: int = 0
     normalized_text_chars: int = 0
     line_count: int = 0
 
+
 @dataclass
 class LegalMarkersSummary:
     """Summary of legal markers found in the text."""
+
     contains_part: bool = False
     contains_chapter: bool = False
     contains_section: bool = False
@@ -135,6 +200,7 @@ class LegalMarkersSummary:
 @dataclass
 class NormalizedArtifact:
     """The final normalized output for a single legal document."""
+
     law_id: str
     law_name: str
     source_url: str
@@ -144,11 +210,11 @@ class NormalizedArtifact:
     normalized_text: str
     text_stats: CleaningStats
     markers: LegalMarkersSummary
-    warnings: List[str] = field(default_factory=list)
-    metadata: Dict[str, str] = field(default_factory=lambda: {"cleaner_version": CLEANER_VERSION})
-    candidate_info: Dict[str, Any] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+    metadata: dict[str, str] = field(default_factory=lambda: {"cleaner_version": CLEANER_VERSION})
+    candidate_info: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "law_id": self.law_id,
             "law_name": self.law_name,
@@ -187,7 +253,8 @@ class NormalizedArtifact:
             "candidate_info": self.candidate_info,
         }
 
-def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]]:
+
+def extract_legal_text_from_html(html_content: str) -> tuple[str, dict[str, Any]]:
     """Extracts the best legal content container from HTML using scoring.
 
     Args:
@@ -224,7 +291,9 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         valid_blocks = []
         for el in elements:
             block_text = extract_text_with_block_boundaries(el)
-            if len(block_text) > 100 and (RE_ARTICLE.search(block_text) or any(m in block_text for m in STRONG_LEGAL_MARKERS)):
+            if len(block_text) > 100 and (
+                RE_ARTICLE.search(block_text) or any(m in block_text for m in STRONG_LEGAL_MARKERS)
+            ):
                 valid_blocks.append(block_text)
 
         if not valid_blocks:
@@ -233,7 +302,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         full_text = "\n\n".join(valid_blocks)
         text_len = len(full_text)
 
-        if text_len > 500: # Minimum threshold for a plausible legal body
+        if text_len > 500:  # Minimum threshold for a plausible legal body
             article_reference_count = len(RE_ARTICLE.findall(full_text))
             article_heading_count = len(extract_article_heading_numbers(full_text))
             max_art = estimate_max_heading_article_number(full_text)
@@ -261,28 +330,10 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
                 }
 
     # 3. Generic candidate scoring fallback
-    candidates = soup.find_all(['div', 'article', 'main', 'section', 'td'])
+    candidates = soup.find_all(["div", "article", "main", "section", "td"])
 
     best_candidate = None
-    best_score = -float('inf')
-
-    # Terms that indicate navigation/site chrome containers
-    BAD_ID_CLASS = {
-        'nav', 'navigation', 'menu', 'sidebar', 'header', 'footer', 'search', 'login',
-        'dangnhap', 'dangky', 'tracuu', 'danhmuc', 'hotro', 'widget', 'tukhoa', 'tomtat'
-    }
-    # Terms that indicate metadata/tabs/tooltips (higher penalty)
-    METADATA_ID_CLASS = {
-        'tab', 'tabs', 'tooltip', 'related', 'relation', 'lienquan', 'lien-quan',
-        'hieuluc', 'hieu-luc', 'thuoc-tinh', 'thuoctinh', 'metadata', 'popup', 'modal'
-    }
-    SITE_NOISE_PHRASES = {
-        'Đăng nhập', 'Đăng ký', 'Tra cứu', 'Danh mục', 'Hỗ trợ', 'Dịch vụ', 'Google',
-        'Widget', 'Từ khóa', 'Tóm tắt nội dung', 'Liên quan hiệu lực', 'Liên quan nội dung',
-        'Thuộc tính', 'Xem chi tiết', 'Văn bản liên quan', 'Văn bản gốc',
-        'CÁC NỘI DUNG ĐƯỢC SỬA ĐỔI, HƯỚNG DẪN', 'Tra cứu nhanh', 'Hỗ trợ Dịch Vụ'
-    }
-
+    best_score = -float("inf")
 
     for candidate in candidates:
         text = extract_text_with_block_boundaries(candidate)
@@ -290,12 +341,12 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
             continue
 
         # Quick check for any legal marker
-        if not any(m in text for m in ('Điều', 'Chương', 'Mục')):
+        if not any(m in text for m in ("Điều", "Chương", "Mục")):
             continue
 
         # Count legal markers
         dieu_count = len(RE_ARTICLE.findall(text))
-        chapter_count = len(re.findall(r'Chương\s+[IVXLCDM]+', text, re.I))
+        chapter_count = len(re.findall(r"Chương\s+[IVXLCDM]+", text, re.I))
         muc_count = text.count("Mục")
         marker_sum = dieu_count + chapter_count + muc_count
 
@@ -309,8 +360,9 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         score = marker_sum * 1000 + text_len
 
         # 1. Penalize link density (Corrected order)
-        link_count = len(candidate.find_all('a'))
-        link_text_len = sum(len(a.get_text(strip=True)) for a in candidate.find_all('a') if a.get_text(strip=True))
+        link_text_len = sum(
+            len(a.get_text(strip=True)) for a in candidate.find_all("a") if a.get_text(strip=True)
+        )
         link_density = link_text_len / text_len if text_len > 0 else 0
         if link_density > 0.5:
             score *= 0.2
@@ -325,8 +377,8 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
             score *= 1.2
 
         # 3. Penalize bad id/class names
-        candidate_id = (candidate.get('id') or '').lower()
-        candidate_class = ' '.join(candidate.get('class') or []).lower()
+        candidate_id = (candidate.get("id") or "").lower()
+        candidate_class = " ".join(candidate.get("class") or []).lower()
 
         # Strong penalty for metadata/tabs/tooltips
         if any(bad in candidate_id or bad in candidate_class for bad in METADATA_ID_CLASS):
@@ -353,11 +405,6 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         final_dieu = len(RE_ARTICLE.findall(final_text))
         final_heading_count = len(extract_article_heading_numbers(final_text))
         final_max_heading = estimate_max_heading_article_number(final_text)
-        final_chapter = len(re.findall(r'Chương\s+[IVXLCDM]+', final_text, re.I))
-        final_muc = final_text.count("Mục")
-        link_count = len(best_candidate.find_all('a'))
-        link_text_len = sum(len(a.get_text(strip=True)) for a in best_candidate.find_all('a') if a.get_text(strip=True))
-        link_density = link_text_len / len(final_text) if final_text else 0
 
         return final_text, {
             "tag": best_candidate.name,
@@ -377,7 +424,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
             "article_sequence_score": compute_article_heading_sequence_score(final_text),
             "heading_sequence_score": compute_article_heading_sequence_score(final_text),
             "text_len": len(final_text),
-            "link_density": 0.0, # Simplified for final
+            "link_density": 0.0,  # Simplified for final
             "avg_chars_per_article": len(final_text) / (final_heading_count + 1),
         }
 
@@ -430,6 +477,7 @@ def extract_legal_text_from_html(html_content: str) -> Tuple[str, Dict[str, Any]
         "avg_chars_per_article": 0,
     }
 
+
 def extract_text_with_block_boundaries(node: Tag) -> str:
     """Extract visible text while preserving block, not inline, boundaries.
 
@@ -437,7 +485,7 @@ def extract_text_with_block_boundaries(node: Tag) -> str:
     `span`, `font`, `b`, `i`, `u`, and `a` are joined as normal inline text so
     they do not create artificial word-fragment line breaks.
     """
-    lines: List[str] = []
+    lines: list[str] = []
 
     def append_text(text: str) -> None:
         line = _normalize_extracted_line(text)
@@ -462,6 +510,7 @@ def extract_text_with_block_boundaries(node: Tag) -> str:
     visit(node)
     return "\n".join(lines)
 
+
 def _normalize_extracted_line(text: str) -> str:
     """Normalize one extracted block line without altering legal structure."""
     text = re.sub(r"\s+", " ", text).strip()
@@ -469,7 +518,8 @@ def _normalize_extracted_line(text: str) -> str:
     text = re.sub(r"([(])\s+", r"\1", text)
     return text
 
-def trim_to_legal_body(text: str, candidate_info: Optional[Dict] = None) -> str:
+
+def trim_to_legal_body(text: str, candidate_info: dict | None = None) -> str:
     """Trims website chrome from the beginning and end of extracted text.
 
     Uses reliable legal headers to find the start of the actual legal document.
@@ -502,6 +552,7 @@ def trim_to_legal_body(text: str, candidate_info: Optional[Dict] = None) -> str:
 
     return text
 
+
 def _find_legal_body_start(text: str) -> int:
     """Finds the start position of the legal body using context-aware markers.
 
@@ -522,7 +573,8 @@ def _find_legal_body_start(text: str) -> int:
                 return pos
     return len(text)
 
-def _find_start_from_early_article_1(text: str) -> Optional[int]:
+
+def _find_start_from_early_article_1(text: str) -> int | None:
     """Find the legal body start when Article 1 appears near the beginning.
 
     Later amendment/source-law sections often contain strong `LUẬT...` markers.
@@ -533,11 +585,12 @@ def _find_start_from_early_article_1(text: str) -> Optional[int]:
     if not match or match.start() > EARLY_ARTICLE_1_WINDOW_CHARS:
         return None
 
-    after_article_1 = text[match.start():]
+    after_article_1 = text[match.start() :]
     if not _has_sufficient_legal_evidence(after_article_1, min_articles=2, min_chars=100):
         return None
 
     return _find_nearby_official_header_start(text, match.start())
+
 
 def _find_nearby_official_header_start(text: str, article_start: int) -> int:
     """Return the nearest official title/header start before Article 1."""
@@ -558,16 +611,15 @@ def _find_nearby_official_header_start(text: str, article_start: int) -> int:
             continue
 
         header_lines = [
-            span[2].strip()
-            for span in line_spans[idx:article_line_idx]
-            if span[2].strip()
+            span[2].strip() for span in line_spans[idx:article_line_idx] if span[2].strip()
         ]
         if _looks_like_official_header(header_lines):
             return line_spans[idx][0]
 
     return article_start
 
-def _line_spans(text: str) -> List[Tuple[int, int, str]]:
+
+def _line_spans(text: str) -> list[tuple[int, int, str]]:
     """Build `(start, end, line)` spans while preserving text offsets."""
     spans = []
     offset = 0
@@ -580,7 +632,8 @@ def _line_spans(text: str) -> List[Tuple[int, int, str]]:
         spans.append((0, len(text), text))
     return spans
 
-def _looks_like_official_header(lines: List[str]) -> bool:
+
+def _looks_like_official_header(lines: list[str]) -> bool:
     """Detect official legal title/header lines, including short split lines."""
     joined = " ".join(lines)
     joined_lower = joined.lower()
@@ -588,22 +641,26 @@ def _looks_like_official_header(lines: List[str]) -> bool:
         return True
 
     compact = re.sub(r"\s+", "", " ".join(lines)).upper()
-    return compact.startswith((
-        "LUẬT",
-        "BỘLUẬT",
-        "VĂNBẢNHỢPNHẤT",
-        "HIẾNPHÁP",
-        "PHÁPLỆNH",
-        "NGHỊĐỊNH",
-        "THÔNGTƯ",
-        "QUỐCHỘI",
-        "CHÍNHPHỦ",
-    ))
+    return compact.startswith(
+        (
+            "LUẬT",
+            "BỘLUẬT",
+            "VĂNBẢNHỢPNHẤT",
+            "HIẾNPHÁP",
+            "PHÁPLỆNH",
+            "NGHỊĐỊNH",
+            "THÔNGTƯ",
+            "QUỐCHỘI",
+            "CHÍNHPHỦ",
+        )
+    )
+
 
 def _looks_like_amendment_source_note(line: str) -> bool:
     """Detect pre-body source-law notes that should not anchor body start."""
     normalized = re.sub(r"\s+", " ", line).strip().lower()
     return normalized.startswith("luật số ") and "sửa đổi, bổ sung" in normalized
+
 
 def _has_sufficient_legal_evidence(text: str, min_articles: int, min_chars: int) -> bool:
     """Checks if text contains enough legal structure to confirm it's the real body."""
@@ -615,6 +672,7 @@ def _has_sufficient_legal_evidence(text: str, min_articles: int, min_chars: int)
     if len(text) < min_chars:
         return False
     return True
+
 
 def _trim_trailing_noise(text: str) -> str:
     """Trims trailing website chrome only after confirming legal body is present."""
@@ -651,8 +709,9 @@ def _trim_trailing_noise(text: str) -> str:
             body_chars_so_far = len(body_so_far)
 
             # Allow trimming if we have sufficient legal body evidence
-            if (article_count_so_far >= 3 and body_chars_so_far >= 100) or \
-               (article_count_so_far >= 3 and (body_chars_so_far >= 500 or i - body_start_idx >= 5)):
+            if (article_count_so_far >= 3 and body_chars_so_far >= 100) or (
+                article_count_so_far >= 3 and (body_chars_so_far >= 500 or i - body_start_idx >= 5)
+            ):
                 cutoff_idx = i
                 break
 
@@ -660,6 +719,7 @@ def _trim_trailing_noise(text: str) -> str:
         lines = lines[:cutoff_idx]
 
     return "\n".join(lines)
+
 
 def remove_safe_boilerplate(text: str) -> str:
     """Removes repeated non-legal boilerplate patterns conservatively.
@@ -702,7 +762,8 @@ def remove_safe_boilerplate(text: str) -> str:
 
     return "\n".join(cleaned_lines)
 
-def extract_article_numbers(text: str) -> List[int]:
+
+def extract_article_numbers(text: str) -> list[int]:
     """Extract all article numbers mentioned anywhere in text."""
     matches = RE_ARTICLE.findall(text)
     numbers = []
@@ -712,43 +773,50 @@ def extract_article_numbers(text: str) -> List[int]:
             numbers.append(int(num_match.group()))
     return numbers
 
-def extract_article_heading_numbers(text: str) -> List[int]:
+
+def extract_article_heading_numbers(text: str) -> list[int]:
     """Extract article numbers from real article heading lines only."""
     return [int(match.group(1)) for match in RE_ARTICLE_HEADING_LINE.finditer(text)]
+
 
 def estimate_max_article_number(text: str) -> int:
     """Estimate the highest article number mentioned anywhere in text."""
     nums = extract_article_numbers(text)
     return max(nums) if nums else 0
 
+
 def estimate_max_heading_article_number(text: str) -> int:
     """Estimate the highest article number among article heading lines."""
     nums = extract_article_heading_numbers(text)
     return max(nums) if nums else 0
+
 
 def has_article_number(text: str, number: int) -> bool:
     """Check if a specific article number is mentioned anywhere in text."""
     nums = extract_article_numbers(text)
     return number in nums
 
+
 def has_article_heading_number(text: str, number: int) -> bool:
     """Check if a specific article number appears as a heading line."""
     nums = extract_article_heading_numbers(text)
     return number in nums
 
+
 def compute_article_sequence_score(text: str) -> float:
     """Compute sequence continuity for article references."""
-    nums = sorted(list(set(extract_article_numbers(text))))
+    nums = sorted(set(extract_article_numbers(text)))
     if not nums:
         return 0.0
     max_num = nums[-1]
     if max_num == 0:
         return 0.0
     return len(nums) / max_num
+
 
 def compute_article_heading_sequence_score(text: str) -> float:
     """Compute sequence continuity for article heading lines."""
-    nums = sorted(list(set(extract_article_heading_numbers(text))))
+    nums = sorted(set(extract_article_heading_numbers(text)))
     if not nums:
         return 0.0
     max_num = nums[-1]
@@ -756,7 +824,8 @@ def compute_article_heading_sequence_score(text: str) -> float:
         return 0.0
     return len(nums) / max_num
 
-def normalize_unicode(text: str) -> Tuple[str, List[str]]:
+
+def normalize_unicode(text: str) -> tuple[str, list[str]]:
     """Applies NFC normalization and removes unwanted characters.
 
     Returns:
@@ -785,6 +854,7 @@ def normalize_unicode(text: str) -> Tuple[str, List[str]]:
     text = "".join(ch for ch in text if ord(ch) >= 32 or ch in "\n\r\t")
 
     return text, warnings
+
 
 def normalize_whitespace(text: str) -> str:
     """Collapses excessive whitespace while preserving legal boundaries."""
@@ -817,6 +887,7 @@ def normalize_whitespace(text: str) -> str:
 
     return "\n".join(final_lines)
 
+
 def remove_encoded_footer_artifacts(text: str) -> str:
     """Remove standalone encoded TVPL watermark/footer artifact lines.
 
@@ -825,11 +896,9 @@ def remove_encoded_footer_artifacts(text: str) -> str:
     identifiers, dates, signatures, table abbreviations, and ordinary text.
     """
     lines = text.splitlines()
-    kept_lines = [
-        line for line in lines
-        if not _looks_like_encoded_artifact_line(line.strip())
-    ]
+    kept_lines = [line for line in lines if not _looks_like_encoded_artifact_line(line.strip())]
     return "\n".join(kept_lines)
+
 
 def _looks_like_encoded_artifact_line(line: str) -> bool:
     """Return true for standalone base64-like TVPL watermark artifacts."""
@@ -838,13 +907,14 @@ def _looks_like_encoded_artifact_line(line: str) -> bool:
 
     return any(_decoded_text_is_tvpl_artifact(decoded) for decoded in _decode_artifact_line(line))
 
-def _decode_artifact_line(line: str) -> List[str]:
+
+def _decode_artifact_line(line: str) -> list[str]:
     """Decode likely base64 text with the TVPL watermark encodings observed."""
     candidates = [line]
     if len(line) % 4 == 1:
         candidates.append(line[1:])
 
-    decoded_texts: List[str] = []
+    decoded_texts: list[str] = []
     for candidate in candidates:
         padded = candidate + ("=" * ((4 - len(candidate) % 4) % 4))
         try:
@@ -862,12 +932,14 @@ def _decode_artifact_line(line: str) -> List[str]:
 
     return decoded_texts
 
+
 def _decoded_text_is_tvpl_artifact(decoded: str) -> bool:
     """Identify decoded TVPL watermark text, not legal content."""
     normalized = decoded.strip().lower()
     return "thuvienphapluat.vn" in normalized or bool(TVPL_MARKER_RE.fullmatch(decoded.strip()))
 
-def repair_line_fragments(lines: List[str]) -> List[str]:
+
+def repair_line_fragments(lines: list[str]) -> list[str]:
     """Repair narrow, known-safe line fragments without flattening structure."""
     repaired = []
     idx = 0
@@ -885,6 +957,7 @@ def repair_line_fragments(lines: List[str]) -> List[str]:
 
     return repaired
 
+
 def _should_join_line_fragments(current: str, next_line: str) -> bool:
     """Return true only for safe legal heading or intra-word fragments."""
     if not current or not next_line:
@@ -898,11 +971,13 @@ def _should_join_line_fragments(current: str, next_line: str) -> bool:
 
     return (current + next_line).lower() in {"điều", "mục", "việc"}
 
+
 def _join_line_fragments(current: str, next_line: str) -> str:
     """Join a pair of fragments using the spacing needed by the fragment type."""
     if current == "Điều" and re.match(r"^\d+\.", next_line):
         return f"{current} {next_line}"
     return f"{current}{next_line}"
+
 
 def detect_legal_markers(text: str) -> LegalMarkersSummary:
     """Detect legal hierarchy markers and article heading/reference metrics."""

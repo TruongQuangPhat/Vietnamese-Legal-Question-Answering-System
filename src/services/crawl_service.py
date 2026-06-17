@@ -35,9 +35,11 @@ from src.ingestion.storage import RawArtifactStore
 
 console = Console()
 
+
 @dataclass
 class CrawlPipelineConfig:
     """Configuration for a crawl pipeline execution."""
+
     output_dir: Path
     report_path: Path | None = Path("artifacts/reports/crawling/crawl_report.json")
     registry_path: Path | None = None
@@ -57,15 +59,18 @@ class CrawlPipelineConfig:
     retry: int | None = None
     verbose: bool = False
 
+
 @dataclass
 class CrawlPipelineResult:
     """Result of a crawl pipeline execution."""
+
     success: bool
     failure_count: int
     results: list[CrawlResult]
     skips: list[CrawlSkipRecord]
     report_path: Path | None = None
     report: dict[str, Any] | None = None
+
 
 def print_selection_table(selection: CrawlSelection) -> None:
     """Print selection details in a table format."""
@@ -103,6 +108,7 @@ def print_selection_table(selection: CrawlSelection) -> None:
 
     console.print(table)
 
+
 def print_crawl_summary(
     results: list[CrawlResult],
     skips: list[CrawlSkipRecord],
@@ -134,6 +140,7 @@ def print_crawl_summary(
         for record in skips:
             console.print(f"  - {record.target.law_id}: {record.reason}")
 
+
 async def run_crawl_pipeline(config: CrawlPipelineConfig) -> CrawlPipelineResult:
     """High-level orchestration of the crawl pipeline."""
     if config.url:
@@ -142,6 +149,7 @@ async def run_crawl_pipeline(config: CrawlPipelineConfig) -> CrawlPipelineResult
         return await _crawl_from_registry(config)
     else:
         raise ValueError("Either registry_path or url must be provided.")
+
 
 async def _crawl_single_url(config: CrawlPipelineConfig) -> CrawlPipelineResult:
     """Internal orchestration for single URL crawl."""
@@ -155,6 +163,7 @@ async def _crawl_single_url(config: CrawlPipelineConfig) -> CrawlPipelineResult:
 
     settings = get_settings()
     from urllib.parse import urlparse
+
     parsed = urlparse(config.url)
     hostname = parsed.hostname
 
@@ -229,6 +238,7 @@ async def _crawl_single_url(config: CrawlPipelineConfig) -> CrawlPipelineResult:
             skips=[],
             success=False,
         )
+
 
 async def _crawl_from_registry(config: CrawlPipelineConfig) -> CrawlPipelineResult:
     """Internal orchestration for registry-based batch crawl."""
