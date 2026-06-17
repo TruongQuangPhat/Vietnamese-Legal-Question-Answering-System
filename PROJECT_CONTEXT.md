@@ -150,9 +150,14 @@ Corpus Registry
 - Phase 9C.3 is `evidence_preview_review_ready`: generated-answer cases expose
   selected and cited evidence previews for human review. Generated JSON and
   Markdown reports remain runtime artifacts and are not source-of-truth data.
+- Phase 9D records human claim-to-citation verdicts for the five-case expanded
+  baseline in `docs/phase9d_manual_faithfulness_review.md`. Status is
+  `phase9d_faithfulness_review_partial`: one generated case passed, three
+  generated cases were partial because of too-broad or incomplete answers, and
+  the annual-leave control correctly remained fallback without an LLM call.
 - Official full indexing and validation reports are under
   `artifacts/reports/indexing/20260611_bgem3_v1_full/`.
-- Phase 9D human claim-to-citation verdict review is next. Phase 10 retrieval
+- Phase 9E regression thresholds and QA gates are next. Phase 10 retrieval
   improvements remain separately scoped.
 
 Operational rules:
@@ -295,7 +300,7 @@ artifacts/reports/chunking/processed_jsonl_validation_report.json
 Current next work:
 
 ```text
-Phase 9D — Human claim-to-citation verdict review
+Phase 9E — Regression thresholds and QA gate
 ```
 
 Phase 9A already starts retrieval with BGE-M3 query embedding and dense top-k
@@ -306,7 +311,7 @@ selected citation-safe evidence.
 
 ## 6. Next Immediate Tasks
 
-1. Record human verdicts for each material claim and cited evidence item.
+1. Define Phase 9E regression thresholds and QA gates from Phase 9D findings.
 2. Resolve all-caution and insufficient-evidence review findings.
 3. Keep citation ID coverage distinct from semantic faithfulness.
 4. Keep sparse/hybrid retrieval and reranking separately scoped for Phase 10.
@@ -322,6 +327,7 @@ selected citation-safe evidence.
 | 9A | Dense Retrieval Baseline | **Complete / Implemented** |
 | 9B | Naive RAG Answer Generation | **Complete / Baseline Implemented** |
 | 9C | Naive RAG Generation Evaluation & Safety Hardening | **Complete / Validated** |
+| 9D | Human Faithfulness Review & Baseline Hardening | **Complete / Partial Findings** |
 | 10 | Advanced RAG | Future |
 | 11 | GraphRAG & Agents | Future |
 | 12 | Evaluation | Future |

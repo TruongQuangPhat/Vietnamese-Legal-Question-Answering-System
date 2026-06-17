@@ -11,7 +11,7 @@ units, and fall back safely when evidence is insufficient.
 ## Current Status
 
 ```text
-Current phase: Phase 9C.3 complete — evidence-backed manual review ready
+Current phase: Phase 9D complete — human faithfulness review partial
 
 Completed:
   Phase 0 — Project Setup and Principles
@@ -30,9 +30,10 @@ Completed:
   Phase 9C.1 — Reviewed Generation Dataset Expansion
   Phase 9C.2 — Manual Faithfulness Review Export
   Phase 9C.3 — Evidence Preview Support
+  Phase 9D — Human Faithfulness Review & Baseline Hardening
 
 Next:
-  Phase 9D — Human claim-to-citation verdict review
+  Phase 9E — Regression thresholds and QA gate
   Keep citation ID coverage distinct from semantic faithfulness
   Do not begin Phase 10 during Phase 9 review cleanup
 ```
@@ -73,7 +74,10 @@ establish semantic faithfulness or legal correctness.
 Phase 9C.3 adds opt-in, bounded evidence previews for repeatable manual review.
 Generated JSON and Markdown reports are runtime artifacts and should not be
 committed. Citation ID coverage remains distinct from semantic faithfulness,
-and human claim-to-citation verdicts are Phase 9D work.
+and Phase 9D records the first human claim-to-citation verdicts in
+`docs/phase9d_manual_faithfulness_review.md`. The Phase 9D status is partial:
+one generated case passed, three generated cases need hardening for too-broad
+or incomplete answers, and the annual-leave fallback control behaved correctly.
 
 Phase 4 is gate-ready:
 

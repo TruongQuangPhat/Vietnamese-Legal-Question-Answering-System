@@ -11,6 +11,7 @@ Phase 9A.4 — Selection Integration Smoke Test: implemented
 Phase 9A.5 — Workflow Boundary Cleanup: implemented
 Phase 9B — Naive RAG Answer Generation: implemented
 Phase 9C — Naive RAG Generation Evaluation & Safety Hardening: validated
+Phase 9D — Human Faithfulness Review & Baseline Hardening: partial
 ```
 
 Phase 9 starts from the validated Phase 8 Qdrant collection:
@@ -538,6 +539,50 @@ JSON and Markdown reports are reproducible outputs, not source-controlled
 project state. The annual-leave fallback still avoids an LLM call, and
 all-caution cases remain priority review items.
 
+## Phase 9D Manual Faithfulness Review
+
+Phase 9D records human claim-to-citation verdicts for the five-case expanded
+Phase 9C baseline in `docs/phase9d_manual_faithfulness_review.md`. It changes
+no retrieval, selection, fallback, prompt, generation, citation guard,
+OpenRouter, Qdrant, indexing, corpus, source, script, test, or dependency
+behavior.
+
+Review input:
+
+```text
+Report: artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json
+Provider/model: openrouter / google/gemini-2.5-flash-lite
+Cases reviewed: 5
+Generated-answer cases: 4
+Fallback cases: 1
+Generated claim/finding rows: 17
+```
+
+Aggregate Phase 9D verdicts:
+
+```text
+supported claims: 10
+too-broad claims: 6
+missing-key-condition findings: 1
+unsupported claims: 0
+irrelevant-citation findings: 0
+case verdicts: 1 pass, 3 partial, 1 not_applicable_for_fallback
+```
+
+All-caution cases reviewed:
+
+```text
+health_insurance_children_under_6_generation -> pass, with caution evidence review risk
+marriage_conditions_generation -> partial, incomplete selected Article 8 coverage and too-broad foreign-element material
+```
+
+The annual-leave control remained `fallback_required`, did not call the LLM,
+and made no substantive legal claim. Phase 9D status is
+`phase9d_faithfulness_review_partial`: citation IDs were valid, but three
+generated cases need baseline hardening because of too-broad or incomplete
+answers. Phase 9E should convert these findings into regression thresholds and
+QA gates.
+
 ## Evaluation Command
 
 ```bash
@@ -564,7 +609,7 @@ uv run --extra qdrant --extra embedding python scripts/retrieval/run_dense_retri
 
 ## Next Work
 
-1. Phase 9D: record human claim-to-citation verdicts.
+1. Phase 9E: define regression thresholds and QA gates from Phase 9D findings.
 2. Resolve all-caution and insufficient-evidence review findings.
 3. Keep citation ID coverage distinct from semantic faithfulness.
 4. Expand the generation dataset only with reviewed legal expectations.
