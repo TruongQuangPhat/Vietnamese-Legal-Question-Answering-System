@@ -43,9 +43,11 @@ Verified repository state as of 2026-06-19:
   back for the annual-leave control, citation-ID validity is not semantic
   faithfulness, model output may vary, and the system is not production legal
   advice.
-- Current Phase 10 stage: repository inspection and progress tracing only.
-  Benchmark protocol, benchmark schemas, validators, sparse retrieval, fusion,
-  and reranking are not implemented in this task.
+- Current Phase 10 stage: Stage C benchmark implementation is in place for
+  schemas, loaders, validation, grouped splitting, fingerprinting, CLI
+  wrappers, tests, configuration, and technical documentation. Real benchmark
+  records, pilot annotation, metrics, sparse retrieval, fusion, and reranking
+  are not implemented.
 
 ## Phase 10 Objective
 
@@ -213,16 +215,16 @@ Baseline assets to preserve:
 
 ### Stage C - Benchmark Implementation
 
-- [ ] Pydantic schema models;
-- [ ] loaders;
-- [ ] validators;
-- [ ] grouped split implementation;
-- [ ] fingerprinting;
-- [ ] CLI wrappers;
-- [ ] unit tests;
-- [ ] integration tests;
-- [ ] configuration;
-- [ ] technical documentation.
+- [x] Pydantic schema models;
+- [x] loaders;
+- [x] validators;
+- [x] grouped split implementation;
+- [x] fingerprinting;
+- [x] CLI wrappers;
+- [x] unit tests;
+- [x] integration tests;
+- [x] configuration;
+- [x] technical documentation.
 
 ### Stage D - Pilot Annotation
 
@@ -374,15 +376,15 @@ Latency reports should include mean, median, p95, and p99 where appropriate.
 
 | Deliverable | Planned path | Status | Dependencies | Notes |
 | --- | --- | --- | --- | --- |
-| Evaluation configuration | `configs/evaluation/` | Scaffold exists; no new files created | Benchmark protocol | Use functional config names only. |
+| Evaluation configuration | `configs/evaluation/legal_qa_benchmark.yml` | Created | Benchmark protocol | Non-secret benchmark options only; no final domain quotas or metric gains. |
 | Legal QA benchmark data | `data/eval/legal_qa_benchmark/` | Planned; not created | Approved schema, annotation workflow | Must not invent legal expectations. |
-| Benchmark schema and loaders | `src/evaluation/benchmark/` | Planned; not created | Protocol and schema approval | Keep broader evaluation separate from current baseline logic. |
+| Benchmark schema and loaders | `src/evaluation/benchmark/` | Created | Protocol and schema approval | Includes enums, schemas, exceptions, loaders, validator, splitting, and fingerprinting. |
 | Evaluation metrics | `src/evaluation/metrics/` | Planned; not created | Metric definitions | Include retrieval, decision/safety, generation, and operational metrics. |
 | Evaluation reporting | `src/evaluation/reporting/` | Planned; not created | Report schema and manifest design | Reports must include dataset version and fingerprints. |
-| Evaluation CLIs | `scripts/evaluation/` | Planned; directory not present | Reusable services under `src/evaluation/` | CLI wrappers must stay thin. |
-| Unit tests | `tests/unit/evaluation/` | Scaffold exists; no new files created | Implemented schemas/loaders/metrics | Mirror source modules. |
-| Integration tests | `tests/integration/evaluation/` | Planned; not present | End-to-end benchmark workflow | Avoid external service calls unless explicitly scoped. |
-| Benchmark documentation | `docs/legal_qa_benchmark.md` | Planned; not created | Protocol and schema freeze | Functional durable documentation after tracer work. |
+| Evaluation CLIs | `scripts/evaluation/validate_benchmark.py`, `scripts/evaluation/create_benchmark_split.py`, `scripts/evaluation/freeze_benchmark.py` | Created | Reusable services under `src/evaluation/` | Thin wrappers only; no Qdrant or OpenRouter calls. |
+| Unit tests | `tests/unit/evaluation/benchmark/` | Created | Implemented schemas, loaders, validator, splitting, fingerprinting | Uses synthetic non-authoritative fixtures only. |
+| Integration tests | `tests/integration/evaluation/test_benchmark_workflow.py` | Created | End-to-end benchmark workflow | Uses temporary synthetic files only; no external service calls. |
+| Benchmark documentation | `docs/legal_qa_benchmark.md` | Created | Protocol and schema implementation | Functional technical documentation for Stage C implementation. |
 | Evaluation protocol documentation | `docs/evaluation_protocol.md` | Created | Protocol decisions | Durable Stage B protocol for benchmark rules, review, split, freeze, and comparison. |
 
 ## Decision Log
@@ -400,6 +402,17 @@ Latency reports should include mean, median, p95, and p99 where appropriate.
 | 2026-06-19 | Treat evidence groups as semantic completeness requirements | Complete-list and multi-evidence cases require group-level completion rather than a flat list of chunk IDs. | Benchmark annotation and metric design | Approved in protocol |
 | 2026-06-19 | Require independent review for held-out and high-risk cases | Held-out, complete-list, cross-law, temporal, fallback, ambiguous, and blocking cases need review beyond chunk-ID validation. | Review workflow | Approved in protocol |
 | 2026-06-19 | Freeze held-out labels by version | Held-out labels must not be edited in place; corrections require a new benchmark version and documented reason. | Benchmark versioning | Approved in protocol |
+| 2026-06-19 | Implement broader benchmark logic under `src/evaluation/benchmark/` | Stage C needs durable benchmark schemas and validation without moving or weakening existing Naive RAG regression logic. | Evaluation architecture | Implemented |
+| 2026-06-19 | Use Pydantic v2 strict input schemas | Unknown fields and malformed records should fail deterministically before annotation data is frozen. | Benchmark schemas and loaders | Implemented |
+| 2026-06-19 | Use connected components for grouped split constraints | `case_family_id` and `source_provision_group_id` leakage is transitive and cannot be handled by independent field grouping. | Split creation | Implemented |
+| 2026-06-19 | Keep corpus-aware validation read-only | Corpus registry and processed chunks are authoritative validation inputs but protected from mutation. | Validator and freeze support | Implemented |
+| 2026-06-19 | Keep regression contamination checks explicit and conservative | Declared regression overlap and exact normalized query matches are enforceable; semantic overlap still requires human review. | Split and validation policy | Implemented |
+| 2026-06-19 | Treat file checksums and canonical model hashes as distinct | Raw artifact checksums preserve exact files; canonical hashes support deterministic data/model fingerprints. | Fingerprinting and freeze manifests | Implemented |
+| 2026-06-19 | Treat protocol invariants as non-configurable | Held-out review, chunk-level qrels for frozen answer-allowed groups, Vietnamese diacritic preservation, and mandatory grouping fields are safety rules rather than tuning knobs. | Benchmark config and validator | Implemented |
+| 2026-06-19 | Use `SplitManifest.assignments` as canonical split state | `BenchmarkQuery.split` is a denormalized summary and must match the manifest before freeze. | Split validation and freeze support | Implemented |
+| 2026-06-19 | Use `ReviewRecord` as canonical review evidence | `BenchmarkQuery.review_status` is a denormalized summary and cannot bypass missing review records. | Review validation and freeze support | Implemented |
+| 2026-06-19 | Store canonical frozen manifests with benchmark data | Runtime reports may live under `artifacts/reports/evaluation/`, but frozen `split_manifest.json` and `benchmark_manifest.json` belong under `data/eval/legal_qa_benchmark/`. | Benchmark documentation and CLI usage | Documented |
+| 2026-06-19 | Refuse draft or overwritten freezes | Frozen benchmark releases require a release version, a new output path, complete validation, and post-write manifest verification. | Freeze support | Implemented |
 
 ## Risks and Open Questions
 
@@ -441,6 +454,9 @@ Open design questions:
 - Whether sparse retrieval should use Qdrant sparse vectors, BM25 outside
   Qdrant, or BGE-M3 sparse output in a separately scoped implementation.
 - Which reranker, if any, is acceptable after the benchmark is frozen.
+- Whether frozen real benchmark files should require both explicit chunk IDs
+  and legal targets for every required group, beyond the current chunk-ID
+  requirement.
 
 ## Validation Log
 
@@ -467,6 +483,34 @@ README, docs, or common task files during inspection.
 | 2026-06-19 | Protocol ambiguity self-review | targeted `rg -n` search for disallowed ambiguity terms in `docs/evaluation_protocol.md` | Passed | No disallowed ambiguous terms remain in the protocol. |
 | 2026-06-19 | Protocol invariant self-review | targeted `rg -n` search for required clarification terms in `docs/evaluation_protocol.md` | Passed | Confirmed required clarification language is present. |
 | 2026-06-19 | Diff hygiene | `git diff --check` | Passed | No whitespace errors reported after protocol clarification edits. |
+| 2026-06-19 | Stage C pre-edit worktree | `git status --short` | Passed | Worktree was clean before Stage C implementation. |
+| 2026-06-19 | Stage C protocol preflight | `rg -n "unsupported substantive\|substantive legal claim without\|required direct citation\|acceptable_chunk_ids\|must not replace\|substantially overlaps\|held_out_test\|development.*case_family_id\|selected child evidence\|Auxiliary parent context\|parent context" docs/evaluation_protocol.md` | Passed | Confirmed required Stage B preflight rules were present before implementation. |
+| 2026-06-19 | Python compile | `uv run python -m py_compile src/evaluation/benchmark/*.py scripts/evaluation/*.py` | Passed | New Stage C Python modules and scripts compile. |
+| 2026-06-19 | Unit tests | `uv run pytest tests/unit/evaluation -q` | Passed | 43 passed. |
+| 2026-06-19 | Integration tests | `uv run pytest tests/integration/evaluation -q` | Passed | 1 passed. |
+| 2026-06-19 | Ruff lint | `uv run ruff check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | No lint errors after scoped formatting/import fixes. |
+| 2026-06-19 | Ruff format check | `uv run ruff format --check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | 18 files already formatted. |
+| 2026-06-19 | Lockfile check | `uv lock --check` | Passed | Lockfile resolved without update. |
+| 2026-06-19 | CLI help smoke | `uv run python scripts/evaluation/validate_benchmark.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-19 | CLI help smoke | `uv run python scripts/evaluation/create_benchmark_split.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-19 | CLI help smoke | `uv run python scripts/evaluation/freeze_benchmark.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-19 | Diff hygiene | `git diff --check` | Passed | No whitespace errors after Stage C implementation. |
+| 2026-06-19 | Stage C hardening pre-edit worktree | `git status --short` | Completed | Existing uncommitted Stage C implementation files were present; no unrelated files were modified. |
+| 2026-06-19 | Stage C hardening audit | targeted `rg -n` over config, benchmark modules, scripts, tests, and docs | Completed | Classified protocol invariants, split/review source-of-truth, manifest placement, fingerprints, qrel consistency, and freeze immutability. |
+| 2026-06-19 | Unit tests after hardening | `uv run pytest tests/unit/evaluation -q` | Passed | 67 passed after hardening changes. |
+| 2026-06-19 | Integration tests after hardening | `uv run pytest tests/integration/evaluation -q` | Passed | 1 passed after hardening changes. |
+| 2026-06-19 | Ruff fix after hardening | `uv run ruff check --fix src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | Fixed scoped lint issue in new Stage C tests. |
+| 2026-06-19 | Ruff format after hardening | `uv run ruff format src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | Reformatted scoped Stage C files only. |
+| 2026-06-19 | Python compile after hardening | `uv run python -m py_compile src/evaluation/benchmark/*.py scripts/evaluation/*.py` | Passed | Stage C benchmark modules and CLI wrappers compile. |
+| 2026-06-19 | Unit tests after hardening final | `uv run pytest tests/unit/evaluation -q` | Passed | 67 passed. |
+| 2026-06-19 | Integration tests after hardening final | `uv run pytest tests/integration/evaluation -q` | Passed | 1 passed. |
+| 2026-06-19 | Ruff lint after hardening final | `uv run ruff check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | All checks passed. |
+| 2026-06-19 | Ruff format check after hardening final | `uv run ruff format --check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | 19 files already formatted. |
+| 2026-06-19 | Lockfile check after hardening | `uv lock --check` | Passed | Resolved 130 packages; lockfile unchanged. |
+| 2026-06-19 | CLI help smoke after hardening | `uv run python scripts/evaluation/validate_benchmark.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-19 | CLI help smoke after hardening | `uv run python scripts/evaluation/create_benchmark_split.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-19 | CLI help smoke after hardening | `uv run python scripts/evaluation/freeze_benchmark.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-19 | Diff hygiene after hardening | `git diff --check` | Passed | No whitespace errors after Stage C hardening. |
 
 ## Change Log
 
@@ -475,6 +519,8 @@ README, docs, or common task files during inspection.
 | 2026-06-19 | Created temporary Phase 10 progress tracer after read-only repository inspection. | `docs/phase10_tracer.md` | Codex |
 | 2026-06-19 | Created durable legal QA evaluation protocol and marked Stage B progress. | `docs/evaluation_protocol.md`, `docs/phase10_tracer.md` | Codex |
 | 2026-06-19 | Clarified Stage B protocol semantics for direct evidence, hard violations, fallback consistency, field names, duplicate normalization, and evidence-group references. | `docs/evaluation_protocol.md`, `docs/phase10_tracer.md` | Codex |
+| 2026-06-19 | Implemented Stage C benchmark schemas, loaders, validator, grouped splitting, fingerprinting, CLI wrappers, tests, config, and technical docs. | `src/evaluation/benchmark/`, `scripts/evaluation/`, `configs/evaluation/legal_qa_benchmark.yml`, `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py`, `docs/legal_qa_benchmark.md`, `docs/phase10_tracer.md` | Codex |
+| 2026-06-19 | Hardened Stage C protocol invariants, split/review source-of-truth checks, raw and canonical fingerprints, qrel/group consistency, and freeze immutability. | `src/evaluation/benchmark/`, `tests/unit/evaluation/benchmark/`, `docs/legal_qa_benchmark.md`, `docs/phase10_tracer.md`, `configs/evaluation/legal_qa_benchmark.yml` | Codex |
 
 ## Exit Criteria
 
@@ -497,10 +543,10 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-benchmark schema design
--> benchmark validator design
--> Stage C implementation
+pilot case design
 -> pilot annotation
+-> independent review
+-> schema and protocol feedback
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.
