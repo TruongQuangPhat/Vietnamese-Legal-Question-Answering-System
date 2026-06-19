@@ -199,17 +199,17 @@ Baseline assets to preserve:
 
 ### Stage B - Benchmark Protocol
 
-- [ ] benchmark inclusion and exclusion policy;
-- [ ] domain taxonomy;
-- [ ] question-type taxonomy;
-- [ ] expected-decision definitions;
-- [ ] direct/supporting/near-miss relevance definitions;
-- [ ] complete-evidence semantics;
-- [ ] blocking-case policy;
-- [ ] annotation guidelines;
-- [ ] independent review policy;
-- [ ] adjudication policy;
-- [ ] temporal/version-sensitive policy.
+- [x] benchmark inclusion and exclusion policy;
+- [x] domain taxonomy;
+- [x] question-type taxonomy;
+- [x] expected-decision definitions;
+- [x] direct/supporting/near-miss relevance definitions;
+- [x] complete-evidence semantics;
+- [x] blocking-case policy;
+- [x] annotation guidelines;
+- [x] independent review policy;
+- [x] adjudication policy;
+- [x] temporal/version-sensitive policy.
 
 ### Stage C - Benchmark Implementation
 
@@ -383,7 +383,7 @@ Latency reports should include mean, median, p95, and p99 where appropriate.
 | Unit tests | `tests/unit/evaluation/` | Scaffold exists; no new files created | Implemented schemas/loaders/metrics | Mirror source modules. |
 | Integration tests | `tests/integration/evaluation/` | Planned; not present | End-to-end benchmark workflow | Avoid external service calls unless explicitly scoped. |
 | Benchmark documentation | `docs/legal_qa_benchmark.md` | Planned; not created | Protocol and schema freeze | Functional durable documentation after tracer work. |
-| Evaluation protocol documentation | `docs/evaluation_protocol.md` | Planned; not created | Protocol decisions | Consolidate durable decisions here when approved. |
+| Evaluation protocol documentation | `docs/evaluation_protocol.md` | Created | Protocol decisions | Durable Stage B protocol for benchmark rules, review, split, freeze, and comparison. |
 
 ## Decision Log
 
@@ -395,6 +395,11 @@ Latency reports should include mean, median, p95, and p99 where appropriate.
 | 2026-06-19 | Use grouped deterministic dev/test splitting | Prevent paraphrase-family and source-provision leakage. | Benchmark construction | Verified as required direction |
 | 2026-06-19 | Do not tune on held-out test data | Held-out comparison is valid only if test data remains untouched until candidate configs are frozen. | Evaluation protocol | Verified |
 | 2026-06-19 | Change retrieval only in the primary comparison | Corpus, chunking, generator, prompt, selection, fallback, and evaluation code should remain fixed unless a controlled ablation explicitly changes one component. | Comparative evaluation | Verified |
+| 2026-06-19 | Use binary final benchmark decisions | The broader frozen benchmark must adjudicate final ground truth to `answer_allowed` or `fallback_required`; existing Phase 9 `needs_review` records remain unchanged. | Benchmark labels and schema design | Approved in protocol |
+| 2026-06-19 | Separate direct, supporting, near-miss, and irrelevant evidence | Legal support requires semantic direct evidence, not lexical similarity, parent context, or near-miss provisions. | Evidence judgments and metrics | Approved in protocol |
+| 2026-06-19 | Treat evidence groups as semantic completeness requirements | Complete-list and multi-evidence cases require group-level completion rather than a flat list of chunk IDs. | Benchmark annotation and metric design | Approved in protocol |
+| 2026-06-19 | Require independent review for held-out and high-risk cases | Held-out, complete-list, cross-law, temporal, fallback, ambiguous, and blocking cases need review beyond chunk-ID validation. | Review workflow | Approved in protocol |
+| 2026-06-19 | Freeze held-out labels by version | Held-out labels must not be edited in place; corrections require a new benchmark version and documented reason. | Benchmark versioning | Approved in protocol |
 
 ## Risks and Open Questions
 
@@ -415,9 +420,22 @@ Confirmed risks:
 Open design questions:
 
 - What minimum and preferred benchmark sizes will be approved?
-- Which legal domains and question types must be represented?
+- What final domain quotas will be approved for the registry-derived taxonomy?
+- Whether secondary domains should be required for every cross-law case or only
+  where needed for stratification.
 - How should complete-evidence groups be encoded and adjudicated?
-- What constitutes a blocking case in the broader benchmark?
+- What exact relevance gain values should be used for nDCG?
+- What numeric relevance gain, if any, should be assigned to supporting
+  evidence after metric implementation defines contextual usefulness?
+- What exact blocking-case thresholds should gate system comparison?
+- Whether `fallback_reason` categories fully cover pilot cases before Stage C
+  freezes an enum.
+- What manual-review threshold should flag diacritic-sensitive near-duplicates
+  without automatically merging Vietnamese legal queries.
+- What reviewer identifier format should be used without exposing unnecessary
+  personal information?
+- Who will staff adjudication for legal-review conflicts?
+- What benchmark versioning convention should be used?
 - Which deterministic fingerprint fields are required for corpus, chunks,
   Qdrant collection, prompts, and model configuration?
 - Whether sparse retrieval should use Qdrant sparse vectors, BM25 outside
@@ -438,12 +456,25 @@ README, docs, or common task files during inspection.
 | 2026-06-19 | Metric and safety inventory | `rg -n "Recall\|MRR\|NDCG\|hit_rate\|latency\|citation\|fallback\|quality_gate" src/retrieval scripts/retrieval tests` | Completed | Confirmed current metric, fallback, citation, and gate coverage. |
 | 2026-06-19 | Evaluation asset counts | `wc -l data/eval/manual_retrieval_queries.jsonl data/eval/manual_naive_rag_generation_queries.jsonl data/processed/legal_chunks.jsonl` | Completed | Confirmed 5 retrieval queries, 5 generation queries, and 40,389 processed chunks. |
 | 2026-06-19 | Diff hygiene | `git diff --check` | Passed | No whitespace errors reported after creating this tracer. |
+| 2026-06-19 | Worktree state | `git status --short` | Completed | No output before Stage B edits. |
+| 2026-06-19 | Corpus registry taxonomy inspection | `sed -n '1,260p' configs/laws/corpus_registry.yml` and follow-up slices | Completed | Used registry groups and domain tags to define domain taxonomy. |
+| 2026-06-19 | Regression asset compatibility inspection | `sed -n` over current manual retrieval, generation, faithfulness, quality-gate, and retrieval config assets | Completed | Confirmed existing `needs_review` remains Phase 9-only and broader benchmark uses adjudicated binary decisions. |
+| 2026-06-19 | Retrieval terminology inspection | `sed -n` over `src/retrieval/evaluation.py`, `src/retrieval/selection.py`, and `src/retrieval/evidence.py` | Completed | Confirmed terminology for expected targets, decisions, evidence packets, citation scope, and fallback reasons. |
+| 2026-06-19 | Markdown validation discovery | `rg -n "markdown\|mdformat\|markdownlint\|pymarkdown\|prettier" README.md docs pyproject.toml` and task-file discovery | No applicable command found | No repository-documented Markdown validation command was available. |
+| 2026-06-19 | Diff hygiene | `git diff --check` | Passed | No whitespace errors reported after creating the protocol and updating this tracer. |
+| 2026-06-19 | Worktree state | `git status --short` | Completed | Existing Stage B docs changes present before clarification edits: `docs/phase10_tracer.md`, `docs/evaluation_protocol.md`. |
+| 2026-06-19 | Protocol consistency self-review | `rg -n "supporting\|evidence group\|blocking\|hard violation\|fallback_reason\|diacritic\|acceptable_chunk_ids\|acceptable_legal_targets\|document title\|match level\|Phan\|Chuong" docs/evaluation_protocol.md docs/phase10_tracer.md` | Completed | Confirmed revised protocol terms are explicit; remaining matches are expected current terms or tracer history. |
+| 2026-06-19 | Protocol ambiguity self-review | targeted `rg -n` search for disallowed ambiguity terms in `docs/evaluation_protocol.md` | Passed | No disallowed ambiguous terms remain in the protocol. |
+| 2026-06-19 | Protocol invariant self-review | targeted `rg -n` search for required clarification terms in `docs/evaluation_protocol.md` | Passed | Confirmed required clarification language is present. |
+| 2026-06-19 | Diff hygiene | `git diff --check` | Passed | No whitespace errors reported after protocol clarification edits. |
 
 ## Change Log
 
 | Date | Change | Files | Author or tool |
 | --- | --- | --- | --- |
 | 2026-06-19 | Created temporary Phase 10 progress tracer after read-only repository inspection. | `docs/phase10_tracer.md` | Codex |
+| 2026-06-19 | Created durable legal QA evaluation protocol and marked Stage B progress. | `docs/evaluation_protocol.md`, `docs/phase10_tracer.md` | Codex |
+| 2026-06-19 | Clarified Stage B protocol semantics for direct evidence, hard violations, fallback consistency, field names, duplicate normalization, and evidence-group references. | `docs/evaluation_protocol.md`, `docs/phase10_tracer.md` | Codex |
 
 ## Exit Criteria
 
@@ -466,10 +497,10 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-approve benchmark protocol
--> implement benchmark schemas
--> implement validators
--> create and review pilot annotations
+benchmark schema design
+-> benchmark validator design
+-> Stage C implementation
+-> pilot annotation
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.
