@@ -106,3 +106,11 @@ data/eval/*
 !data/eval/manual_retrieval_queries.jsonl
 !data/eval/manual_naive_rag_generation_queries.jsonl
 !data/eval/manual_faithfulness_verdicts.json
+!data/eval/legal_qa_benchmark/
+!data/eval/legal_qa_benchmark/pilot/
+!data/eval/legal_qa_benchmark/pilot/README.md
+!data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl
+!data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl
+!data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl
+!data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl
+!data/eval/legal_qa_benchmark/pilot/review_records.jsonl
