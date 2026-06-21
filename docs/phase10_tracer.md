@@ -34,13 +34,15 @@ after Phase 10 closes and durable information has been consolidated.
 - Five-case suite: regression and safety suite only, not held-out proof.
 - Phase 10 stage: Stage D documentation and pilot stabilization are complete.
   Schema contract version `1.0` is frozen for full benchmark construction.
-  Stage E1 full benchmark construction planning is complete. Stage E2A
-  created the first 36-case full-benchmark draft batch, and Stage E2B-1
-  expanded it to 78 draft cases.
-- Not done: remaining full benchmark construction to the 120-case minimum,
-  dev/test split, held-out benchmark freeze, frozen Naive RAG baseline run,
-  metrics, sparse retrieval, fusion, reranking, GraphRAG, API, UI, and
-  fine-tuning.
+  Stage E1 full benchmark construction planning is complete. Stage E2A,
+  E2B-1, and E2B-2 created the 120-case minimum viable full-benchmark draft.
+- Stage E-Final audit result: the 120-case minimum viable draft validates with
+  0 errors and 0 warnings, but split/freeze is blocked by held-out
+  eligibility and coverage gates.
+- Not done: qualified human legal-review allocation for high-risk held-out
+  candidates, low/medium-risk held-out coverage balancing, dev/test split,
+  held-out benchmark freeze, frozen Naive RAG baseline run, metrics, sparse
+  retrieval, fusion, reranking, GraphRAG, API, UI, and fine-tuning.
 
 ## Canonical Document Map
 
@@ -109,7 +111,7 @@ Core invariants:
 | Stage B - Benchmark Protocol | Complete | Durable rules consolidated into `docs/evaluation.md`. |
 | Stage C - Benchmark Implementation | Complete | Schemas, loaders, validator, splitting, fingerprinting, freeze support, CLIs, config, and tests implemented. |
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
-| Stage E - Full Benchmark and Split Freeze | In progress | Stage E1 planning is complete. Stage E2A and E2B-1 created and validated 78 full-benchmark draft cases. Additional construction, grouped split, leakage validation, and manifest freeze remain pending. |
+| Stage E - Full Benchmark and Split Freeze | Blocked before split/freeze | Stage E1 planning is complete. Stage E2A, E2B-1, and E2B-2 created and validated 120 full-benchmark draft cases. Stage E-Final audit found held-out eligibility and coverage blockers, so no split or manifests were created. |
 | Stage F - Frozen Naive RAG Baseline | Not started | Baseline execution on frozen development and held-out splits remains pending. |
 | Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
@@ -187,12 +189,11 @@ Core invariants:
 - [x] narrow `.gitignore` exceptions for full benchmark JSONL files;
 - [x] second full-benchmark draft batch;
 - [x] cumulative full-benchmark corpus-aware validation;
-- [ ] final draft construction to the 120-case minimum;
-- [ ] duplicate and near-duplicate detection;
-- [ ] paraphrase-family grouping;
-- [ ] source-provision grouping;
+- [x] final draft construction to the 120-case minimum;
+- [x] duplicate and near-duplicate audit;
+- [x] paraphrase-family and source-provision grouping audit;
 - [ ] deterministic development/test split;
-- [ ] leakage validation;
+- [ ] final split leakage validation;
 - [ ] test freeze;
 - [ ] checksums;
 - [ ] benchmark manifest.
@@ -260,7 +261,7 @@ Core invariants:
 | Evaluation CLIs | `scripts/evaluation/` | Created | Thin wrappers; no Qdrant or OpenRouter calls. |
 | Evaluation tests | `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py` | Created | Synthetic fixtures only. |
 | Pilot dataset | `data/eval/legal_qa_benchmark/pilot/` | Draft | Pre-split, non-frozen, not held-out proof. |
-| Full benchmark draft batches | `data/eval/legal_qa_benchmark/*.jsonl` | Draft | 78 pre-split, non-frozen cases; structured automated review complete; no manifests. |
+| Full benchmark draft batches | `data/eval/legal_qa_benchmark/*.jsonl` | Draft | 120 pre-split, non-frozen cases; structured automated review complete; no manifests. |
 
 ## Pilot Snapshot
 
@@ -286,24 +287,30 @@ Core invariants:
 - Conflict queries: 0.
 - Frozen queries: 0.
 - Assigned queries: 0.
+- Held-out eligibility audit: 40 query-level low/medium-risk candidates, but
+  only 35 remain eligible after transitive grouping by `case_family_id` and
+  `source_provision_group_id`.
+- Freeze blocker: the eligible held-out pool is too small for the target
+  30 percent split and lacks important safety/type coverage including
+  fallback, sanction/penalty, criminal-procedure, and maritime cases.
 
 ## Full Benchmark Draft Snapshot
 
-Stage E2A and E2B-1 created the current canonical full-benchmark draft under
-`data/eval/legal_qa_benchmark/`. It is draft data only: no query has a split,
-no query is frozen, and no `split_manifest.json` or `benchmark_manifest.json`
-exists.
+Stage E2A, E2B-1, and E2B-2 created the current canonical full-benchmark
+draft under `data/eval/legal_qa_benchmark/`. It is draft data only: no query
+has a split, no query is frozen, and no `split_manifest.json` or
+`benchmark_manifest.json` exists.
 
-- Query count: 78.
-- Remaining gap to `minimum_viable_benchmark_size=120`: 42 cases.
-- Expected decisions: 68 `answer_allowed`, 10 `fallback_required`.
-- Complete-evidence cases: 19.
-- Blocking/high-risk cases: 61.
-- Low/medium-risk cases: 17.
-- Fallback cases: 10.
+- Query count: 120.
+- Remaining gap to `minimum_viable_benchmark_size=120`: 0 cases.
+- Expected decisions: 103 `answer_allowed`, 17 `fallback_required`.
+- Complete-evidence cases: 27.
+- Blocking/high-risk cases: 80.
+- Low/medium-risk cases: 40.
+- Fallback cases: 17.
 - Regression-overlap cases: 0.
-- Primary review records: 78.
-- Structured independent review records: 78.
+- Primary review records: 120.
+- Structured independent review records: 120.
 - Adjudication records: 0.
 - Conflict queries: 0.
 - Frozen queries: 0.
@@ -311,35 +318,36 @@ exists.
 
 Domain counts:
 
-- `business_banking_tax`: 10;
-- `labor_employment_social_security`: 10;
-- `land_real_estate_construction_environment`: 10;
-- `civil_family_identity`: 9;
-- `consumer_health_education_digital_ip`: 9;
-- `criminal_procedure_penalty`: 8;
-- `administrative_government_interaction`: 7;
-- `traffic_public_order_sanctions`: 7;
-- `civil_procedure_dispute_resolution`: 6;
-- `constitutional_state_rights`: 2.
+- `business_banking_tax`: 14;
+- `consumer_health_education_digital_ip`: 14;
+- `labor_employment_social_security`: 14;
+- `land_real_estate_construction_environment`: 14;
+- `civil_family_identity`: 13;
+- `traffic_public_order_sanctions`: 13;
+- `administrative_government_interaction`: 11;
+- `civil_procedure_dispute_resolution`: 10;
+- `criminal_procedure_penalty`: 9;
+- `constitutional_state_rights`: 7;
+- `maritime_transport`: 1.
 
 Question-type counts:
 
-- `ambiguous`: 7;
-- `clause_point_lookup`: 62;
-- `complete_list`: 14;
-- `conditions_and_exceptions`: 10;
-- `cross_law`: 3;
-- `definition`: 9;
-- `eligibility`: 10;
-- `fallback`: 10;
-- `lexical_mismatch`: 22;
-- `multi_evidence`: 17;
-- `near_duplicate_provision`: 7;
-- `paraphrase`: 76;
-- `procedure`: 21;
-- `rights_and_obligations`: 36;
-- `sanction_or_penalty`: 10;
-- `single_article_lookup`: 53;
+- `ambiguous`: 14;
+- `clause_point_lookup`: 93;
+- `complete_list`: 22;
+- `conditions_and_exceptions`: 19;
+- `cross_law`: 4;
+- `definition`: 11;
+- `eligibility`: 16;
+- `fallback`: 17;
+- `lexical_mismatch`: 34;
+- `multi_evidence`: 26;
+- `near_duplicate_provision`: 8;
+- `paraphrase`: 118;
+- `procedure`: 34;
+- `rights_and_obligations`: 66;
+- `sanction_or_penalty`: 15;
+- `single_article_lookup`: 57;
 - `temporal_version_sensitive`: 0.
 
 ## Stage E1 Construction Plan
@@ -573,6 +581,10 @@ Before split and benchmark manifests are created:
 | 2026-06-21 | Add narrow Git exceptions only for full benchmark JSONL files | Draft benchmark records must be tracked, while split and benchmark manifests remain later freeze artifacts. | Implemented |
 | 2026-06-21 | Keep Stage E2B-1 conflict-free cases at `independent_reviewed` without fake adjudication records | No material disagreements were recorded, so adjudication records would create false review history. | Implemented |
 | 2026-06-21 | Keep `temporal_version_sensitive` coverage at 0 for E2B-1 | Current processed chunks still lack defensible temporal metadata for safe temporal ground truth. | Implemented |
+| 2026-06-21 | Keep Stage E2B-2 conflict-free cases at `independent_reviewed` without fake adjudication records | No material disagreements were recorded, so adjudication records would create false review history. | Implemented |
+| 2026-06-21 | Treat the 120-case dataset as a minimum viable draft, not a frozen benchmark | Grouping, leakage review, qualified-review allocation, split creation, and manifests are still pending. | Implemented |
+| 2026-06-21 | Keep `temporal_version_sensitive` coverage at 0 for E2B-2 | Current processed chunks still lack defensible temporal metadata for safe temporal ground truth. | Implemented |
+| 2026-06-21 | Block split and freeze after Stage E-Final audit | Held-out candidate pool has 35 grouped eligible low/medium-risk cases and lacks fallback, sanction/penalty, criminal-procedure, and maritime coverage because high-risk cases have no qualified human legal review. | Implemented |
 
 ## Risks and Open Questions
 
@@ -584,11 +596,21 @@ Confirmed risks:
 - Temporal/version-sensitive cases were not exercised in the pilot.
 - Semantic regression overlap still requires manual review.
 - Pilot over-samples blocking and high-risk cases.
-- Full benchmark construction may expose schema or protocol edge cases not
-  represented in the pilot.
+- Full benchmark grouping and split planning may expose schema or protocol
+  edge cases not represented by draft construction alone.
 - The cumulative draft benchmark still has high blocking/high-risk density
-  (61 of 78 cases), though E2B-1 added more low/medium-risk cases.
-- Stage E2B-1 does not define final held-out eligibility.
+  (80 of 120 cases), though E2B-2 increased low/medium-risk coverage to 40
+  cases.
+- The 120-case draft does not yet have a valid held-out split.
+- Only 35 grouped low/medium-risk cases are held-out eligible without
+  qualified human legal review, which is below the 36-case 30 percent target.
+- The current held-out eligible pool lacks fallback, sanction/penalty,
+  criminal-procedure, and maritime coverage.
+- `cross_law`, `definition`, `eligibility`, `sanction_or_penalty`,
+  `maritime_transport`, and `temporal_version_sensitive` coverage remain
+  below preferred quotas and need explicit split/freeze review.
+- `benchmark_version` remains `draft`; a release-valid benchmark version must
+  be approved before `benchmark_manifest.json` can be created.
 - Generation output can be non-deterministic even with fixed prompts and
   inputs.
 - Sparse retrieval, fusion, and reranking may add latency and cost.
@@ -669,6 +691,31 @@ Latest Stage E2B-1 draft-batch checks passed:
 - removed-document reference search: no active references;
 - `git diff --check`: passed.
 
+Latest Stage E2B-2 draft-batch checks passed:
+
+- full-benchmark corpus-aware validation: 0 errors, 0 warnings;
+- review-history audit: 120 queries, 120 primary review records, 120
+  structured independent review records, 0 adjudication records, 0 conflicts,
+  0 frozen queries, 0 assigned queries;
+- draft record counts: 120 queries, 200 targets, 200 qrels, 181 evidence
+  groups, 240 review records;
+- remaining gap to `minimum_viable_benchmark_size=120`: 0 cases;
+- manifest absence check: no split or benchmark manifest exists;
+- no held-out assignments and no frozen records.
+
+Latest Stage E-Final pre-freeze audit:
+
+- full-benchmark corpus-aware validation: 0 errors, 0 warnings;
+- normalized duplicate query audit: 0 duplicates;
+- exact regression-overlap audit: 0 matches;
+- exact pilot-overlap audit: 0 matches;
+- transitive grouping components: 108;
+- query-level held-out candidates without qualified human review: 40;
+- grouped held-out-eligible candidates: 35;
+- development-only cases due high-risk without qualified human review: 80;
+- excluded-from-freeze cases: 0;
+- result: freeze blocked; no split or manifests created.
+
 ## Change Log
 
 | Date | Change |
@@ -685,6 +732,8 @@ Latest Stage E2B-1 draft-batch checks passed:
 | 2026-06-21 | Added Stage E1 full benchmark construction planning, quota proposal, eligibility tiers, split strategy, and Stage E2 acceptance criteria. |
 | 2026-06-21 | Created the first 36-case full-benchmark draft batch with primary annotation, structured automated review, and corpus-aware validation. |
 | 2026-06-21 | Added the second 42-case full-benchmark draft batch, bringing the cumulative draft to 78 cases with corpus-aware validation passing. |
+| 2026-06-21 | Added the final 42-case minimum-viable draft batch, bringing the cumulative draft to 120 cases with corpus-aware validation passing. |
+| 2026-06-21 | Completed Stage E-Final pre-freeze audit and blocked split/freeze because held-out eligibility and coverage gates did not pass. |
 
 ## Exit Criteria
 
@@ -707,11 +756,11 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-Stage E2B-2 final draft batch construction
--> coverage gap closure to the 120-case minimum
--> duplicate, paraphrase, and source-provision grouping
--> annotation workload and qualified-review allocation
--> grouped split and leakage validation
+qualified human legal-review allocation for high-risk held-out candidates
+-> add or reclassify low/medium-risk cases if held-out coverage remains thin
+-> rerun duplicate, paraphrase, source-provision, and leakage audit
+-> create grouped split only after eligibility and coverage gates pass
+-> freeze split and benchmark manifests only with a release-valid benchmark version
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.
