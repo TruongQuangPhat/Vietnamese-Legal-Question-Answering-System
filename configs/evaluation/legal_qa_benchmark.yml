@@ -1,6 +1,8 @@
 schema_version: "1.0"
-# Development placeholder only. Freeze refuses draft benchmark versions.
-benchmark_version: "draft"
+# Scoped v0.1 benchmark release. Held-out scope is low/medium-risk eligible
+# cases only; high-risk cases without qualified human legal review remain
+# development-only.
+benchmark_version: "v0.1.0"
 # Provisional Stage C default, not an approved final benchmark split ratio.
 development_ratio: 0.7
 split_seed: 20260619

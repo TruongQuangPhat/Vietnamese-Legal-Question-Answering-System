@@ -490,6 +490,25 @@ resolved or excluded, all high-risk held-out review requirements must be met,
 raw and canonical fingerprints must be computed, and `benchmark_version` must
 be a release-valid value rather than `draft`.
 
+### Scoped `v0.1.0` Release Policy
+
+Benchmark release `v0.1.0` is allowed to freeze a scoped held-out split with
+low/medium-risk eligible cases only. High-risk cases without qualified human
+legal review may remain in `development` for tuning, debugging, regression
+analysis, and qualitative review, but they must not enter `held_out_test`.
+
+For `v0.1.0`, held-out coverage may intentionally defer
+`sanction_or_penalty` and `criminal_procedure_penalty` when all available
+candidates are high-risk and lack qualified human legal review. Any Stage F,
+G, H, or I conclusion based on `v0.1.0` must state that held-out results do
+not validate performance on high-risk sanction, penalty, or criminal legal QA.
+
+Future releases, such as `v0.2.0`, may add high-risk held-out coverage only
+after qualified human legal review is completed and recorded. This scoped
+policy does not weaken global hard violations, citation requirements,
+selected-evidence-only generation, fallback safety, or the requirement that
+high-risk held-out cases receive qualified human legal review.
+
 ## Benchmark Schemas
 
 Typed schema boundaries live under `src/evaluation/benchmark/`:

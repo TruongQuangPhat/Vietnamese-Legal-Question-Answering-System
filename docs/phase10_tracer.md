@@ -36,13 +36,14 @@ after Phase 10 closes and durable information has been consolidated.
   Schema contract version `1.0` is frozen for full benchmark construction.
   Stage E1 full benchmark construction planning is complete. Stage E2A,
   E2B-1, and E2B-2 created the 120-case minimum viable full-benchmark draft.
-- Stage E-Final audit result: the 120-case minimum viable draft validates with
-  0 errors and 0 warnings, but split/freeze is blocked by held-out
-  eligibility and coverage gates.
-- Not done: qualified human legal-review allocation for high-risk held-out
-  candidates, low/medium-risk held-out coverage balancing, dev/test split,
-  held-out benchmark freeze, frozen Naive RAG baseline run, metrics, sparse
-  retrieval, fusion, reranking, GraphRAG, API, UI, and fine-tuning.
+- Stage E final result: scoped benchmark release `v0.1.0` is frozen. The
+  frozen dataset contains 128 cases, 85 `development` cases, and 43
+  `held_out_test` cases. The held-out scope is low/medium-risk eligible cases
+  only; high-risk cases without qualified human legal review remain
+  development-only.
+- Not done: qualified human legal review for high-risk held-out expansion,
+  frozen Naive RAG baseline run, metrics, sparse retrieval, fusion, reranking,
+  GraphRAG, API, UI, and fine-tuning.
 
 ## Canonical Document Map
 
@@ -111,7 +112,7 @@ Core invariants:
 | Stage B - Benchmark Protocol | Complete | Durable rules consolidated into `docs/evaluation.md`. |
 | Stage C - Benchmark Implementation | Complete | Schemas, loaders, validator, splitting, fingerprinting, freeze support, CLIs, config, and tests implemented. |
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
-| Stage E - Full Benchmark and Split Freeze | Blocked before split/freeze | Stage E1 planning is complete. Stage E2A, E2B-1, and E2B-2 created and validated 120 full-benchmark draft cases. Stage E-Final audit found held-out eligibility and coverage blockers, so no split or manifests were created. |
+| Stage E - Full Benchmark and Split Freeze | Complete for scoped `v0.1.0` | Stage E1 planning, E2 construction, E-Repair, scoped split, and freeze are complete. `held_out_test` contains low/medium-risk eligible cases only; high-risk sanction/criminal held-out coverage is deferred pending qualified human legal review. |
 | Stage F - Frozen Naive RAG Baseline | Not started | Baseline execution on frozen development and held-out splits remains pending. |
 | Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
@@ -192,11 +193,13 @@ Core invariants:
 - [x] final draft construction to the 120-case minimum;
 - [x] duplicate and near-duplicate audit;
 - [x] paraphrase-family and source-provision grouping audit;
-- [ ] deterministic development/test split;
-- [ ] final split leakage validation;
-- [ ] test freeze;
-- [ ] checksums;
-- [ ] benchmark manifest.
+- [x] targeted held-out eligibility repair batch;
+- [x] high-risk held-out human-review allocation packet;
+- [x] deterministic development/test split for scoped `v0.1.0`;
+- [x] final split leakage validation;
+- [x] test freeze;
+- [x] checksums;
+- [x] benchmark manifest.
 
 ### Stage F - Frozen Naive RAG Baseline
 
@@ -261,7 +264,7 @@ Core invariants:
 | Evaluation CLIs | `scripts/evaluation/` | Created | Thin wrappers; no Qdrant or OpenRouter calls. |
 | Evaluation tests | `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py` | Created | Synthetic fixtures only. |
 | Pilot dataset | `data/eval/legal_qa_benchmark/pilot/` | Draft | Pre-split, non-frozen, not held-out proof. |
-| Full benchmark draft batches | `data/eval/legal_qa_benchmark/*.jsonl` | Draft | 120 pre-split, non-frozen cases; structured automated review complete; no manifests. |
+| Full benchmark release | `data/eval/legal_qa_benchmark/` | Frozen scoped `v0.1.0` | 128 frozen records, 85 development cases, 43 low/medium-risk held-out cases, split and benchmark manifests created. |
 
 ## Pilot Snapshot
 
@@ -287,68 +290,156 @@ Core invariants:
 - Conflict queries: 0.
 - Frozen queries: 0.
 - Assigned queries: 0.
-- Held-out eligibility audit: 40 query-level low/medium-risk candidates, but
-  only 35 remain eligible after transitive grouping by `case_family_id` and
-  `source_provision_group_id`.
-- Freeze blocker: the eligible held-out pool is too small for the target
-  30 percent split and lacks important safety/type coverage including
-  fallback, sanction/penalty, criminal-procedure, and maritime cases.
+- Held-out eligibility audit: pilot records remain separate from the full
+  benchmark and are not part of the current held-out candidate pool.
+- Freeze blocker: pilot cases remain pre-split, non-frozen, and not
+  qualified-human-reviewed.
 
 ## Full Benchmark Draft Snapshot
 
-Stage E2A, E2B-1, and E2B-2 created the current canonical full-benchmark
-draft under `data/eval/legal_qa_benchmark/`. It is draft data only: no query
-has a split, no query is frozen, and no `split_manifest.json` or
-`benchmark_manifest.json` exists.
+Stage E2A, E2B-1, E2B-2, E-Repair, and the final scoped freeze created the
+current canonical full benchmark under `data/eval/legal_qa_benchmark/`.
+Benchmark release `v0.1.0` is frozen with a scoped held-out split.
 
-- Query count: 120.
+- Query count: 128.
 - Remaining gap to `minimum_viable_benchmark_size=120`: 0 cases.
-- Expected decisions: 103 `answer_allowed`, 17 `fallback_required`.
-- Complete-evidence cases: 27.
+- Expected decisions: 110 `answer_allowed`, 18 `fallback_required`.
+- Complete-evidence cases: 28.
 - Blocking/high-risk cases: 80.
-- Low/medium-risk cases: 40.
-- Fallback cases: 17.
+- Low/medium-risk cases: 48.
+- Fallback cases: 18.
 - Regression-overlap cases: 0.
-- Primary review records: 120.
-- Structured independent review records: 120.
+- Primary review records: 128.
+- Structured independent review records: 128.
 - Adjudication records: 0.
 - Conflict queries: 0.
-- Frozen queries: 0.
-- Assigned queries: 0.
+- Frozen queries: 128.
+- Assigned queries: 128.
+- Development split: 85 cases.
+- Held-out split: 43 cases.
+- Held-out high-risk cases: 0.
+- Benchmark version: `v0.1.0`.
+- Split manifest: `data/eval/legal_qa_benchmark/split_manifest.json`.
+- Benchmark manifest: `data/eval/legal_qa_benchmark/benchmark_manifest.json`.
 
 Domain counts:
 
+- `consumer_health_education_digital_ip`: 16;
 - `business_banking_tax`: 14;
-- `consumer_health_education_digital_ip`: 14;
 - `labor_employment_social_security`: 14;
 - `land_real_estate_construction_environment`: 14;
-- `civil_family_identity`: 13;
+- `civil_family_identity`: 14;
 - `traffic_public_order_sanctions`: 13;
 - `administrative_government_interaction`: 11;
-- `civil_procedure_dispute_resolution`: 10;
+- `civil_procedure_dispute_resolution`: 11;
 - `criminal_procedure_penalty`: 9;
 - `constitutional_state_rights`: 7;
-- `maritime_transport`: 1.
+- `maritime_transport`: 5.
 
 Question-type counts:
 
 - `ambiguous`: 14;
-- `clause_point_lookup`: 93;
-- `complete_list`: 22;
+- `clause_point_lookup`: 100;
+- `complete_list`: 23;
 - `conditions_and_exceptions`: 19;
 - `cross_law`: 4;
-- `definition`: 11;
+- `definition`: 17;
 - `eligibility`: 16;
-- `fallback`: 17;
-- `lexical_mismatch`: 34;
+- `fallback`: 18;
+- `lexical_mismatch`: 38;
 - `multi_evidence`: 26;
 - `near_duplicate_provision`: 8;
-- `paraphrase`: 118;
-- `procedure`: 34;
-- `rights_and_obligations`: 66;
+- `paraphrase`: 125;
+- `procedure`: 36;
+- `rights_and_obligations`: 67;
 - `sanction_or_penalty`: 15;
-- `single_article_lookup`: 57;
+- `single_article_lookup`: 64;
 - `temporal_version_sensitive`: 0.
+
+### Scoped `v0.1.0` Held-Out Eligibility
+
+The repair batch added eight low/medium-risk draft cases:
+
+```text
+bench_0121
+bench_0122
+bench_0123
+bench_0124
+bench_0125
+bench_0126
+bench_0127
+bench_0128
+```
+
+Repair focus:
+
+- additional `maritime_transport` coverage;
+- one low/medium-risk fallback boundary;
+- additional `definition`, `procedure`, `complete_list`, and
+  `rights_and_obligations` coverage;
+- no qualified human legal-review record was added;
+- no high-risk case was downgraded to force split eligibility.
+
+Final scoped held-out eligibility audit:
+
+- query-level held-out eligible candidates: 48;
+- grouped held-out eligible candidates after transitive grouping: 43;
+- development-only cases due high-risk without qualified human legal review:
+  80;
+- excluded cases: 0;
+- exact normalized duplicate queries: 0;
+- exact regression overlaps: 0;
+- exact pilot overlaps: 0;
+- transitive grouping components: 116;
+- final held-out assignment: 43 grouped low/medium-risk cases;
+- final development assignment: 85 cases.
+
+Grouped held-out-eligible coverage now includes:
+
+- expected decisions: 42 `answer_allowed`, 1 `fallback_required`;
+- domains: `business_banking_tax`, `traffic_public_order_sanctions`,
+  `constitutional_state_rights`, `civil_family_identity`,
+  `civil_procedure_dispute_resolution`,
+  `administrative_government_interaction`,
+  `consumer_health_education_digital_ip`,
+  `land_real_estate_construction_environment`,
+  `labor_employment_social_security`, and `maritime_transport`;
+- question types: `single_article_lookup`, `clause_point_lookup`,
+  `definition`, `lexical_mismatch`, `complete_list`, `paraphrase`,
+  `multi_evidence`, `rights_and_obligations`, `procedure`, `cross_law`,
+  `conditions_and_exceptions`, `eligibility`, and `fallback`.
+
+Known scoped `v0.1.0` limitations:
+
+- high-risk sanction, penalty, fallback-safety, criminal, and some eligibility
+  cases still need qualified human legal review before future held-out use;
+- `v0.1.0` held-out results must not be used to validate performance on
+  high-risk sanction, penalty, or criminal legal QA;
+- no qualified human legal review has been completed;
+- temporal/version-sensitive held-out coverage remains excluded.
+
+### High-Risk Human Review Allocation Packet
+
+The following cases are priority candidates if high-risk held-out coverage is
+required. Current assurance for all listed cases is structured automated
+review only; qualified human legal review has not been completed.
+
+| Query ID | Domain | Coverage need | High-risk reason | Reviewer must verify |
+| --- | --- | --- | --- | --- |
+| `bench_0120` | `criminal_procedure_penalty` | fallback, sanction/penalty, criminal coverage | fact-specific criminal penalty fallback safety | Whether fallback is required and whether no direct penalty answer is safe without offense facts. |
+| `bench_0023` | `traffic_public_order_sanctions` | fallback and traffic sanction coverage | exact fine amount absent from corpus | Whether incomplete-evidence fallback is correct and no decree-level fine is directly available. |
+| `bench_0089` | `traffic_public_order_sanctions` | fallback and traffic sanction coverage | exact sidewalk-stop fine amount absent from corpus | Whether supporting sanction provisions remain non-direct and fallback is required. |
+| `bench_0024` | `criminal_procedure_penalty` | criminal eligibility and penalty-scope coverage | juvenile criminal-liability scope | Whether the age and offense-scope conditions are complete and directly cited. |
+| `bench_0078` | `criminal_procedure_penalty` | criminal procedure fallback coverage | case-specific investigation deadline conclusion | Whether unsafe ambiguity and conditions/exceptions are properly handled. |
+| `bench_0022` | `traffic_public_order_sanctions` | complete-list sanction coverage | omission of sanction forms changes legal meaning | Whether all in-scope sanction forms are complete and correctly grouped. |
+| `bench_0025` | `criminal_procedure_penalty` | criminal mitigation coverage | penalty consequence and mitigation scope | Whether the mitigation provision is direct and not over-broad. |
+| `bench_0026` | `criminal_procedure_penalty` | near-duplicate criminal penalty coverage | theft aggravation/condition risk | Whether the queried condition is exact and near-miss provisions are not treated as alternatives. |
+| `bench_0040` | `civil_family_identity` | fallback sanction boundary | exact identity-card loss fine absent from corpus | Whether fallback is required and no sanction amount is directly available. |
+| `bench_0075` | `criminal_procedure_penalty` | criminal responsibility coverage | intoxication and liability consequence | Whether the provision supports the answer scope without broader criminal-law interpretation. |
+| `bench_0076` | `criminal_procedure_penalty` | aggravating-circumstance coverage | criminal penalty consequence | Whether the target provision is direct and hierarchy depth is correct. |
+| `bench_0087` | `traffic_public_order_sanctions` | complete-list sanction coverage | administrative sanction list completeness | Whether the evidence groups fully cover the in-scope list and avoid duplicate leakage. |
+| `bench_0102` | `consumer_health_education_digital_ip` | fallback sanction/digital safety coverage | AI/personal-data penalty source gap | Whether fallback is required and whether the question is too broad for corpus-only answer. |
+| `bench_0088` | `traffic_public_order_sanctions` | rights/procedure in sanction context | burden-of-proof and sanction-process consequence | Whether the rights/procedure claim is complete and directly grounded. |
 
 ## Stage E1 Construction Plan
 
@@ -585,6 +676,10 @@ Before split and benchmark manifests are created:
 | 2026-06-21 | Treat the 120-case dataset as a minimum viable draft, not a frozen benchmark | Grouping, leakage review, qualified-review allocation, split creation, and manifests are still pending. | Implemented |
 | 2026-06-21 | Keep `temporal_version_sensitive` coverage at 0 for E2B-2 | Current processed chunks still lack defensible temporal metadata for safe temporal ground truth. | Implemented |
 | 2026-06-21 | Block split and freeze after Stage E-Final audit | Held-out candidate pool has 35 grouped eligible low/medium-risk cases and lacks fallback, sanction/penalty, criminal-procedure, and maritime coverage because high-risk cases have no qualified human legal review. | Implemented |
+| 2026-06-21 | Use targeted low/medium-risk repair instead of downgrading high-risk cases | Held-out eligibility can be improved safely with additional source-grounded definition, procedure, maritime, and fallback cases; high-risk sanction/criminal cases still require qualified human review before held-out use. | Implemented |
+| 2026-06-21 | Do not create split or manifests after E-Repair | Although grouped held-out eligibility improved to 43 candidates, `benchmark_version` remains `draft` and high-risk held-out allocation still requires qualified human review decisions. | Implemented |
+| 2026-06-21 | Freeze scoped `v0.1.0` with low/medium-risk held-out only | A safe held-out split is available when all high-risk cases without qualified human legal review are development-only and sanction/criminal held-out coverage is explicitly deferred. | Implemented |
+| 2026-06-21 | Defer high-risk sanction/criminal held-out claims | `v0.1.0` must not be described as validating high-risk sanction, penalty, or criminal legal QA. | Active |
 
 ## Risks and Open Questions
 
@@ -599,18 +694,18 @@ Confirmed risks:
 - Full benchmark grouping and split planning may expose schema or protocol
   edge cases not represented by draft construction alone.
 - The cumulative draft benchmark still has high blocking/high-risk density
-  (80 of 120 cases), though E2B-2 increased low/medium-risk coverage to 40
-  cases.
-- The 120-case draft does not yet have a valid held-out split.
-- Only 35 grouped low/medium-risk cases are held-out eligible without
-  qualified human legal review, which is below the 36-case 30 percent target.
-- The current held-out eligible pool lacks fallback, sanction/penalty,
-  criminal-procedure, and maritime coverage.
+  (80 of 128 cases), though E-Repair increased low/medium-risk coverage to
+  48 cases.
+- `v0.1.0` has a valid held-out split, but the held-out split intentionally
+  contains low/medium-risk cases only.
+- `v0.1.0` held-out excludes high-risk sanction/penalty and criminal-procedure
+  coverage unless qualified human legal review is completed in a future
+  release.
 - `cross_law`, `definition`, `eligibility`, `sanction_or_penalty`,
   `maritime_transport`, and `temporal_version_sensitive` coverage remain
   below preferred quotas and need explicit split/freeze review.
-- `benchmark_version` remains `draft`; a release-valid benchmark version must
-  be approved before `benchmark_manifest.json` can be created.
+- Future benchmark releases need an explicit version decision and should not
+  overwrite `v0.1.0` manifests.
 - Generation output can be non-deterministic even with fixed prompts and
   inputs.
 - Sparse retrieval, fusion, and reranking may add latency and cost.
@@ -716,6 +811,43 @@ Latest Stage E-Final pre-freeze audit:
 - excluded-from-freeze cases: 0;
 - result: freeze blocked; no split or manifests created.
 
+Latest Stage E-Repair audit:
+
+- repair batch added: 8 low/medium-risk draft cases;
+- full-benchmark corpus-aware validation: 0 errors, 0 warnings;
+- draft record counts: 128 queries, 207 targets, 207 qrels, 188 evidence
+  groups, 256 review records;
+- review-history audit: 128 primary review records, 128 structured
+  independent review records, 0 adjudication records, 0 conflicts, 0 frozen
+  queries, 0 assigned queries;
+- normalized duplicate query audit: 0 duplicates;
+- exact regression-overlap audit: 0 matches;
+- exact pilot-overlap audit: 0 matches;
+- transitive grouping components: 116;
+- query-level held-out candidates without qualified human review: 48;
+- grouped held-out-eligible candidates: 43;
+- development-only cases due high-risk without qualified human review: 80;
+- excluded-from-freeze cases: 0;
+- manifest absence check: no split or benchmark manifest exists;
+- result: held-out pool improved, but freeze remains blocked by release-version
+  and high-risk qualified-review gates.
+
+Latest scoped `v0.1.0` freeze audit:
+
+- full-benchmark validation with split manifest: 0 errors, 0 warnings;
+- benchmark version: `v0.1.0`;
+- draft record counts at freeze: 128 queries, 207 targets, 207 qrels, 188
+  evidence groups, 256 review records;
+- frozen query count: 128;
+- split counts: 85 `development`, 43 `held_out_test`;
+- held-out high-risk cases: 0;
+- development high-risk cases: 80;
+- benchmark manifest created:
+  `data/eval/legal_qa_benchmark/benchmark_manifest.json`;
+- split manifest created:
+  `data/eval/legal_qa_benchmark/split_manifest.json`;
+- result: scoped `v0.1.0` freeze completed.
+
 ## Change Log
 
 | Date | Change |
@@ -734,6 +866,8 @@ Latest Stage E-Final pre-freeze audit:
 | 2026-06-21 | Added the second 42-case full-benchmark draft batch, bringing the cumulative draft to 78 cases with corpus-aware validation passing. |
 | 2026-06-21 | Added the final 42-case minimum-viable draft batch, bringing the cumulative draft to 120 cases with corpus-aware validation passing. |
 | 2026-06-21 | Completed Stage E-Final pre-freeze audit and blocked split/freeze because held-out eligibility and coverage gates did not pass. |
+| 2026-06-21 | Added an 8-case Stage E-Repair batch, improved grouped held-out eligibility to 43 cases, and recorded high-risk human-review allocation candidates without creating split or benchmark manifests. |
+| 2026-06-21 | Froze scoped benchmark release `v0.1.0` with 43 low/medium-risk held-out cases, 85 development cases, and manifest fingerprints. |
 
 ## Exit Criteria
 
@@ -756,11 +890,12 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-qualified human legal-review allocation for high-risk held-out candidates
--> add or reclassify low/medium-risk cases if held-out coverage remains thin
--> rerun duplicate, paraphrase, source-provision, and leakage audit
--> create grouped split only after eligibility and coverage gates pass
--> freeze split and benchmark manifests only with a release-valid benchmark version
+frozen Naive RAG baseline planning
+-> run frozen dense baseline on development split
+-> run frozen dense baseline on held_out_test split
+-> keep `v0.1.0` limitations visible in all comparison reports
+-> do not start sparse retrieval, RRF, or reranking until baseline manifests
+   and metrics are recorded
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.

@@ -112,6 +112,8 @@ data/eval/*
 !data/eval/legal_qa_benchmark/benchmark_qrels.jsonl
 !data/eval/legal_qa_benchmark/evidence_groups.jsonl
 !data/eval/legal_qa_benchmark/review_records.jsonl
+!data/eval/legal_qa_benchmark/split_manifest.json
+!data/eval/legal_qa_benchmark/benchmark_manifest.json
 !data/eval/legal_qa_benchmark/pilot/
 !data/eval/legal_qa_benchmark/pilot/README.md
 !data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl
