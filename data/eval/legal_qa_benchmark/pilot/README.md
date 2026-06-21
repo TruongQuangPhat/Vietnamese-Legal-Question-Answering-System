@@ -4,10 +4,14 @@ This directory contains draft pilot annotation for the broader legal QA
 benchmark.
 
 It is not a held-out benchmark, is not frozen, and must not be used to claim
-that any system improves over the Naive RAG baseline. Independent legal review,
-disagreement recording, adjudication, schema/protocol feedback, split creation,
-and benchmark freeze are still pending. The existing five-case suite under
-`data/eval/` remains separate regression data.
+that any system improves over the Naive RAG baseline. The pilot has completed
+source-grounded primary annotation, structured automated second-pass review,
+and repository-level adjudication. This does not constitute qualified human
+legal review. Qualified human legal review has not been completed.
+Schema/protocol stabilization and the schema contract freeze are complete for
+full benchmark construction, but split creation and benchmark freeze are still
+pending. The existing five-case suite under `data/eval/` remains separate
+regression data.
 
 ## Files
 
@@ -17,10 +21,13 @@ benchmark_targets.jsonl
 benchmark_qrels.jsonl
 evidence_groups.jsonl
 review_records.jsonl
+independent_review_report.md
+stabilization_report.md
 ```
 
 No `split_manifest.json` or `benchmark_manifest.json` is present. Every pilot
-query is pre-split with `split=null` and `review_status=primary_reviewed`.
+query is pre-split with `split=null`. Query review statuses after D2 are
+18 `independent_reviewed` and 1 `adjudicated`; no query is `frozen`.
 
 ## Source and Annotation Method
 
@@ -65,6 +72,10 @@ selected child chunks from `data/processed/legal_chunks.jsonl`.
 - Blocking cases: 14
 - Regression-overlap bridge cases: 2
 - Temporal/version-sensitive cases: 0
+- Independent-reviewed queries: 18
+- Adjudicated queries: 1
+- Unresolved cases requiring human review for D2 resolution: 0
+- Qualified human legal review completed: false
 
 The pilot intentionally over-samples difficult cases, including complete-list,
 eligibility, sanction, criminal, procedure, cross-law, and fallback-safety
@@ -93,7 +104,7 @@ benchmark.
 - `ambiguous`: 1
 - `clause_point_lookup`: 13
 - `complete_list`: 5
-- `conditions_and_exceptions`: 4
+- `conditions_and_exceptions`: 3
 - `cross_law`: 1
 - `definition`: 1
 - `eligibility`: 3
@@ -146,37 +157,27 @@ not fully automatic.
   pre-split until independent review and adjudication are complete.
 - Frozen benchmark manifests: omitted because the pilot is draft data.
 
-## Known Annotation Uncertainties and D2 Review Questions
+## D2 Review Findings
 
-- `pilot_0001`:
-  - Is the query scope limited to Article 8 Clause 1 marriage conditions?
-  - Is Clause 2 on non-recognition of same-sex marriage outside the current
-    query scope?
-  - Are the current evidence groups complete for the scoped query?
-- `pilot_0002`:
-  - Is Civil Code Article 213 Clause 1 required direct evidence or only
-    supporting context?
-  - Is Clause 2 the direct provision needed for rights over common property?
-  - Is the cross-law evidence-group granularity correct?
-- `pilot_0003`:
-  - Is the Vietnamese query sufficiently restricted to ordinary Clause 2
-    overtime limits?
-  - Are Article 107 Clause 3 extended overtime cases outside the scope?
-  - Should the query be narrowed or should the evidence be expanded?
-- `pilot_0017`:
-  - Is the exact motorbike red-light fine truly unavailable from the frozen
-    corpus?
-  - Are supporting traffic provisions correctly non-direct?
-  - Does `incomplete_evidence` remain the correct fallback reason after the
-    query correction removed relative temporal wording?
-- `pilot_0018`:
-  - Is the ambiguity unsafe rather than resolvable as annual leave?
-  - Is removing `complete_list` and setting `complete_evidence_required=false`
-    correct?
-  - Is its regression overlap fully documented?
+Detailed findings are recorded in
+`data/eval/legal_qa_benchmark/pilot/independent_review_report.md`.
+The stabilization decision is recorded in
+`data/eval/legal_qa_benchmark/pilot/stabilization_report.md`.
 
-These questions are not independent-review conclusions. They are prepared for
-D2 review.
+Summary:
+
+- 19 cases received independent review records using
+  `codex_independent_review_v1`.
+- 1 material disagreement was found for `pilot_0003`.
+- `pilot_0003` was adjudicated by `codex_adjudication_v1` by narrowing the
+  query to ordinary overtime under Article 107 Clause 2 and removing
+  `conditions_and_exceptions` from `question_types`.
+- No case was rejected from the pilot.
+- No unresolved case requires human review for D2 conflict resolution.
+- The pilot has completed source-grounded primary annotation, structured
+  automated second-pass review, and repository-level adjudication.
+- This does not constitute qualified human legal review.
+- Qualified human legal review has not been completed.
 
 ## Human Review Checklist
 
@@ -193,6 +194,10 @@ D2 review.
 
 ## Current Status
 
-All records are draft pilot annotations, primary-reviewed only, and pre-split.
-Independent review and adjudication must happen before any schema freeze,
-benchmark split, baseline run, or controlled retrieval comparison.
+All records are still draft pilot annotations and pre-split. Source-grounded
+primary annotation, structured automated second-pass review, and the one
+required repository-level adjudication are complete. The pilot remains
+non-frozen and has not received qualified human legal review. Schema/protocol
+stabilization and schema contract freeze are complete for full benchmark
+construction. A benchmark split, benchmark freeze, baseline run, or controlled
+retrieval comparison has not been performed.

@@ -43,11 +43,14 @@ Verified repository state as of 2026-06-20:
   back for the annual-leave control, citation-ID validity is not semantic
   faithfulness, model output may vary, and the system is not production legal
   advice.
-- Current Phase 10 stage: Stage D1 pilot construction and primary annotation
-  are complete. Independent review, disagreement recording, adjudication, and
-  schema/protocol stabilization remain pending. No held-out split, benchmark
-  freeze, baseline execution, metrics, sparse retrieval, fusion, or reranking
-  has been implemented.
+- Current Phase 10 stage: Stage D stabilization is complete for the draft
+  pilot. The pilot has completed source-grounded primary annotation,
+  structured automated second-pass review, and repository-level adjudication.
+  This does not constitute qualified human legal review. Qualified human legal
+  review has not been completed. Schema/protocol stabilization has passed, and
+  schema contract version `1.0` is frozen for full benchmark construction. No
+  held-out split, benchmark freeze, baseline execution, metrics, sparse
+  retrieval, fusion, or reranking has been implemented.
 
 ## Phase 10 Objective
 
@@ -234,13 +237,15 @@ Baseline assets to preserve:
 - [x] 15-20 pilot queries;
 - [x] coverage of difficult question types;
 - [x] primary annotation;
-- [ ] independent review;
-- [ ] adjudication;
-- [ ] schema revision;
-- [ ] protocol revision;
-- [x] schema/protocol revision assessment completed; no change required after
-  corpus-aware pilot validation;
-- [ ] schema version freeze.
+- [x] structured automated independent review;
+- [x] repository-level adjudication;
+- [x] schema revision assessment - backward-compatible review-assurance
+  metadata added;
+- [x] protocol revision assessment - review-assurance clarification added;
+- [x] schema/protocol stabilization;
+- [x] schema version freeze;
+- [ ] qualified human legal review, required before eligible high-risk
+  held-out use.
 
 ### Stage E - Full Benchmark and Split Freeze
 
@@ -384,6 +389,8 @@ Latency reports should include mean, median, p95, and p99 where appropriate.
 | Evaluation configuration | `configs/evaluation/legal_qa_benchmark.yml` | Created | Benchmark protocol | Non-secret benchmark options only; no final domain quotas or metric gains. |
 | Legal QA benchmark data | `data/eval/legal_qa_benchmark/` | Draft pilot directory created; frozen benchmark not created | Approved schema, annotation workflow | Pilot data is primary-reviewed only, pre-split, and not held-out proof. |
 | Pilot benchmark annotation | `data/eval/legal_qa_benchmark/pilot/` | Created | Stage B protocol and Stage C implementation | Contains 19 draft pilot queries, targets, qrels, evidence groups, review records, and README coverage summary. |
+| Pilot independent review report | `data/eval/legal_qa_benchmark/pilot/independent_review_report.md` | Created | Stage D2 structured review | Records 19 second-pass reviews, 1 material disagreement, and 1 adjudication; not qualified human legal review. |
+| Pilot stabilization report | `data/eval/legal_qa_benchmark/pilot/stabilization_report.md` | Created | Stage D2 review history and schema/protocol assessment | Concludes schema version `1.0` is stable for full benchmark construction; does not freeze pilot data. |
 | Benchmark schema and loaders | `src/evaluation/benchmark/` | Created | Protocol and schema approval | Includes enums, schemas, exceptions, loaders, validator, splitting, and fingerprinting. |
 | Evaluation metrics | `src/evaluation/metrics/` | Planned; not created | Metric definitions | Include retrieval, decision/safety, generation, and operational metrics. |
 | Evaluation reporting | `src/evaluation/reporting/` | Planned; not created | Report schema and manifest design | Reports must include dataset version and fingerprints. |
@@ -422,13 +429,19 @@ Latency reports should include mean, median, p95, and p99 where appropriate.
 | 2026-06-20 | Keep pilot records pre-split and primary-reviewed only | Stage D1 prepares cases for independent review and must not create held-out assignments or frozen manifests. | Pilot annotation | Implemented |
 | 2026-06-20 | Use two deliberate regression bridge cases only | Bridge cases preserve compatibility with known regression targets while remaining permanently ineligible for held-out proof. | Pilot annotation and contamination policy | Implemented |
 | 2026-06-20 | Omit temporal pilot cases until metadata is sufficient | Processed chunk inspection did not expose enough effective/expiry metadata for defensible `as_of_date` annotation. | Pilot coverage | Implemented |
+| 2026-06-20 | Keep D2 review procedural, not human-legal | The second pass improves annotation discipline but must not be represented as qualified legal counsel. | Pilot review documentation | Implemented |
+| 2026-06-20 | Adjudicate `pilot_0003` by narrowing query scope | The original overtime query could require Article 107 Clause 3 evidence, while the available child chunks do not directly expose the 300-hour cap header. | Pilot annotation | Implemented |
+| 2026-06-21 | Record review assurance separately from review stage | Workflow completion must not be confused with qualified human legal review. | `ReviewRecord`, pilot review records, documentation | Implemented |
+| 2026-06-21 | Freeze schema contract version `1.0` for full benchmark construction | The reviewed pilot exercised schemas, validation, review history, and adjudication without unresolved blocking issues after assurance metadata was added. | Benchmark schema contract | Approved |
+| 2026-06-21 | Require accurate benchmark assurance claims and qualified review for high-risk held-out use | The benchmark may be described as source-grounded, schema-validated, corpus-aware validated, structured-review-completed, and repository-adjudicated when true, but not expert-reviewed, lawyer-reviewed, or legally validated without recorded qualified human legal review. High-risk held-out items require qualified human legal review or exclusion from the frozen held-out split. | Benchmark documentation and release claims | Approved |
 
 ## Risks and Open Questions
 
 Confirmed risks:
 
 - Benchmark annotation cost may be high.
-- Legal review coverage may be insufficient without a clear review workflow.
+- Qualified human legal review coverage may be insufficient without staffing
+  and scheduling for full benchmark construction.
 - Complete-list questions require evidence-group and completeness semantics.
 - Paraphrase and source-provision leakage can invalidate dev/test splits.
 - Embedding model revision is currently nullable in `configs/retrieval/retrieval.yml`.
@@ -438,11 +451,17 @@ Confirmed risks:
   tuning.
 - Latency and cost may regress when sparse retrieval, fusion, or reranking are
   added.
-- Pilot annotations may change after independent legal review.
+- Pilot annotations may change after qualified human legal review.
 - Two pilot bridge cases intentionally overlap regression targets and must
   remain excluded from held-out proof.
 - Current pilot coverage omits temporal/version-sensitive cases because chunk
   metadata is insufficient for defensible temporal labels.
+- D2 review was a structured repository review and did not provide qualified
+  human legal review.
+- High-risk held-out items require qualified human legal review or exclusion
+  from the frozen held-out split.
+- Full benchmark construction may expose schema or protocol edge cases not
+  represented in the 19-case pilot.
 
 Open design questions:
 
@@ -450,18 +469,14 @@ Open design questions:
 - What final domain quotas will be approved for the registry-derived taxonomy?
 - Whether secondary domains should be required for every cross-law case or only
   where needed for stratification.
-- How should complete-evidence groups be encoded and adjudicated?
 - What exact relevance gain values should be used for nDCG?
 - What numeric relevance gain, if any, should be assigned to supporting
   evidence after metric implementation defines contextual usefulness?
 - What exact blocking-case thresholds should gate system comparison?
-- Whether `fallback_reason` categories fully cover pilot cases before Stage C
-  freezes an enum.
 - What manual-review threshold should flag diacritic-sensitive near-duplicates
   without automatically merging Vietnamese legal queries.
-- What reviewer identifier format should be used without exposing unnecessary
-  personal information?
-- Who will staff adjudication for legal-review conflicts?
+- Who will staff qualified human legal review and any later legal-review
+  adjudication for full benchmark conflicts?
 - What benchmark versioning convention should be used?
 - Which deterministic fingerprint fields are required for corpus, chunks,
   Qdrant collection, prompts, and model configuration?
@@ -480,6 +495,8 @@ Open design questions:
   motorbike red-light fine target.
 - Whether `pilot_0018` should remain `unsafe_ambiguity` or be split into
   narrower leave-entitlement cases.
+- Whether a qualified human legal reviewer should re-open any D2-confirmed
+  pilot case before full benchmark freeze or held-out use.
 
 ## Validation Log
 
@@ -566,6 +583,53 @@ README, docs, or common task files during inspection.
 | 2026-06-20 | Lockfile check after pilot hardening | `uv lock --check` | Passed | Resolved 130 packages; lockfile unchanged. |
 | 2026-06-20 | Pilot record counts after hardening | `wc -l data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl data/eval/legal_qa_benchmark/pilot/review_records.jsonl` | Passed | 19 queries, 47 targets, 47 qrels, 39 evidence groups, 19 review records. |
 | 2026-06-20 | Diff hygiene after pilot hardening | `git diff --check` | Passed | No whitespace errors after Stage D1 hardening. |
+| 2026-06-20 | D2 pre-edit worktree | `git status --short` | Passed | No output; worktree was clean before structured independent review. |
+| 2026-06-20 | D2 evidence-first review inventory | `uv run python - <<'PY' ... print query, targets, groups, qrels, and chunk text ... PY` | Completed | Read-only review of all pilot records and exact child chunks. |
+| 2026-06-20 | D2 focus-case sibling inspection | `uv run python - <<'PY' ... inspect same-article sibling chunks for focus cases ... PY` | Completed | Found `pilot_0003` scope issue around Article 107 Clause 3 parent-header evidence. |
+| 2026-06-20 | Validator help smoke after D2 | `uv run python scripts/evaluation/validate_benchmark.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-20 | Corpus-aware pilot validation after D2 | `uv run python scripts/evaluation/validate_benchmark.py --queries data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl --legal-targets data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl --evidence-judgments data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl --evidence-groups data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl --review-records data/eval/legal_qa_benchmark/pilot/review_records.jsonl --config configs/evaluation/legal_qa_benchmark.yml --corpus-registry configs/laws/corpus_registry.yml --processed-chunks data/processed/legal_chunks.jsonl --output /tmp/vnlaw_pilot_d2_validation_report.json` | Passed | 0 errors, 2 expected warnings for unsplit regression-overlap bridge cases. |
+| 2026-06-20 | D2 review audit | `uv run python - <<'PY' ... audit query review stages, conflicts, adjudications, frozen and assigned queries ... PY` | Passed | 19 primary records, 19 independent records, 1 adjudication record, 0 conflicts, 0 frozen queries, 0 assigned queries. |
+| 2026-06-20 | D2 record counts | `wc -l data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl data/eval/legal_qa_benchmark/pilot/review_records.jsonl` | Passed | 19 queries, 47 targets, 47 qrels, 39 evidence groups, 39 review records. |
+| 2026-06-20 | Python compile after D2 | `uv run python -m py_compile src/evaluation/benchmark/*.py scripts/evaluation/*.py` | Passed | Stage C benchmark modules and CLI wrappers still compile. |
+| 2026-06-20 | Evaluation unit tests after D2 | `uv run pytest tests/unit/evaluation -q` | Passed | 67 passed. |
+| 2026-06-20 | Evaluation integration tests after D2 | `uv run pytest tests/integration/evaluation -q` | Passed | 1 passed. |
+| 2026-06-20 | Retrieval unit regression tests after D2 | `uv run pytest tests/unit/retrieval -q` | Passed | 173 passed; no Qdrant or OpenRouter calls. |
+| 2026-06-20 | Ruff lint after D2 | `uv run ruff check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | All checks passed. |
+| 2026-06-20 | Ruff format check after D2 | `uv run ruff format --check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | 19 files already formatted. |
+| 2026-06-20 | Lockfile check after D2 | `uv lock --check` | Passed | Resolved 130 packages; lockfile unchanged. |
+| 2026-06-20 | Diff hygiene after D2 | `git diff --check` | Passed | No whitespace errors after structured independent review and adjudication. |
+| 2026-06-21 | Stage D stabilization pre-edit worktree | `git status --short` | Completed | Existing uncommitted D2 changes were present in pilot docs/data and benchmark docs/tracer. |
+| 2026-06-21 | D2 review-history audit before stabilization | `uv run python - <<'PY' ... audit pilot review records and pilot_0003 history ... PY` | Passed | 19 queries, 19 primary records, 19 independent records, 1 adjudication record, 0 conflicts, 0 frozen queries, 0 assigned queries. |
+| 2026-06-21 | Validator help smoke during stabilization | `uv run python scripts/evaluation/validate_benchmark.py --help` | Passed | Help text displayed; no benchmark files loaded. |
+| 2026-06-21 | Corpus-aware pilot validation after stabilization | `uv run python scripts/evaluation/validate_benchmark.py --queries data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl --legal-targets data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl --evidence-judgments data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl --evidence-groups data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl --review-records data/eval/legal_qa_benchmark/pilot/review_records.jsonl --config configs/evaluation/legal_qa_benchmark.yml --corpus-registry configs/laws/corpus_registry.yml --processed-chunks data/processed/legal_chunks.jsonl --output /tmp/vnlaw_pilot_stabilization_validation_report.json` | Passed | 0 errors, 2 expected warnings for unsplit regression-overlap bridge cases. |
+| 2026-06-21 | Stabilization review audit | `uv run python - <<'PY' ... audit review stages, statuses, reviewer_kind, and review_assurance ... PY` | Passed | 19 primary records, 19 independent records, 1 adjudication record, 18 independent-reviewed queries, 1 adjudicated query, 0 frozen and 0 assigned queries. |
+| 2026-06-21 | Python compile after stabilization | `uv run python -m py_compile src/evaluation/benchmark/*.py scripts/evaluation/*.py` | Passed | Stage C benchmark modules and CLI wrappers compile. |
+| 2026-06-21 | Evaluation unit tests after stabilization | `uv run pytest tests/unit/evaluation -q` | Passed | 68 passed. |
+| 2026-06-21 | Evaluation integration tests after stabilization | `uv run pytest tests/integration/evaluation -q` | Passed | 1 passed. |
+| 2026-06-21 | Retrieval unit regression tests after stabilization | `uv run pytest tests/unit/retrieval -q` | Passed | 173 passed; no Qdrant or OpenRouter calls. |
+| 2026-06-21 | Ruff lint before import-order fix | `uv run ruff check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Failed then corrected | Reported import-order issues in `src/evaluation/benchmark/__init__.py`, `src/evaluation/benchmark/schemas.py`, and `tests/unit/evaluation/benchmark/test_schemas.py`. |
+| 2026-06-21 | Ruff import-order fix | `uv run ruff check src/evaluation/benchmark/__init__.py src/evaluation/benchmark/schemas.py tests/unit/evaluation/benchmark/test_schemas.py --fix` | Passed | Fixed 3 import-order issues only. |
+| 2026-06-21 | Ruff lint after stabilization | `uv run ruff check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | All checks passed. |
+| 2026-06-21 | Ruff format check after stabilization | `uv run ruff format --check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | 19 files already formatted. |
+| 2026-06-21 | Lockfile check after stabilization | `uv lock --check` | Passed | Resolved 130 packages; lockfile unchanged. |
+| 2026-06-21 | Pilot record counts after stabilization | `wc -l data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl data/eval/legal_qa_benchmark/pilot/review_records.jsonl` | Passed | 19 queries, 47 targets, 47 qrels, 39 evidence groups, 39 review records. |
+| 2026-06-21 | Manifest absence check | `find data/eval/legal_qa_benchmark -maxdepth 2 \( -name split_manifest.json -o -name benchmark_manifest.json \) -print` | Passed | No split or benchmark manifest was found. |
+| 2026-06-21 | Protected-path status check | `git status --short data/raw data/interim data/reports data/processed/legal_chunks.jsonl data/eval/manual_retrieval_queries.jsonl data/eval/manual_naive_rag_generation_queries.jsonl data/eval/manual_faithfulness_verdicts.json configs/retrieval/quality_gate.yml` | Passed | No protected corpus path, regression asset, or quality-gate config changes. |
+| 2026-06-21 | Diff hygiene after stabilization | `git diff --check` | Passed | No whitespace errors after Stage D stabilization. |
+| 2026-06-21 | D2 review-assurance wording audit | `rg -n "independent legal review\|qualified human\|human legal review\|expert-reviewed\|lawyer-reviewed\|legally validated\|needs_human_legal_review\|independent_reviewed\|adjudicated\|review assurance\|held-out\|high-risk" docs data/eval/legal_qa_benchmark/pilot` | Completed | Found soft high-risk held-out wording and review metadata that could imply human review was unnecessary. |
+| 2026-06-21 | Pilot non-frozen audit after D2 hardening | `uv run python - <<'PY' ... audit split, frozen status, and manifest absence ... PY` | Passed | 19 queries, 0 assigned queries, 0 frozen queries, no split manifest, no benchmark manifest. |
+| 2026-06-21 | Corpus-aware pilot validation after D2 hardening | `uv run python scripts/evaluation/validate_benchmark.py --queries data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl --legal-targets data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl --evidence-judgments data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl --evidence-groups data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl --review-records data/eval/legal_qa_benchmark/pilot/review_records.jsonl --config configs/evaluation/legal_qa_benchmark.yml --corpus-registry configs/laws/corpus_registry.yml --processed-chunks data/processed/legal_chunks.jsonl --output /tmp/vnlaw_pilot_d2_hardening_validation_report.json` | Passed | 0 errors, 2 expected warnings for unsplit regression-overlap bridge cases. |
+| 2026-06-21 | Python compile after D2 hardening | `uv run python -m py_compile src/evaluation/benchmark/*.py scripts/evaluation/*.py` | Passed | Stage C benchmark modules and CLI wrappers compile. |
+| 2026-06-21 | Evaluation unit tests after D2 hardening | `uv run pytest tests/unit/evaluation -q` | Passed | 68 passed. |
+| 2026-06-21 | Evaluation integration tests after D2 hardening | `uv run pytest tests/integration/evaluation -q` | Passed | 1 passed. |
+| 2026-06-21 | Retrieval unit regression tests after D2 hardening | `uv run pytest tests/unit/retrieval -q` | Passed | 173 passed; no Qdrant or OpenRouter calls. |
+| 2026-06-21 | Ruff lint after D2 hardening | `uv run ruff check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | All checks passed. |
+| 2026-06-21 | Ruff format check after D2 hardening | `uv run ruff format --check src/evaluation scripts/evaluation tests/unit/evaluation tests/integration/evaluation` | Passed | 19 files already formatted. |
+| 2026-06-21 | Lockfile check after D2 hardening | `uv lock --check` | Passed | Resolved 130 packages; lockfile unchanged. |
+| 2026-06-21 | Pilot record counts after D2 hardening | `wc -l data/eval/legal_qa_benchmark/pilot/benchmark_queries.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_targets.jsonl data/eval/legal_qa_benchmark/pilot/benchmark_qrels.jsonl data/eval/legal_qa_benchmark/pilot/evidence_groups.jsonl data/eval/legal_qa_benchmark/pilot/review_records.jsonl` | Passed | 19 queries, 47 targets, 47 qrels, 39 evidence groups, 39 review records. |
+| 2026-06-21 | Manifest absence check after D2 hardening | `find data/eval/legal_qa_benchmark -maxdepth 2 \( -name split_manifest.json -o -name benchmark_manifest.json \) -print` | Passed | No split or benchmark manifest was found. |
+| 2026-06-21 | Protected-path status check after D2 hardening | `git status --short data/raw data/interim data/reports data/processed/legal_chunks.jsonl data/eval/manual_retrieval_queries.jsonl data/eval/manual_naive_rag_generation_queries.jsonl data/eval/manual_faithfulness_verdicts.json configs/retrieval/quality_gate.yml` | Passed | No protected corpus path, regression asset, or quality-gate config changes. |
+| 2026-06-21 | Diff hygiene after D2 hardening | `git diff --check` | Passed | No whitespace errors after D2 review-assurance hardening. |
 
 ## Change Log
 
@@ -578,6 +642,9 @@ README, docs, or common task files during inspection.
 | 2026-06-19 | Hardened Stage C protocol invariants, split/review source-of-truth checks, raw and canonical fingerprints, qrel/group consistency, and freeze immutability. | `src/evaluation/benchmark/`, `tests/unit/evaluation/benchmark/`, `docs/legal_qa_benchmark.md`, `docs/phase10_tracer.md`, `configs/evaluation/legal_qa_benchmark.yml` | Codex |
 | 2026-06-20 | Created Stage D1 draft pilot annotation and coverage summary for independent review preparation. | `data/eval/legal_qa_benchmark/pilot/`, `.gitignore`, `docs/phase10_tracer.md` | Codex |
 | 2026-06-20 | Hardened Stage D1 pilot semantics for temporal wording, multi-evidence tags, ambiguous fallback scope, review questions, and tracer freshness. | `data/eval/legal_qa_benchmark/pilot/`, `docs/phase10_tracer.md` | Codex |
+| 2026-06-20 | Completed structured D2 independent review, adjudicated the `pilot_0003` scope conflict, and documented review limitations. | `data/eval/legal_qa_benchmark/pilot/`, `docs/legal_qa_benchmark.md`, `docs/phase10_tracer.md` | Codex |
+| 2026-06-21 | Completed Stage D stabilization, added review-assurance metadata, froze schema contract version `1.0`, and documented stabilization limits. | `src/evaluation/benchmark/`, `tests/unit/evaluation/benchmark/`, `docs/evaluation_protocol.md`, `docs/legal_qa_benchmark.md`, `docs/phase10_tracer.md`, `data/eval/legal_qa_benchmark/pilot/` | Codex |
+| 2026-06-21 | Hardened D2 review-assurance wording and made high-risk held-out qualified-review policy mandatory. | `docs/evaluation_protocol.md`, `docs/legal_qa_benchmark.md`, `docs/phase10_tracer.md`, `data/eval/legal_qa_benchmark/pilot/` | Codex |
 
 ## Exit Criteria
 
@@ -600,10 +667,10 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-independent pilot review
--> disagreement recording
--> adjudication
--> schema/protocol stabilization
+documentation consolidation
+-> full benchmark construction planning
+-> annotation workload and qualified-review allocation
+-> full benchmark construction
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.

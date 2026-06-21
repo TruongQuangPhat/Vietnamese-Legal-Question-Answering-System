@@ -120,6 +120,24 @@ class ReviewStage(StrEnum):
     FREEZE_REVIEW = "freeze_review"
 
 
+class ReviewerKind(StrEnum):
+    """Reviewer category used to separate workflow evidence from assurance claims."""
+
+    AUTOMATED_SYSTEM = "automated_system"
+    HUMAN_DOMAIN_REVIEWER = "human_domain_reviewer"
+    QUALIFIED_HUMAN_LEGAL_REVIEWER = "qualified_human_legal_reviewer"
+
+
+class ReviewAssurance(StrEnum):
+    """Assurance level represented by a review record."""
+
+    PRIMARY_ANNOTATION = "primary_annotation"
+    STRUCTURED_AUTOMATED_REVIEW = "structured_automated_review"
+    REPOSITORY_ADJUDICATION = "repository_adjudication"
+    HUMAN_DOMAIN_REVIEW = "human_domain_review"
+    QUALIFIED_HUMAN_LEGAL_REVIEW = "qualified_human_legal_review"
+
+
 class AmbiguityCategory(StrEnum):
     """Approved ambiguity categories from the evaluation protocol."""
 

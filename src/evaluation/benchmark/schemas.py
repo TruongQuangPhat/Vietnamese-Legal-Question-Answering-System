@@ -18,6 +18,8 @@ from src.evaluation.benchmark.enums import (
     MatchLevel,
     QuestionType,
     RelevanceLevel,
+    ReviewAssurance,
+    ReviewerKind,
     ReviewStage,
     ReviewStatus,
     TargetRole,
@@ -325,12 +327,14 @@ class EvidenceGroup(StrictBenchmarkModel):
 
 
 class ReviewRecord(StrictBenchmarkModel):
-    """Minimal provenance for primary review, independent review, or adjudication."""
+    """Minimal provenance and assurance metadata for review evidence."""
 
     id: str = Field(..., min_length=1)
     query_id: str = Field(..., min_length=1)
     review_stage: ReviewStage
     reviewer_id: str = Field(..., min_length=1)
+    reviewer_kind: ReviewerKind | None = None
+    review_assurance: ReviewAssurance | None = None
     status: ReviewStatus
     reviewed_fields: list[str] = Field(default_factory=list)
     disagreements: list[str] = Field(default_factory=list)

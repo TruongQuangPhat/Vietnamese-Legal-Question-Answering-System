@@ -19,8 +19,10 @@ data/eval/legal_qa_benchmark/split_manifest.json
 data/eval/legal_qa_benchmark/benchmark_manifest.json
 ```
 
-Stage C implements loaders and validators for these file types, but it does
-not create real benchmark records. Synthetic records are used only in tests.
+Stage C implements loaders and validators for these file types. Stage D has
+created a draft pilot annotation under `data/eval/legal_qa_benchmark/pilot/`;
+the canonical frozen benchmark files listed above still do not exist.
+Synthetic records are used only in tests.
 
 Runtime or draft diagnostics may be written to:
 
@@ -29,8 +31,9 @@ artifacts/reports/evaluation/
 ```
 
 The canonical frozen split and benchmark manifests belong with the versioned
-benchmark dataset under `data/eval/legal_qa_benchmark/`. Stage D/E will create
-that real benchmark directory after pilot design and annotation approval.
+benchmark dataset under `data/eval/legal_qa_benchmark/`. Stage E will create
+those real benchmark assets only after pilot review, stabilization, and full
+benchmark construction approval.
 CLI output paths are explicit and caller-controlled; Stage C does not hard-code
 repository mutation.
 
@@ -47,8 +50,8 @@ Typed schema boundaries live under `src/evaluation/benchmark/`:
 - `EvidenceJudgment`: chunk-level relevance judgments.
 - `EvidenceGroup`: semantic evidence requirements with
   `acceptable_chunk_ids` and `acceptable_legal_targets`.
-- `ReviewRecord`: minimal primary review, independent review, and
-  adjudication provenance.
+- `ReviewRecord`: minimal primary review, independent review, adjudication,
+  reviewer-kind, and review-assurance provenance.
 - `SplitManifest`: deterministic grouped split assignments.
 - `BenchmarkManifest`: frozen benchmark manifest with checksums.
 
@@ -107,6 +110,28 @@ IDs, and fails when `BenchmarkQuery.split` disagrees with the manifest.
 the effective review evidence from records and fails when a query summary
 claims `independent_reviewed`, `adjudicated`, or `frozen` without the required
 records. Unresolved conflicts prevent freeze.
+
+Review assurance is explicit. `reviewer_kind` distinguishes
+`automated_system`, `human_domain_reviewer`, and
+`qualified_human_legal_reviewer`. `review_assurance` distinguishes
+`primary_annotation`, `structured_automated_review`,
+`repository_adjudication`, `human_domain_review`, and
+`qualified_human_legal_review`. These fields prevent workflow completion from
+being mistaken for qualified human legal review and avoid storing unnecessary
+personal data.
+
+Before frozen held-out use, any blocking or high-risk held-out item involving
+criminal liability, sanctions or penalties, eligibility, procedural deadlines,
+cross-law interpretation, fallback safety, complete legal conditions, or
+material temporal/version applicability must receive qualified human legal
+review. If qualified human legal review is not available, the item must remain
+development-only or be excluded from the frozen held-out split.
+
+The benchmark must not be described as `expert-reviewed`, `lawyer-reviewed`,
+or `legally validated` unless qualified human legal review actually occurred
+and is recorded. Allowed descriptions, when accurate, include
+`source-grounded`, `schema-validated`, `corpus-aware validated`,
+`structured-review-completed`, and `repository-adjudicated`.
 
 ## Validation Layers
 
@@ -244,10 +269,38 @@ runtime report paths as canonical frozen benchmark assets.
 - `1`: validation completed but found benchmark errors.
 - `2`: command could not run because inputs, config, or file I/O failed.
 
+## Schema Version Policy
+
+The schema contract version `1.0` is frozen for full benchmark construction as
+of 2026-06-21. This means the current field contract, enum values, validation
+semantics, and review-assurance metadata are stable enough to annotate the full
+benchmark. It does not freeze pilot records, create held-out splits, release a
+benchmark version, or prevent documented bug fixes.
+
+Breaking schema changes require a new incompatible schema version and an
+explicit migration. Examples include removing a field, renaming a field,
+changing field meaning, changing an enum incompatibly, or changing cross-file
+identity semantics.
+
+Backward-compatible schema changes require an explicit version decision and
+tests. Examples include adding an optional field with a safe default, adding
+non-breaking metadata, or adding a review note field without changing existing
+semantics.
+
+Documentation or validation clarifications that do not change the accepted
+data shape or semantic meaning may keep the schema version, but they must be
+recorded in the change log. Existing frozen data must not be silently
+reinterpreted.
+
 ## Current Limitations
 
-- No real benchmark cases are included yet.
-- No pilot annotation has started.
+- A draft pilot annotation exists under
+  `data/eval/legal_qa_benchmark/pilot/`, but it is not a frozen benchmark and
+  must not be used as held-out proof.
+- The pilot completed source-grounded primary annotation, structured automated
+  second-pass review, and repository-level adjudication. This does not
+  constitute qualified human legal review. Qualified human legal review has not
+  been completed.
 - Metric computation is not implemented in this layer.
 - Sparse retrieval, BM25, RRF, fusion, reranking, GraphRAG, API, UI, and
   fine-tuning are out of scope.

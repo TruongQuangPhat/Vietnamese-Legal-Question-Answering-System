@@ -435,6 +435,28 @@ Reviewer responsibilities:
 The reviewer must not merely confirm that chunk IDs exist. Citation-ID or
 chunk-ID validity is not semantic faithfulness.
 
+Review assurance must be recorded separately from workflow stage. Independent
+review means a reviewer pass independent from the primary annotator; it does
+not by itself mean qualified human legal review. Structured automated
+second-pass review may satisfy development workflow discipline when it is
+clearly labeled, but it must not be described as `expert-reviewed`,
+`lawyer-reviewed`, or `legally validated`.
+
+For frozen held-out use, every item requires an independent reviewer pass.
+Before frozen held-out use, any blocking or high-risk held-out item involving
+criminal liability, sanctions or penalties, eligibility, procedural deadlines,
+cross-law interpretation, fallback safety, complete legal conditions, or
+material temporal/version applicability must receive qualified human legal
+review. If qualified human legal review is not available, the item must remain
+development-only or be excluded from the frozen held-out split.
+
+The benchmark must not be described as `expert-reviewed`, `lawyer-reviewed`,
+or `legally validated` unless qualified human legal review actually occurred
+and is recorded. It may be described as `source-grounded`,
+`schema-validated`, `corpus-aware validated`,
+`structured-review-completed`, or `repository-adjudicated` only when those
+claims are accurate and recorded.
+
 ## 14. Conflict and Adjudication Policy
 
 Disagreements must be recorded rather than silently overwritten. Adjudication

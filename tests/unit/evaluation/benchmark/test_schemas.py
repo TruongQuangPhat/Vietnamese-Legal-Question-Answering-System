@@ -15,6 +15,8 @@ from src.evaluation.benchmark.enums import (
     MatchLevel,
     QuestionType,
     RelevanceLevel,
+    ReviewAssurance,
+    ReviewerKind,
     ReviewStage,
     ReviewStatus,
     TargetRole,
@@ -171,6 +173,36 @@ def test_review_disagreement_requires_resolution_when_adjudicated() -> None:
             status=ReviewStatus.ADJUDICATED,
             reviewed_fields=["expected_decision"],
             disagreements=["expected_decision"],
+            reviewed_at=datetime(2026, 1, 1),
+        )
+
+
+def test_review_record_tracks_assurance_without_personal_details() -> None:
+    record = ReviewRecord(
+        id="r1",
+        query_id="q1",
+        review_stage=ReviewStage.INDEPENDENT_REVIEW,
+        reviewer_id="structured_reviewer",
+        reviewer_kind=ReviewerKind.AUTOMATED_SYSTEM,
+        review_assurance=ReviewAssurance.STRUCTURED_AUTOMATED_REVIEW,
+        status=ReviewStatus.INDEPENDENT_REVIEWED,
+        reviewed_fields=["expected_decision"],
+        reviewed_at=datetime(2026, 1, 1),
+    )
+
+    assert record.reviewer_kind == ReviewerKind.AUTOMATED_SYSTEM
+    assert record.review_assurance == ReviewAssurance.STRUCTURED_AUTOMATED_REVIEW
+
+    with pytest.raises(ValidationError):
+        ReviewRecord(
+            id="r2",
+            query_id="q1",
+            review_stage=ReviewStage.INDEPENDENT_REVIEW,
+            reviewer_id="structured_reviewer",
+            reviewer_kind="qualified_lawyer",
+            review_assurance=ReviewAssurance.STRUCTURED_AUTOMATED_REVIEW,
+            status=ReviewStatus.INDEPENDENT_REVIEWED,
+            reviewed_fields=["expected_decision"],
             reviewed_at=datetime(2026, 1, 1),
         )
 
