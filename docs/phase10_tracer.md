@@ -34,6 +34,7 @@ after Phase 10 closes and durable information has been consolidated.
 - Five-case suite: regression and safety suite only, not held-out proof.
 - Phase 10 stage: Stage D documentation and pilot stabilization are complete.
   Schema contract version `1.0` is frozen for full benchmark construction.
+  Stage E1 full benchmark construction planning is complete.
 - Not done: full benchmark construction, dev/test split, held-out benchmark
   freeze, frozen Naive RAG baseline run, metrics, sparse retrieval, fusion,
   reranking, GraphRAG, API, UI, and fine-tuning.
@@ -105,7 +106,7 @@ Core invariants:
 | Stage B - Benchmark Protocol | Complete | Durable rules consolidated into `docs/evaluation.md`. |
 | Stage C - Benchmark Implementation | Complete | Schemas, loaders, validator, splitting, fingerprinting, freeze support, CLIs, config, and tests implemented. |
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
-| Stage E - Full Benchmark and Split Freeze | Not started | Full benchmark construction, grouped split, leakage validation, and manifest freeze remain pending. |
+| Stage E - Full Benchmark and Split Freeze | Planning complete; construction not started | Stage E1 defines size, quota, eligibility, split, review, and freeze prerequisites. Full benchmark records, grouped split, leakage validation, and manifest freeze remain pending. |
 | Stage F - Frozen Naive RAG Baseline | Not started | Baseline execution on frozen development and held-out splits remains pending. |
 | Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
@@ -166,8 +167,16 @@ Core invariants:
 
 ### Stage E - Full Benchmark and Split Freeze
 
-- [ ] minimum reviewed benchmark size;
-- [ ] preferred benchmark size;
+- [x] minimum reviewed benchmark size proposed;
+- [x] preferred benchmark size proposed;
+- [x] domain and question-type quota proposal;
+- [x] case eligibility tiers;
+- [x] pilot reuse policy;
+- [x] full benchmark file layout;
+- [x] grouped split strategy;
+- [x] full benchmark review workflow;
+- [x] high-risk held-out human-review gate;
+- [x] Stage E2 acceptance criteria;
 - [ ] duplicate and near-duplicate detection;
 - [ ] paraphrase-family grouping;
 - [ ] source-provision grouping;
@@ -266,6 +275,197 @@ Core invariants:
 - Frozen queries: 0.
 - Assigned queries: 0.
 
+## Stage E1 Construction Plan
+
+### Corpus Planning Inventory
+
+Read-only inventory was derived from
+`configs/laws/corpus_registry.yml` and `data/processed/legal_chunks.jsonl`.
+The corpus contains 52 registered laws and 40,389 processed chunks. The
+processed chunks expose `law_id`, `law_name`, article/clause/point hierarchy,
+chunk text, parent text, citations, source URL, hashes, and warnings. The
+sampled chunk schema does not expose effective or expiry date fields, so
+temporal/version-sensitive cases are excluded from the initial frozen
+benchmark unless defensible temporal metadata is added through reviewed
+annotation.
+
+Registered corpus groups and chunk counts:
+
+| Registry group | Laws | Chunks | Planning use |
+| --- | ---: | ---: | --- |
+| Bộ luật cốt lõi | 6 | 11,725 | Core civil, criminal, labor, procedure, and maritime coverage. |
+| Kinh tế, Doanh nghiệp, Ngân hàng & Thuế | 10 | 7,165 | Business, banking, tax, bankruptcy, investment, and commerce. |
+| Đất đai, BĐS, Xây dựng & Môi trường | 6 | 6,882 | Land, housing, real estate, construction, environment, notarization. |
+| Tiêu dùng, Y tế, Giáo dục & Công nghệ số | 7 | 4,056 | IP, health, consumer, education, cybersecurity, e-transactions, food safety. |
+| Tổ chức bộ máy Nhà nước & Tố tụng Hành chính | 6 | 3,692 | State organization and administrative procedure. |
+| Giao thông, Trật tự & Xử phạt | 4 | 2,275 | Road traffic, roads, administrative sanctions, alcohol harm prevention. |
+| Lao động, Việc làm & An sinh xã hội | 4 | 2,011 | Labor, employment, social insurance, health insurance, labor safety. |
+| Dân sự, Gia đình & Nhân thân | 5 | 1,480 | Marriage, identity, residence, civil status, military service. |
+| Khiếu nại, Tố cáo & Tương tác chính quyền | 3 | 813 | Complaints, denunciations, access to information. |
+| Hiến pháp | 1 | 290 | Constitutional rights and state authority. |
+
+Point-rich laws suitable for clause/point lookup and complete-list stress
+include `BLHS_VBHN`, `LDD_VBHN`, `BLTTHS_VBHN`, `LBVMT_VBHN`, `LDN_VBHN`,
+`BLTTDS_VBHN`, `LTCTD_VBHN`, `LNO_VBHN`, `LXD_VBHN`, `LSHTT_VBHN`,
+`LKBCB_VBHN`, `LTTHC`, `LQLT_VBHN`, `LTATGT_VBHN`, and `LDT_VBHN`.
+
+### Benchmark Size Proposal
+
+| Size tier | Proposed count | Purpose |
+| --- | ---: | --- |
+| `minimum_viable_benchmark_size` | 120 cases | Covers every approved domain except temporal if unsupported, all major question types, and enough high-risk/fallback cases to validate the pipeline. |
+| `preferred_benchmark_size` | 180 cases | Supports a 70/30 development/held-out split with meaningful domain and question-type diagnostics while remaining reviewable. |
+| `maximum_initial_benchmark_size` | 240 cases | Upper bound before Stage F, used only if annotation and qualified-review capacity are available. |
+
+`development_ratio=0.7` remains the provisional Stage C default. It should be
+reconfirmed before split freeze and adjusted only before held-out assignments
+exist.
+
+### Domain Quotas
+
+| Domain | Minimum cases | Preferred cases | High-risk share | Candidate laws | Reason |
+| --- | ---: | ---: | --- | --- | --- |
+| `constitutional_state_rights` | 6 | 8 | Low to medium | `HP_2013` | Ensures constitutional rights and state-structure coverage. |
+| `civil_family_identity` | 12 | 16 | Medium | `BLDS_2015`, `LHNGD_VBHN`, `LCC_VBHN`, `LCT_VBHN`, `LHT_2014`, `LNVQS_VBHN` | Covers identity, marriage/family, residence, civil status, and civil rights. |
+| `criminal_procedure_penalty` | 14 | 22 | High | `BLHS_VBHN`, `BLTTHS_VBHN` | Required for criminal liability, penalties, and criminal procedure. |
+| `civil_procedure_dispute_resolution` | 8 | 12 | Medium | `BLTTDS_VBHN` | Covers civil procedure and dispute workflows. |
+| `land_real_estate_construction_environment` | 14 | 22 | Medium to high | `LDD_VBHN`, `LNO_VBHN`, `LXD_VBHN`, `LKDBDS_VBHN`, `LBVMT_VBHN`, `LCCONGCHUNG_VBHN` | High-volume property, construction, environment, and notarization issues. |
+| `business_banking_tax` | 16 | 24 | Medium to high | `LDN_VBHN`, `LTCTD_VBHN`, `LQLT_VBHN`, `LTM_VBHN`, `LDT_VBHN`, `LPS_VBHN`, `LCT_2018`, tax laws | Broad business and obligation coverage with many point-level provisions. |
+| `traffic_public_order_sanctions` | 12 | 18 | High | `LTATGT_VBHN`, `LDB_VBHN`, `LXLVPHC_VBHN`, `LPCTRB_2019` | Traffic and sanction boundaries are safety-sensitive and common. |
+| `labor_employment_social_security` | 14 | 20 | Medium to high | `BLLD_VBHN`, `LBHXH_VBHN`, `LBHYT_VBHN`, `LATVSLD_VBHN`, `LVL_2025` | Labor, employment, insurance, and benefit questions require complete conditions. |
+| `consumer_health_education_digital_ip` | 14 | 20 | Medium to high | `LSHTT_VBHN`, `LKBCB_VBHN`, `LBVQLNTD_VBHN`, `LANM_2025`, `LGD_VBHN`, `LATTP_VBHN`, `LGDDT_VBHN` | Exercises health, education, consumer, IP, food safety, and digital rules. |
+| `administrative_government_interaction` | 8 | 12 | Medium | `LKN`, `LTC`, `LTCTT`, `LTTHC` | Covers complaint, denunciation, information access, and administrative interaction. |
+| `maritime_transport` | 2 | 6 | Medium | `BLHH_VBHN` | Keeps specialized transport represented without over-weighting a niche domain. |
+
+### Question-Type Quotas
+
+Question types are multi-valued, so counts intentionally exceed total case
+count.
+
+| Question type | Minimum cases | Preferred cases | Required review assurance | Reason |
+| --- | ---: | ---: | --- | --- |
+| `single_article_lookup` | 30 | 45 | Structured review; qualified review if high-risk | Basic retrieval and citation anchor coverage. |
+| `clause_point_lookup` | 50 | 75 | Structured review; qualified review if high-risk | Tests hierarchy precision and point-level retrieval. |
+| `complete_list` | 20 | 30 | Structured review plus qualified review for held-out high-risk complete legal conditions | Completeness is a known baseline risk. |
+| `conditions_and_exceptions` | 18 | 28 | Structured review; qualified review if high-risk | Prevents too-broad answers that omit exclusions. |
+| `multi_evidence` | 25 | 40 | Structured review; qualified review for cross-law/high-risk held-out | Tests evidence-group coverage beyond one chunk. |
+| `cross_law` | 8 | 14 | Qualified review before held-out use | Requires careful legal interaction review. |
+| `definition` | 12 | 18 | Structured review | Covers defined-term lookup and lexical matching. |
+| `procedure` | 16 | 24 | Qualified review before held-out use when deadlines or rights are affected | Procedure and deadline errors can be material. |
+| `eligibility` | 18 | 28 | Qualified review before high-risk held-out use | Eligibility errors materially affect rights and obligations. |
+| `rights_and_obligations` | 30 | 45 | Structured review; qualified review if high-risk | Core legal QA category across domains. |
+| `sanction_or_penalty` | 18 | 30 | Qualified review before held-out use | Penalty errors are high-risk. |
+| `fallback` | 18 | 28 | Structured review; qualified review for high-risk held-out fallback safety | Tests refusal and no-LLM fallback behavior. |
+| `ambiguous` | 8 | 14 | Structured review; qualified review if high-risk | Tests unsafe ambiguity handling. |
+| `near_duplicate_provision` | 8 | 12 | Structured review | Exercises confusing sibling provisions. |
+| `lexical_mismatch` | 30 | 45 | Structured review | Tests semantic retrieval beyond exact wording. |
+| `paraphrase` | 50 | 75 | Structured review | Ensures natural Vietnamese query coverage. |
+| `temporal_version_sensitive` | 0 initial frozen | 0 initial frozen | Qualified review if later included | Excluded from initial frozen benchmark until temporal metadata is defensible. |
+
+### Case Eligibility Tiers
+
+| Tier | Criteria | Split eligibility |
+| --- | --- | --- |
+| `dev_eligible` | Complete schema records, direct qrels where required, primary + structured independent review, material conflicts adjudicated, corpus-aware validation passes. | May enter `development`. |
+| `held_out_eligible` | Satisfies `dev_eligible`, no regression overlap, no unresolved conflict, complete grouping metadata, no leakage risk, and high-risk review gate satisfied. | May enter `held_out_test`. |
+| `development_only` | Useful for diagnostics, bridge coverage, pilot continuity, temporal exploration, or unresolved qualified-review capacity limits. | Must stay in `development` or remain outside frozen scoring. |
+| `excluded` | Unsupported expectation, unsafe temporal scope, unresolved conflict, duplicate without purpose, missing direct qrels for `answer_allowed`, or failed validation. | Must not enter scored benchmark. |
+
+### Pilot Reuse Policy
+
+The 19 pilot cases remain draft and pre-split. They should be used primarily
+as seed patterns and validator/protocol examples. A pilot case may be promoted
+later only after the full benchmark review workflow confirms it under the
+same schema contract and applies the eligibility rules above.
+
+`pilot_0001` and `pilot_0018` have declared regression overlap and are
+permanently ineligible for `held_out_test`. High-risk pilot cases require
+qualified human legal review before held-out use; without that review they
+remain `development_only` or seed patterns.
+
+### Full Benchmark File Layout
+
+Canonical full benchmark files will live at:
+
+```text
+data/eval/legal_qa_benchmark/benchmark_queries.jsonl
+data/eval/legal_qa_benchmark/benchmark_targets.jsonl
+data/eval/legal_qa_benchmark/benchmark_qrels.jsonl
+data/eval/legal_qa_benchmark/evidence_groups.jsonl
+data/eval/legal_qa_benchmark/review_records.jsonl
+data/eval/legal_qa_benchmark/split_manifest.json
+data/eval/legal_qa_benchmark/benchmark_manifest.json
+```
+
+Stage E1 does not create these files. Current `.gitignore` rules ignore
+future full benchmark JSONL and manifest paths through broad
+`data/eval/**/*.json*` patterns; only the pilot files currently have narrow
+exceptions. Stage E2 must add narrow exceptions for approved canonical full
+benchmark JSONL files, `split_manifest.json`, and `benchmark_manifest.json`
+before creating them, while keeping runtime reports ignored.
+
+### Split Strategy
+
+- Use `development` and `held_out_test` unless learned components later
+  require train/validation/test.
+- Start from the provisional `development_ratio=0.7` and
+  `split_seed=20260619`, then confirm before split creation.
+- Group transitively by `case_family_id` and `source_provision_group_id`.
+- Keep regression-overlap bridge cases out of `held_out_test`.
+- Keep duplicate, near-duplicate, paraphrase-family, and source-provision
+  groups in one split.
+- Require high-risk held-out qualified review before assignment; otherwise
+  force to development or exclude.
+- Validate minimum held-out coverage by domain and question type before
+  freezing.
+- If a connected group is too large, keep it intact and document the coverage
+  deviation rather than splitting it.
+- If held-out lacks a required type, revise annotation before split freeze or
+  document the approved exclusion; never tune after observing held-out system
+  performance.
+
+### Full Benchmark Review Workflow
+
+```text
+source-first annotation
+-> primary annotation
+-> structured independent review
+-> repository-level adjudication
+-> qualified human legal review for eligible high-risk held-out cases
+-> schema and corpus-aware validation
+-> split eligibility audit
+-> grouped split
+-> freeze
+```
+
+Review records must use schema `1.0` fields including `reviewer_kind`,
+`review_assurance`, `review_stage`, `status`, `reviewer_id`, and
+`resolution_notes`. The benchmark may be described as source-grounded,
+schema-validated, corpus-aware validated, structured-review-completed, or
+repository-adjudicated only when those statements are accurate. It must not
+be described as expert-reviewed, lawyer-reviewed, or legally validated unless
+qualified human legal review actually occurred and is recorded.
+
+### Stage E2 Acceptance Criteria
+
+Before split and benchmark manifests are created:
+
+- benchmark JSONL files pass schema validation;
+- corpus-aware validation has 0 errors;
+- review history is complete;
+- all material conflicts are resolved or excluded;
+- high-risk held-out candidates have qualified human legal review or are
+  excluded from held-out;
+- regression-overlap cases are not in held-out;
+- duplicate, paraphrase, near-duplicate, and source-provision leakage is
+  prevented;
+- `.gitignore` has narrow exceptions for approved canonical full benchmark
+  JSONL files and manifests;
+- split coverage by domain and question type is acceptable;
+- raw and canonical checksums/fingerprints are recorded;
+- `benchmark_version` is release-valid and not `draft`;
+- pilot data remains clearly separate from frozen benchmark data.
+
 ## Review and Adjudication Snapshot
 
 - D1 completed source-grounded primary annotation.
@@ -300,6 +500,10 @@ Core invariants:
 | 2026-06-20 | Omit temporal pilot cases | Current chunk metadata is insufficient for defensible temporal labels. | Implemented |
 | 2026-06-21 | Freeze schema contract version `1.0` | Pilot and tests exercised schema, validation, review history, and adjudication. | Approved |
 | 2026-06-21 | Require qualified review or exclusion for high-risk held-out items | Structured automated review must not be confused with human legal validation. | Approved |
+| 2026-06-21 | Use 120 / 180 / 240 as Stage E1 benchmark size tiers | Balances domain/type coverage with legal-review cost before Stage F. | Proposed |
+| 2026-06-21 | Treat temporal cases as excluded from the initial frozen benchmark unless defensible metadata exists | Processed chunks do not expose effective/expiry metadata needed for safe temporal ground truth. | Proposed |
+| 2026-06-21 | Treat pilot cases as seed patterns unless re-reviewed for full benchmark eligibility | Pilot is draft, pre-split, non-frozen, and not qualified-human-reviewed. | Proposed |
+| 2026-06-21 | Preserve provisional 70/30 split only as a pre-freeze default | The ratio is implemented in config but must be confirmed before split creation. | Proposed |
 
 ## Risks and Open Questions
 
@@ -319,8 +523,8 @@ Confirmed risks:
 
 Open questions:
 
-- What minimum and preferred benchmark sizes will be approved?
-- What final domain quotas will be approved?
+- Whether the Stage E1 proposed size tiers and quotas need adjustment after
+  annotation capacity and qualified-review staffing are confirmed.
 - Who will staff qualified human legal review and later adjudication?
 - What benchmark versioning convention will be used?
 - What numeric relevance gains should be used for nDCG?
@@ -347,7 +551,15 @@ Latest Stage D documentation and pilot hardening checks passed:
 - protected-path status check: no protected corpus path, regression asset, or
   quality-gate config changes.
 
-Documentation consolidation validation is tracked in the current task result.
+Latest Stage E1 planning documentation checks passed:
+
+- `git diff --check`: passed;
+- removed-document reference search: no active references;
+- heading inventory: completed for `docs/evaluation.md`,
+  `docs/phase10_tracer.md`, and the pilot README;
+- `.gitignore` audit: future full benchmark JSONL and canonical manifests
+  currently require narrow exceptions before Stage E2 creates them;
+- changed files are documentation only.
 
 ## Change Log
 
@@ -362,6 +574,7 @@ Documentation consolidation validation is tracked in the current task result.
 | 2026-06-21 | Added review-assurance metadata and froze schema contract version `1.0`. |
 | 2026-06-21 | Hardened D2 assurance wording and high-risk held-out review policy. |
 | 2026-06-21 | Consolidated evaluation documentation into the current canonical structure. |
+| 2026-06-21 | Added Stage E1 full benchmark construction planning, quota proposal, eligibility tiers, split strategy, and Stage E2 acceptance criteria. |
 
 ## Exit Criteria
 
@@ -384,10 +597,10 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-full benchmark construction planning
--> annotation workload and qualified-review allocation
+annotation workload and qualified-review allocation
 -> full benchmark construction
 -> grouped split and leakage validation
+-> split and benchmark manifest freeze
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.

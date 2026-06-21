@@ -277,13 +277,25 @@ Record counts:
 
 No split or benchmark manifest exists.
 
+## Role in Full Benchmark Construction
+
+The pilot should be used as seed patterns, schema/protocol exercise data, and
+review-workflow examples. It is not automatically part of the full benchmark.
+
+A pilot case may be promoted later only if it is rechecked under the full
+benchmark review workflow and assigned an eligibility tier. `pilot_0001` and
+`pilot_0018` are deliberate regression-overlap bridge cases and are
+permanently ineligible for `held_out_test`. High-risk pilot cases require
+qualified human legal review before any held-out use; otherwise they must
+remain development-only or be excluded from frozen held-out evaluation.
+
 ## Next Steps
 
 ```text
-full benchmark construction planning
--> annotation workload and qualified-review allocation
+annotation workload and qualified-review allocation
 -> full benchmark construction
 -> grouped split and leakage validation
+-> split and benchmark manifest freeze
 ```
 
 Do not use the pilot as held-out proof. Do not run benchmark freeze on pilot

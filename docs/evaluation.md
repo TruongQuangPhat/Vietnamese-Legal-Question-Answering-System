@@ -450,6 +450,46 @@ Run the frozen dense baseline and frozen candidate systems together during the
 final held-out evaluation after configurations are fixed. If learned
 components are trained later, require train/validation/test splits.
 
+## Full Benchmark Construction Policy
+
+Full benchmark construction must use the schema contract version `1.0` and
+the canonical files listed below. Draft annotation may be built before a split
+exists, but frozen benchmark data requires a complete review history,
+corpus-aware validation with zero errors, a deterministic grouped split, and
+manifest fingerprints.
+
+Case eligibility tiers:
+
+| Tier | Meaning |
+| --- | --- |
+| `dev_eligible` | The case can be used for development after primary annotation, independent review, adjudication of material conflicts, complete qrels, and validation. |
+| `held_out_eligible` | The case satisfies `dev_eligible`, has no regression overlap, has no unresolved conflict, has complete split grouping keys, and satisfies the qualified-review gate when high-risk. |
+| `development_only` | The case is useful for tuning, diagnostics, bridge coverage, or pilot continuity, but must not enter held-out evaluation. |
+| `excluded` | The case should not be used in benchmark scoring because it is unsupported, unresolved, duplicate without purpose, temporally unsafe, or otherwise fails protocol requirements. |
+
+Additional eligibility rules:
+
+- regression-overlap bridge cases are not held-out eligible;
+- unresolved conflict cases are not held-out eligible;
+- `answer_allowed` cases require direct chunk-level qrels;
+- fallback cases require `fallback_reason`;
+- temporal cases require defensible `as_of_date` and applicable version
+  metadata;
+- duplicate, paraphrase, and source-provision groups must stay in one split;
+- high-risk held-out cases require qualified human legal review or exclusion
+  from held-out use.
+
+Before `split_manifest.json` is created, all benchmark JSONL files must pass
+schema and corpus-aware validation, review histories must be complete enough
+for split eligibility, regression-overlap declarations must be present, and
+duplicate/paraphrase/source-provision grouping must be reviewed.
+
+Before `benchmark_manifest.json` is created, every frozen record must have an
+assigned split matching the split manifest, all material conflicts must be
+resolved or excluded, all high-risk held-out review requirements must be met,
+raw and canonical fingerprints must be computed, and `benchmark_version` must
+be a release-valid value rather than `draft`.
+
 ## Benchmark Schemas
 
 Typed schema boundaries live under `src/evaluation/benchmark/`:
