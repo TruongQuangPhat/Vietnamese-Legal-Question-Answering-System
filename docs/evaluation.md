@@ -15,8 +15,6 @@ Authority and supporting references:
 - `docs/naive_rag.md` remains the canonical Naive RAG technical reference.
 - `docs/advanced_rag.md` remains the Advanced RAG design reference.
 - `docs/phase10_tracer.md` is the active Phase 10 operational dashboard.
-- `data/eval/legal_qa_benchmark/pilot/README.md` describes the draft pilot
-  dataset and review summary.
 
 This document does not claim that Advanced RAG is already better than the
 frozen Naive RAG baseline.
@@ -464,7 +462,7 @@ Case eligibility tiers:
 | --- | --- |
 | `dev_eligible` | The case can be used for development after primary annotation, independent review, adjudication of material conflicts, complete qrels, and validation. |
 | `held_out_eligible` | The case satisfies `dev_eligible`, has no regression overlap, has no unresolved conflict, has complete split grouping keys, and satisfies the qualified-review gate when high-risk. |
-| `development_only` | The case is useful for tuning, diagnostics, bridge coverage, or pilot continuity, but must not enter held-out evaluation. |
+| `development_only` | The case is useful for tuning, diagnostics, bridge coverage, or historical-pattern continuity, but must not enter held-out evaluation. |
 | `excluded` | The case should not be used in benchmark scoring because it is unsupported, unresolved, duplicate without purpose, temporally unsafe, or otherwise fails protocol requirements. |
 
 Additional eligibility rules:
@@ -532,7 +530,7 @@ All public input models reject unknown fields.
 
 ## Canonical Data Files
 
-Future canonical benchmark data is expected under:
+The active scoped `v0.1.0` benchmark is stored under:
 
 ```text
 data/eval/legal_qa_benchmark/benchmark_queries.jsonl
@@ -544,9 +542,9 @@ data/eval/legal_qa_benchmark/split_manifest.json
 data/eval/legal_qa_benchmark/benchmark_manifest.json
 ```
 
-The current draft pilot lives under `data/eval/legal_qa_benchmark/pilot/`.
-It is not frozen and is not held-out proof. Runtime or draft diagnostics may
-be written under `artifacts/reports/evaluation/`.
+Historical pilot data was removed after the `v0.1.0` freeze; its details remain
+available in Git history. Runtime or draft diagnostics may be written under
+`artifacts/reports/evaluation/`.
 
 ## Loaders and Validation
 
@@ -734,9 +732,9 @@ appropriate.
 
 The schema contract version `1.0` is frozen for full benchmark construction as
 of 2026-06-21. This freezes the field contract, enum values, validation
-semantics, and review-assurance metadata. It does not freeze pilot records,
-create held-out splits, release a benchmark version, or prevent documented bug
-fixes.
+semantics, and review-assurance metadata. The scoped benchmark release
+`v0.1.0` uses this schema contract. Schema freeze does not prevent documented
+bug fixes.
 
 Breaking schema changes require a new incompatible schema version and an
 explicit migration. Examples include removing a field, renaming a field,
@@ -753,14 +751,14 @@ reinterpreted.
 
 - The reviewed generation suite in `src/retrieval/` has only five regression
   cases and is not held-out proof.
-- The draft pilot is not frozen, not held-out, and has not received qualified
-  human legal review.
+- The scoped `v0.1.0` held-out split contains low/medium-risk eligible cases
+  only; high-risk sanction, penalty, criminal, and fallback-safety held-out
+  coverage is deferred until qualified human legal review occurs.
 - Metric computation for the broader benchmark is not implemented yet.
-- Temporal/version-sensitive pilot cases were not exercised because current
-  processed chunk metadata is insufficient for a defensible pilot temporal
-  label.
+- Temporal/version-sensitive held-out coverage is excluded because current
+  processed chunk metadata is insufficient for defensible temporal labels.
 - Semantic regression overlap detection is not fully automatic.
-- Domain quotas, final benchmark size, numeric relevance gains, sparse
-  architecture, and reranker choices remain open.
+- Preferred-domain expansion beyond scoped `v0.1.0`, numeric relevance gains,
+  sparse architecture, and reranker choices remain open.
 - There is no overwrite mode for frozen benchmark manifests. Corrections
   should normally use a new benchmark version and output path.

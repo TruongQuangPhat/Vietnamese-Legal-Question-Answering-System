@@ -4,7 +4,7 @@
 
 This document is the active operational dashboard for Phase 10 benchmark-first
 Advanced RAG evaluation work. It tracks current progress, decisions, risks,
-deliverables, pilot status, and next actions.
+deliverables, benchmark release status, and next actions.
 
 Canonical sources:
 
@@ -54,8 +54,8 @@ after Phase 10 closes and durable information has been consolidated.
 | Naive RAG | `docs/naive_rag.md` | Baseline implementation and quality gate reference | Active |
 | Evaluation protocol and implementation | `docs/evaluation.md` | Durable benchmark rules, schemas, validation, split, freeze, review policy, CLI, metrics contract | Active |
 | Advanced RAG design | `docs/advanced_rag.md` | Future hybrid/fusion/reranking design reference | Active |
-| Pilot data and summary | `data/eval/legal_qa_benchmark/pilot/README.md` | Draft pilot purpose, coverage, review results, limitations | Active |
-| Detailed review history | `data/eval/legal_qa_benchmark/pilot/review_records.jsonl` | Machine-readable review and adjudication audit trail | Active |
+| Frozen benchmark data | `data/eval/legal_qa_benchmark/*.jsonl` | Active scoped `v0.1.0` benchmark records and review history | Active |
+| Split and benchmark manifests | `data/eval/legal_qa_benchmark/split_manifest.json`, `data/eval/legal_qa_benchmark/benchmark_manifest.json` | Frozen split assignments, checksums, and release metadata | Active |
 
 ## Phase 10 Objective
 
@@ -263,37 +263,14 @@ Core invariants:
 | Benchmark implementation | `src/evaluation/benchmark/` | Created | Schemas, loaders, validator, splitting, fingerprinting, freeze support. |
 | Evaluation CLIs | `scripts/evaluation/` | Created | Thin wrappers; no Qdrant or OpenRouter calls. |
 | Evaluation tests | `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py` | Created | Synthetic fixtures only. |
-| Pilot dataset | `data/eval/legal_qa_benchmark/pilot/` | Draft | Pre-split, non-frozen, not held-out proof. |
 | Full benchmark release | `data/eval/legal_qa_benchmark/` | Frozen scoped `v0.1.0` | 128 frozen records, 85 development cases, 43 low/medium-risk held-out cases, split and benchmark manifests created. |
 
-## Pilot Snapshot
+## Historical Pilot Note
 
-- Query count: 19.
-- Expected decisions: 17 `answer_allowed`, 2 `fallback_required`.
-- Primary domains covered: 9.
-- Domain counts:
-  - `labor_employment_social_security`: 4;
-  - `business_banking_tax`: 3;
-  - `traffic_public_order_sanctions`: 3;
-  - `civil_family_identity`: 2;
-  - `criminal_procedure_penalty`: 2;
-  - `consumer_health_education_digital_ip`: 2;
-  - `administrative_government_interaction`: 1;
-  - `civil_procedure_dispute_resolution`: 1;
-  - `land_real_estate_construction_environment`: 1.
-- Complete-evidence cases: 7.
-- Blocking cases: 14.
-- Regression-overlap bridge cases: 2.
-- Primary review records: 19.
-- Structured independent review records: 19.
-- Adjudication records: 1.
-- Conflict queries: 0.
-- Frozen queries: 0.
-- Assigned queries: 0.
-- Held-out eligibility audit: pilot records remain separate from the full
-  benchmark and are not part of the current held-out candidate pool.
-- Freeze blocker: pilot cases remain pre-split, non-frozen, and not
-  qualified-human-reviewed.
+Stage D produced a 19-case pilot to exercise the schema, validation, structured
+automated review, and repository-level adjudication workflow. That pilot is no
+longer an active repository asset after the scoped `v0.1.0` freeze. Historical
+details remain available in Git history.
 
 ## Full Benchmark Draft Snapshot
 
@@ -534,24 +511,19 @@ count.
 | --- | --- | --- |
 | `dev_eligible` | Complete schema records, direct qrels where required, primary + structured independent review, material conflicts adjudicated, corpus-aware validation passes. | May enter `development`. |
 | `held_out_eligible` | Satisfies `dev_eligible`, no regression overlap, no unresolved conflict, complete grouping metadata, no leakage risk, and high-risk review gate satisfied. | May enter `held_out_test`. |
-| `development_only` | Useful for diagnostics, bridge coverage, pilot continuity, temporal exploration, or unresolved qualified-review capacity limits. | Must stay in `development` or remain outside frozen scoring. |
+| `development_only` | Useful for diagnostics, bridge coverage, temporal exploration, or unresolved qualified-review capacity limits. | Must stay in `development` or remain outside frozen scoring. |
 | `excluded` | Unsupported expectation, unsafe temporal scope, unresolved conflict, duplicate without purpose, missing direct qrels for `answer_allowed`, or failed validation. | Must not enter scored benchmark. |
 
-### Pilot Reuse Policy
+### Historical Pilot Reuse Policy
 
-The 19 pilot cases remain draft and pre-split. They should be used primarily
-as seed patterns and validator/protocol examples. A pilot case may be promoted
-later only after the full benchmark review workflow confirms it under the
-same schema contract and applies the eligibility rules above.
-
-`pilot_0001` and `pilot_0018` have declared regression overlap and are
-permanently ineligible for `held_out_test`. High-risk pilot cases require
-qualified human legal review before held-out use; without that review they
-remain `development_only` or seed patterns.
+The pilot is historical only. It must not be used as active benchmark data. Any
+future case inspired by the pilot must be reconstructed from source-first
+inspection, assigned a new benchmark ID, reviewed under the full benchmark
+workflow, and evaluated under the current eligibility rules.
 
 ### Full Benchmark File Layout
 
-Canonical full benchmark files will live at:
+Canonical full benchmark files live at:
 
 ```text
 data/eval/legal_qa_benchmark/benchmark_queries.jsonl
@@ -563,10 +535,9 @@ data/eval/legal_qa_benchmark/split_manifest.json
 data/eval/legal_qa_benchmark/benchmark_manifest.json
 ```
 
-Stage E2A created the five canonical draft JSONL files and added narrow
-`.gitignore` exceptions for those JSONL files only. `split_manifest.json` and
-`benchmark_manifest.json` remain uncreated and ignored until a later split and
-freeze task explicitly scopes them.
+The scoped `v0.1.0` freeze created the active JSONL records, split manifest,
+and benchmark manifest. `.gitignore` keeps narrow exceptions for these
+canonical files only.
 
 ### Split Strategy
 
@@ -628,7 +599,7 @@ Before split and benchmark manifests are created:
 - split coverage by domain and question type is acceptable;
 - raw and canonical checksums/fingerprints are recorded;
 - `benchmark_version` is release-valid and not `draft`;
-- pilot data remains clearly separate from frozen benchmark data.
+- obsolete pilot data has been removed or clearly marked historical.
 
 ## Review and Adjudication Snapshot
 
@@ -636,14 +607,11 @@ Before split and benchmark manifests are created:
 - D2 completed structured automated second-pass review.
 - This review does not constitute qualified human legal review.
 - Qualified human legal review has not been completed.
-- One material disagreement was found for `pilot_0003`.
-- `pilot_0003` was adjudicated by narrowing the query to ordinary overtime
-  under Article 107 Clause 2 and removing `conditions_and_exceptions` from
-  `question_types`.
+- One material scope disagreement was found during the historical pilot
+  review and was resolved through repository-level adjudication.
 - No unresolved conflict remains.
-- No pilot case is frozen or assigned to a split.
-- Detailed machine-readable review history remains in
-  `data/eval/legal_qa_benchmark/pilot/review_records.jsonl`.
+- The active benchmark review history is stored in
+  `data/eval/legal_qa_benchmark/review_records.jsonl`.
 
 ## Current Decisions
 
@@ -688,14 +656,12 @@ Confirmed risks:
 - Qualified human legal review has not been completed.
 - High-risk held-out items require qualified human legal review or exclusion
   from the frozen held-out split.
-- Temporal/version-sensitive cases were not exercised in the pilot.
+- Temporal/version-sensitive cases are not included in the scoped `v0.1.0`
+  held-out split.
 - Semantic regression overlap still requires manual review.
-- Pilot over-samples blocking and high-risk cases.
-- Full benchmark grouping and split planning may expose schema or protocol
-  edge cases not represented by draft construction alone.
-- The cumulative draft benchmark still has high blocking/high-risk density
-  (80 of 128 cases), though E-Repair increased low/medium-risk coverage to
-  48 cases.
+- The active benchmark has high blocking/high-risk density in development
+  (80 of 128 cases), though the held-out split contains only low/medium-risk
+  eligible cases.
 - `v0.1.0` has a valid held-out split, but the held-out split intentionally
   contains low/medium-risk cases only.
 - `v0.1.0` held-out excludes high-risk sanction/penalty and criminal-procedure
@@ -723,7 +689,7 @@ Open questions:
 
 ## Validation Summary
 
-Latest Stage D documentation and pilot hardening checks passed:
+Historical Stage D pilot hardening checks passed before pilot removal:
 
 - corpus-aware pilot validation: 0 errors, 2 expected warnings for unsplit
   regression bridge cases;
@@ -744,8 +710,8 @@ Latest Stage E1 planning documentation checks passed:
 
 - `git diff --check`: passed;
 - removed-document reference search: no active references;
-- heading inventory: completed for `docs/evaluation.md`,
-  `docs/phase10_tracer.md`, and the pilot README;
+- heading inventory: completed for `docs/evaluation.md` and
+  `docs/phase10_tracer.md`;
 - `.gitignore` audit: Stage E2 must keep full benchmark JSONL exceptions
   narrow and leave canonical manifests separately scoped;
 - changed files are documentation only.
@@ -809,7 +775,7 @@ Latest Stage E-Final pre-freeze audit:
 - grouped held-out-eligible candidates: 35;
 - development-only cases due high-risk without qualified human review: 80;
 - excluded-from-freeze cases: 0;
-- result: freeze blocked; no split or manifests created.
+- result: split/freeze gate did not pass; no split or manifests were created.
 
 Latest Stage E-Repair audit:
 
@@ -857,7 +823,7 @@ Latest scoped `v0.1.0` freeze audit:
 | 2026-06-19 | Implemented benchmark schemas, loaders, validator, grouped splitting, fingerprinting, CLI wrappers, tests, config, and technical docs. |
 | 2026-06-19 | Hardened protocol invariants, split/review sources of truth, fingerprints, qrel/group consistency, and freeze immutability. |
 | 2026-06-20 | Created and hardened 19-case draft pilot annotation. |
-| 2026-06-20 | Completed structured D2 review and adjudicated the `pilot_0003` scope conflict. |
+| 2026-06-20 | Completed structured D2 review and adjudicated the pilot scope conflict. |
 | 2026-06-21 | Added review-assurance metadata and froze schema contract version `1.0`. |
 | 2026-06-21 | Hardened D2 assurance wording and high-risk held-out review policy. |
 | 2026-06-21 | Consolidated evaluation documentation into the current canonical structure. |

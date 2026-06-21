@@ -45,6 +45,7 @@ scripts/
   corpus/       # corpus pipeline CLI entrypoints
   indexing/     # embedding/Qdrant CLI entrypoints
   retrieval/    # retrieval, Naive RAG, evaluation, and QA CLI entrypoints
+  evaluation/   # legal QA benchmark validation, split, and freeze entrypoints
 
 src/
   ingestion/    # registry, crawl, audit, cleaning, storage
@@ -53,7 +54,7 @@ src/
   retrieval/    # dense retrieval, evidence, selection, generation, evaluation, review, quality gate
   services/     # existing orchestration services
   api/          # future/separately scoped
-  evaluation/   # future broader evaluation layer
+  evaluation/   # legal QA benchmark schemas, validation, splitting, and freeze support
   monitoring/   # future/separately scoped
   security/     # future/separately scoped
 ```
@@ -203,19 +204,24 @@ It is not a held-out benchmark for claiming broad Vietnamese legal QA quality or
 7. Model output may vary across runs.
 8. The current system is not production-ready legal advice.
 9. Sparse retrieval, fusion, and reranking have not yet been evaluated on a frozen comparative benchmark.
+10. The scoped legal QA benchmark `v0.1.0` is frozen, but its held-out split is limited to low/medium-risk eligible cases.
+11. Qualified human legal review has not been completed for high-risk held-out expansion.
+12. `v0.1.0` held-out results must not be used to validate high-risk sanction, penalty, or criminal legal QA.
 
 ## 8. Current Next Stage
 
-The next stage should be benchmark-first Advanced RAG work.
+The next stage should run the frozen Naive RAG baseline on the scoped
+`v0.1.0` benchmark before adding Advanced RAG components.
 
-Do not begin by immediately adding hybrid retrieval. First establish a controlled comparison framework.
+Do not begin by immediately adding hybrid retrieval. First record the dense
+baseline on the frozen development and held-out splits.
 
 Recommended sequence:
 
 ```text
-1. Build a broader reviewed legal retrieval/QA benchmark.
-2. Define and freeze development and held-out test splits.
-3. Run the current Naive RAG baseline on the frozen benchmark.
+1. Run the current Naive RAG baseline on the frozen `v0.1.0` development split.
+2. Run the current Naive RAG baseline once on the frozen `v0.1.0` held-out split.
+3. Record baseline manifests, metrics, and scoped-release limitations.
 4. Implement sparse retrieval and controlled dense+sparse fusion.
 5. Evaluate hybrid retrieval on the development split.
 6. Add reranking only as a separate ablation.
@@ -407,8 +413,9 @@ Runtime reports under `artifacts/reports/` should remain ignored unless explicit
 | Dense retrieval and fallback-aware Naive RAG | Complete |
 | Generation evaluation, faithfulness review, prompt hardening, quality gate | Complete |
 | Phase 9 closure | Complete with known limitations |
-| Benchmark construction and frozen split | Next |
-| Advanced retrieval comparison | Future / next stage |
+| Benchmark construction and frozen split | Complete for scoped `v0.1.0` |
+| Frozen Naive RAG baseline on benchmark | Next |
+| Advanced retrieval comparison | Future |
 | GraphRAG and agents | Future |
 | API and UI | Future |
 | Deployment and MLOps | Future |
