@@ -34,10 +34,12 @@ after Phase 10 closes and durable information has been consolidated.
 - Five-case suite: regression and safety suite only, not held-out proof.
 - Phase 10 stage: Stage D documentation and pilot stabilization are complete.
   Schema contract version `1.0` is frozen for full benchmark construction.
-  Stage E1 full benchmark construction planning is complete.
-- Not done: full benchmark construction, dev/test split, held-out benchmark
-  freeze, frozen Naive RAG baseline run, metrics, sparse retrieval, fusion,
-  reranking, GraphRAG, API, UI, and fine-tuning.
+  Stage E1 full benchmark construction planning is complete. Stage E2A
+  created the first 36-case full-benchmark draft batch.
+- Not done: remaining full benchmark construction to the 120-case minimum,
+  dev/test split, held-out benchmark freeze, frozen Naive RAG baseline run,
+  metrics, sparse retrieval, fusion, reranking, GraphRAG, API, UI, and
+  fine-tuning.
 
 ## Canonical Document Map
 
@@ -106,7 +108,7 @@ Core invariants:
 | Stage B - Benchmark Protocol | Complete | Durable rules consolidated into `docs/evaluation.md`. |
 | Stage C - Benchmark Implementation | Complete | Schemas, loaders, validator, splitting, fingerprinting, freeze support, CLIs, config, and tests implemented. |
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
-| Stage E - Full Benchmark and Split Freeze | Planning complete; construction not started | Stage E1 defines size, quota, eligibility, split, review, and freeze prerequisites. Full benchmark records, grouped split, leakage validation, and manifest freeze remain pending. |
+| Stage E - Full Benchmark and Split Freeze | In progress | Stage E1 planning is complete. Stage E2A created and validated the first 36-case full-benchmark draft batch. Additional batches, grouped split, leakage validation, and manifest freeze remain pending. |
 | Stage F - Frozen Naive RAG Baseline | Not started | Baseline execution on frozen development and held-out splits remains pending. |
 | Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
@@ -177,6 +179,11 @@ Core invariants:
 - [x] full benchmark review workflow;
 - [x] high-risk held-out human-review gate;
 - [x] Stage E2 acceptance criteria;
+- [x] first full-benchmark draft batch;
+- [x] batch primary annotation;
+- [x] batch structured automated independent review;
+- [x] batch corpus-aware validation;
+- [x] narrow `.gitignore` exceptions for full benchmark JSONL files;
 - [ ] duplicate and near-duplicate detection;
 - [ ] paraphrase-family grouping;
 - [ ] source-provision grouping;
@@ -249,6 +256,7 @@ Core invariants:
 | Evaluation CLIs | `scripts/evaluation/` | Created | Thin wrappers; no Qdrant or OpenRouter calls. |
 | Evaluation tests | `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py` | Created | Synthetic fixtures only. |
 | Pilot dataset | `data/eval/legal_qa_benchmark/pilot/` | Draft | Pre-split, non-frozen, not held-out proof. |
+| Full benchmark draft batch 1 | `data/eval/legal_qa_benchmark/*.jsonl` | Draft | 36 pre-split, non-frozen cases; structured automated review complete; no manifests. |
 
 ## Pilot Snapshot
 
@@ -274,6 +282,58 @@ Core invariants:
 - Conflict queries: 0.
 - Frozen queries: 0.
 - Assigned queries: 0.
+
+## Full Benchmark Batch Snapshot
+
+Stage E2A created the first canonical full-benchmark draft batch under
+`data/eval/legal_qa_benchmark/`. It is draft data only: no query has a split,
+no query is frozen, and no `split_manifest.json` or `benchmark_manifest.json`
+exists.
+
+- Query count: 36.
+- Remaining gap to `minimum_viable_benchmark_size=120`: 84 cases.
+- Expected decisions: 32 `answer_allowed`, 4 `fallback_required`.
+- Complete-evidence cases: 10.
+- Blocking/high-risk cases: 34.
+- Fallback cases: 4.
+- Regression-overlap cases: 0.
+- Primary review records: 36.
+- Structured independent review records: 36.
+- Adjudication records: 0.
+- Conflict queries: 0.
+- Frozen queries: 0.
+- Assigned queries: 0.
+
+Domain counts:
+
+- `business_banking_tax`: 5;
+- `labor_employment_social_security`: 5;
+- `land_real_estate_construction_environment`: 5;
+- `civil_family_identity`: 4;
+- `traffic_public_order_sanctions`: 4;
+- `criminal_procedure_penalty`: 4;
+- `consumer_health_education_digital_ip`: 4;
+- `administrative_government_interaction`: 3;
+- `civil_procedure_dispute_resolution`: 2.
+
+Question-type counts:
+
+- `ambiguous`: 2;
+- `clause_point_lookup`: 30;
+- `complete_list`: 8;
+- `conditions_and_exceptions`: 3;
+- `cross_law`: 1;
+- `definition`: 2;
+- `eligibility`: 8;
+- `fallback`: 4;
+- `lexical_mismatch`: 12;
+- `multi_evidence`: 9;
+- `near_duplicate_provision`: 2;
+- `paraphrase`: 34;
+- `procedure`: 6;
+- `rights_and_obligations`: 16;
+- `sanction_or_penalty`: 6;
+- `single_article_lookup`: 24.
 
 ## Stage E1 Construction Plan
 
@@ -397,12 +457,10 @@ data/eval/legal_qa_benchmark/split_manifest.json
 data/eval/legal_qa_benchmark/benchmark_manifest.json
 ```
 
-Stage E1 does not create these files. Current `.gitignore` rules ignore
-future full benchmark JSONL and manifest paths through broad
-`data/eval/**/*.json*` patterns; only the pilot files currently have narrow
-exceptions. Stage E2 must add narrow exceptions for approved canonical full
-benchmark JSONL files, `split_manifest.json`, and `benchmark_manifest.json`
-before creating them, while keeping runtime reports ignored.
+Stage E2A created the five canonical draft JSONL files and added narrow
+`.gitignore` exceptions for those JSONL files only. `split_manifest.json` and
+`benchmark_manifest.json` remain uncreated and ignored until a later split and
+freeze task explicitly scopes them.
 
 ### Split Strategy
 
@@ -504,6 +562,8 @@ Before split and benchmark manifests are created:
 | 2026-06-21 | Treat temporal cases as excluded from the initial frozen benchmark unless defensible metadata exists | Processed chunks do not expose effective/expiry metadata needed for safe temporal ground truth. | Proposed |
 | 2026-06-21 | Treat pilot cases as seed patterns unless re-reviewed for full benchmark eligibility | Pilot is draft, pre-split, non-frozen, and not qualified-human-reviewed. | Proposed |
 | 2026-06-21 | Preserve provisional 70/30 split only as a pre-freeze default | The ratio is implemented in config but must be confirmed before split creation. | Proposed |
+| 2026-06-21 | Keep Stage E2A conflict-free cases at `independent_reviewed` without fake adjudication records | Adjudication records are only valid when a material disagreement exists. | Implemented |
+| 2026-06-21 | Add narrow Git exceptions only for full benchmark JSONL files | Draft benchmark records must be tracked, while split and benchmark manifests remain later freeze artifacts. | Implemented |
 
 ## Risks and Open Questions
 
@@ -517,6 +577,8 @@ Confirmed risks:
 - Pilot over-samples blocking and high-risk cases.
 - Full benchmark construction may expose schema or protocol edge cases not
   represented in the pilot.
+- Stage E2A over-samples blocking/high-risk cases and does not define final
+  held-out eligibility.
 - Generation output can be non-deterministic even with fixed prompts and
   inputs.
 - Sparse retrieval, fusion, and reranking may add latency and cost.
@@ -557,9 +619,26 @@ Latest Stage E1 planning documentation checks passed:
 - removed-document reference search: no active references;
 - heading inventory: completed for `docs/evaluation.md`,
   `docs/phase10_tracer.md`, and the pilot README;
-- `.gitignore` audit: future full benchmark JSONL and canonical manifests
-  currently require narrow exceptions before Stage E2 creates them;
+- `.gitignore` audit: Stage E2 must keep full benchmark JSONL exceptions
+  narrow and leave canonical manifests separately scoped;
 - changed files are documentation only.
+
+Latest Stage E2A draft-batch checks passed:
+
+- full-benchmark corpus-aware validation: 0 errors, 0 warnings;
+- review-history audit: 36 queries, 36 primary review records, 36 structured
+  independent review records, 0 adjudication records, 0 conflicts, 0 frozen
+  queries, 0 assigned queries;
+- draft record counts: 36 queries, 61 targets, 61 qrels, 55 evidence groups,
+  72 review records;
+- Python compile for benchmark modules and evaluation CLIs: passed;
+- evaluation unit tests: 68 passed;
+- evaluation integration tests: 1 passed;
+- retrieval unit regression tests: 173 passed;
+- Ruff lint and format check: passed;
+- `uv lock --check`: passed;
+- removed-document reference search: no active references;
+- `git diff --check`: passed.
 
 ## Change Log
 
@@ -575,6 +654,7 @@ Latest Stage E1 planning documentation checks passed:
 | 2026-06-21 | Hardened D2 assurance wording and high-risk held-out review policy. |
 | 2026-06-21 | Consolidated evaluation documentation into the current canonical structure. |
 | 2026-06-21 | Added Stage E1 full benchmark construction planning, quota proposal, eligibility tiers, split strategy, and Stage E2 acceptance criteria. |
+| 2026-06-21 | Created the first 36-case full-benchmark draft batch with primary annotation, structured automated review, and corpus-aware validation. |
 
 ## Exit Criteria
 
@@ -597,8 +677,9 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-annotation workload and qualified-review allocation
--> full benchmark construction
+Stage E2B full-benchmark draft batch construction
+-> coverage gap closure toward the 120-case minimum
+-> annotation workload and qualified-review allocation
 -> grouped split and leakage validation
 -> split and benchmark manifest freeze
 ```
