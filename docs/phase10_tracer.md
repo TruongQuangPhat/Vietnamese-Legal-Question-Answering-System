@@ -35,7 +35,8 @@ after Phase 10 closes and durable information has been consolidated.
 - Phase 10 stage: Stage D documentation and pilot stabilization are complete.
   Schema contract version `1.0` is frozen for full benchmark construction.
   Stage E1 full benchmark construction planning is complete. Stage E2A
-  created the first 36-case full-benchmark draft batch.
+  created the first 36-case full-benchmark draft batch, and Stage E2B-1
+  expanded it to 78 draft cases.
 - Not done: remaining full benchmark construction to the 120-case minimum,
   dev/test split, held-out benchmark freeze, frozen Naive RAG baseline run,
   metrics, sparse retrieval, fusion, reranking, GraphRAG, API, UI, and
@@ -108,7 +109,7 @@ Core invariants:
 | Stage B - Benchmark Protocol | Complete | Durable rules consolidated into `docs/evaluation.md`. |
 | Stage C - Benchmark Implementation | Complete | Schemas, loaders, validator, splitting, fingerprinting, freeze support, CLIs, config, and tests implemented. |
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
-| Stage E - Full Benchmark and Split Freeze | In progress | Stage E1 planning is complete. Stage E2A created and validated the first 36-case full-benchmark draft batch. Additional batches, grouped split, leakage validation, and manifest freeze remain pending. |
+| Stage E - Full Benchmark and Split Freeze | In progress | Stage E1 planning is complete. Stage E2A and E2B-1 created and validated 78 full-benchmark draft cases. Additional construction, grouped split, leakage validation, and manifest freeze remain pending. |
 | Stage F - Frozen Naive RAG Baseline | Not started | Baseline execution on frozen development and held-out splits remains pending. |
 | Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
@@ -184,6 +185,9 @@ Core invariants:
 - [x] batch structured automated independent review;
 - [x] batch corpus-aware validation;
 - [x] narrow `.gitignore` exceptions for full benchmark JSONL files;
+- [x] second full-benchmark draft batch;
+- [x] cumulative full-benchmark corpus-aware validation;
+- [ ] final draft construction to the 120-case minimum;
 - [ ] duplicate and near-duplicate detection;
 - [ ] paraphrase-family grouping;
 - [ ] source-provision grouping;
@@ -256,7 +260,7 @@ Core invariants:
 | Evaluation CLIs | `scripts/evaluation/` | Created | Thin wrappers; no Qdrant or OpenRouter calls. |
 | Evaluation tests | `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py` | Created | Synthetic fixtures only. |
 | Pilot dataset | `data/eval/legal_qa_benchmark/pilot/` | Draft | Pre-split, non-frozen, not held-out proof. |
-| Full benchmark draft batch 1 | `data/eval/legal_qa_benchmark/*.jsonl` | Draft | 36 pre-split, non-frozen cases; structured automated review complete; no manifests. |
+| Full benchmark draft batches | `data/eval/legal_qa_benchmark/*.jsonl` | Draft | 78 pre-split, non-frozen cases; structured automated review complete; no manifests. |
 
 ## Pilot Snapshot
 
@@ -283,22 +287,23 @@ Core invariants:
 - Frozen queries: 0.
 - Assigned queries: 0.
 
-## Full Benchmark Batch Snapshot
+## Full Benchmark Draft Snapshot
 
-Stage E2A created the first canonical full-benchmark draft batch under
+Stage E2A and E2B-1 created the current canonical full-benchmark draft under
 `data/eval/legal_qa_benchmark/`. It is draft data only: no query has a split,
 no query is frozen, and no `split_manifest.json` or `benchmark_manifest.json`
 exists.
 
-- Query count: 36.
-- Remaining gap to `minimum_viable_benchmark_size=120`: 84 cases.
-- Expected decisions: 32 `answer_allowed`, 4 `fallback_required`.
-- Complete-evidence cases: 10.
-- Blocking/high-risk cases: 34.
-- Fallback cases: 4.
+- Query count: 78.
+- Remaining gap to `minimum_viable_benchmark_size=120`: 42 cases.
+- Expected decisions: 68 `answer_allowed`, 10 `fallback_required`.
+- Complete-evidence cases: 19.
+- Blocking/high-risk cases: 61.
+- Low/medium-risk cases: 17.
+- Fallback cases: 10.
 - Regression-overlap cases: 0.
-- Primary review records: 36.
-- Structured independent review records: 36.
+- Primary review records: 78.
+- Structured independent review records: 78.
 - Adjudication records: 0.
 - Conflict queries: 0.
 - Frozen queries: 0.
@@ -306,34 +311,36 @@ exists.
 
 Domain counts:
 
-- `business_banking_tax`: 5;
-- `labor_employment_social_security`: 5;
-- `land_real_estate_construction_environment`: 5;
-- `civil_family_identity`: 4;
-- `traffic_public_order_sanctions`: 4;
-- `criminal_procedure_penalty`: 4;
-- `consumer_health_education_digital_ip`: 4;
-- `administrative_government_interaction`: 3;
-- `civil_procedure_dispute_resolution`: 2.
+- `business_banking_tax`: 10;
+- `labor_employment_social_security`: 10;
+- `land_real_estate_construction_environment`: 10;
+- `civil_family_identity`: 9;
+- `consumer_health_education_digital_ip`: 9;
+- `criminal_procedure_penalty`: 8;
+- `administrative_government_interaction`: 7;
+- `traffic_public_order_sanctions`: 7;
+- `civil_procedure_dispute_resolution`: 6;
+- `constitutional_state_rights`: 2.
 
 Question-type counts:
 
-- `ambiguous`: 2;
-- `clause_point_lookup`: 30;
-- `complete_list`: 8;
-- `conditions_and_exceptions`: 3;
-- `cross_law`: 1;
-- `definition`: 2;
-- `eligibility`: 8;
-- `fallback`: 4;
-- `lexical_mismatch`: 12;
-- `multi_evidence`: 9;
-- `near_duplicate_provision`: 2;
-- `paraphrase`: 34;
-- `procedure`: 6;
-- `rights_and_obligations`: 16;
-- `sanction_or_penalty`: 6;
-- `single_article_lookup`: 24.
+- `ambiguous`: 7;
+- `clause_point_lookup`: 62;
+- `complete_list`: 14;
+- `conditions_and_exceptions`: 10;
+- `cross_law`: 3;
+- `definition`: 9;
+- `eligibility`: 10;
+- `fallback`: 10;
+- `lexical_mismatch`: 22;
+- `multi_evidence`: 17;
+- `near_duplicate_provision`: 7;
+- `paraphrase`: 76;
+- `procedure`: 21;
+- `rights_and_obligations`: 36;
+- `sanction_or_penalty`: 10;
+- `single_article_lookup`: 53;
+- `temporal_version_sensitive`: 0.
 
 ## Stage E1 Construction Plan
 
@@ -564,6 +571,8 @@ Before split and benchmark manifests are created:
 | 2026-06-21 | Preserve provisional 70/30 split only as a pre-freeze default | The ratio is implemented in config but must be confirmed before split creation. | Proposed |
 | 2026-06-21 | Keep Stage E2A conflict-free cases at `independent_reviewed` without fake adjudication records | Adjudication records are only valid when a material disagreement exists. | Implemented |
 | 2026-06-21 | Add narrow Git exceptions only for full benchmark JSONL files | Draft benchmark records must be tracked, while split and benchmark manifests remain later freeze artifacts. | Implemented |
+| 2026-06-21 | Keep Stage E2B-1 conflict-free cases at `independent_reviewed` without fake adjudication records | No material disagreements were recorded, so adjudication records would create false review history. | Implemented |
+| 2026-06-21 | Keep `temporal_version_sensitive` coverage at 0 for E2B-1 | Current processed chunks still lack defensible temporal metadata for safe temporal ground truth. | Implemented |
 
 ## Risks and Open Questions
 
@@ -577,8 +586,9 @@ Confirmed risks:
 - Pilot over-samples blocking and high-risk cases.
 - Full benchmark construction may expose schema or protocol edge cases not
   represented in the pilot.
-- Stage E2A over-samples blocking/high-risk cases and does not define final
-  held-out eligibility.
+- The cumulative draft benchmark still has high blocking/high-risk density
+  (61 of 78 cases), though E2B-1 added more low/medium-risk cases.
+- Stage E2B-1 does not define final held-out eligibility.
 - Generation output can be non-deterministic even with fixed prompts and
   inputs.
 - Sparse retrieval, fusion, and reranking may add latency and cost.
@@ -640,6 +650,25 @@ Latest Stage E2A draft-batch checks passed:
 - removed-document reference search: no active references;
 - `git diff --check`: passed.
 
+Latest Stage E2B-1 draft-batch checks passed:
+
+- full-benchmark corpus-aware validation: 0 errors, 0 warnings;
+- review-history audit: 78 queries, 78 primary review records, 78 structured
+  independent review records, 0 adjudication records, 0 conflicts, 0 frozen
+  queries, 0 assigned queries;
+- draft record counts: 78 queries, 124 targets, 124 qrels, 112 evidence
+  groups, 156 review records;
+- manifest absence check: no split or benchmark manifest exists;
+- no held-out assignments and no frozen records;
+- Python compile for benchmark modules and evaluation CLIs: passed;
+- evaluation unit tests: 68 passed;
+- evaluation integration tests: 1 passed;
+- retrieval unit regression tests: 173 passed;
+- Ruff lint and format check: passed;
+- `uv lock --check`: passed;
+- removed-document reference search: no active references;
+- `git diff --check`: passed.
+
 ## Change Log
 
 | Date | Change |
@@ -655,6 +684,7 @@ Latest Stage E2A draft-batch checks passed:
 | 2026-06-21 | Consolidated evaluation documentation into the current canonical structure. |
 | 2026-06-21 | Added Stage E1 full benchmark construction planning, quota proposal, eligibility tiers, split strategy, and Stage E2 acceptance criteria. |
 | 2026-06-21 | Created the first 36-case full-benchmark draft batch with primary annotation, structured automated review, and corpus-aware validation. |
+| 2026-06-21 | Added the second 42-case full-benchmark draft batch, bringing the cumulative draft to 78 cases with corpus-aware validation passing. |
 
 ## Exit Criteria
 
@@ -677,11 +707,11 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-Stage E2B full-benchmark draft batch construction
--> coverage gap closure toward the 120-case minimum
+Stage E2B-2 final draft batch construction
+-> coverage gap closure to the 120-case minimum
+-> duplicate, paraphrase, and source-provision grouping
 -> annotation workload and qualified-review allocation
 -> grouped split and leakage validation
--> split and benchmark manifest freeze
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.
