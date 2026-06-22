@@ -43,9 +43,11 @@ after Phase 10 closes and durable information has been consolidated.
   development-only.
 - Stage F1: frozen dense retrieval-only baseline is complete for benchmark
   `v0.1.0`.
+- Stage F2: frozen Naive RAG generation baseline is complete for benchmark
+  `v0.1.0`, using frozen F1 retrieval artifacts and the current Naive RAG
+  pipeline without fallback/evidence-gate relaxation.
 - Not done: qualified human legal review for high-risk held-out expansion,
-  frozen Naive RAG generation baseline run, sparse retrieval, fusion,
-  reranking, GraphRAG, API, UI, and fine-tuning.
+  sparse retrieval, fusion, reranking, GraphRAG, API, UI, and fine-tuning.
 
 ## Canonical Document Map
 
@@ -115,7 +117,7 @@ Core invariants:
 | Stage C - Benchmark Implementation | Complete | Schemas, loaders, validator, splitting, fingerprinting, freeze support, CLIs, config, and tests implemented. |
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
 | Stage E - Full Benchmark and Split Freeze | Complete for scoped `v0.1.0` | Stage E1 planning, E2 construction, E-Repair, scoped split, and freeze are complete. `held_out_test` contains low/medium-risk eligible cases only; high-risk sanction/criminal held-out coverage is deferred pending qualified human legal review. |
-| Stage F - Frozen Naive RAG Baseline | In progress | Stage F1 dense retrieval-only baseline is complete on frozen development and held-out splits. Frozen Naive RAG generation baseline remains pending. |
+| Stage F - Frozen Naive RAG Baseline | In progress | Stage F1 dense retrieval-only baseline and Stage F2 frozen Naive RAG generation baseline are complete on frozen development and held-out splits. Regression-suite and quality-gate reruns remain pending. |
 | Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
 | Stage I - Held-Out Comparison | Not started | Final comparison must occur after candidate configurations are fixed. |
@@ -211,7 +213,7 @@ Core invariants:
 - [x] retrieval run manifest;
 - [x] runtime parameter capture;
 - [x] retrieval result validation;
-- [ ] frozen Naive RAG generation baseline;
+- [x] frozen Naive RAG generation baseline;
 - [ ] regression-suite rerun;
 - [ ] quality-gate rerun.
 
@@ -475,6 +477,73 @@ Known Stage F1 limitations:
 - no sparse retrieval, RRF, reranking, fusion, or query rewriting was used;
 - `held_out_test` remains scoped to low/medium-risk v0.1 cases only;
 - qualified human legal review has not occurred.
+
+## Frozen Naive RAG Generation Baseline Snapshot
+
+Stage F2 ran the current Naive RAG generation pipeline against frozen
+benchmark release `v0.1.0`, reusing the frozen dense retrieval results from
+Stage F1. This was a baseline run only: no fallback/evidence gate was relaxed,
+no prompt or selector tuning was applied, and no sparse retrieval, fusion,
+reranking, query rewriting, or Advanced RAG behavior was introduced.
+
+Runtime identity:
+
+- LLM provider/model: `openrouter` / `google/gemini-2.5-flash`;
+- generation temperature: 0.0;
+- max tokens: 1024;
+- retrieval input:
+  `artifacts/reports/evaluation/naive_rag_baseline/retrieval/case_results.jsonl`;
+- artifact directory:
+  `artifacts/reports/evaluation/naive_rag_baseline/generation/`;
+- generated case results: 128;
+- generation errors: 0.
+
+Headline metrics:
+
+| Split | Queries | Decision accuracy | Answer-allowed answer rate | Fallback-required fallback rate | Citation ID validity | Evidence group coverage | Missing required evidence rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `all` | 128 | 0.430 | 0.391 | 0.667 | 1.000 | 0.357 | 0.673 |
+| `development` | 85 | 0.529 | 0.500 | 0.647 | 1.000 | 0.452 | 0.588 |
+| `held_out_test` | 43 | 0.233 | 0.214 | 1.000 | 1.000 | 0.202 | 0.810 |
+
+Case status:
+
+- pass: 48;
+- partial: 7;
+- fail: 73.
+
+Fallback and citation behavior:
+
+- Pipeline fallback count: 79 total, 45 development, 34 held-out.
+- Fallbacks were produced without LLM calls and without citations.
+- Citation ID validity for answered cases was 1.000.
+- Unsupported or uncited claim checking in this run is citation-ID-guard only,
+  not semantic claim-level faithfulness review.
+
+Weakest generation breakdowns:
+
+- domains with lowest decision accuracy or evidence-group coverage:
+  `maritime_transport`, `business_banking_tax`,
+  `traffic_public_order_sanctions`, `constitutional_state_rights`, and
+  `labor_employment_social_security`;
+- question types with weakest evidence coverage or highest missing-evidence
+  rates: `complete_list`, `multi_evidence`, `lexical_mismatch`,
+  `conditions_and_exceptions`, and `definition`;
+- expected `answer_allowed` cases are the main failure source: many retrieved
+  cases still fall back because strict selected-evidence coverage does not
+  satisfy required evidence groups.
+
+Known Stage F2 limitations:
+
+- Naive RAG baseline only;
+- uses frozen dense retrieval results from F1;
+- no hybrid retrieval, sparse retrieval, fusion, reranking, or query rewriting;
+- `held_out_test` excludes high-risk sanction/criminal QA;
+- qualified human legal review has not occurred;
+- unsupported claim check is citation-ID-guard only, not full semantic
+  faithfulness review;
+- LLM output may be nondeterministic despite temperature 0;
+- fallback/evidence gate was intentionally not relaxed in this baseline.
 
 ## Stage E1 Construction Plan
 
@@ -892,6 +961,26 @@ Latest Stage F1 frozen dense retrieval baseline checks:
 - result: frozen dense retrieval-only baseline completed without generation,
   OpenRouter, Qdrant writes, sparse retrieval, fusion, or reranking.
 
+Latest Stage F2 frozen Naive RAG generation baseline checks:
+
+- frozen benchmark validation with split manifest: 0 errors, 0 warnings;
+- F1 retrieval artifacts reused and compatibility-checked;
+- LLM provider/model: `openrouter` / `google/gemini-2.5-flash`;
+- query count: 128;
+- sample mode: false;
+- generation errors: 0;
+- development metrics: decision accuracy 0.529, answer-allowed answer rate
+  0.500, fallback-required fallback rate 0.647, citation ID validity 1.000,
+  evidence group coverage 0.452;
+- held-out metrics: decision accuracy 0.233, answer-allowed answer rate
+  0.214, fallback-required fallback rate 1.000, citation ID validity 1.000,
+  evidence group coverage 0.202;
+- artifacts written under
+  `artifacts/reports/evaluation/naive_rag_baseline/generation/`;
+- result: frozen Naive RAG generation baseline completed without benchmark
+  data changes, fallback-gate relaxation, retrieval tuning, Qdrant writes, or
+  Advanced RAG behavior.
+
 ## Change Log
 
 | Date | Change |
@@ -913,6 +1002,7 @@ Latest Stage F1 frozen dense retrieval baseline checks:
 | 2026-06-21 | Added an 8-case Stage E-Repair batch, improved grouped held-out eligibility to 43 cases, and recorded high-risk human-review allocation candidates without creating split or benchmark manifests. |
 | 2026-06-21 | Froze scoped benchmark release `v0.1.0` with 43 low/medium-risk held-out cases, 85 development cases, and manifest fingerprints. |
 | 2026-06-22 | Ran frozen dense retrieval-only baseline on benchmark `v0.1.0` and recorded split-level metrics, per-case retrieval results, and a baseline manifest. |
+| 2026-06-22 | Ran frozen Naive RAG generation baseline on benchmark `v0.1.0`, reusing frozen F1 retrieval artifacts and recording split-level generation metrics. |
 
 ## Exit Criteria
 
@@ -935,12 +1025,14 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-Stage F2 frozen Naive RAG generation baseline
--> run generation on frozen development split
--> run generation on frozen held_out_test split
+Stage F3 regression and quality-gate refresh
+-> rerun the existing five-case regression suite
+-> rerun the existing offline quality gate
+-> compare frozen benchmark baseline observations with existing regression
+   warnings
 -> keep `v0.1.0` limitations visible in all comparison reports
--> do not start sparse retrieval, RRF, or reranking until baseline manifests
-   and metrics are recorded
+-> do not start sparse retrieval, RRF, or reranking until regression and
+   quality-gate refresh results are recorded
 ```
 
 Sparse retrieval, RRF, and reranking must not begin yet.

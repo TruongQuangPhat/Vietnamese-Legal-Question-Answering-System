@@ -314,5 +314,7 @@ class RetrievalConfig(BaseModel):
     def validate_query_embedding_contract(self) -> RetrievalConfig:
         """Require the configured dense vector dimension to match BGE-M3 v1."""
         if self.dense_retrieval.expected_vector_dim != DEFAULT_DENSE_DIMENSION:
-            raise ValueError("dense retrieval baseline expects 1024-dimensional BGE-M3 dense vectors")
+            raise ValueError(
+                "dense retrieval baseline expects 1024-dimensional BGE-M3 dense vectors"
+            )
         return self
