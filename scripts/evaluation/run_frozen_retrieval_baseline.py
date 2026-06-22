@@ -37,7 +37,7 @@ from src.services.retrieval_service import RetrievalService
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT_DIR = Path("artifacts/reports/evaluation/naive_rag_baseline_v0_1/retrieval")
+DEFAULT_OUTPUT_DIR = Path("artifacts/reports/evaluation/naive_rag_baseline/retrieval")
 DEFAULT_QUERIES = Path("data/eval/legal_qa_benchmark/benchmark_queries.jsonl")
 DEFAULT_TARGETS = Path("data/eval/legal_qa_benchmark/benchmark_targets.jsonl")
 DEFAULT_QRELS = Path("data/eval/legal_qa_benchmark/benchmark_qrels.jsonl")
@@ -349,13 +349,13 @@ def render_summary(
         "## Scope",
         "",
         "- Retrieval type: dense.",
-        f"- Benchmark version: `{manifest['benchmark_version']}`.",
+        "- Benchmark version is recorded in `baseline_manifest.json`.",
         f"- Qdrant collection: `{manifest['qdrant_collection_name']}`.",
         f"- Embedding model: `{manifest['embedding_model']}`.",
         f"- Vector name: `{manifest['vector_name']}`.",
         f"- Top-k: {manifest['top_k']}.",
         "- No answer generation, LLM call, sparse retrieval, fusion, reranking, or query rewriting.",
-        "- `held_out_test` is scoped to low/medium-risk v0.1 cases only.",
+        "- `held_out_test` is scoped to low/medium-risk cases only.",
         "",
         "## Headline Metrics",
         "",

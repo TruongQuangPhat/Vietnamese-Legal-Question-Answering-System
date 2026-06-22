@@ -267,7 +267,7 @@ Core invariants:
 | Evaluation CLIs | `scripts/evaluation/` | Created | Thin wrappers; no Qdrant or OpenRouter calls. |
 | Evaluation tests | `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py` | Created | Synthetic fixtures only. |
 | Full benchmark release | `data/eval/legal_qa_benchmark/` | Frozen scoped `v0.1.0` | 128 frozen records, 85 development cases, 43 low/medium-risk held-out cases, split and benchmark manifests created. |
-| Dense retrieval baseline artifacts | `artifacts/reports/evaluation/naive_rag_baseline_v0_1/retrieval/` | Created | Runtime artifacts for Stage F1 retrieval-only baseline; not benchmark source data. |
+| Dense retrieval baseline artifacts | `artifacts/reports/evaluation/naive_rag_baseline/retrieval/` | Created | Runtime artifacts for Stage F1 retrieval-only baseline; not benchmark source data. |
 
 ## Historical Pilot Note
 
@@ -438,7 +438,7 @@ Runtime identity:
 - collection points: 40,389;
 - top-k: 10;
 - artifact directory:
-  `artifacts/reports/evaluation/naive_rag_baseline_v0_1/retrieval/`.
+  `artifacts/reports/evaluation/naive_rag_baseline/retrieval/`.
 
 Headline metrics:
 
@@ -888,7 +888,7 @@ Latest Stage F1 frozen dense retrieval baseline checks:
 - held-out metrics: Recall@10 0.929, MRR@10 0.777, NDCG@10 0.779,
   evidence group coverage@10 0.705;
 - artifacts written under
-  `artifacts/reports/evaluation/naive_rag_baseline_v0_1/retrieval/`;
+  `artifacts/reports/evaluation/naive_rag_baseline/retrieval/`;
 - result: frozen dense retrieval-only baseline completed without generation,
   OpenRouter, Qdrant writes, sparse retrieval, fusion, or reranking.
 

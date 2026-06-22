@@ -3,13 +3,13 @@
 ## Scope
 
 - Retrieval type: dense.
-- Benchmark version: `v0.1.0`.
+- Benchmark version is recorded in `baseline_manifest.json`.
 - Qdrant collection: `vnlaw_chunks_bgem3_v1_full`.
 - Embedding model: `BAAI/bge-m3`.
 - Vector name: `dense`.
 - Top-k: 10.
 - No answer generation, LLM call, sparse retrieval, fusion, reranking, or query rewriting.
-- `held_out_test` is scoped to low/medium-risk v0.1 cases only.
+- `held_out_test` is scoped to low/medium-risk cases only.
 
 ## Headline Metrics
 
