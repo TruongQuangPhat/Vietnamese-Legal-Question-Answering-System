@@ -41,9 +41,11 @@ after Phase 10 closes and durable information has been consolidated.
   `held_out_test` cases. The held-out scope is low/medium-risk eligible cases
   only; high-risk cases without qualified human legal review remain
   development-only.
+- Stage F1: frozen dense retrieval-only baseline is complete for benchmark
+  `v0.1.0`.
 - Not done: qualified human legal review for high-risk held-out expansion,
-  frozen Naive RAG baseline run, metrics, sparse retrieval, fusion, reranking,
-  GraphRAG, API, UI, and fine-tuning.
+  frozen Naive RAG generation baseline run, sparse retrieval, fusion,
+  reranking, GraphRAG, API, UI, and fine-tuning.
 
 ## Canonical Document Map
 
@@ -113,7 +115,7 @@ Core invariants:
 | Stage C - Benchmark Implementation | Complete | Schemas, loaders, validator, splitting, fingerprinting, freeze support, CLIs, config, and tests implemented. |
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
 | Stage E - Full Benchmark and Split Freeze | Complete for scoped `v0.1.0` | Stage E1 planning, E2 construction, E-Repair, scoped split, and freeze are complete. `held_out_test` contains low/medium-risk eligible cases only; high-risk sanction/criminal held-out coverage is deferred pending qualified human legal review. |
-| Stage F - Frozen Naive RAG Baseline | Not started | Baseline execution on frozen development and held-out splits remains pending. |
+| Stage F - Frozen Naive RAG Baseline | In progress | Stage F1 dense retrieval-only baseline is complete on frozen development and held-out splits. Frozen Naive RAG generation baseline remains pending. |
 | Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
 | Stage I - Held-Out Comparison | Not started | Final comparison must occur after candidate configurations are fixed. |
@@ -203,12 +205,13 @@ Core invariants:
 
 ### Stage F - Frozen Naive RAG Baseline
 
-- [ ] development baseline run;
-- [ ] held-out baseline execution plan;
-- [ ] held-out baseline run;
-- [ ] run manifest;
-- [ ] runtime parameter capture;
-- [ ] result validation;
+- [x] frozen dense retrieval baseline run;
+- [x] development retrieval metrics;
+- [x] held-out retrieval metrics;
+- [x] retrieval run manifest;
+- [x] runtime parameter capture;
+- [x] retrieval result validation;
+- [ ] frozen Naive RAG generation baseline;
 - [ ] regression-suite rerun;
 - [ ] quality-gate rerun.
 
@@ -264,6 +267,7 @@ Core invariants:
 | Evaluation CLIs | `scripts/evaluation/` | Created | Thin wrappers; no Qdrant or OpenRouter calls. |
 | Evaluation tests | `tests/unit/evaluation/benchmark/`, `tests/integration/evaluation/test_benchmark_workflow.py` | Created | Synthetic fixtures only. |
 | Full benchmark release | `data/eval/legal_qa_benchmark/` | Frozen scoped `v0.1.0` | 128 frozen records, 85 development cases, 43 low/medium-risk held-out cases, split and benchmark manifests created. |
+| Dense retrieval baseline artifacts | `artifacts/reports/evaluation/naive_rag_baseline_v0_1/retrieval/` | Created | Runtime artifacts for Stage F1 retrieval-only baseline; not benchmark source data. |
 
 ## Historical Pilot Note
 
@@ -417,6 +421,60 @@ review only; qualified human legal review has not been completed.
 | `bench_0087` | `traffic_public_order_sanctions` | complete-list sanction coverage | administrative sanction list completeness | Whether the evidence groups fully cover the in-scope list and avoid duplicate leakage. |
 | `bench_0102` | `consumer_health_education_digital_ip` | fallback sanction/digital safety coverage | AI/personal-data penalty source gap | Whether fallback is required and whether the question is too broad for corpus-only answer. |
 | `bench_0088` | `traffic_public_order_sanctions` | rights/procedure in sanction context | burden-of-proof and sanction-process consequence | Whether the rights/procedure claim is complete and directly grounded. |
+
+## Frozen Dense Retrieval Baseline Snapshot
+
+Stage F1 ran the current dense retrieval stack against frozen benchmark
+release `v0.1.0`. This was retrieval-only: no answer generation, LLM call,
+sparse retrieval, fusion, reranking, or query rewriting was used.
+
+Runtime identity:
+
+- retrieval type: dense;
+- embedding model: `BAAI/bge-m3`;
+- Qdrant collection: `vnlaw_chunks_bgem3_v1_full`;
+- vector name: `dense`;
+- distance: cosine;
+- collection points: 40,389;
+- top-k: 10;
+- artifact directory:
+  `artifacts/reports/evaluation/naive_rag_baseline_v0_1/retrieval/`.
+
+Headline metrics:
+
+| Split | Queries | Recall@10 | MRR@10 | NDCG@10 | Required direct coverage@10 | Evidence group coverage@10 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `all` | 128 | 0.845 | 0.657 | 0.610 | 0.569 | 0.569 |
+| `development` | 85 | 0.794 | 0.583 | 0.524 | 0.504 | 0.504 |
+| `held_out_test` | 43 | 0.929 | 0.777 | 0.779 | 0.705 | 0.705 |
+
+Fallback diagnostics:
+
+- `all`: 18 fallback cases, near-miss@10 = 0, supporting@10 = 4,
+  direct-evidence@10 = 0;
+- `development`: 17 fallback cases, near-miss@10 = 0, supporting@10 = 4,
+  direct-evidence@10 = 0;
+- `held_out_test`: 1 fallback case, near-miss@10 = 0, supporting@10 = 0,
+  direct-evidence@10 = 0.
+
+Weakest answer-allowed direct-recall breakdowns:
+
+- domains: `labor_employment_social_security` (Recall@10 0.727),
+  `business_banking_tax` (0.750),
+  `land_real_estate_construction_environment` (0.750),
+  `civil_procedure_dispute_resolution` (0.818),
+  `traffic_public_order_sanctions` (0.818);
+- question types: `complete_list` (Recall@10 0.591),
+  `near_duplicate_provision` (0.625), `multi_evidence` (0.654),
+  `sanction_or_penalty` (0.700), `eligibility` (0.800).
+
+Known Stage F1 limitations:
+
+- retrieval-only metrics do not measure legal answer quality;
+- no generation, fallback answer behavior, or citation wording was evaluated;
+- no sparse retrieval, RRF, reranking, fusion, or query rewriting was used;
+- `held_out_test` remains scoped to low/medium-risk v0.1 cases only;
+- qualified human legal review has not occurred.
 
 ## Stage E1 Construction Plan
 
@@ -814,6 +872,26 @@ Latest scoped `v0.1.0` freeze audit:
   `data/eval/legal_qa_benchmark/split_manifest.json`;
 - result: scoped `v0.1.0` freeze completed.
 
+Latest Stage F1 frozen dense retrieval baseline checks:
+
+- frozen benchmark validation with split manifest: 0 errors, 0 warnings;
+- retrieval config: `configs/retrieval/retrieval.yml`;
+- Qdrant collection: `vnlaw_chunks_bgem3_v1_full`;
+- embedding model: `BAAI/bge-m3`;
+- vector name: `dense`;
+- collection points verified at runtime: 40,389;
+- retrieval cutoff: top-k 10;
+- per-case retrieval results: 128 records;
+- retrieval errors: 0;
+- development metrics: Recall@10 0.794, MRR@10 0.583, NDCG@10 0.524,
+  evidence group coverage@10 0.504;
+- held-out metrics: Recall@10 0.929, MRR@10 0.777, NDCG@10 0.779,
+  evidence group coverage@10 0.705;
+- artifacts written under
+  `artifacts/reports/evaluation/naive_rag_baseline_v0_1/retrieval/`;
+- result: frozen dense retrieval-only baseline completed without generation,
+  OpenRouter, Qdrant writes, sparse retrieval, fusion, or reranking.
+
 ## Change Log
 
 | Date | Change |
@@ -834,6 +912,7 @@ Latest scoped `v0.1.0` freeze audit:
 | 2026-06-21 | Completed Stage E-Final pre-freeze audit and blocked split/freeze because held-out eligibility and coverage gates did not pass. |
 | 2026-06-21 | Added an 8-case Stage E-Repair batch, improved grouped held-out eligibility to 43 cases, and recorded high-risk human-review allocation candidates without creating split or benchmark manifests. |
 | 2026-06-21 | Froze scoped benchmark release `v0.1.0` with 43 low/medium-risk held-out cases, 85 development cases, and manifest fingerprints. |
+| 2026-06-22 | Ran frozen dense retrieval-only baseline on benchmark `v0.1.0` and recorded split-level metrics, per-case retrieval results, and a baseline manifest. |
 
 ## Exit Criteria
 
@@ -856,9 +935,9 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-frozen Naive RAG baseline planning
--> run frozen dense baseline on development split
--> run frozen dense baseline on held_out_test split
+Stage F2 frozen Naive RAG generation baseline
+-> run generation on frozen development split
+-> run generation on frozen held_out_test split
 -> keep `v0.1.0` limitations visible in all comparison reports
 -> do not start sparse retrieval, RRF, or reranking until baseline manifests
    and metrics are recorded
