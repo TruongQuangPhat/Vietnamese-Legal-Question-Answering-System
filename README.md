@@ -1,638 +1,139 @@
 # VnLaw-QA
 
-Vietnamese legal QA/RAG project focused on trusted legal-source ingestion,
-deterministic preprocessing, hierarchy-preserving parsing, and citation-safe
-retrieval.
+VnLaw-QA is a Vietnamese legal question-answering and retrieval-augmented
+generation project focused on trusted legal sources, hierarchy-preserving data
+processing, traceable citations, and safe fallback when evidence is
+insufficient.
 
-VnLaw-QA is not a generic chatbot. The system is designed to answer Vietnamese
-legal questions only from a trusted corpus, preserve traceability down to legal
-units, and fall back safely when evidence is insufficient.
+## What This Project Is
 
-## Current Status
+VnLaw-QA is a legal research support system for Vietnamese law. It builds a
+trusted legal corpus, cleans and parses legal documents into hierarchy-aware
+chunks, indexes those chunks for retrieval, and evaluates retrieval and RAG
+behavior under strict citation and fallback rules.
 
-```text
-Current phase: Phase 9 closed with known limitations — quality gate passed
+The project emphasizes deterministic corpus processing before any LLM usage.
+Legal text is kept traceable from the original trusted source through raw,
+intermediate, processed, retrieval, and answer-evaluation artifacts.
 
-Completed:
-  Phase 0 — Project Setup and Principles
-  Phase 1 — Legal Corpus Registry
-  Phase 2 — Registry-driven Crawling
-  Phase 3 — Raw Corpus Audit and Validation
-  Phase 4 — Cleaning & Normalization
-  Phase 5 — Legal Hierarchy Parsing
-  Phase 6 — Parent-child Chunking
-  Phase 7 — Processed Chunk Validation & Embedding Readiness
-  Phase 7.5 — LLM-assisted corpus audit
-  Phase 8 — BGE-M3 Embedding & Qdrant Indexing Foundation
-  Phase 9A — Dense Retrieval Baseline
-  Phase 9B — Fallback-aware Naive RAG Generation
-  Phase 9C — Naive RAG Generation Evaluation & Safety Hardening
-  Phase 9C.1 — Reviewed Generation Dataset Expansion
-  Phase 9C.2 — Manual Faithfulness Review Export
-  Phase 9C.3 — Evidence Preview Support
-  Phase 9D — Human Faithfulness Review & Baseline Hardening
-  Phase 9E — Regression Thresholds and QA Gate
-  Phase 9F — Phase 9 Closure and Decision Gate
+## What This Project Is Not
 
-Next:
-  Next planned stage may begin
-  Keep citation ID coverage distinct from semantic faithfulness
-  Do not claim production readiness from the five-case baseline
-```
-
-Phase 9B loads `.env` automatically for `scripts/retrieval/run_naive_rag.py`.
-Non-secret OpenRouter defaults are stored in `configs/llm/openrouter.yml`;
-`OPENROUTER_API_KEY` must exist only in the real environment or uncommitted
-`.env`. Model precedence is `--model`, then `OPENROUTER_MODEL`, then YAML
-`default_model`, then the emergency fallback. Exported environment values are
-not overridden, and API keys must never be printed or written to reports.
-
-Run the Phase 9C generation baseline with the lower-cost smoke model:
-
-```bash
-uv run --extra qdrant --extra embedding python scripts/retrieval/evaluate_naive_rag_generation.py \
-  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
-  --collection-name vnlaw_chunks_bgem3_v1_full \
-  --url http://localhost:6333 \
-  --top-k 20 \
-  --device cpu \
-  --provider openrouter \
-  --model google/gemini-2.5-flash-lite \
-  --output artifacts/reports/retrieval/naive_rag_generation_eval.json
-```
-
-The report validates citation ID integrity, not full semantic faithfulness.
-The initial live baseline completed with status
-`validated_generation_eval_passed`: 3/3 cases passed, citation ID coverage was
-1.0, and no unknown/missing citation IDs or secret leaks were detected.
-
-Phase 9C.1 expands the dataset to five unique cases using every currently
-reviewed Phase 9A manual query. Three cases remain blocking; marriage
-conditions and civil-rights protection are non-blocking manual-review cases
-because their allowed retrieval decisions vary. The expanded report adds
-caution-evidence and selection-warning review signals. These metrics do not
-establish semantic faithfulness or legal correctness.
-
-Phase 9C.3 adds opt-in, bounded evidence previews for repeatable manual review.
-Generated JSON and Markdown reports are runtime artifacts and should not be
-committed. Citation ID coverage remains distinct from semantic faithfulness.
-After prompt hardening and manual claim-to-citation review, three generated
-cases pass, one non-blocking generated case remains partial, and the
-annual-leave fallback control behaves correctly.
-
-Run the offline quality gate:
-
-```bash
-uv run python scripts/retrieval/evaluate_quality_gate.py \
-  --generation-report artifacts/reports/retrieval/naive_rag_generation_eval_expanded_with_evidence.json \
-  --faithfulness-verdicts data/eval/manual_faithfulness_verdicts.json \
-  --policy configs/retrieval/quality_gate.yml \
-  --output artifacts/reports/retrieval/quality_gate.json
-```
-
-Current gate status is `quality_gate_passed`: hard gates and quality gates
-pass with two non-blocking warnings for `marriage_conditions_generation`.
-The gate is offline and does not call OpenRouter or Qdrant.
-
-Detailed Naive RAG architecture, safety invariants, evaluation commands,
-manual review results, quality-gate policy, closure decision, and known
-limitations are documented in `docs/naive_rag.md`.
-
-Phase 4 is gate-ready:
-
-```text
-Registry entries:        52
-Raw main.html files:     52
-Raw metadata.json files: 52
-normalized.json files:   52
-cleaned.txt files:       52
-Cleaning failures:       0
-Warning artifacts:       0
-Suspiciously short:      0
-Missing article marker:  0
-Cleaner version:         v0.8.0
-```
-
-Phase 5 is complete and hardened:
-
-```text
-Parsed documents:        52
-Hierarchy outputs:       52
-Parsing failures:        0
-Parser version:          v0.1.0
-Hierarchy output:        data/interim/{LAW_ID}/hierarchy.json
-Parsing report:          artifacts/reports/parsing/legal_parsing_report.json
-Remaining caveats:       non-fatal parser warnings documented in the report
-```
-
-Phase 6 is complete and validated:
-
-```text
-Chunk output:            data/processed/legal_chunks.jsonl
-Chunking report:         artifacts/reports/chunking/chunking_report.json
-Validated laws:          52/52
-Success with warnings:   18
-Chunking failures:       0
-Total chunks:            40,389
-Article chunks:          1,322
-Clause chunks:           20,643
-Point chunks:            18,424
-Empty/repealed chunks:   180
-Source-tail markers:     0 in text, 0 in parent_text
-Max parent_text length:  14,481 chars
-Duplicate chunk_id:      0
-Bad JSONL lines:         0
-Selection-rule issues:   0
-Invariant issues:        0
-Validation audit:        artifacts/reports/chunking/full_corpus_validation_report.json
-```
-
-Phase 6 preserves Article parent context in `parent_text` and uses
-Article/Clause/Point hierarchy units instead of arbitrary token or character
-windows. Phase 6 hardening removed VBHN/source-tail leakage from chunk
-`text` and `parent_text`, and flags repealed placeholder chunks in metadata.
-Phase 7 validates embedding-readiness. Phase 8 embeds only `text`; `parent_text` is stored as retrieval/LLM context payload.
-
-Phase 7 is implementation-complete:
-
-```text
-Valid chunks:            40,389
-Invalid chunks:          0
-Errors:                  0
-Warnings:                8,206
-Embedding ready:         true
-Readiness status:        ready_with_warnings
-Validation report:       artifacts/reports/chunking/processed_jsonl_validation_report.json
-```
-
-Phase 7 warning follow-up W1-W3 and the Phase 7.5 read-only corpus audit are
-complete. Phase 8 indexed all 40,389 chunks into Qdrant collection
-`vnlaw_chunks_bgem3_v1_full` using normalized 1024-dimensional
-`BAAI/bge-m3` dense vectors, named vector `dense`, cosine distance, and the
-`text_only` template. All points were upserted successfully and full index
-validation passed for schema, payload, vectors, filters, and retrieval sanity.
-Phase 9A adds a read-only dense retrieval baseline that embeds Vietnamese
-queries with BGE-M3, searches named vector `dense`, and returns typed
-payload-backed legal evidence. It does not generate answers.
-
-Official reports:
-
-```text
-artifacts/reports/indexing/20260611_bgem3_v1_full/
-```
-
-Qdrant storage and model caches are runtime state and must not be committed.
-
-## Legal Accuracy Rules
-
-- Default trusted source: `https://thuvienphapluat.vn`.
-- Prefer VBHN consolidated legal documents when available.
-- Preserve source traceability from raw HTML to final citations.
-- Preserve legal hierarchy: `Phần / Chương / Mục / Điều / Khoản / Điểm`.
-- Do not mutate `data/raw/`; derived artifacts go under `data/interim/`,
-  `data/processed/`; official indexing reports go under
-  `artifacts/reports/indexing/<run_id>/`.
-- Do not use LLMs for deterministic legal preprocessing.
-- Do not let future QA generation invent laws, articles, clauses, points, or
+- It is not a generic chatbot.
+- It is not a replacement for professional legal advice.
+- It must not give confident legal answers without trusted evidence.
+- It must not fabricate laws, articles, clauses, points, penalties, dates, or
   citations.
+- It must not treat a valid citation ID as proof that a generated claim is
+  semantically faithful.
 
-Required final-answer citation style for future QA:
+## Core Principles
+
+- Use a trusted legal corpus, currently centered on `thuvienphapluat.vn`.
+- Preserve Vietnamese legal hierarchy: `Phần -> Chương -> Mục -> Điều ->
+  Khoản -> Điểm`.
+- Prefer consolidated legal documents (`VBHN`) when available.
+- Keep retrieval and generation citation-first.
+- Fall back safely when evidence is missing, incomplete, unsafe, or indirect.
+- Keep preprocessing deterministic before using LLMs.
+- Keep secrets, Qdrant storage, model caches, and runtime state out of Git.
+
+## Architecture
+
+High-level flow:
 
 ```text
-According to Clause {X}, Article {Y}, {Law Name} {Year or Consolidated Version}: "{quoted legal content}"
+trusted legal sources
+-> raw corpus
+-> cleaning and normalization
+-> legal hierarchy parsing
+-> parent-child chunking
+-> processed chunk validation
+-> embedding and indexing
+-> retrieval
+-> evidence construction and selection
+-> generation and evaluation
 ```
+
+Main source modules:
+
+| Path | Responsibility |
+| --- | --- |
+| `src/ingestion/` | Corpus registry loading, crawling support, raw audit, cleaning, and storage utilities. |
+| `src/processing/` | Legal hierarchy parsing, parent-child chunking, and processed JSONL validation. |
+| `src/indexing/` | Embedding model integration and Qdrant indexing/validation utilities. |
+| `src/retrieval/` | Dense retrieval, evidence construction, evidence selection, Naive RAG generation, review export, and quality gates. |
+| `src/evaluation/` | Frozen benchmark schemas, validation, metrics, and controlled retrieval comparison utilities. |
+| `src/generation/` | Reserved home for generation-specific code when split from retrieval orchestration. |
+| `src/services/` | Existing orchestration services where a service boundary is already used. |
+| `src/api/`, `src/monitoring/`, `src/security/` | Separately scoped application, observability, and security surfaces. |
+
+Scripts under `scripts/` are thin CLI wrappers. Reusable logic belongs under
+`src/`.
+
+## Pipeline Overview
+
+```text
+Legal corpus registry
+-> crawling and raw audit
+-> cleaning and normalization
+-> hierarchy parsing
+-> parent-child chunking
+-> processed corpus validation
+-> embedding and Qdrant indexing
+-> retrieval
+-> evidence selection
+-> generation and evaluation
+```
+
+The validated processed corpus is `data/processed/legal_chunks.jsonl`. Runtime
+reports and benchmark outputs live under `artifacts/reports/`.
+
+## Current Capabilities
+
+- Registry-driven Vietnamese legal corpus ingestion.
+- Raw corpus audit and immutable raw artifact policy.
+- Deterministic cleaning and normalization for trusted legal HTML.
+- Hierarchy-preserving legal parser.
+- Parent-child legal chunking without arbitrary character-window splitting.
+- Processed chunk validation and embedding-readiness checks.
+- BGE-M3 dense indexing in Qdrant.
+- Sparse BM25 and hybrid retrieval evaluation utilities.
+- Evidence construction and strict evidence-selection gate.
+- Fallback-aware Naive RAG baseline.
+- Citation-ID guard and manual faithfulness review workflow.
+- Frozen legal QA benchmark validation and retrieval/generation evaluation
+  workflow.
+
+For current metrics, benchmark status, and stage-level decisions, read
+`PROJECT_CONTEXT.md` and `docs/phase10_tracer.md`.
 
 ## Repository Layout
-
-Current scaffolded layout:
 
 ```text
 VnLaw-QA/
 ├── configs/
-│   ├── laws/
-│   ├── sources/
-│   ├── ingestion/
-│   ├── processing/
-│   ├── indexing/
-│   ├── retrieval/
-│   ├── generation/
-│   └── evaluation/
+│   ├── laws/          # trusted legal corpus registry
+│   ├── indexing/      # embedding and Qdrant indexing config
+│   ├── processing/    # parser/chunk/processed JSONL validation config
+│   ├── retrieval/     # retrieval and quality-gate config
+│   ├── evaluation/    # frozen benchmark config
+│   └── llm/           # non-secret LLM provider defaults
 ├── data/
-│   ├── raw/          # immutable crawl artifacts
-│   ├── interim/      # normalized artifacts and hierarchy outputs
-│   ├── processed/    # validated legal chunk JSONL
-│   ├── indexes/      # future retrieval indexes
-│   └── eval/         # future evaluation datasets
+│   ├── raw/           # immutable crawl artifacts
+│   ├── interim/       # derived cleaning and hierarchy artifacts
+│   ├── processed/     # validated legal chunk corpus
+│   └── eval/          # benchmark and reviewed evaluation assets
 ├── artifacts/
-│   ├── reports/
-│   │   ├── crawling/
-│   │   ├── audit/
-│   │   ├── cleaning/
-│   │   ├── parsing/
-│   │   ├── chunking/
-│   │   ├── indexing/
-│   │   ├── retrieval/
-│   │   ├── generation/
-│   │   └── evaluation/
-│   ├── traces/       # parser/retrieval/generation traces
-│   ├── runs/         # experiment and benchmark runs
-│   ├── metrics/      # evaluation metrics
-│   └── logs/         # saved logs when needed
-├── docs/
-│   ├── project_phase_journal.md
-│   ├── corpus_registry.md
-│   ├── raw_corpus_audit.md
-│   ├── cleaning_normalization.md
-│   └── legal_parsing.md
+│   └── reports/       # generated reports and evaluation artifacts
+├── docs/              # durable technical documentation
 ├── scripts/
-│   ├── corpus/       # Phase 2-7 corpus CLI entrypoints
-│   ├── indexing/     # Phase 8 embedding/Qdrant CLI entrypoints
-│   └── retrieval/    # Phase 9 retrieval/RAG CLI entrypoints
-├── src/
-│   ├── core/
-│   ├── ingestion/    # implemented ingestion and cleaning domain logic
-│   ├── processing/   # implemented parser and chunking domain logic
-│   ├── indexing/     # implemented embedding and Qdrant indexing logic
-│   ├── retrieval/    # implemented dense retrieval baseline logic
-│   ├── generation/   # future generation/RAG logic
-│   ├── services/     # orchestration/reporting
-│   ├── api/          # future API
-│   ├── evaluation/   # future evaluation logic
-│   ├── monitoring/   # future monitoring code
-│   └── security/     # future security helpers
-└── tests/
-    ├── unit/
-    │   ├── ingestion/
-    │   ├── processing/
-    │   ├── indexing/
-    │   ├── retrieval/
-    │   ├── generation/
-    │   ├── services/
-    │   └── evaluation/
-    ├── integration/
-    ├── regression/
-    └── fixtures/
+│   ├── corpus/        # corpus pipeline CLIs
+│   ├── indexing/      # embedding/Qdrant CLIs
+│   ├── retrieval/     # retrieval, RAG, review, and quality-gate CLIs
+│   └── evaluation/    # benchmark validation and comparison CLIs
+├── src/               # reusable implementation modules
+└── tests/             # unit, integration, regression, and fixtures
 ```
-
-Target production layout, scaffolded with `.gitkeep` and implemented incrementally by phase:
-
-```text
-VnLaw-QA/
-├── configs/{laws,sources,ingestion,processing,indexing,retrieval,generation,evaluation}/
-├── data/{raw,interim,processed,indexes,eval}/
-├── artifacts/
-│   ├── reports/{crawling,audit,cleaning,parsing,chunking,indexing,retrieval,generation,evaluation}/
-│   ├── traces/{crawling,audit,cleaning,parsing,retrieval,generation}/
-│   ├── runs/{experiments,benchmarks,evaluations}/
-│   ├── metrics/{indexing,retrieval,generation,evaluation}/
-│   └── logs/
-├── src/{core,ingestion,processing,indexing,retrieval,generation,services,api,evaluation,monitoring,security}/
-├── scripts/
-├── tests/{unit,integration,regression,fixtures}/
-├── docs/
-├── docker/
-├── deployment/
-├── monitoring/
-└── .github/workflows/
-```
-
-The target layout is scaffolded now so future phases have stable homes. Empty
-directories contain only `.gitkeep`; implementation logic is still phase-gated.
-
-Architecture boundary:
-
-```text
-┌──────────────────────┐
-│ scripts/             │
-│ CLI, argparse, exit  │
-│ codes, console text  │
-└──────────┬───────────┘
-           │ calls
-           ▼
-┌──────────────────────┐
-│ src/services/        │
-│ pipeline orchestration│
-│ report composition   │
-└──────────┬───────────┘
-           │ uses
-           ▼
-┌──────────────────────┐
-│ src/ingestion/       │
-│ reusable domain      │
-│ logic and models     │
-└──────────────────────┘
-```
-
-## End-to-End Pipeline
-
-Implemented and planned pipeline:
-
-```text
-┌──────────────────────────────┐
-│ Phase 1                      │
-│ Legal Corpus Registry        │
-│ configs/laws/*.yml            │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│ Phase 2                      │
-│ Registry-driven Crawling     │
-│ data/raw/{LAW_ID}/latest/    │
-│ artifacts/reports/crawling/  │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│ Phase 3                      │
-│ Raw Corpus Audit             │
-│ artifacts/reports/audit/*.json    │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│ Phase 4                      │
-│ Cleaning & Normalization     │
-│ data/interim/*/normalized.json│
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│ Phase 5                      │
-│ Legal Hierarchy Parsing      │
-│ data/interim/*/hierarchy.json│
-│ COMPLETE AND HARDENED        │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│ Phase 6                      │
-│ Parent-child Chunking        │
-│ data/processed/legal_chunks.jsonl │
-│ COMPLETE AND VALIDATED       │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│ Later Phases                 │
-│ JSONL validation → Embedding │
-│ → Naive RAG                  │
-│ → Advanced RAG → GraphRAG    │
-│ PLANNED                      │
-└──────────────────────────────┘
-```
-
-## Current Executable Pipeline
-
-The currently implemented executable path runs from registry and raw artifacts
-through Legal Hierarchy Parsing:
-
-```text
-┌────────────────────────────────────────────┐
-│ 1. Corpus Registry                         │
-│ configs/laws/corpus_registry.yml            │
-│ 52 law_id entries                          │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ 2. Raw Artifacts                           │
-│ data/raw/{LAW_ID}/latest/main.html         │
-│ data/raw/{LAW_ID}/latest/metadata.json     │
-│ immutable legal evidence                   │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ 3. Raw Corpus Audit                        │
-│ validate file presence, metadata, source,  │
-│ size, encoding, error-page markers         │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ 4. Cleaning & Normalization                │
-│ preferred TVPL selector                    │
-│ block-aware HTML extraction                │
-│ Unicode/whitespace normalization           │
-│ legal body trimming                        │
-│ safe line-fragment repair                  │
-│ encoded artifact cleanup                   │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ 5. Normalized Artifacts                    │
-│ data/interim/{LAW_ID}/normalized.json      │
-│ data/interim/{LAW_ID}/cleaned.txt          │
-│ cleaner_version: v0.8.0                    │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ 6. Legal Hierarchy Parsing                 │
-│ data/interim/{LAW_ID}/hierarchy.json       │
-│ artifacts/reports/parsing/legal_parsing_report.json │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ 7. Quality Reports                         │
-│ artifacts/reports/cleaning/cleaning_report.json          │
-│ artifacts/reports/cleaning/cleaning_quality_audit.json   │
-│ artifacts/reports/cleaning/raw_vs_cleaning_comparison... │
-└────────────────────────────────────────────┘
-```
-
-## Phase 4 Cleaning Logic Summary
-
-The cleaner is intentionally conservative. It fixes known TVPL extraction
-issues without changing legal meaning.
-
-```text
-┌──────────────────────────────┐
-│ Raw HTML                     │
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ Preferred legal body selector│
-│ e.g. #divContentDoc .content1│
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ Block-aware extraction       │
-│ block tags keep boundaries   │
-│ inline tags join naturally   │
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ Start detection / trimming   │
-│ preserve Article 1           │
-│ skip amendment pre-body notes│
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ Unicode normalization        │
-│ NFC, NBSP, BOM, zero-width   │
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ Whitespace and fragment fix  │
-│ preserve Điều / 1. / a)      │
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ Encoded TVPL artifact cleanup│
-│ remove watermark/footer lines│
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ Markers and metadata         │
-│ refs vs headings clarified   │
-└──────────────────────────────┘
-```
-
-Important marker fields in `normalized.json`:
-
-```text
-article_reference_count       all "Điều N" mentions, including references
-article_heading_count         real article heading lines
-max_heading_article_number    highest real heading number
-has_heading_article_1         whether real Article 1 heading exists
-heading_sequence_score        continuity score for real headings
-```
-
-Example:
-
-```text
-BLDS_2015:
-  article_reference_count = 829
-  article_heading_count = 689
-  max_heading_article_number = 689
-```
-
-This means BLDS has 689 real article headings. The larger reference count is
-expected because the law references other articles internally.
-
-## Phase 5 Legal Hierarchy Parsing
-
-Phase 5 parses hierarchy only. It does not chunk or embed.
-
-```text
-┌────────────────────────────────────────────┐
-│ Input                                      │
-│ data/interim/{LAW_ID}/normalized.json      │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ Heading Recognizer                         │
-│ Phần / Chương / Mục / Điều                 │
-│ numbered clause lines: 1., 2., 3.          │
-│ point labels: a), b), c)                   │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ Span Segmenter                             │
-│ assign text ranges to legal units          │
-│ preserve source offsets where practical    │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ Hierarchy Builder                          │
-│ parent-child links                         │
-│ Law → Part → Chapter → Section             │
-│ → Article → Clause → Point                 │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ Parser Validator                           │
-│ no orphan nodes                            │
-│ no impossible overlaps                     │
-│ Article 1 and known max article preserved  │
-│ parser report generated                    │
-└────────────────────┬───────────────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────────────┐
-│ Output                                     │
-│ data/interim/{LAW_ID}/hierarchy.json       │
-│ artifacts/reports/parsing/legal_parsing_report.json     │
-└────────────────────────────────────────────┘
-```
-
-Official command:
-
-```bash
-uv run python scripts/corpus/parse_legal_hierarchy.py \
-  --input-dir data/interim \
-  --output-dir data/interim \
-  --report artifacts/reports/parsing/legal_parsing_report.json \
-  --overwrite \
-  --verbose
-```
-
-The full corpus run completed with 52 total documents, 6 successes, 46
-successes with warnings, and 0 failures. No validator failures, no RED audit
-cases, no ORANGE audit cases, no source-tail leakage, no
-AMBIGUOUS_CLAUSE_CANDIDATE warnings, and no POINT_LIKE_LINE_OUTSIDE_CLAUSE
-warnings. Remaining non-fatal warnings (SOURCE_NOTE_EXCLUDED, EMPTY_ARTICLE_NODE,
-NODE_ID_COLLISION_RESOLVED, ARTICLE_COUNT_MISMATCH, MAX_ARTICLE_NUMBER_MISMATCH)
-are preserved in the parsing report for Phase 6 reference.
-
-## Phase 6 Parent-child Chunking
-
-Phase 6 chunks the validated legal hierarchy into a single corpus JSONL file.
-It does not embed, index, retrieve, or generate answers.
-
-```text
-Input:   data/interim/{LAW_ID}/hierarchy.json
-Output:  data/processed/legal_chunks.jsonl
-Report:  artifacts/reports/chunking/chunking_report.json
-Audit:   artifacts/reports/chunking/full_corpus_validation_report.json
-```
-
-Official command:
-
-```bash
-uv run python scripts/corpus/chunk_legal_corpus.py \
-  --input-dir data/interim \
-  --output data/processed/legal_chunks.jsonl \
-  --report artifacts/reports/chunking/chunking_report.json \
-  --overwrite \
-  --verbose \
-  --no-color
-```
-
-Result:
-
-```text
-34 laws succeeded
-18 laws succeeded with warnings
-0 failed laws
-40,389 chunks
-180 empty/repealed chunks flagged
-0 source-tail markers in text
-0 source-tail markers in parent_text
-max parent_text length: 14,481 chars
-0 bad JSONL lines
-0 duplicate chunk IDs
-0 selection-rule issues
-0 chunk invariant issues
-```
-
-Chunk selection policy:
-
-- Article without Clause/Point children -> article-level chunk.
-- Clause without Point children -> clause-level chunk.
-- Clause with Point children -> one point-level chunk per Point.
-- `text` is the embedding unit.
-- `parent_text` is the full Article context for downstream RAG.
-- `metadata.is_empty_or_repealed` flags empty/repealed placeholders.
-- `metadata.is_source_unit_repealed` flags repealed Article/Clause/Point units.
 
 ## Setup
 
@@ -647,21 +148,22 @@ Install dependencies:
 uv sync
 ```
 
-Run the main ingestion unit tests:
+Run the main lightweight checks:
 
 ```bash
-uv run pytest tests/unit/ingestion -q
+uv run pytest tests/unit -q
+uv run ruff check src scripts tests
+uv run ruff format --check src scripts tests
+uv lock --check
 ```
 
-Run linting:
+Some retrieval and generation commands require optional extras, Qdrant, local
+model cache access, or provider credentials. See the component docs before
+running those workflows.
 
-```bash
-uv run ruff check .
-```
+## Common Commands
 
-## Official Commands
-
-Validate processed chunks for a future controlled reindexing run:
+Validate the processed legal chunk corpus:
 
 ```bash
 uv run python scripts/corpus/validate_processed_jsonl.py \
@@ -671,133 +173,100 @@ uv run python scripts/corpus/validate_processed_jsonl.py \
   --pretty
 ```
 
-Use `--fail-on-warnings` in strict CI environments. Warning-only reports exit
-with code 0 by default and code 2 in strict mode.
-
-Inspect crawler:
+Validate the frozen legal QA benchmark:
 
 ```bash
-uv run python scripts/corpus/crawl_raw_corpus.py --help
+uv run python scripts/evaluation/validate_benchmark.py \
+  --queries data/eval/legal_qa_benchmark/benchmark_queries.jsonl \
+  --legal-targets data/eval/legal_qa_benchmark/benchmark_targets.jsonl \
+  --evidence-judgments data/eval/legal_qa_benchmark/benchmark_qrels.jsonl \
+  --evidence-groups data/eval/legal_qa_benchmark/evidence_groups.jsonl \
+  --review-records data/eval/legal_qa_benchmark/review_records.jsonl \
+  --split-manifest data/eval/legal_qa_benchmark/split_manifest.json \
+  --benchmark-manifest data/eval/legal_qa_benchmark/benchmark_manifest.json \
+  --processed-chunks data/processed/legal_chunks.jsonl
 ```
 
-Crawl raw corpus:
+Run focused test suites:
 
 ```bash
-uv run python scripts/corpus/crawl_raw_corpus.py \
-  --registry configs/laws/corpus_registry.yml \
-  --output data/raw \
-  --report artifacts/reports/crawling/crawl_report.json \
-  --only-status pending
+uv run pytest tests/unit/processing -q
+uv run pytest tests/unit/retrieval -q
+uv run pytest tests/unit/evaluation -q
 ```
 
-Audit raw corpus:
+Inspect available CLI options before running corpus, indexing, retrieval, or
+evaluation workflows:
 
 ```bash
-uv run python scripts/corpus/audit_raw_corpus.py \
-  --registry configs/laws/corpus_registry.yml \
-  --raw-dir data/raw \
-  --output artifacts/reports/audit/raw_corpus_audit.json
+uv run python scripts/corpus/validate_processed_jsonl.py --help
+uv run python scripts/retrieval/run_naive_rag.py --help
+uv run python scripts/evaluation/validate_benchmark.py --help
 ```
 
-Clean and normalize corpus:
+Detailed indexing, retrieval, generation, and benchmark commands are documented
+in `docs/embedding_indexing.md`, `docs/naive_rag.md`, and
+`docs/evaluation.md`.
 
-```bash
-uv run python scripts/corpus/clean_raw_corpus.py \
-  --raw-dir data/raw \
-  --output-dir data/interim \
-  --report artifacts/reports/cleaning/cleaning_report.json \
-  --write-txt \
-  --audit
-```
+## Data and Artifacts
 
-Run cleaning diagnostics:
+- `data/raw/` is immutable crawl state.
+- `data/interim/` contains derived cleaning and hierarchy artifacts.
+- `data/processed/legal_chunks.jsonl` is the validated legal chunk corpus.
+- `data/eval/` contains reviewed evaluation assets and frozen benchmark files.
+- `artifacts/reports/` stores generated crawl, audit, indexing, retrieval, and
+  evaluation reports.
+- Qdrant storage, Hugging Face/model caches, virtual environments, Python
+  caches, runtime logs, and local secrets must not be committed.
 
-```bash
-uv run python scripts/corpus/audit_cleaning_quality.py \
-  --raw-dir data/raw \
-  --interim-dir data/interim \
-  --report-dir artifacts/reports/cleaning \
-  --registry configs/laws/corpus_registry.yml
-```
-
-Focused cleaning tests:
-
-```bash
-uv run pytest tests/unit/ingestion/test_cleaning.py -v
-```
-
-All ingestion tests:
-
-```bash
-uv run pytest tests/unit/ingestion -q
-```
-
-## Data Artifacts
-
-Raw artifacts:
-
-```text
-data/raw/{LAW_ID}/latest/main.html
-data/raw/{LAW_ID}/latest/metadata.json
-```
-
-Normalized artifacts:
-
-```text
-data/interim/{LAW_ID}/normalized.json
-data/interim/{LAW_ID}/cleaned.txt
-```
-
-Reports:
-
-```text
-artifacts/reports/crawling/crawl_report.json
-artifacts/reports/audit/raw_corpus_audit.json
-artifacts/reports/cleaning/cleaning_report.json
-artifacts/reports/cleaning/cleaning_quality_audit.json
-artifacts/reports/cleaning/raw_vs_cleaning_comparison.json
-artifacts/reports/cleaning/html_pattern_audit.json
-artifacts/reports/cleaning/selector_candidate_audit.json
-artifacts/reports/cleaning/pattern_groups.json
-```
+Do not mutate protected corpus paths unless a task explicitly scopes an
+official rerun.
 
 ## Documentation Map
 
 | Document | Purpose |
-|---|---|
-| `PROJECT_CONTEXT.md` | Current project state and phase boundary |
-| `AGENTS.md` | Codex workflow, safety, and project rules |
-| `docs/project_phase_journal.md` | Chronological phase notebook and pipeline decisions |
-| `docs/raw_data_crawling.md` | Detailed Phase 2 raw data crawling pipeline |
-| `docs/corpus_registry.md` | Registry schema and trusted corpus rules |
-| `docs/raw_corpus_audit.md` | Raw artifact audit gate |
-| `docs/cleaning_normalization.md` | Cleaning pipeline and validation details |
-| `docs/legal_parsing.md` | Phase 5 parser design |
-| `docs/parent_child_chunking.md` | Implemented Phase 6 parent-child chunking design and command |
-| `docs/processed_jsonl.md` | Phase 7 processed chunk validation & embedding-readiness notes |
-| `docs/phase75_llm_corpus_audit.md` | Phase 7.5 semantic corpus audit and Phase 8 guardrails |
-| `docs/phase7_warning_resolution_decision.md` | Final warning treatment and Phase 8 go/no-go decision |
-| `docs/phase8_embedding_indexing_tracker.md` | Completed Phase 8 implementation, indexing, and validation record |
-| `docs/embedding_indexing.md` | Phase 8 design background |
-| `retrieval_naive_rag_tracker` | Phase 9 retrieval and fallback-aware Naive RAG status |
-| `docs/naive_rag.md` | Implemented dense retrieval and fallback-aware Naive RAG baseline |
-| `docs/evaluation.md` | Future evaluation strategy |
+| --- | --- |
+| `AGENTS.md` | Repository-wide safety, workflow, protected-path, and validation rules. |
+| `PROJECT_CONTEXT.md` | Canonical current project state, architecture, limitations, and roadmap. |
+| `docs/project_phase_journal.md` | Chronological engineering journal for completed corpus and processing phases. |
+| `docs/phase10_tracer.md` | Operational tracker for frozen benchmark and advanced retrieval evaluation work. |
+| `docs/end_to_end_pipeline.md` | End-to-end architecture and data-flow reference. |
+| `docs/corpus_registry.md` | Trusted corpus registry schema and source policy. |
+| `docs/raw_data_crawling.md` | Registry-driven crawling pipeline. |
+| `docs/raw_corpus_audit.md` | Raw artifact audit rules and validation gates. |
+| `docs/cleaning_normalization.md` | Vietnamese legal text cleaning and normalization details. |
+| `docs/legal_parsing.md` | Legal hierarchy parser design. |
+| `docs/parent_child_chunking.md` | Parent-child chunking design and validation notes. |
+| `docs/processed_jsonl.md` | Processed chunk schema and embedding-readiness validation. |
+| `docs/embedding_indexing.md` | BGE-M3 embedding and Qdrant indexing design. |
+| `docs/naive_rag.md` | Dense retrieval and fallback-aware Naive RAG baseline reference. |
+| `docs/evaluation.md` | Frozen benchmark protocol, schemas, validation, metrics, and CLI usage. |
+| `docs/advanced_rag.md` | Advanced retrieval design notes and controlled-ablation context. |
+| `docs/graphrag_agents.md` | Future GraphRAG and agent design notes. |
+| `docs/api_deployment.md` | Future API/deployment notes. |
+| `docs/mlops_maintenance.md` | Future MLOps and maintenance notes. |
 
 ## Development Boundaries
 
-Do not do yet:
+- Do not mutate `data/raw/`, `data/interim/`, `data/reports/`, or
+  `data/processed/legal_chunks.jsonl` without explicit scope.
+- Do not modify frozen benchmark labels, qrels, evidence groups, split
+  assignments, or manifests outside an explicitly scoped benchmark task.
+- Do not recreate, delete, upsert, re-index, or mutate Qdrant collections
+  unless indexing work is explicitly requested.
+- Do not bypass or relax evidence selection, fallback behavior, citation
+  guards, or quality gates without a controlled safety-scoped ablation.
+- Do not use LLMs for deterministic preprocessing.
+- Do not commit runtime state, generated caches, local settings, or secrets.
+- Do not claim production readiness or broad legal QA quality from narrow
+  regression suites.
 
-- Do not modify raw or interim corpus artifacts without explicit approval.
-- Do not mutate `data/processed/legal_chunks.jsonl`.
-- Do not commit Qdrant storage, model caches, or other runtime state.
-- Do not bypass the evidence gate, implement Advanced RAG, or implement
-  GraphRAG without a separately scoped task.
-- Do not mutate `data/raw/`.
-- Do not commit credentials, local provider tokens, `.env`, or machine-specific
-  config.
+## Security
 
-## Security Note
+Provider credentials belong only in environment variables or an untracked
+local `.env` file. Non-secret provider defaults may live in config files.
 
-Provider credentials must live outside tracked files. Use an untracked local
-environment file or shell environment variables for secrets. If a token was ever
-committed, remove it from the repository and rotate it before merging.
+Never print, log, serialize, or commit API keys, tokens, Authorization headers,
+or full environment dumps. If a secret is ever committed, remove it from the
+repository history according to the project security policy and rotate the
+credential before merging.
