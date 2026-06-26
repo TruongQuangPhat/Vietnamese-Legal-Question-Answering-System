@@ -46,8 +46,10 @@ after Phase 10 closes and durable information has been consolidated.
 - Stage F2: frozen Naive RAG generation baseline is complete for benchmark
   `v0.1.0`, using frozen F1 retrieval artifacts and the current Naive RAG
   pipeline without fallback/evidence-gate relaxation.
+- Stage G1: frozen sparse BM25 retrieval-only baseline is complete for
+  benchmark `v0.1.0`.
 - Not done: qualified human legal review for high-risk held-out expansion,
-  sparse retrieval, fusion, reranking, GraphRAG, API, UI, and fine-tuning.
+  hybrid fusion, reranking, GraphRAG, API, UI, and fine-tuning.
 
 ## Canonical Document Map
 
@@ -118,7 +120,7 @@ Core invariants:
 | Stage D - Pilot Annotation and Stabilization | Complete | 19-case draft pilot, primary annotation, structured automated review, repository adjudication, and schema contract freeze complete. |
 | Stage E - Full Benchmark and Split Freeze | Complete for scoped `v0.1.0` | Stage E1 planning, E2 construction, E-Repair, scoped split, and freeze are complete. `held_out_test` contains low/medium-risk eligible cases only; high-risk sanction/criminal held-out coverage is deferred pending qualified human legal review. |
 | Stage F - Frozen Naive RAG Baseline | In progress | Stage F1 dense retrieval-only baseline and Stage F2 frozen Naive RAG generation baseline are complete on frozen development and held-out splits. Regression-suite and quality-gate reruns remain pending. |
-| Stage G - Hybrid Retrieval | Not started | Sparse retrieval and fusion must wait until benchmark freeze. |
+| Stage G - Hybrid Retrieval | In progress | G1 sparse BM25 retrieval-only baseline is complete. G2 hybrid dense+sparse/RRF remains next. |
 | Stage H - Reranking | Not started | Reranking ablation must wait until benchmark freeze and controlled hybrid comparison. |
 | Stage I - Held-Out Comparison | Not started | Final comparison must occur after candidate configurations are fixed. |
 | Stage J - Closure | Not started | Adoption/rejection decision and documentation consolidation remain future work. |
@@ -219,14 +221,106 @@ Core invariants:
 
 ### Stage G - Hybrid Retrieval
 
-- [ ] sparse retrieval design;
-- [ ] sparse index strategy;
+- [x] sparse retrieval design;
+- [x] sparse index strategy;
 - [ ] dense+sparse candidate generation;
 - [ ] RRF or fusion strategy;
-- [ ] development tuning;
-- [ ] retrieval metric comparison;
-- [ ] evidence-coverage comparison;
-- [ ] latency and memory profiling.
+- [x] sparse retrieval metric comparison;
+- [x] sparse evidence-coverage comparison;
+- [x] sparse latency profiling;
+- [ ] development-only hybrid tuning.
+
+#### Stage G1 - Frozen Sparse BM25 Retrieval Baseline
+
+Status: complete.
+
+Artifact directory:
+
+```text
+artifacts/reports/evaluation/advanced_rag/sparse_retrieval/
+```
+
+Method:
+
+```text
+sparse_bm25 over data/processed/legal_chunks.jsonl
+top_k=10
+k1=1.5
+b=0.75
+Unicode NFC + casefold normalization
+Unicode regex tokenization preserving Vietnamese diacritics
+no dense retrieval, Qdrant, Docker, LLM call, hybrid fusion, reranking, or generation
+```
+
+Query count:
+
+```text
+128 evaluated
+0 retrieval errors
+```
+
+Headline metrics:
+
+| Split | Recall@10 | MRR@10 | NDCG@10 | required_direct_coverage@10 | evidence_group_coverage@10 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| all | 0.8636363636 | 0.6481782107 | 0.6019167459 | 0.7446808511 | 0.7446808511 |
+| development | 0.9264705882 | 0.6597805789 | 0.5975918588 | 0.7716535433 | 0.7716535433 |
+| held_out_test | 0.7619047619 | 0.6293934240 | 0.6104659411 | 0.6885245902 | 0.6885245902 |
+
+Comparison against F1 dense retrieval:
+
+| Split | Recall@10 delta | evidence_group_coverage@10 delta |
+| --- | ---: | ---: |
+| all | +0.0181818181 | +0.1755319149 |
+| development | +0.1323529411 | +0.2677165354 |
+| held_out_test | -0.1666666667 | -0.0163934426 |
+
+Interpretation:
+
+- Sparse BM25 improved all-query and development evidence-group coverage over
+  F1 dense retrieval.
+- Held-out Recall@10 regressed substantially versus F1 dense retrieval, while
+  held-out evidence-group coverage was slightly lower.
+- G1 supports continuing to G2 hybrid dense+sparse/RRF because sparse and dense
+  have complementary behavior; sparse alone should not replace F1 dense.
+
+Weakest primary domains by evidence-group coverage:
+
+```text
+maritime_transport: 0.500
+land_real_estate_construction_environment: 0.524
+labor_employment_social_security: 0.577
+consumer_health_education_digital_ip: 0.727
+administrative_government_interaction: 0.750
+```
+
+Weakest question types by evidence-group coverage:
+
+```text
+cross_law: 0.400
+definition: 0.591
+multi_evidence: 0.673
+rights_and_obligations: 0.706
+complete_list: 0.714
+```
+
+Known limitations:
+
+- sparse lexical retrieval only;
+- no dense retrieval in this run;
+- no hybrid fusion;
+- no reranking;
+- no LLM generation;
+- BM25 may miss semantic paraphrases;
+- `held_out_test` was evaluated once and must not be used for tuning;
+- `held_out_test` excludes high-risk sanction/criminal QA;
+- qualified human legal review has not occurred.
+
+Next action:
+
+```text
+G2 hybrid dense+sparse retrieval with RRF as a separate controlled ablation.
+```
 
 ### Stage H - Reranking
 

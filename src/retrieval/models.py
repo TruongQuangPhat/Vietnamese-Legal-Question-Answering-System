@@ -249,7 +249,8 @@ class RetrievalResult(BaseModel):
         vector_name: Named vector used for dense search.
         top_k: Requested top-k result count.
         elapsed_ms: Wall-clock retrieval time in milliseconds.
-        query_vector_dimension: Dimension of the validated query vector.
+        query_vector_dimension: Dimension of the validated dense query vector,
+            or 0 for retrieval methods that do not use dense vectors.
         results: Ranked retrieval candidates.
         issues: Retrieval-level issues not tied to a specific chunk.
     """
@@ -261,7 +262,7 @@ class RetrievalResult(BaseModel):
     vector_name: str = Field(DEFAULT_DENSE_VECTOR_NAME, min_length=1)
     top_k: int = Field(..., gt=0)
     elapsed_ms: float = Field(..., ge=0.0)
-    query_vector_dimension: int = Field(..., gt=0)
+    query_vector_dimension: int = Field(..., ge=0)
     filters: RetrievalFilters = Field(default_factory=RetrievalFilters)
     results: list[RetrievedChunk] = Field(default_factory=list)
     issues: list[RetrievalIssue] = Field(default_factory=list)
