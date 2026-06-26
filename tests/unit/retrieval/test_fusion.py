@@ -4,17 +4,27 @@ from __future__ import annotations
 
 import pytest
 
-from src.retrieval.fusion import reciprocal_rank_fusion
+from src.retrieval.fusion import (
+    DiversitySelectionConfig,
+    QuotaSelectionConfig,
+    reciprocal_rank_fusion,
+)
 from src.retrieval.models import RetrievedChunk
 
 
-def _hit(chunk_id: str, *, rank: int, score: float = 1.0) -> RetrievedChunk:
+def _hit(
+    chunk_id: str,
+    *,
+    rank: int,
+    score: float = 1.0,
+    article_number: str = "1",
+) -> RetrievedChunk:
     return RetrievedChunk(
         rank=rank,
         score=score,
         chunk_id=chunk_id,
         law_id="LAW_A",
-        article_number="1",
+        article_number=article_number,
         text="Synthetic legal text.",
     )
 
@@ -99,3 +109,78 @@ def test_rrf_rejects_invalid_settings() -> None:
             final_top_k=10,
             rrf_k=0,
         )
+
+
+def test_weighted_rrf_applies_source_weights() -> None:
+    fused = reciprocal_rank_fusion(
+        dense_results=[_hit("dense_top", rank=1)],
+        sparse_results=[_hit("sparse_top", rank=1)],
+        final_top_k=2,
+        rrf_k=60,
+        dense_weight=1.0,
+        sparse_weight=2.0,
+    )
+
+    assert [candidate.chunk_id for candidate in fused] == ["sparse_top", "dense_top"]
+    assert fused[0].score == pytest.approx(2 / 61)
+    assert fused[1].score == pytest.approx(1 / 61)
+
+
+def test_quota_selection_adds_sparse_and_dense_slots() -> None:
+    fused = reciprocal_rank_fusion(
+        dense_results=[_hit("dense_a", rank=1), _hit("dense_b", rank=2)],
+        sparse_results=[_hit("sparse_a", rank=1), _hit("sparse_b", rank=2)],
+        final_top_k=3,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=1, sparse_quota=1, dense_quota=1),
+    )
+
+    assert len({candidate.chunk_id for candidate in fused}) == 3
+    assert fused[0].metadata["fusion"]["retrieval_method"] == "hybrid_dense_sparse_rrf"
+    assert any(candidate.metadata["fusion"]["sparse_rank"] is not None for candidate in fused)
+    assert any(candidate.metadata["fusion"]["dense_rank"] is not None for candidate in fused)
+
+
+def test_diversity_penalty_promotes_different_article() -> None:
+    fused = reciprocal_rank_fusion(
+        dense_results=[
+            _hit("article_1_a", rank=1),
+            _hit("article_1_b", rank=2),
+            _hit("article_2", rank=3, article_number="2"),
+        ],
+        sparse_results=[],
+        final_top_k=3,
+        rrf_k=60,
+        diversity_config=DiversitySelectionConfig(penalty=0.01),
+    )
+
+    assert [candidate.chunk_id for candidate in fused][:2] == ["article_1_a", "article_2"]
+
+
+def test_fusion_does_not_rank_by_gold_relevance_metadata() -> None:
+    low_gold_top_rank = _hit("top_by_rank", rank=1).model_copy(
+        update={"metadata": {"relevance": "irrelevant", "evidence_group_ids": []}}
+    )
+    high_gold_lower_rank = _hit("lower_by_rank", rank=2).model_copy(
+        update={"metadata": {"relevance": "required_direct", "evidence_group_ids": ["gold_group"]}}
+    )
+
+    fused = reciprocal_rank_fusion(
+        dense_results=[low_gold_top_rank, high_gold_lower_rank],
+        sparse_results=[],
+        final_top_k=2,
+        rrf_k=60,
+    )
+
+    assert [candidate.chunk_id for candidate in fused] == ["top_by_rank", "lower_by_rank"]
+
+
+def test_empty_candidate_handling_returns_empty_list() -> None:
+    assert (
+        reciprocal_rank_fusion(
+            dense_results=[],
+            sparse_results=[],
+            final_top_k=10,
+        )
+        == []
+    )

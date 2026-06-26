@@ -1189,6 +1189,65 @@ Latest Stage F2 frozen Naive RAG generation baseline checks:
   data changes, fallback-gate relaxation, retrieval tuning, Qdrant writes, or
   Advanced RAG behavior.
 
+Latest Stage G3 coverage-aware hybrid retrieval ablation checks:
+
+- goal: test whether coverage-aware hybrid fusion can preserve G2 hybrid
+  recall gains while recovering G1 sparse evidence-group coverage strength;
+- frozen benchmark validation: 0 errors, 0 warnings;
+- Qdrant use: read-only dense retrieval from `vnlaw_chunks_bgem3_v1_full`
+  with vector `dense`;
+- no LLM, generation, reranking, fallback-gate change, evidence-selection
+  change, Qdrant write, protected corpus mutation, or benchmark data change;
+- development-only ablation families tested:
+  - weighted RRF with fixed dense/sparse weights;
+  - deeper dense/sparse candidate pools;
+  - quota-based final selection;
+  - metadata diversity penalties;
+- selection rule: highest development evidence_group_coverage@10, then
+  required_direct_coverage@10, Recall@10, MRR@10, NDCG@10, lower mean
+  retrieval latency, and simpler config;
+- selected config: `C4` quota selector with dense_candidate_k 50,
+  sparse_candidate_k 50, final_top_k 10, rrf_k 60, dense_weight 1.0,
+  sparse_weight 1.5, fused_best 5, sparse_quota 4, dense_quota 1;
+- development ablation artifact directory:
+  `artifacts/reports/evaluation/advanced_rag/fusion_ablation/`;
+- final selected retrieval artifact directory:
+  `artifacts/reports/evaluation/advanced_rag/coverage_aware_retrieval/`;
+- updated comparison artifacts:
+  `artifacts/reports/evaluation/advanced_rag/retrieval_comparison/`;
+- final all metrics: Recall@10 0.955, MRR@10 0.688, NDCG@10 0.647,
+  evidence group coverage@10 0.771;
+- final development metrics: Recall@10 0.956, MRR@10 0.692, NDCG@10
+  0.617, evidence group coverage@10 0.748;
+- final held-out metrics: Recall@10 0.952, MRR@10 0.683, NDCG@10 0.704,
+  evidence group coverage@10 0.820;
+- comparison with F1 dense: all Recall@10 +0.109 and evidence group
+  coverage@10 +0.202; held-out Recall@10 +0.024 and evidence group
+  coverage@10 +0.115;
+- comparison with G1 sparse: all Recall@10 +0.091 and evidence group
+  coverage@10 +0.027; development evidence group coverage@10 -0.024, so
+  sparse development coverage was not fully recovered;
+- comparison with G2 fixed RRF: all Recall@10 +0.082 and evidence group
+  coverage@10 +0.149; held-out Recall@10 +0.119 and evidence group
+  coverage@10 +0.180;
+- weakest primary domains by evidence_group_coverage@10:
+  `land_real_estate_construction_environment` 0.571,
+  `labor_employment_social_security` 0.577,
+  `civil_procedure_dispute_resolution` 0.636;
+- weakest question types by evidence_group_coverage@10: `complete_list`
+  0.615, `multi_evidence` 0.635, `procedure` 0.698;
+- result: G3 substantially improves over G2 and preserves dense held-out
+  recall, but does not fully recover G1 sparse development evidence-group
+  coverage;
+- known limitations: retrieval-only evaluation, no generation, no reranking,
+  development-selected config, fixed ablation search space, held_out_test
+  evaluated once after selection, high-risk sanction/criminal QA excluded from
+  held_out_test, qualified human legal review not yet completed, and
+  coverage-aware ranking uses metadata proxies rather than gold evidence
+  groups;
+- next recommended stage: Stage H reranking ablation, with any generation gate
+  or selection-policy relaxation kept as a separate safety-scoped ablation.
+
 ## Change Log
 
 | Date | Change |
@@ -1211,6 +1270,7 @@ Latest Stage F2 frozen Naive RAG generation baseline checks:
 | 2026-06-21 | Froze scoped benchmark release `v0.1.0` with 43 low/medium-risk held-out cases, 85 development cases, and manifest fingerprints. |
 | 2026-06-22 | Ran frozen dense retrieval-only baseline on benchmark `v0.1.0` and recorded split-level metrics, per-case retrieval results, and a baseline manifest. |
 | 2026-06-22 | Ran frozen Naive RAG generation baseline on benchmark `v0.1.0`, reusing frozen F1 retrieval artifacts and recording split-level generation metrics. |
+| 2026-06-26 | Ran Stage G3 development-only fusion ablation and final selected coverage-aware hybrid retrieval report, updating advanced retrieval comparison artifacts. |
 
 ## Exit Criteria
 
@@ -1233,14 +1293,10 @@ Phase 10 can close only after:
 ## Next Immediate Action
 
 ```text
-Stage F3 regression and quality-gate refresh
--> rerun the existing five-case regression suite
--> rerun the existing offline quality gate
--> compare frozen benchmark baseline observations with existing regression
-   warnings
--> keep `v0.1.0` limitations visible in all comparison reports
--> do not start sparse retrieval, RRF, or reranking until regression and
-   quality-gate refresh results are recorded
+Stage H reranking ablation
+-> keep G3 selected retrieval fixed as the strongest retrieval candidate so far
+-> evaluate reranking as a controlled retrieval-only ablation first
+-> keep benchmark data, split assignments, generation prompt, fallback gate, and
+   evidence-selection behavior unchanged
+-> do not tune on held_out_test
 ```
-
-Sparse retrieval, RRF, and reranking must not begin yet.
