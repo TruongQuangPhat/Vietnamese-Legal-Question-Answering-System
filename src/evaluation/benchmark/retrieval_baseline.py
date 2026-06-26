@@ -322,7 +322,7 @@ def _summarize_chunk(
     group_ids_by_chunk: dict[str, list[str]],
 ) -> dict[str, Any]:
     relevance = relevance_by_chunk.get(chunk.chunk_id or "")
-    return {
+    summary = {
         "rank": chunk.rank,
         "chunk_id": chunk.chunk_id,
         "score": chunk.score,
@@ -333,6 +333,18 @@ def _summarize_chunk(
         "relevance": relevance.value if relevance is not None else None,
         "evidence_group_ids": group_ids_by_chunk.get(chunk.chunk_id or "", []),
     }
+    fusion = chunk.metadata.get("fusion")
+    if isinstance(fusion, dict):
+        summary.update(
+            {
+                "fused_score": fusion.get("fused_score"),
+                "dense_rank": fusion.get("dense_rank"),
+                "dense_score": fusion.get("dense_score"),
+                "sparse_rank": fusion.get("sparse_rank"),
+                "sparse_score": fusion.get("sparse_score"),
+            }
+        )
+    return summary
 
 
 def _fraction(numerator: int, denominator: int) -> float:
