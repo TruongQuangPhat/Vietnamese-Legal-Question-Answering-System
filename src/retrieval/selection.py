@@ -292,8 +292,16 @@ def select_evidence_for_answer(
             )
         )
 
-    if expected_targets and settings.enable_eval_exact_target_gate:
-        if not any(
+    if expected_targets is not None and settings.enable_eval_exact_target_gate:
+        if not expected_targets:
+            fallback_reasons.append(
+                _fallback(
+                    FallbackReasonCode.EXACT_TARGET_MISSING_IN_EVAL_MODE,
+                    "evaluation target gate is active and no answerable target is defined",
+                    details={"expected_targets": []},
+                )
+            )
+        elif not any(
             _packet_matches_expected_target(item.packet, target)
             for item in selected
             for target in expected_targets

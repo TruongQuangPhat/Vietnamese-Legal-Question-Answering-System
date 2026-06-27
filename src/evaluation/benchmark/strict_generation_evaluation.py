@@ -13,7 +13,7 @@ from typing import Any, Protocol
 
 from pydantic import ValidationError
 
-from src.evaluation.benchmark.enums import TargetRole
+from src.evaluation.benchmark.enums import ExpectedDecision, TargetRole
 from src.evaluation.benchmark.fingerprinting import sha256_file
 from src.evaluation.benchmark.fusion_ablation import (
     CoverageAwareFusionConfig,
@@ -215,7 +215,7 @@ async def run_strict_generation_cases(
                 selection_config=selection_config,
                 collection_name=str(retrieval_manifest["qdrant_collection_name"]),
                 final_top_k=int(retrieval_manifest["final_top_k"]),
-                expected_targets=targets_by_query.get(query.id),
+                expected_targets=_expected_targets_for_query(query, targets_by_query),
                 judgments=judgments_by_query.get(query.id, []),
                 groups=groups_by_query.get(query.id, []),
             )
@@ -725,6 +725,16 @@ def _targets_by_query(
             )
         )
     return grouped
+
+
+def _expected_targets_for_query(
+    query: BenchmarkQuery,
+    targets_by_query: dict[str, list[ExpectedTarget]],
+) -> list[ExpectedTarget] | None:
+    """Return strict evaluation targets while preserving fallback-required intent."""
+    if query.expected_decision == ExpectedDecision.FALLBACK_REQUIRED:
+        return []
+    return targets_by_query.get(query.id)
 
 
 def _write_jsonl_atomic(path: Path, records: list[dict[str, Any]]) -> None:

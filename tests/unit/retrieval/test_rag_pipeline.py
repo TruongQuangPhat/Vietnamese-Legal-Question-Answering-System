@@ -169,6 +169,65 @@ async def test_answer_allowed_selection_calls_llm_once_and_maps_citation() -> No
 
 
 @pytest.mark.asyncio
+async def test_empty_expected_targets_force_fallback_without_llm_call() -> None:
+    """Evaluation mode can represent a reviewed fallback-required query explicitly."""
+    retriever = FakeRetriever(_result([_chunk(text="Related but insufficient legal text.")]))
+    llm = MockLLMClient([_llm_response("Không được gọi [E1]")])
+
+    result = await run_naive_rag(
+        query="Câu hỏi đã được đánh dấu phải fallback",
+        retriever=retriever,
+        llm_client=llm,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        expected_targets=[],
+    )
+
+    assert result.decision == AnswerabilityDecision.FALLBACK_REQUIRED
+    assert result.llm_called is False
+    assert llm.requests == []
+    assert "exact_target_missing_in_eval_mode" in result.fallback_reasons
+
+
+@pytest.mark.asyncio
+async def test_empty_expected_targets_do_not_force_fallback_when_gate_disabled() -> None:
+    """Disabling the eval target gate preserves previous selection behavior."""
+    retriever = FakeRetriever(_result([_chunk(text="Related legal text.")]))
+    llm = MockLLMClient([_llm_response("Câu trả lời có trích dẫn [E1].")])
+
+    result = await run_naive_rag(
+        query="Câu hỏi kiểm tra gate tắt",
+        retriever=retriever,
+        llm_client=llm,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        selection_config=EvidenceSelectionConfig(enable_eval_exact_target_gate=False),
+        expected_targets=[],
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.llm_called is True
+    assert len(llm.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_absent_expected_targets_do_not_force_production_fallback() -> None:
+    """No-eval mode does not infer fallback solely from missing target metadata."""
+    retriever = FakeRetriever(_result([_chunk(text="Citable legal text.")]))
+    llm = MockLLMClient([_llm_response("Câu trả lời có trích dẫn [E1].")])
+
+    result = await run_naive_rag(
+        query="Câu hỏi không có target eval",
+        retriever=retriever,
+        llm_client=llm,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        expected_targets=None,
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.llm_called is True
+    assert len(llm.requests) == 1
+
+
+@pytest.mark.asyncio
 async def test_prompt_sent_to_llm_excludes_rejected_unsafe_evidence() -> None:
     """Rejected unsafe text must never be sent to the model prompt."""
     retriever = FakeRetriever(

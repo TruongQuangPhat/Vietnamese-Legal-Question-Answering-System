@@ -17,6 +17,7 @@ from scripts.evaluation.run_strict_generation_evaluation import (
 from src.evaluation.benchmark.enums import (
     BenchmarkSplit,
     ExpectedDecision,
+    FallbackReason,
     LegalDomain,
     QuestionType,
     ReviewStatus,
@@ -31,12 +32,14 @@ from src.evaluation.benchmark.strict_generation_evaluation import (
     CoverageAwareQuotaRetriever,
     FrozenResultRetriever,
     StrictGenerationPaths,
+    _expected_targets_for_query,
     aggregate_strict_generation_metrics,
     build_strict_generation_manifest,
     evaluate_strict_generation_query,
     write_strict_generation_outputs,
 )
 from src.retrieval.dense_retriever import DenseRetrieverError
+from src.retrieval.evaluation import ExpectedTarget
 from src.retrieval.generation import RagGenerationConfig
 from src.retrieval.llm_client import LLMClientError, LLMRequest, LLMResponse, MockLLMClient
 from src.retrieval.models import RetrievalResult, RetrievedChunk
@@ -259,6 +262,39 @@ async def test_retrieval_error_is_recorded_as_case_error_and_metric() -> None:
     assert metrics["generation_error_count"] == 0
 
 
+@pytest.mark.asyncio
+async def test_fallback_required_query_with_empty_targets_does_not_call_llm() -> None:
+    retrieval = await _coverage_retriever([_chunk()]).retrieve(
+        query="Câu hỏi mơ hồ phải fallback?",
+        top_k=10,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+    )
+    llm = MockLLMClient([_llm_response("Không được gọi [E1]")])
+
+    case = await evaluate_strict_generation_query(
+        query=_query(
+            expected_decision=ExpectedDecision.FALLBACK_REQUIRED,
+            question_types=[QuestionType.FALLBACK],
+            fallback_reason=FallbackReason.UNSAFE_AMBIGUITY,
+        ),
+        split="development",
+        retriever=FrozenResultRetriever(retrieval),
+        llm_client=llm,
+        generation_config=RagGenerationConfig(fail_on_invalid_citation=True),
+        selection_config=EvidenceSelectionConfig(),
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        final_top_k=10,
+        expected_targets=[],
+        judgments=[],
+        groups=[],
+    )
+
+    assert case["pipeline_decision"] == ExpectedDecision.FALLBACK_REQUIRED.value
+    assert case["llm_called"] is False
+    assert llm.requests == []
+    assert "exact_target_missing_in_eval_mode" in case["fallback_reasons"]
+
+
 def test_manifest_uses_functional_metadata_and_strict_guards(tmp_path: Path) -> None:
     paths = _paths(tmp_path)
     retrieval_manifest = _retrieval_manifest()
@@ -364,6 +400,29 @@ def test_strict_metric_aggregation_separates_retrieval_errors() -> None:
     assert metrics["generation_error_count"] == 0
 
 
+def test_strict_evaluation_represents_fallback_required_targets_as_empty() -> None:
+    target = ExpectedTarget(
+        law_id="BLDS_2015",
+        article_number="2",
+        clause_number=None,
+        point_label=None,
+        match_level="article",
+    )
+
+    assert (
+        _expected_targets_for_query(
+            _query(
+                expected_decision=ExpectedDecision.FALLBACK_REQUIRED,
+                question_types=[QuestionType.FALLBACK],
+                fallback_reason=FallbackReason.UNSAFE_AMBIGUITY,
+            ),
+            {"query-development": [target]},
+        )
+        == []
+    )
+    assert _expected_targets_for_query(_query(), {"query-development": [target]}) == [target]
+
+
 def _paths(tmp_path: Path) -> StrictGenerationPaths:
     benchmark_manifest = tmp_path / "benchmark_manifest.json"
     split_manifest = tmp_path / "split_manifest.json"
@@ -424,13 +483,19 @@ def _retrieval_manifest() -> dict[str, Any]:
     }
 
 
-def _query() -> BenchmarkQuery:
+def _query(
+    *,
+    expected_decision: ExpectedDecision = ExpectedDecision.ANSWER_ALLOWED,
+    question_types: list[QuestionType] | None = None,
+    fallback_reason: FallbackReason | None = None,
+) -> BenchmarkQuery:
     return BenchmarkQuery(
         id="query-development",
         query="Quyền dân sự được bảo vệ như thế nào?",
         primary_domain=LegalDomain.CIVIL_FAMILY_IDENTITY,
-        question_types=[QuestionType.SINGLE_ARTICLE_LOOKUP],
-        expected_decision=ExpectedDecision.ANSWER_ALLOWED,
+        question_types=question_types or [QuestionType.SINGLE_ARTICLE_LOOKUP],
+        expected_decision=expected_decision,
+        fallback_reason=fallback_reason,
         review_status=ReviewStatus.FROZEN,
         split=BenchmarkSplit.DEVELOPMENT,
         reviewer_notes="Mock query for strict generation evaluation tests.",
