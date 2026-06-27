@@ -1,0 +1,11 @@
+{
+  "fallback_reason_counts": {
+    "exact_target_missing_in_eval_mode": 5,
+    "parent_context_only": 71
+  },
+  "selection_warning_counts": {
+    "all_selected_evidence_caution": 71,
+    "auxiliary_parent_context_included": 403,
+    "caution_evidence_selected": 558
+  }
+}

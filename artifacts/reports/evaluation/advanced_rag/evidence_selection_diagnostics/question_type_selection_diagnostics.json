@@ -1,0 +1,431 @@
+{
+  "ambiguous": {
+    "case_count": 14,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 0,
+      "fallback_required_answered": 7,
+      "selected_evidence_empty": 7,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 0,
+      "selected_but_incomplete_required_group_coverage": 0,
+      "parent_context_only_fallback": 7,
+      "all_selected_evidence_caution": 7,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 7,
+      "fallback_policy": 7
+    },
+    "selection_bottleneck_count": 7,
+    "selection_bottleneck_rate": 0.5,
+    "selected_evidence_empty_count": 7,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 0
+  },
+  "clause_point_lookup": {
+    "case_count": 100,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 63,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 63,
+      "required_evidence_not_retrieved": 5,
+      "required_evidence_retrieved_but_not_selected": 58,
+      "selected_but_incomplete_required_group_coverage": 12,
+      "parent_context_only_fallback": 61,
+      "all_selected_evidence_caution": 61,
+      "exact_target_missing_in_eval_mode": 5,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 70,
+      "none": 25,
+      "retrieval": 5
+    },
+    "selection_bottleneck_count": 70,
+    "selection_bottleneck_rate": 0.7,
+    "selected_evidence_empty_count": 63,
+    "required_evidence_not_retrieved_count": 5,
+    "required_evidence_retrieved_but_not_selected_count": 58
+  },
+  "complete_list": {
+    "case_count": 23,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 9,
+      "fallback_required_answered": 1,
+      "selected_evidence_empty": 9,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 9,
+      "selected_but_incomplete_required_group_coverage": 10,
+      "parent_context_only_fallback": 9,
+      "all_selected_evidence_caution": 9,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 19,
+      "fallback_policy": 1,
+      "none": 3
+    },
+    "selection_bottleneck_count": 19,
+    "selection_bottleneck_rate": 0.8260869565217391,
+    "selected_evidence_empty_count": 9,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 9
+  },
+  "conditions_and_exceptions": {
+    "case_count": 19,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 5,
+      "fallback_required_answered": 2,
+      "selected_evidence_empty": 8,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 5,
+      "selected_but_incomplete_required_group_coverage": 3,
+      "parent_context_only_fallback": 8,
+      "all_selected_evidence_caution": 8,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 11,
+      "fallback_policy": 2,
+      "none": 6
+    },
+    "selection_bottleneck_count": 11,
+    "selection_bottleneck_rate": 0.5789473684210527,
+    "selected_evidence_empty_count": 8,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 5
+  },
+  "cross_law": {
+    "case_count": 4,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 1,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 1,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 1,
+      "selected_but_incomplete_required_group_coverage": 2,
+      "parent_context_only_fallback": 1,
+      "all_selected_evidence_caution": 1,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 3,
+      "none": 1
+    },
+    "selection_bottleneck_count": 3,
+    "selection_bottleneck_rate": 0.75,
+    "selected_evidence_empty_count": 1,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 1
+  },
+  "definition": {
+    "case_count": 17,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 9,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 9,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 9,
+      "selected_but_incomplete_required_group_coverage": 1,
+      "parent_context_only_fallback": 9,
+      "all_selected_evidence_caution": 9,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 10,
+      "none": 7
+    },
+    "selection_bottleneck_count": 10,
+    "selection_bottleneck_rate": 0.5882352941176471,
+    "selected_evidence_empty_count": 9,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 9
+  },
+  "eligibility": {
+    "case_count": 16,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 11,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 12,
+      "required_evidence_not_retrieved": 1,
+      "required_evidence_retrieved_but_not_selected": 10,
+      "selected_but_incomplete_required_group_coverage": 1,
+      "parent_context_only_fallback": 12,
+      "all_selected_evidence_caution": 12,
+      "exact_target_missing_in_eval_mode": 1,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 12,
+      "none": 3,
+      "retrieval": 1
+    },
+    "selection_bottleneck_count": 12,
+    "selection_bottleneck_rate": 0.75,
+    "selected_evidence_empty_count": 12,
+    "required_evidence_not_retrieved_count": 1,
+    "required_evidence_retrieved_but_not_selected_count": 10
+  },
+  "fallback": {
+    "case_count": 18,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 0,
+      "fallback_required_answered": 8,
+      "selected_evidence_empty": 10,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 0,
+      "selected_but_incomplete_required_group_coverage": 0,
+      "parent_context_only_fallback": 10,
+      "all_selected_evidence_caution": 10,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 10,
+      "fallback_policy": 8
+    },
+    "selection_bottleneck_count": 10,
+    "selection_bottleneck_rate": 0.5555555555555556,
+    "selected_evidence_empty_count": 10,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 0
+  },
+  "lexical_mismatch": {
+    "case_count": 38,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 16,
+      "fallback_required_answered": 3,
+      "selected_evidence_empty": 22,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 16,
+      "selected_but_incomplete_required_group_coverage": 2,
+      "parent_context_only_fallback": 22,
+      "all_selected_evidence_caution": 22,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 24,
+      "fallback_policy": 3,
+      "none": 11
+    },
+    "selection_bottleneck_count": 24,
+    "selection_bottleneck_rate": 0.631578947368421,
+    "selected_evidence_empty_count": 22,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 16
+  },
+  "multi_evidence": {
+    "case_count": 26,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 8,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 8,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 8,
+      "selected_but_incomplete_required_group_coverage": 12,
+      "parent_context_only_fallback": 8,
+      "all_selected_evidence_caution": 8,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 20,
+      "none": 6
+    },
+    "selection_bottleneck_count": 20,
+    "selection_bottleneck_rate": 0.7692307692307693,
+    "selected_evidence_empty_count": 8,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 8
+  },
+  "near_duplicate_provision": {
+    "case_count": 8,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 4,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 4,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 4,
+      "selected_but_incomplete_required_group_coverage": 3,
+      "parent_context_only_fallback": 4,
+      "all_selected_evidence_caution": 4,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 7,
+      "none": 1
+    },
+    "selection_bottleneck_count": 7,
+    "selection_bottleneck_rate": 0.875,
+    "selected_evidence_empty_count": 4,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 4
+  },
+  "paraphrase": {
+    "case_count": 125,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 62,
+      "fallback_required_answered": 8,
+      "selected_evidence_empty": 72,
+      "required_evidence_not_retrieved": 5,
+      "required_evidence_retrieved_but_not_selected": 57,
+      "selected_but_incomplete_required_group_coverage": 12,
+      "parent_context_only_fallback": 70,
+      "all_selected_evidence_caution": 70,
+      "exact_target_missing_in_eval_mode": 5,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 79,
+      "fallback_policy": 8,
+      "none": 33,
+      "retrieval": 5
+    },
+    "selection_bottleneck_count": 79,
+    "selection_bottleneck_rate": 0.632,
+    "selected_evidence_empty_count": 72,
+    "required_evidence_not_retrieved_count": 5,
+    "required_evidence_retrieved_but_not_selected_count": 57
+  },
+  "procedure": {
+    "case_count": 36,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 17,
+      "fallback_required_answered": 4,
+      "selected_evidence_empty": 21,
+      "required_evidence_not_retrieved": 2,
+      "required_evidence_retrieved_but_not_selected": 15,
+      "selected_but_incomplete_required_group_coverage": 1,
+      "parent_context_only_fallback": 20,
+      "all_selected_evidence_caution": 20,
+      "exact_target_missing_in_eval_mode": 2,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 20,
+      "fallback_policy": 4,
+      "none": 10,
+      "retrieval": 2
+    },
+    "selection_bottleneck_count": 20,
+    "selection_bottleneck_rate": 0.5555555555555556,
+    "selected_evidence_empty_count": 21,
+    "required_evidence_not_retrieved_count": 2,
+    "required_evidence_retrieved_but_not_selected_count": 15
+  },
+  "rights_and_obligations": {
+    "case_count": 67,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 37,
+      "fallback_required_answered": 1,
+      "selected_evidence_empty": 38,
+      "required_evidence_not_retrieved": 5,
+      "required_evidence_retrieved_but_not_selected": 32,
+      "selected_but_incomplete_required_group_coverage": 7,
+      "parent_context_only_fallback": 36,
+      "all_selected_evidence_caution": 36,
+      "exact_target_missing_in_eval_mode": 5,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 40,
+      "fallback_policy": 1,
+      "none": 21,
+      "retrieval": 5
+    },
+    "selection_bottleneck_count": 40,
+    "selection_bottleneck_rate": 0.5970149253731343,
+    "selected_evidence_empty_count": 38,
+    "required_evidence_not_retrieved_count": 5,
+    "required_evidence_retrieved_but_not_selected_count": 32
+  },
+  "sanction_or_penalty": {
+    "case_count": 15,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 7,
+      "fallback_required_answered": 2,
+      "selected_evidence_empty": 10,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 7,
+      "selected_but_incomplete_required_group_coverage": 2,
+      "parent_context_only_fallback": 10,
+      "all_selected_evidence_caution": 10,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 12,
+      "fallback_policy": 2,
+      "none": 1
+    },
+    "selection_bottleneck_count": 12,
+    "selection_bottleneck_rate": 0.8,
+    "selected_evidence_empty_count": 10,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 7
+  },
+  "single_article_lookup": {
+    "case_count": 64,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 38,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 38,
+      "required_evidence_not_retrieved": 1,
+      "required_evidence_retrieved_but_not_selected": 37,
+      "selected_but_incomplete_required_group_coverage": 0,
+      "parent_context_only_fallback": 37,
+      "all_selected_evidence_caution": 37,
+      "exact_target_missing_in_eval_mode": 1,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 37,
+      "none": 26,
+      "retrieval": 1
+    },
+    "selection_bottleneck_count": 37,
+    "selection_bottleneck_rate": 0.578125,
+    "selected_evidence_empty_count": 38,
+    "required_evidence_not_retrieved_count": 1,
+    "required_evidence_retrieved_but_not_selected_count": 37
+  }
+}

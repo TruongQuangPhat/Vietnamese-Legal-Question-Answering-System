@@ -1,0 +1,66 @@
+{
+  "report_type": "evidence_selection_diagnostics",
+  "workflow_name": "evidence_selection_diagnostics",
+  "source_workflow": "strict_generation_evaluation",
+  "retrieval_strategy": "coverage_aware_quota",
+  "held_out_reporting_only": true,
+  "development_first": true,
+  "query_count": 128,
+  "development_query_count": 85,
+  "diagnostic_counts": {
+    "answer_allowed_fallback": 63,
+    "fallback_required_answered": 8,
+    "selected_evidence_empty": 73,
+    "required_evidence_not_retrieved": 5,
+    "required_evidence_retrieved_but_not_selected": 58,
+    "selected_but_incomplete_required_group_coverage": 12,
+    "parent_context_only_fallback": 71,
+    "all_selected_evidence_caution": 71,
+    "exact_target_missing_in_eval_mode": 5,
+    "citation_guard_fallback": 0,
+    "retrieval_error": 0,
+    "generation_error": 0
+  },
+  "development_diagnostic_counts": {
+    "answer_allowed_fallback": 41,
+    "fallback_required_answered": 7,
+    "selected_evidence_empty": 51,
+    "required_evidence_not_retrieved": 3,
+    "required_evidence_retrieved_but_not_selected": 38,
+    "selected_but_incomplete_required_group_coverage": 10,
+    "parent_context_only_fallback": 50,
+    "all_selected_evidence_caution": 50,
+    "exact_target_missing_in_eval_mode": 3,
+    "citation_guard_fallback": 0,
+    "retrieval_error": 0,
+    "generation_error": 0
+  },
+  "likely_primary_bottleneck": "evidence_selection",
+  "recommended_next_actions": [
+    "Inspect why retrieved child evidence is marked caution or parent-context-only.",
+    "Prefer improving selection diagnostics before changing selection policy.",
+    "Do not relax citation guard.",
+    "Do not make parent context directly citable.",
+    "Do not change benchmark labels, qrels, legal chunks, retrieval artifacts, or generated results.",
+    "Use development split only for policy changes.",
+    "Keep held-out test reporting-only."
+  ],
+  "input_summary": {
+    "metrics_query_count": 128,
+    "breakdown_dimensions": [
+      "blocking",
+      "expected_decision",
+      "primary_domain",
+      "question_types",
+      "split"
+    ],
+    "comparison_systems": [
+      "generation_baseline",
+      "strict_generation_evaluation"
+    ],
+    "error_bucket_count": 10,
+    "development_error_bucket_count": 10,
+    "domain_error_summary_count": 11,
+    "question_type_error_summary_count": 16
+  }
+}

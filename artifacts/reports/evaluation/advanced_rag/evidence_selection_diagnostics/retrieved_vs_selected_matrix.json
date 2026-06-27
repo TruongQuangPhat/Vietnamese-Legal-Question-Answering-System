@@ -1,0 +1,10 @@
+{
+  "case_count": 128,
+  "counts": {
+    "no_required_evidence_defined": 18,
+    "required_evidence_not_retrieved": 5,
+    "required_evidence_retrieved_and_selected": 47,
+    "required_evidence_retrieved_but_not_selected": 58,
+    "selected_evidence_empty": 73
+  }
+}
