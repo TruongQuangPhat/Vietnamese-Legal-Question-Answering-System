@@ -197,3 +197,31 @@ def test_build_benchmark_case_inputs_indexes_records_by_query() -> None:
 
     assert judgments["q1"][0].chunk_id == "chunk_a"
     assert groups["q1"][0].evidence_group_id == "g1"
+
+
+def test_retrieved_summary_includes_reranking_diagnostics() -> None:
+    hit = _hit(1, "chunk_a").model_copy(
+        update={
+            "metadata": {
+                "reranking": {
+                    "reranker_score": 2.0,
+                    "normalized_reranker_score": 1.0,
+                    "g3_score": 0.1,
+                    "normalized_g3_score": 0.5,
+                    "final_score": 0.85,
+                }
+            }
+        }
+    )
+
+    case = evaluate_case_retrieval(
+        query=_query(),
+        split=BenchmarkSplit.DEVELOPMENT,
+        retrieved=[hit],
+        judgments=[_judgment("chunk_a")],
+        groups=[_group()],
+    )
+
+    assert case["retrieved"][0]["reranker_score"] == pytest.approx(2.0)
+    assert case["retrieved"][0]["g3_score"] == pytest.approx(0.1)
+    assert case["retrieved"][0]["final_score"] == pytest.approx(0.85)

@@ -344,6 +344,17 @@ def _summarize_chunk(
                 "sparse_score": fusion.get("sparse_score"),
             }
         )
+    reranking = chunk.metadata.get("reranking")
+    if isinstance(reranking, dict):
+        summary.update(
+            {
+                "reranker_score": reranking.get("reranker_score"),
+                "normalized_reranker_score": reranking.get("normalized_reranker_score"),
+                "g3_score": reranking.get("g3_score"),
+                "normalized_g3_score": reranking.get("normalized_g3_score"),
+                "final_score": reranking.get("final_score"),
+            }
+        )
     return summary
 
 

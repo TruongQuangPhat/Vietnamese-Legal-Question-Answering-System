@@ -1248,6 +1248,31 @@ Latest Stage G3 coverage-aware hybrid retrieval ablation checks:
 - next recommended stage: Stage H reranking ablation, with any generation gate
   or selection-policy relaxation kept as a separate safety-scoped ablation.
 
+Stage H reranking ablation implementation status:
+
+- base retrieval remains G3 config `C4`;
+- implemented candidate-pool reranking for pool sizes 30 and 50, deterministic
+  per-query score normalization, mixed reranker/G3 scoring, source-quota
+  preservation, development-only eligibility gates, deterministic selection,
+  final frozen-report writing, and comparison-report support;
+- implemented variants `H0` through `H6` and local-only FlagEmbedding model
+  resolution so benchmark commands cannot silently download model files;
+- benchmark validation passed with 0 errors and 0 warnings;
+- Qdrant availability was confirmed read-only for
+  `vnlaw_chunks_bgem3_v1_full` with 40,389 points;
+- `flagembedding==1.4.0` is already available through the existing
+  `embedding` optional dependency, so no dependency or lockfile change is
+  required;
+- the preferred real reranker `BAAI/bge-reranker-v2-m3` is not present in the
+  local model cache;
+- real development ablation stopped before retrieval/model evaluation, and no
+  Stage H metrics, ablation artifacts, final artifacts, held-out evaluation,
+  comparison update, generation, LLM call, Qdrant write, or model download
+  occurred;
+- status: implementation and deterministic mock-based tests are ready, but
+  Stage H evaluation is blocked pending an explicitly approved model download
+  or an approved existing local reranker path.
+
 ## Change Log
 
 | Date | Change |
@@ -1271,6 +1296,7 @@ Latest Stage G3 coverage-aware hybrid retrieval ablation checks:
 | 2026-06-22 | Ran frozen dense retrieval-only baseline on benchmark `v0.1.0` and recorded split-level metrics, per-case retrieval results, and a baseline manifest. |
 | 2026-06-22 | Ran frozen Naive RAG generation baseline on benchmark `v0.1.0`, reusing frozen F1 retrieval artifacts and recording split-level generation metrics. |
 | 2026-06-26 | Ran Stage G3 development-only fusion ablation and final selected coverage-aware hybrid retrieval report, updating advanced retrieval comparison artifacts. |
+| 2026-06-27 | Implemented the Stage H reranking framework and tests; real-model evaluation remains blocked because the configured reranker is not available locally. |
 
 ## Exit Criteria
 
