@@ -53,7 +53,7 @@ Main source modules:
 | `src/ingestion/`  | Corpus registry, crawling support, raw audit, cleaning, and storage utilities.                                                                                                                                            |
 | `src/processing/` | Legal hierarchy parsing, parent-child chunking, and processed JSONL validation.                                                                                                                                           |
 | `src/indexing/`   | Embedding, Qdrant indexing, and index validation utilities.                                                                                                                                                               |
-| `src/retrieval/`  | Dense retrieval, local BM25 retrieval, RRF fusion, coverage-aware quota retrieval, evidence construction/selection, citation guard integration, fallback behavior, and RAG pipeline behavior where currently implemented. |
+| `src/retrieval/`  | Dense retrieval, local BM25 retrieval, RRF fusion, coverage-aware quota retrieval, evidence construction/selection, citation ID guard integration, fallback behavior, and RAG pipeline behavior where currently implemented. |
 | `src/generation/` | Generation-specific helpers where implemented.                                                                                                                                                                            |
 | `src/evaluation/` | Frozen benchmark schemas, metrics, retrieval comparisons, strict generation evaluation, evidence diagnostics, and offline diagnostics.                                                                                    |
 | `src/services/`   | Existing orchestration services where a service boundary is already used.                                                                                                                                                 |
@@ -222,7 +222,7 @@ as engineering evidence, not a legal-quality certification.
 - The benchmark has only 128 queries.
 - No claim-level qualified human legal review has been completed for final
   generation outputs.
-- Citation guard validates citation IDs, not complete semantic legal
+- Citation ID guard validates citation IDs, not complete semantic legal
   correctness.
 - Held-out test excludes high-risk sanction/criminal QA.
 - Provider output may be nondeterministic.
@@ -232,6 +232,11 @@ as engineering evidence, not a legal-quality certification.
 
 ## License / Acknowledgments
 
+This project is licensed under the MIT License. See `LICENSE` for details.
+
+This system is intended for legal research and engineering evaluation only. Do
+not assume production or legal-advice suitability without additional legal,
+security, and deployment review.
 No repository license file is currently present. Do not assume production or
 legal-advice suitability without additional legal, security, and deployment
 review.

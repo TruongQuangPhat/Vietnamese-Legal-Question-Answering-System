@@ -1,7 +1,7 @@
 [project]
 name = "vnlaw-qa"
 version = "0.1.0"
-description = "Vietnamese legal question-answering system with Naive RAG → Advanced RAG → GraphRAG"
+description = "Vietnamese legal question-answering system with hierarchy-aware RAG, hybrid retrieval, strict citation validation, and conservative fallback control"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
