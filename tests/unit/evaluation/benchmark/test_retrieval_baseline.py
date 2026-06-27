@@ -206,8 +206,8 @@ def test_retrieved_summary_includes_reranking_diagnostics() -> None:
                 "reranking": {
                     "reranker_score": 2.0,
                     "normalized_reranker_score": 1.0,
-                    "g3_score": 0.1,
-                    "normalized_g3_score": 0.5,
+                    "base_fusion_score": 0.1,
+                    "normalized_base_fusion_score": 0.5,
                     "final_score": 0.85,
                 }
             }
@@ -223,5 +223,5 @@ def test_retrieved_summary_includes_reranking_diagnostics() -> None:
     )
 
     assert case["retrieved"][0]["reranker_score"] == pytest.approx(2.0)
-    assert case["retrieved"][0]["g3_score"] == pytest.approx(0.1)
+    assert case["retrieved"][0]["base_fusion_score"] == pytest.approx(0.1)
     assert case["retrieved"][0]["final_score"] == pytest.approx(0.85)

@@ -18,11 +18,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.evaluation.run_reranking_ablation import (
+    DEFAULT_BASE_REFERENCE_DIR,
     DEFAULT_BENCHMARK_MANIFEST,
     DEFAULT_CHUNKS,
     DEFAULT_DENSE_REFERENCE_DIR,
     DEFAULT_G2_REFERENCE_DIR,
-    DEFAULT_G3_REFERENCE_DIR,
     DEFAULT_GROUPS,
     DEFAULT_QRELS,
     DEFAULT_QUERIES,
@@ -43,7 +43,7 @@ from src.indexing.embedding_model import BgeM3EmbeddingModel, EmbeddingModelErro
 from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
 from src.retrieval.dense_retriever import DenseRetriever, DenseRetrieverError
 from src.retrieval.reranker import (
-    FlagEmbeddingReranker,
+    NativeTransformersReranker,
     RerankerError,
     resolve_local_model_path,
 )
@@ -85,7 +85,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dense-reference-dir", type=Path, default=DEFAULT_DENSE_REFERENCE_DIR)
     parser.add_argument("--sparse-reference-dir", type=Path, default=DEFAULT_SPARSE_REFERENCE_DIR)
     parser.add_argument("--g2-reference-dir", type=Path, default=DEFAULT_G2_REFERENCE_DIR)
-    parser.add_argument("--g3-reference-dir", type=Path, default=DEFAULT_G3_REFERENCE_DIR)
+    parser.add_argument(
+        "--base-reference-dir",
+        type=Path,
+        default=DEFAULT_BASE_REFERENCE_DIR,
+    )
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -104,7 +108,7 @@ async def run_command(argv: list[str] | None = None) -> int:
         validate_output_dir(args.output_dir)
         validate_output_dir(args.comparison_dir)
         model_path = resolve_local_model_path(args.reranker_model)
-        reranker = FlagEmbeddingReranker(
+        reranker = NativeTransformersReranker(
             model_name=args.reranker_model,
             model_path=model_path,
             device=args.device,
@@ -145,7 +149,7 @@ async def run_command(argv: list[str] | None = None) -> int:
             sparse_retriever=sparse_retriever,
             reranker=reranker,
             reranker_device=args.device,
-            reranker_dependency="flagembedding==1.4.0",
+            reranker_dependency="transformers==5.10.2; torch",
             dense_config_payload=retrieval_config.model_dump(mode="json"),
             qdrant_collection_name=collection_name,
             qdrant_collection_info=collection_info,

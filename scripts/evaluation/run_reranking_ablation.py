@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run development-only reranking ablation over G3 retrieval."""
+"""Run development-only reranking ablation over coverage-aware retrieval."""
 
 # ruff: noqa: E402
 
@@ -27,7 +27,7 @@ from src.indexing.embedding_model import BgeM3EmbeddingModel, EmbeddingModelErro
 from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
 from src.retrieval.dense_retriever import DenseRetriever, DenseRetrieverError
 from src.retrieval.reranker import (
-    FlagEmbeddingReranker,
+    NativeTransformersReranker,
     RerankerError,
     resolve_local_model_path,
 )
@@ -41,7 +41,7 @@ DEFAULT_OUTPUT_DIR = Path("artifacts/reports/evaluation/advanced_rag/reranking_a
 DEFAULT_DENSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/naive_rag_baseline/retrieval")
 DEFAULT_SPARSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/sparse_retrieval")
 DEFAULT_G2_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/hybrid_retrieval")
-DEFAULT_G3_REFERENCE_DIR = Path(
+DEFAULT_BASE_REFERENCE_DIR = Path(
     "artifacts/reports/evaluation/advanced_rag/coverage_aware_retrieval"
 )
 DEFAULT_CHUNKS = Path("data/processed/legal_chunks.jsonl")
@@ -59,7 +59,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     """Build the development-only reranking ablation CLI parser."""
     parser = argparse.ArgumentParser(
         prog="scripts/evaluation/run_reranking_ablation.py",
-        description="Run development-only reranking ablation over G3 retrieval.",
+        description="Run development-only reranking ablation over coverage-aware retrieval.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--queries", type=Path, default=DEFAULT_QUERIES)
@@ -81,7 +81,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dense-reference-dir", type=Path, default=DEFAULT_DENSE_REFERENCE_DIR)
     parser.add_argument("--sparse-reference-dir", type=Path, default=DEFAULT_SPARSE_REFERENCE_DIR)
     parser.add_argument("--g2-reference-dir", type=Path, default=DEFAULT_G2_REFERENCE_DIR)
-    parser.add_argument("--g3-reference-dir", type=Path, default=DEFAULT_G3_REFERENCE_DIR)
+    parser.add_argument(
+        "--base-reference-dir",
+        type=Path,
+        default=DEFAULT_BASE_REFERENCE_DIR,
+    )
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -98,7 +102,7 @@ async def run_command(argv: list[str] | None = None) -> int:
     try:
         validate_output_dir(args.output_dir)
         model_path = resolve_local_model_path(args.reranker_model)
-        reranker = FlagEmbeddingReranker(
+        reranker = NativeTransformersReranker(
             model_name=args.reranker_model,
             model_path=model_path,
             device=args.device,
@@ -137,7 +141,7 @@ async def run_command(argv: list[str] | None = None) -> int:
             sparse_retriever=sparse_retriever,
             reranker=reranker,
             reranker_device=args.device,
-            reranker_dependency="flagembedding==1.4.0",
+            reranker_dependency="transformers==5.10.2; torch",
             qdrant_collection_name=collection_name,
             vector_name=retrieval_config.dense_retrieval.vector_name,
             embedding_model=retrieval_config.embedding.model_name,
@@ -183,7 +187,7 @@ def _paths_from_args(args: argparse.Namespace) -> RerankingBenchmarkPaths:
         dense_reference_dir=args.dense_reference_dir,
         sparse_reference_dir=args.sparse_reference_dir,
         g2_reference_dir=args.g2_reference_dir,
-        g3_reference_dir=args.g3_reference_dir,
+        base_reference_dir=args.base_reference_dir,
         output_dir=args.output_dir,
     )
 

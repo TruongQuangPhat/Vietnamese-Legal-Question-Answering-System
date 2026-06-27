@@ -350,8 +350,8 @@ def _summarize_chunk(
             {
                 "reranker_score": reranking.get("reranker_score"),
                 "normalized_reranker_score": reranking.get("normalized_reranker_score"),
-                "g3_score": reranking.get("g3_score"),
-                "normalized_g3_score": reranking.get("normalized_g3_score"),
+                "base_fusion_score": reranking.get("base_fusion_score"),
+                "normalized_base_fusion_score": reranking.get("normalized_base_fusion_score"),
                 "final_score": reranking.get("final_score"),
             }
         )

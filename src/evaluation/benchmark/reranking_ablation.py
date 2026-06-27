@@ -37,13 +37,12 @@ from src.retrieval.fusion import QuotaSelectionConfig, reciprocal_rank_fusion
 from src.retrieval.reranker import RerankerProtocol, rerank_candidates
 from src.retrieval.sparse_retriever import SparseRetrieverError
 
-G3_DENSE_CANDIDATE_K = 50
-G3_SPARSE_CANDIDATE_K = 50
-G3_FINAL_TOP_K = 10
-G3_RRF_K = 60
-G3_DENSE_WEIGHT = 1.0
-G3_SPARSE_WEIGHT = 1.5
-G3_QUOTA = QuotaSelectionConfig(fused_best=5, sparse_quota=4, dense_quota=1)
+BASE_DENSE_CANDIDATE_K = 50
+BASE_SPARSE_CANDIDATE_K = 50
+BASE_RRF_K = 60
+BASE_DENSE_WEIGHT = 1.0
+BASE_SPARSE_WEIGHT = 1.5
+BASE_QUOTA = QuotaSelectionConfig(fused_best=5, sparse_quota=4, dense_quota=1)
 
 
 class RerankingAblationError(RuntimeError):
@@ -58,7 +57,7 @@ class RerankingConfig:
     candidate_pool_k: int
     final_top_k: int
     reranker_weight: float
-    g3_weight: float
+    base_weight: float
     preserve_source_quota: bool = False
     sparse_quota: int = 0
     dense_quota: int = 0
@@ -72,9 +71,9 @@ class RerankingConfig:
             "candidate_pool_k": self.candidate_pool_k,
             "final_top_k": self.final_top_k,
             "reranker_weight": self.reranker_weight,
-            "g3_weight": self.g3_weight,
+            "base_weight": self.base_weight,
             "score_combination": _score_combination(self),
-            "normalization_method": "per-query min-max" if self.g3_weight > 0 else "none",
+            "normalization_method": "per-query min-max" if self.base_weight > 0 else "none",
             "quota_preservation": {
                 "enabled": self.preserve_source_quota,
                 "sparse_quota": self.sparse_quota,
@@ -97,7 +96,7 @@ class RerankingBenchmarkPaths:
     dense_reference_dir: Path
     sparse_reference_dir: Path
     g2_reference_dir: Path
-    g3_reference_dir: Path
+    base_reference_dir: Path
     output_dir: Path
 
 
@@ -180,8 +179,8 @@ async def run_development_reranking_ablation(
             }
         )
 
-    base_metrics = load_system_metrics(paths.g3_reference_dir)["development"]
-    selection = select_reranking_config(variants, g3_development_metrics=base_metrics)
+    base_metrics = load_system_metrics(paths.base_reference_dir)["development"]
+    selection = select_reranking_config(variants, base_development_metrics=base_metrics)
     report = {
         "report_type": "development_reranking_ablation_results",
         "benchmark_version": benchmark_manifest.benchmark_version,
@@ -202,7 +201,7 @@ async def run_development_reranking_ablation(
                 "simpler config",
             ],
         },
-        "g3_development_metrics": base_metrics,
+        "base_development_metrics": base_metrics,
         **selection,
         "variants": variants,
     }
@@ -212,9 +211,9 @@ async def run_development_reranking_ablation(
         "benchmark_manifest_sha256": sha256_file(paths.benchmark_manifest),
         "split_manifest_sha256": sha256_file(paths.split_manifest),
         "base_retrieval_method": "coverage_aware_quota",
-        "base_retrieval_config_id": "C4",
+        "base_retrieval_strategy": "coverage_aware_quota",
         "base_retrieval_manifest_sha256": sha256_file(
-            paths.g3_reference_dir / "baseline_manifest.json"
+            paths.base_reference_dir / "baseline_manifest.json"
         ),
         "selection_split": BenchmarkSplit.DEVELOPMENT.value,
         "reranker_model": reranker.model_name,
@@ -324,7 +323,7 @@ async def run_final_reranked_report(
         dense_dir=paths.dense_reference_dir,
         sparse_dir=paths.sparse_reference_dir,
         g2_dir=paths.g2_reference_dir,
-        g3_dir=paths.g3_reference_dir,
+        base_dir=paths.base_reference_dir,
         reranked_dir=paths.output_dir,
         ablation_report=ablation_report,
     )
@@ -334,7 +333,7 @@ async def run_final_reranked_report(
 def select_reranking_config(
     variants: list[dict[str, Any]],
     *,
-    g3_development_metrics: dict[str, Any],
+    base_development_metrics: dict[str, Any],
 ) -> dict[str, Any]:
     """Select an eligible reranker using development metrics only."""
     reranked = [variant for variant in variants if variant["config"]["config_id"] != "H0"]
@@ -342,9 +341,9 @@ def select_reranking_config(
         variant
         for variant in reranked
         if variant["development_metrics"]["evidence_group_coverage_at_10"]
-        >= g3_development_metrics["evidence_group_coverage_at_10"] - 0.01
+        >= base_development_metrics["evidence_group_coverage_at_10"] - 0.01
         and variant["development_metrics"]["recall_at_10"]
-        >= g3_development_metrics["recall_at_10"] - 0.01
+        >= base_development_metrics["recall_at_10"] - 0.01
     ]
     if not eligible:
         return {
@@ -357,9 +356,9 @@ def select_reranking_config(
         }
     selected = max(eligible, key=_selection_key)
     metrics = selected["development_metrics"]
-    improves_rank_quality = metrics["ndcg_at_10"] > g3_development_metrics["ndcg_at_10"] or (
-        math_isclose(metrics["ndcg_at_10"], g3_development_metrics["ndcg_at_10"])
-        and metrics["mrr_at_10"] > g3_development_metrics["mrr_at_10"]
+    improves_rank_quality = metrics["ndcg_at_10"] > base_development_metrics["ndcg_at_10"] or (
+        math_isclose(metrics["ndcg_at_10"], base_development_metrics["ndcg_at_10"])
+        and metrics["mrr_at_10"] > base_development_metrics["mrr_at_10"]
     )
     return {
         "eligible_config_ids": [variant["config"]["config_id"] for variant in eligible],
@@ -381,7 +380,7 @@ def config_from_payload(payload: dict[str, Any]) -> RerankingConfig:
         candidate_pool_k=int(payload["candidate_pool_k"]),
         final_top_k=int(payload["final_top_k"]),
         reranker_weight=float(payload["reranker_weight"]),
-        g3_weight=float(payload["g3_weight"]),
+        base_weight=float(payload["base_weight"]),
         preserve_source_quota=bool(quota.get("enabled", False)),
         sparse_quota=int(quota.get("sparse_quota", 0)),
         dense_quota=int(quota.get("dense_quota", 0)),
@@ -413,8 +412,8 @@ async def _retrieve_candidate_cache(
     for query in queries:
         started = time.perf_counter()
         try:
-            dense = await dense_retriever.retrieve(query.query, top_k=G3_DENSE_CANDIDATE_K)
-            sparse = await sparse_retriever.retrieve(query.query, top_k=G3_SPARSE_CANDIDATE_K)
+            dense = await dense_retriever.retrieve(query.query, top_k=BASE_DENSE_CANDIDATE_K)
+            sparse = await sparse_retriever.retrieve(query.query, top_k=BASE_SPARSE_CANDIDATE_K)
             cache[query.id] = {
                 "dense": dense.results,
                 "sparse": sparse.results,
@@ -444,7 +443,7 @@ def _prepare_reranker_cache(
         if cached["retrieval_error"] is not None:
             continue
         for pool_size in sorted(pool_sizes):
-            pool = _build_g3_pool(cached, final_top_k=pool_size)
+            pool = _build_base_candidate_pool(cached, final_top_k=pool_size)
             started = time.perf_counter()
             scores = reranker.score(query.query, pool)
             prepared[(query.id, pool_size)] = {
@@ -475,7 +474,7 @@ def _evaluate_config(
             error = cached["retrieval_error"]
             elapsed_ms = cached["elapsed_ms"]
         elif config.no_rerank:
-            retrieved = _build_g3_pool(cached, final_top_k=config.final_top_k)
+            retrieved = _build_base_candidate_pool(cached, final_top_k=config.final_top_k)
             error = None
             elapsed_ms = cached["elapsed_ms"]
         else:
@@ -485,7 +484,7 @@ def _evaluate_config(
                 reranker_scores=prepared["scores"],
                 final_top_k=config.final_top_k,
                 reranker_weight=config.reranker_weight,
-                g3_weight=config.g3_weight,
+                base_weight=config.base_weight,
                 preserve_source_quota=config.preserve_source_quota,
                 sparse_quota=config.sparse_quota,
                 dense_quota=config.dense_quota,
@@ -508,15 +507,15 @@ def _evaluate_config(
     return cases
 
 
-def _build_g3_pool(cached: dict[str, Any], *, final_top_k: int) -> list[Any]:
+def _build_base_candidate_pool(cached: dict[str, Any], *, final_top_k: int) -> list[Any]:
     return reciprocal_rank_fusion(
         dense_results=cached["dense"],
         sparse_results=cached["sparse"],
         final_top_k=final_top_k,
-        rrf_k=G3_RRF_K,
-        dense_weight=G3_DENSE_WEIGHT,
-        sparse_weight=G3_SPARSE_WEIGHT,
-        quota_config=G3_QUOTA,
+        rrf_k=BASE_RRF_K,
+        dense_weight=BASE_DENSE_WEIGHT,
+        sparse_weight=BASE_SPARSE_WEIGHT,
+        quota_config=BASE_QUOTA,
     )
 
 
@@ -555,9 +554,9 @@ def _write_final_outputs(
         "split_manifest_sha256": sha256_file(paths.split_manifest),
         "retrieval_method": "cross_encoder_reranked_coverage_aware_retrieval",
         "base_retrieval_method": "coverage_aware_quota",
-        "base_retrieval_config_id": "C4",
+        "base_retrieval_strategy": "coverage_aware_quota",
         "base_retrieval_manifest_sha256": sha256_file(
-            paths.g3_reference_dir / "baseline_manifest.json"
+            paths.base_reference_dir / "baseline_manifest.json"
         ),
         "selected_reranking_config_id": config.config_id,
         "selected_by": "development eligibility gates then NDCG@10 and MRR@10",
@@ -567,7 +566,7 @@ def _write_final_outputs(
         "reranker_device": reranker_device,
         "reranker_dependency": reranker_dependency,
         "score_combination": _score_combination(config),
-        "normalization_method": "per-query min-max" if config.g3_weight > 0 else "none",
+        "normalization_method": "per-query min-max" if config.base_weight > 0 else "none",
         "quota_preservation": config.model_dump()["quota_preservation"],
         "qdrant_collection_name": qdrant_collection_name,
         "qdrant_collection_info": qdrant_collection_info,
@@ -614,7 +613,7 @@ def _write_final_outputs(
             manifest=manifest,
             all_metrics=all_metrics,
             split_metrics=split_metrics,
-            g3_metrics=load_system_metrics(paths.g3_reference_dir),
+            base_metrics=load_system_metrics(paths.base_reference_dir),
             breakdowns=breakdowns,
         ),
         encoding="utf-8",
@@ -627,7 +626,7 @@ def write_reranking_comparison(
     dense_dir: Path,
     sparse_dir: Path,
     g2_dir: Path,
-    g3_dir: Path,
+    base_dir: Path,
     reranked_dir: Path,
     ablation_report: dict[str, Any],
 ) -> None:
@@ -636,7 +635,7 @@ def write_reranking_comparison(
         "f1_dense": ("dense_bge_m3", dense_dir),
         "g1_sparse_bm25": ("sparse_bm25", sparse_dir),
         "g2_hybrid_rrf": ("hybrid_dense_sparse_rrf", g2_dir),
-        "g3_coverage_aware": ("coverage_aware_hybrid", g3_dir),
+        "coverage_aware_base": ("coverage_aware_hybrid", base_dir),
         "h_reranked": ("cross_encoder_reranked_coverage_aware", reranked_dir),
     }
     payload = {
@@ -654,20 +653,20 @@ def write_reranking_comparison(
             }
             for label, (method, path) in systems.items()
         },
-        "stage_h_ablation": {
+        "reranking_ablation": {
             "adopted": ablation_report["adopted"],
             "selected_config_id": ablation_report["selected_config_id"],
             "held_out_test_used_for_selection": False,
         },
     }
     payload["deltas"] = {
-        "h_vs_g3": _delta_metrics(
+        "reranked_vs_base": _delta_metrics(
             payload["systems"]["h_reranked"]["metrics"],
-            payload["systems"]["g3_coverage_aware"]["metrics"],
+            payload["systems"]["coverage_aware_base"]["metrics"],
         )
     }
     payload["interpretation"] = (
-        "Reranking was selected on development metrics subject to G3 recall and "
+        "Reranking was selected on development metrics subject to base retrieval recall and "
         "evidence-group coverage preservation gates."
     )
     payload["recommendation"] = (
@@ -716,7 +715,7 @@ def render_final_summary(
     manifest: dict[str, Any],
     all_metrics: dict[str, Any],
     split_metrics: dict[str, dict[str, Any]],
-    g3_metrics: dict[str, dict[str, Any]],
+    base_metrics: dict[str, dict[str, Any]],
     breakdowns: dict[str, dict[str, dict[str, Any]]],
 ) -> str:
     """Render the final selected reranked retrieval summary."""
@@ -736,13 +735,13 @@ def render_final_summary(
         ("held_out_test", split_metrics["held_out_test"]),
     ):
         lines.append(_metric_line(label, metrics))
-    lines.extend(["", "## Delta vs G3", ""])
+    lines.extend(["", "## Delta vs Base Retrieval", ""])
     current = {
         "all": all_metrics,
         "development": split_metrics["development"],
         "held_out_test": split_metrics["held_out_test"],
     }
-    for split_name, deltas in _delta_metrics(current, g3_metrics).items():
+    for split_name, deltas in _delta_metrics(current, base_metrics).items():
         lines.append(
             f"- `{split_name}`: NDCG@10={deltas['ndcg_at_10_delta']:+.3f}; "
             f"MRR@10={deltas['mrr_at_10_delta']:+.3f}; "
@@ -779,10 +778,10 @@ def render_comparison_markdown(comparison: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Stage H Decision",
+            "## Reranking Decision",
             "",
-            f"- Adopted: `{comparison['stage_h_ablation']['adopted']}`.",
-            f"- Selected config: `{comparison['stage_h_ablation']['selected_config_id']}`.",
+            f"- Adopted: `{comparison['reranking_ablation']['adopted']}`.",
+            f"- Selected config: `{comparison['reranking_ablation']['selected_config_id']}`.",
             "- Held-out test used for selection: `false`.",
             "",
             "## Interpretation",
@@ -812,10 +811,13 @@ def _selection_key(variant: dict[str, Any]) -> tuple[float, float, float, float,
 
 def _score_combination(config: RerankingConfig) -> str:
     if config.no_rerank:
-        return "g3_c4_unchanged"
-    if config.g3_weight == 0:
+        return "coverage_aware_quota_unchanged"
+    if config.base_weight == 0:
         return "reranker_score"
-    return f"{config.reranker_weight} * normalized_reranker + {config.g3_weight} * normalized_g3"
+    return (
+        f"{config.reranker_weight} * normalized_reranker + "
+        f"{config.base_weight} * normalized_base_fusion"
+    )
 
 
 def _load_json_object(path: Path) -> dict[str, Any]:

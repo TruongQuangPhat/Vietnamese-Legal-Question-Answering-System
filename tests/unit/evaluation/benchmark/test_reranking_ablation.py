@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from src.evaluation.benchmark.reranking_ablation import (
@@ -66,15 +68,15 @@ def test_default_configs_cover_h0_through_h6() -> None:
     assert configs[-1].preserve_source_quota is True
 
 
-def test_selection_rejects_configs_that_break_g3_preservation_gates() -> None:
-    g3 = _metrics(group_10=0.75, recall_10=0.95)
+def test_selection_rejects_configs_that_break_base_preservation_gates() -> None:
+    base = _metrics(group_10=0.75, recall_10=0.95)
     variants = [
-        _variant("H0", g3, simplicity_rank=0),
+        _variant("H0", base, simplicity_rank=0),
         _variant("H1", _metrics(group_10=0.73, recall_10=0.99, ndcg_10=0.90)),
         _variant("H2", _metrics(group_10=0.80, recall_10=0.93, ndcg_10=0.90)),
     ]
 
-    selection = select_reranking_config(variants, g3_development_metrics=g3)
+    selection = select_reranking_config(variants, base_development_metrics=base)
 
     assert selection["eligible_config_ids"] == []
     assert selection["adopted"] is False
@@ -82,27 +84,27 @@ def test_selection_rejects_configs_that_break_g3_preservation_gates() -> None:
 
 
 def test_selection_uses_ndcg_then_mrr_and_adopts_rank_gain() -> None:
-    g3 = _metrics(ndcg_10=0.62, mrr_10=0.69)
+    base = _metrics(ndcg_10=0.62, mrr_10=0.69)
     variants = [
-        _variant("H0", g3, simplicity_rank=0),
+        _variant("H0", base, simplicity_rank=0),
         _variant("H1", _metrics(ndcg_10=0.64, mrr_10=0.70)),
         _variant("H2", _metrics(ndcg_10=0.65, mrr_10=0.68)),
     ]
 
-    selection = select_reranking_config(variants, g3_development_metrics=g3)
+    selection = select_reranking_config(variants, base_development_metrics=base)
 
     assert selection["selected_config_id"] == "H2"
     assert selection["adopted"] is True
 
 
 def test_selection_does_not_adopt_without_rank_quality_gain() -> None:
-    g3 = _metrics(ndcg_10=0.65, mrr_10=0.70)
+    base = _metrics(ndcg_10=0.65, mrr_10=0.70)
     variants = [
-        _variant("H0", g3, simplicity_rank=0),
+        _variant("H0", base, simplicity_rank=0),
         _variant("H1", _metrics(ndcg_10=0.64, mrr_10=0.80)),
     ]
 
-    selection = select_reranking_config(variants, g3_development_metrics=g3)
+    selection = select_reranking_config(variants, base_development_metrics=base)
 
     assert selection["best_eligible_config_id"] == "H1"
     assert selection["adopted"] is False
@@ -110,14 +112,14 @@ def test_selection_does_not_adopt_without_rank_quality_gain() -> None:
 
 
 def test_held_out_metrics_are_not_used_for_selection() -> None:
-    g3 = _metrics()
+    base = _metrics()
     variants = [
-        _variant("H0", g3, simplicity_rank=0),
+        _variant("H0", base, simplicity_rank=0),
         _variant("H1", _metrics(ndcg_10=0.64), held_out_ndcg=0.0),
         _variant("H2", _metrics(ndcg_10=0.63), held_out_ndcg=1.0),
     ]
 
-    selection = select_reranking_config(variants, g3_development_metrics=g3)
+    selection = select_reranking_config(variants, base_development_metrics=base)
 
     assert selection["selected_config_id"] == "H1"
 
@@ -127,3 +129,17 @@ def test_manifest_guard_rejects_secret_shaped_keys() -> None:
 
     with pytest.raises(RerankingAblationError, match="secret-shaped"):
         assert_manifest_has_no_secret_keys({"nested": {"authorization": "redacted"}})
+
+
+def test_reranking_implementation_uses_functional_names() -> None:
+    forbidden = ("g" + "3", "stage" + "_h", "c" + "4")
+    paths = (
+        Path("src/retrieval/reranker.py"),
+        Path("src/evaluation/benchmark/reranking_ablation.py"),
+        Path("scripts/evaluation/run_reranking_ablation.py"),
+        Path("scripts/evaluation/run_reranked_retrieval.py"),
+    )
+
+    for path in paths:
+        content = path.read_text(encoding="utf-8").casefold()
+        assert not any(label in content for label in forbidden), path

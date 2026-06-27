@@ -74,7 +74,7 @@ class FlagEmbeddingReranker:
                 batch_size=batch_size,
                 max_length=max_length,
             )
-        except (OSError, RuntimeError, ValueError) as exc:
+        except Exception as exc:
             raise RerankerError(f"failed to load local reranker model: {exc}") from exc
         self._model_name = model_name
         self._batch_size = batch_size
@@ -98,13 +98,128 @@ class FlagEmbeddingReranker:
         pairs = [(normalized_query, candidate.text or "") for candidate in candidates]
         try:
             raw_scores = self._model.compute_score(pairs, batch_size=self._batch_size)
-        except (OSError, RuntimeError, ValueError) as exc:
+        except Exception as exc:
             raise RerankerError(f"reranker scoring failed: {exc}") from exc
         if hasattr(raw_scores, "tolist"):
             raw_scores = raw_scores.tolist()
         if isinstance(raw_scores, (int, float)):
             raw_scores = [raw_scores]
         scores = [float(score) for score in raw_scores]
+        _validate_scores(scores, expected_count=len(candidates))
+        return scores
+
+
+class NativeTransformersReranker:
+    """Local-only Transformers sequence-classification reranker.
+
+    The wrapper loads tokenizer and model files from an already resolved local
+    snapshot. It scores direct child chunk text under ``torch.no_grad()`` and
+    never invokes generation or benchmark gold annotations.
+    """
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        model_path: Path,
+        device: str = "cpu",
+        batch_size: int = 16,
+        max_length: int = 512,
+        tokenizer_factory: Callable[..., Any] | None = None,
+        model_factory: Callable[..., Any] | None = None,
+        torch_module: Any | None = None,
+    ) -> None:
+        """Load a native Transformers reranker from local files only.
+
+        Args:
+            model_name: Stable model identifier recorded in manifests.
+            model_path: Existing local Hugging Face snapshot directory.
+            device: Requested device: ``auto``, ``cpu``, or ``cuda``.
+            batch_size: Positive query-document scoring batch size.
+            max_length: Positive tokenizer truncation length.
+            tokenizer_factory: Optional injected tokenizer loader for tests.
+            model_factory: Optional injected sequence-classification loader.
+            torch_module: Optional injected torch-compatible module.
+
+        Raises:
+            ValueError: If settings are invalid.
+            RerankerError: If dependencies or local model files cannot load.
+        """
+        if device not in {"auto", "cpu", "cuda"}:
+            raise ValueError("device must be one of: auto, cpu, cuda")
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+        if max_length <= 0:
+            raise ValueError("max_length must be positive")
+        if not model_path.exists():
+            raise RerankerError(f"local reranker model path does not exist: {model_path}")
+
+        torch_runtime = torch_module or _load_torch_module()
+        effective_device = _resolve_native_device(device, torch_runtime)
+        tokenizer_loader, model_loader = _load_native_factories(
+            tokenizer_factory=tokenizer_factory,
+            model_factory=model_factory,
+        )
+        try:
+            self._tokenizer = tokenizer_loader(
+                str(model_path),
+                local_files_only=True,
+            )
+            self._model = model_loader(
+                str(model_path),
+                local_files_only=True,
+            )
+            self._model.to(effective_device)
+            self._model.eval()
+        except Exception as exc:
+            raise RerankerError(
+                f"failed to load native local reranker model {model_name!r}: {exc}"
+            ) from exc
+
+        self._model_name = model_name
+        self._device = effective_device
+        self._batch_size = batch_size
+        self._max_length = max_length
+        self._torch = torch_runtime
+
+    @property
+    def model_name(self) -> str:
+        """Return the stable reranker model identifier."""
+        return self._model_name
+
+    def score(self, query: str, candidates: Sequence[RetrievedChunk]) -> list[float]:
+        """Score query-child-text pairs with local sequence classification."""
+        normalized_query = query.strip()
+        if not normalized_query:
+            raise RerankerError("reranker query must not be blank")
+        if not candidates:
+            return []
+
+        scores: list[float] = []
+        for start in range(0, len(candidates), self._batch_size):
+            batch = candidates[start : start + self._batch_size]
+            documents = [candidate.text or "" for candidate in batch]
+            try:
+                encoded = self._tokenizer(
+                    [normalized_query] * len(batch),
+                    documents,
+                    padding=True,
+                    truncation=True,
+                    max_length=self._max_length,
+                    return_tensors="pt",
+                )
+                model_inputs = {
+                    key: value.to(self._device) if hasattr(value, "to") else value
+                    for key, value in encoded.items()
+                }
+                with self._torch.no_grad():
+                    outputs = self._model(**model_inputs)
+                scores.extend(_extract_classification_scores(outputs, expected_count=len(batch)))
+            except RerankerError:
+                raise
+            except Exception as exc:
+                raise RerankerError(f"native reranker scoring failed: {exc}") from exc
+
         _validate_scores(scores, expected_count=len(candidates))
         return scores
 
@@ -177,22 +292,22 @@ def rerank_candidates(
     reranker_scores: Sequence[float],
     final_top_k: int,
     reranker_weight: float,
-    g3_weight: float,
+    base_weight: float,
     preserve_source_quota: bool = False,
     sparse_quota: int = 4,
     dense_quota: int = 1,
     model_name: str,
 ) -> list[RetrievedChunk]:
-    """Combine reranker and G3 scores, then select a deterministic final rank.
+    """Combine reranker and base fusion scores into a deterministic final rank.
 
     Ranking uses only retrieval candidates, retrieval metadata, and reranker
     scores. Benchmark qrels and evidence-group annotations are never read.
     """
     if final_top_k <= 0:
         raise ValueError("final_top_k must be positive")
-    if reranker_weight < 0 or g3_weight < 0:
+    if reranker_weight < 0 or base_weight < 0:
         raise ValueError("score weights must be non-negative")
-    if reranker_weight == 0 and g3_weight == 0:
+    if reranker_weight == 0 and base_weight == 0:
         raise ValueError("at least one score weight must be positive")
     if sparse_quota < 0 or dense_quota < 0:
         raise ValueError("source quotas must be non-negative")
@@ -209,34 +324,34 @@ def rerank_candidates(
             score_by_id.setdefault(candidate.chunk_id, float(score))
     raw_reranker_scores = [score_by_id[candidate.chunk_id] for candidate in unique]
     _validate_scores(raw_reranker_scores, expected_count=len(unique))
-    g3_scores = [_g3_score(candidate) for candidate in unique]
+    base_fusion_scores = [_base_fusion_score(candidate) for candidate in unique]
     normalized_reranker = min_max_normalize(raw_reranker_scores)
-    normalized_g3 = min_max_normalize(g3_scores)
+    normalized_base = min_max_normalize(base_fusion_scores)
 
     ranked: list[RetrievedChunk] = []
-    for candidate, raw_score, normalized_score, g3_score, normalized_base in zip(
+    for candidate, raw_score, normalized_score, base_fusion_score, normalized_base_score in zip(
         unique,
         raw_reranker_scores,
         normalized_reranker,
-        g3_scores,
-        normalized_g3,
+        base_fusion_scores,
+        normalized_base,
         strict=True,
     ):
         final_score = (
             raw_score
-            if g3_weight == 0
-            else reranker_weight * normalized_score + g3_weight * normalized_base
+            if base_weight == 0
+            else reranker_weight * normalized_score + base_weight * normalized_base_score
         )
         metadata = dict(candidate.metadata)
         metadata["reranking"] = {
             "reranker_model": model_name,
             "reranker_score": raw_score,
             "normalized_reranker_score": normalized_score,
-            "g3_score": g3_score,
-            "normalized_g3_score": normalized_base,
+            "base_fusion_score": base_fusion_score,
+            "normalized_base_fusion_score": normalized_base_score,
             "final_score": final_score,
             "reranker_weight": reranker_weight,
-            "g3_weight": g3_weight,
+            "base_weight": base_weight,
         }
         ranked.append(
             candidate.model_copy(
@@ -304,14 +419,14 @@ def _reranking_sort_key(candidate: RetrievedChunk) -> tuple[float, float, float,
     return (
         -float(reranking["final_score"]),
         -float(reranking["reranker_score"]),
-        -float(reranking["g3_score"]),
+        -float(reranking["base_fusion_score"]),
         _source_rank(candidate, "dense") or math.inf,
         _source_rank(candidate, "sparse") or math.inf,
         candidate.chunk_id or "",
     )
 
 
-def _g3_score(candidate: RetrievedChunk) -> float:
+def _base_fusion_score(candidate: RetrievedChunk) -> float:
     fusion = candidate.metadata.get("fusion")
     if isinstance(fusion, dict) and fusion.get("fused_score") is not None:
         return float(fusion["fused_score"])
@@ -333,6 +448,74 @@ def _validate_scores(scores: Sequence[float], *, expected_count: int) -> None:
         )
     if any(not math.isfinite(score) for score in scores):
         raise RerankerError("reranker returned a non-finite score")
+
+
+def _extract_classification_scores(outputs: Any, *, expected_count: int) -> list[float]:
+    logits = getattr(outputs, "logits", None)
+    if logits is None or not hasattr(logits, "shape"):
+        raise RerankerError("native reranker output is missing logits")
+    shape = tuple(int(dimension) for dimension in logits.shape)
+    if len(shape) != 2 or shape[0] != expected_count:
+        raise RerankerError(
+            f"unsupported reranker logits shape {shape}; expected [{expected_count}, 1 or 2]"
+        )
+    if shape[1] == 1:
+        selected = logits[:, 0]
+    elif shape[1] == 2:
+        selected = logits[:, 1]
+    else:
+        raise RerankerError(
+            f"unsupported reranker logits shape {shape}; expected [{expected_count}, 1 or 2]"
+        )
+    if hasattr(selected, "detach"):
+        selected = selected.detach()
+    if hasattr(selected, "cpu"):
+        selected = selected.cpu()
+    if hasattr(selected, "tolist"):
+        selected = selected.tolist()
+    scores = [float(score) for score in selected]
+    _validate_scores(scores, expected_count=expected_count)
+    return scores
+
+
+def _load_native_factories(
+    *,
+    tokenizer_factory: Callable[..., Any] | None,
+    model_factory: Callable[..., Any] | None,
+) -> tuple[Callable[..., Any], Callable[..., Any]]:
+    if tokenizer_factory is not None and model_factory is not None:
+        return tokenizer_factory, model_factory
+    try:
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    except ImportError as exc:
+        raise RerankerError(
+            "Transformers reranker dependencies are unavailable; run with --extra embedding"
+        ) from exc
+    return (
+        tokenizer_factory or AutoTokenizer.from_pretrained,
+        model_factory or AutoModelForSequenceClassification.from_pretrained,
+    )
+
+
+def _load_torch_module() -> Any:
+    try:
+        import torch
+    except ImportError as exc:
+        raise RerankerError(
+            "PyTorch reranker dependency is unavailable; run with --extra embedding"
+        ) from exc
+    return torch
+
+
+def _resolve_native_device(requested: str, torch_module: Any) -> str:
+    if requested == "cpu":
+        return "cpu"
+    cuda_available = bool(torch_module.cuda.is_available())
+    if requested == "cuda" and not cuda_available:
+        raise RerankerError("CUDA was requested but torch.cuda.is_available() is false")
+    if requested == "auto":
+        return "cuda" if cuda_available else "cpu"
+    return requested
 
 
 def _load_flag_reranker_factory() -> Callable[..., Any]:
