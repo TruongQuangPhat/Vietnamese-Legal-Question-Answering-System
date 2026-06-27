@@ -109,7 +109,7 @@ class TestTrimToLegalBody:
 
 
 class TestP0StartTrimmingRepair:
-    """Stage 2A tests for P0 start-trimming failure modes."""
+    """start-trimming tests for P0 start-trimming failure modes."""
 
     def test_fragmented_header_keeps_article_1_before_later_amendment(self) -> None:
         text = "\n".join(
@@ -195,8 +195,8 @@ class TestP0StartTrimmingRepair:
         assert not trimmed.startswith("LUẬT SỬA ĐỔI")
 
 
-class TestStage2GSourceLawNoteTrimming:
-    """Stage 2G tests for pre-body source-law/amendment notes."""
+class TestSourceLawNoteTrimming:
+    """source-law-note trimming tests for pre-body source-law/amendment notes."""
 
     def test_lhngd_style_source_law_note_is_trimmed_before_main_body(self) -> None:
         text = "\n".join(
@@ -334,7 +334,7 @@ class TestExtractLegalText:
 
 
 class TestP2AHtmlExtractionFragmentation:
-    """Stage 2D tests for inline-heavy TVPL extraction patterns."""
+    """inline extraction tests for inline-heavy TVPL extraction patterns."""
 
     def test_inline_span_font_split_words_do_not_create_newline_fragments(self) -> None:
         html = _tvpl_content_html(
@@ -532,7 +532,7 @@ class TestWhitespaceNormalization:
 
 
 class TestP1LineFragmentRepair:
-    """Stage 2A tests for conservative line-fragment repair."""
+    """start-trimming tests for conservative line-fragment repair."""
 
     def test_join_split_article_marker_and_number(self) -> None:
         normalized = normalize_whitespace("Điều\n32. Nội dung")
@@ -563,8 +563,8 @@ class TestP1LineFragmentRepair:
         assert normalized == "a) nội dung"
 
 
-class TestStage2HEncodedFooterArtifacts:
-    """Stage 2H tests for conservative encoded footer artifact cleanup."""
+class TestEncodedFooterArtifacts:
+    """encoded-footer cleanup tests for conservative encoded footer artifact cleanup."""
 
     def test_remove_standalone_base64_artifact_after_signature(self) -> None:
         text = "\n".join(

@@ -292,8 +292,16 @@ def select_evidence_for_answer(
             )
         )
 
-    if expected_targets and settings.enable_eval_exact_target_gate:
-        if not any(
+    if expected_targets is not None and settings.enable_eval_exact_target_gate:
+        if not expected_targets:
+            fallback_reasons.append(
+                _fallback(
+                    FallbackReasonCode.EXACT_TARGET_MISSING_IN_EVAL_MODE,
+                    "evaluation target gate is active and no answerable target is defined",
+                    details={"expected_targets": []},
+                )
+            )
+        elif not any(
             _packet_matches_expected_target(item.packet, target)
             for item in selected
             for target in expected_targets
@@ -320,9 +328,7 @@ def select_evidence_for_answer(
         )
 
     all_caution = all(item.safety_level == EvidenceSafetyLevel.CAUTION for item in selected)
-    all_parent_context_risk = all(
-        item.citation_scope == CitationScope.UNSAFE_PARENT_CONTEXT for item in selected
-    )
+    all_parent_context_risk = all(_is_parent_context_only(item) for item in selected)
     if all_caution:
         reason = _fallback(
             FallbackReasonCode.ALL_SELECTED_EVIDENCE_CAUTION,
@@ -344,6 +350,8 @@ def select_evidence_for_answer(
                     ),
                 )
             )
+        elif all(_is_auxiliary_parent_context_only_caution(item) for item in selected):
+            pass
         elif settings.fallback_on_all_evidence_caution:
             fallback_reasons.append(reason)
         elif settings.needs_review_on_all_evidence_caution:
@@ -429,6 +437,34 @@ def _select(packet: EvidencePacket, config: EvidenceSelectionConfig) -> Selected
         citation_scope=packet.citation_scope,
         has_auxiliary_context=packet.auxiliary_context is not None,
         warnings=warnings,
+    )
+
+
+def _is_parent_context_only(item: SelectedEvidence) -> bool:
+    packet = item.packet
+    return (
+        item.citation_scope == CitationScope.UNSAFE_PARENT_CONTEXT
+        and packet.safe_citable_text is None
+        and packet.auxiliary_context is not None
+    )
+
+
+def _is_auxiliary_parent_context_only_caution(item: SelectedEvidence) -> bool:
+    packet = item.packet
+    allowed_issue_codes = {
+        "parent_context_auxiliary_only",
+        "parent_context_deduplicated",
+    }
+    issue_codes = {issue.code for issue in packet.safety_issues}
+    return (
+        item.safety_level == EvidenceSafetyLevel.CAUTION
+        and item.citation_scope == CitationScope.CHILD_EXACT
+        and packet.chunk_id is not None
+        and packet.safe_citable_text is not None
+        and packet.law_id is not None
+        and packet.source_url is not None
+        and packet.citation is not None
+        and issue_codes <= allowed_issue_codes
     )
 
 

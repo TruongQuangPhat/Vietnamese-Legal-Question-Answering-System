@@ -1,4 +1,4 @@
-"""Unit tests for the read-only Phase 8 legal chunk loader."""
+"""Unit tests for the read-only embedding/indexing legal chunk loader."""
 
 from __future__ import annotations
 

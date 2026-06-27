@@ -425,7 +425,7 @@ def _report(cases: list[dict[str, Any]], **overrides: Any) -> GenerationEvalRepo
     payload: dict[str, Any] = {
         "report_type": "naive_rag_generation_evaluation",
         "run_type": "manual_generation_eval",
-        "pipeline_stage": "retrieval_naive_rag_generation",
+        "workflow_name": "retrieval_naive_rag_generation",
         "status": "expanded_generation_eval_passed",
         "started_at": "2026-01-01T00:00:00+00:00",
         "finished_at": "2026-01-01T00:00:01+00:00",

@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 processed JSONL validation models."""
+"""Unit tests for processed JSONL validation models."""
 
 from __future__ import annotations
 

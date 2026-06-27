@@ -1,4 +1,4 @@
-"""Tests for the Phase 5 batch legal parsing service."""
+"""Tests for the legal hierarchy parsing batch legal parsing service."""
 
 from __future__ import annotations
 

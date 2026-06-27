@@ -1,6 +1,6 @@
-"""Batch service orchestration for Phase 5 legal hierarchy parsing.
+"""Batch service orchestration for legal hierarchy parsing.
 
-This module coordinates already-implemented deterministic Phase 5 processing
+This module coordinates already-implemented deterministic legal hierarchy parsing processing
 over one or more normalized legal documents. It discovers inputs, calls the
 per-document parser facade, writes successful `hierarchy.json` artifacts, and
 aggregates the canonical batch parsing report.
@@ -104,7 +104,7 @@ class LegalParsingServiceError(RuntimeError):
 
 
 class LegalParsingService:
-    """Run Phase 5 parsing over a deterministic batch of normalized artifacts.
+    """Run legal hierarchy parsing over a deterministic batch of normalized artifacts.
 
     The service performs orchestration and artifact writing only. It does not
     implement legal heading recognition, span segmentation, hierarchy building,
@@ -141,7 +141,7 @@ class LegalParsingService:
         law_ids: list[str] | None = None,
         overwrite: bool = False,
     ) -> LegalParsingServiceResult:
-        """Parse selected normalized legal documents and write Phase 5 outputs.
+        """Parse selected normalized legal documents and write legal hierarchy parsing outputs.
 
         Args:
             input_dir: Directory containing `{LAW_ID}/normalized.json` inputs.
@@ -307,7 +307,7 @@ def discover_normalized_inputs(
     input_dir: Path,
     law_ids: list[str] | None = None,
 ) -> list[DiscoveredNormalizedInput]:
-    """Discover normalized Phase 5 inputs in deterministic law-ID order.
+    """Discover normalized legal hierarchy parsing inputs in deterministic law-ID order.
 
     Args:
         input_dir: Directory containing `{LAW_ID}/normalized.json`.

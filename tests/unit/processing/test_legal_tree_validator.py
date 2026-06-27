@@ -1,4 +1,4 @@
-"""Tests for deterministic Phase 5 legal tree validation."""
+"""Tests for deterministic legal tree validation."""
 
 from __future__ import annotations
 
@@ -490,7 +490,7 @@ def test_offsets_text_slices_parent_containment_and_sibling_order_are_validated(
 
 
 def test_article_presence_metric_warnings_and_empty_article_detection() -> None:
-    """Article requirements and Phase 4 metric comparisons are deterministic."""
+    """Article requirements and cleaning/normalization metric comparisons are deterministic."""
     root_only_text = "Không có điều luật."
     root = LegalNode(
         node_id="TEST_LAW__root",
@@ -553,7 +553,7 @@ def test_validation_summary_counts_issue_deduplication_order_and_serialization()
     text = "Điều 2. Hai\nNội dung hai."
     duplicate_warning = StructuredParsingIssue(
         code=ParsingIssueCode.ARTICLE_COUNT_MISMATCH,
-        message="Parsed article count differs from Phase 4 heading count.",
+        message="Parsed article count differs from cleaning/normalization heading count.",
         law_id="TEST_LAW",
         context={"expected": 2, "actual": 1},
     )

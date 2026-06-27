@@ -1,4 +1,4 @@
-"""Tests for the Phase 5 legal hierarchy parsing CLI entrypoint."""
+"""Tests for the legal hierarchy parsing CLI entrypoint."""
 
 from __future__ import annotations
 

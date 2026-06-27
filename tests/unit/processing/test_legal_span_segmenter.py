@@ -1,4 +1,4 @@
-"""Tests for deterministic Phase 5 span segmentation."""
+"""Tests for deterministic legal hierarchy parsing span segmentation."""
 
 from __future__ import annotations
 

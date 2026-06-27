@@ -1,4 +1,4 @@
-"""Tests for Phase 5 normalized input loading."""
+"""Tests for legal hierarchy parsing normalized input loading."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def test_valid_normalized_artifact_loads_correctly(tmp_path: Path) -> None:
 
 
 def test_required_fields_are_validated(tmp_path: Path) -> None:
-    """Reject normalized artifacts missing required Phase 5 input fields."""
+    """Reject normalized artifacts missing required legal hierarchy parsing input fields."""
     normalized_path = tmp_path / "normalized.json"
     payload = _artifact_payload()
     del payload["raw_artifact_path"]

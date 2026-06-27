@@ -230,7 +230,7 @@ class QualityGateResult(BaseModel):
 
     report_type: str = "naive_rag_quality_gate"
     run_type: str = "offline_regression_gate"
-    pipeline_stage: str = "retrieval_naive_rag_quality_gate"
+    workflow_name: str = "retrieval_naive_rag_quality_gate"
     status: GateStatus
     hard_gate_passed: bool
     quality_gate_passed: bool
@@ -242,10 +242,10 @@ class QualityGateResult(BaseModel):
 
 
 class QualityGateEvaluator:
-    """Evaluate the reviewed reviewed baseline against deterministic QA gates.
+    """Evaluate the reviewed generation baseline against deterministic QA gates.
 
-    The evaluator is intentionally offline. It accepts already-produced Phase
-    9C report JSON, a source-controlled manual faithfulness verdict manifest, and a YAML
+    The evaluator is intentionally offline. It accepts already-produced generation
+    report JSON, a source-controlled manual faithfulness verdict manifest, and a YAML
     policy. It never calls Qdrant, OpenRouter, embedding models, retrieval, or
     generation.
     """
@@ -257,7 +257,7 @@ class QualityGateEvaluator:
         faithfulness_verdicts_path: Path,
         policy_path: Path,
     ) -> QualityGateResult:
-        """Load inputs from disk and evaluate the quality gate gate.
+        """Load inputs from disk and evaluate the quality gate.
 
         Args:
             generation_report_path: Existing generation evaluation generation-evaluation report.

@@ -1,144 +1,161 @@
 ---
 name: vnlaw-advanced-rag
-description: Use when implementing Advanced RAG features such as hybrid dense+sparse retrieval, RRF, reranking, time-aware filtering, query decomposition, context packing, confidence scoring, and citation validation.
+description: Use when maintaining or extending Advanced RAG workflows, including dense+sparse retrieval, BM25, RRF, coverage-aware quota retrieval, evidence selection, strict citation validation, fallback control, and controlled retrieval/generation evaluation.
 ---
 
 # Advanced RAG Skill
 
-Use this skill only after a working Naive RAG baseline exists.
-Current project status: Advanced RAG is a future phase. Do not implement hybrid
-retrieval, reranking, query decomposition, or Advanced RAG orchestration until
-Naive RAG has a validated baseline.
+Use this skill for Advanced RAG implementation, maintenance, review, and evaluation.
+
+Current project status: Advanced RAG retrieval and strict generation evaluation are implemented. The adopted retrieval strategy is `coverage_aware_quota`. Reranking was evaluated as a controlled ablation but was not adopted. Time-aware filtering remains future or separately scoped.
 
 ## Goal
 
-Improve retrieval quality, answer faithfulness, and legal citation reliability.
+Improve retrieval coverage, answer grounding, citation reliability, and safe fallback behavior.
+
+Final adopted workflow:
 
 ```text
 query
-  → query analysis
-  → intent/date/legal-reference extraction
-  → dense retrieval + sparse retrieval
+  → dense BGE-M3 retrieval
+  → sparse BM25 retrieval
   → RRF fusion
-  → time-aware filtering
-  → reranking
-  → context packing
-  → answer generation
-  → citation validation
-  → confidence/fallback decision
+  → coverage-aware quota retrieval
+  → evidence selection
+  → citable child evidence preservation
+  → strict legal generation
+  → citation ID guard
+  → answerability fallback guard
+  → evaluation artifacts
 ```
 
-## Required Techniques
+## Adopted Techniques
 
-- Dense semantic retrieval.
-- Sparse lexical/BM25 retrieval.
-- Reciprocal Rank Fusion.
-- Cross-encoder reranking.
-- Time-aware legal filtering.
-- Legal context packing.
-- Confidence scoring.
-- Strict citation validation.
-- Fallback when evidence is insufficient.
+* Dense semantic retrieval with BGE-M3.
+* Sparse lexical retrieval with BM25.
+* Reciprocal Rank Fusion.
+* Coverage-aware quota retrieval.
+* Evidence selection over citable child chunks.
+* Auxiliary parent context for context only.
+* Strict citation ID validation.
+* Answerability fallback guard.
+* Reproducible retrieval and generation evaluation.
+
+## Not Adopted in Final Pipeline
+
+* Cross-encoder reranking was evaluated but not adopted.
+* Time-aware legal filtering is not part of the current adopted pipeline.
+* Query decomposition and agentic planning are future or separately scoped.
+* FastAPI/API deployment is not part of the evaluated Advanced RAG result unless explicitly implemented in a separate task.
 
 ## Retrieval Strategy
 
-Use dense retrieval for semantic questions:
-
-```text
-"What are maternity rights?"
-```
-
-Use sparse retrieval for exact legal references:
-
-```text
-"Điều 141 Bộ luật Hình sự"
-```
-
-Use hybrid retrieval for most production queries.
+Use dense retrieval for semantic matching and BM25 sparse retrieval for exact legal terms, article references, and lexical queries.
 
 Default pattern:
 
 ```text
-dense top 40 + sparse top 40 → RRF top 20 → reranker → top 5 evidence packets
+dense candidates + sparse BM25 candidates
+  → RRF
+  → coverage-aware quota
+  → selected citable child evidence
 ```
 
-## Time-Aware Filtering
-
-If the query includes a date, retrieve the law version effective at that date.
-
-If no query date exists, use the current configured system date.
-
-Never mix expired and active versions without explaining legal validity.
-
-## Context Packing
-
-Each evidence packet must include:
+The adopted retrieval configuration is:
 
 ```text
-law_id
-law_name
-version/VBHN
-effective_date
-expiry_date
-hierarchy
-relevant child excerpt
-parent article content
-source_url
-retrieval_score
-rerank_score
+dense_candidate_k = 50
+sparse_candidate_k = 50
+final_top_k = 10
+rrf_k = 60
+dense_weight = 1.0
+sparse_weight = 1.5
+quota = fused_best 5, sparse_quota 4, dense_quota 1
 ```
 
-Prefer concise, citation-ready packets over large unstructured context.
+## Evidence Selection
+
+Selected evidence should be citation-ready.
+
+A citable child evidence packet should have:
+
+```text
+chunk_id
+child text or directly citable text
+law_id
+source_url
+citation or legal reference
+legal hierarchy metadata when available
+```
+
+Parent context may be included as auxiliary context, but it must not be treated as directly citable evidence.
+
+Fallback or needs-review behavior is required when evidence is unsafe, parent-only, missing required citation metadata, or insufficient for a grounded legal answer.
 
 ## Citation Validation
 
-After generation, validate that every legal claim cites evidence that actually appears in the retrieved context.
+Generated answers must use only citation IDs from selected evidence.
 
-Reject or regenerate answers when:
+Reject or fallback when:
 
-- citation references a missing article;
-- citation references a missing clause/point;
-- answer contains unsupported legal claims;
-- top evidence is below confidence threshold.
+* the answer cites an unknown evidence ID;
+* the answer makes legal claims without citations;
+* selected evidence is empty;
+* evidence is parent-context-only;
+* required citation/source/law metadata is missing;
+* strict evaluation mode has explicit empty expected targets.
 
-## Quality Gates
+Citation ID validity is required, but it is not a full substitute for human legal semantic faithfulness review.
 
-Target metrics:
+## Evaluation Guidance
 
-- RAGAS context precision ≥ 85%.
-- Faithfulness ≥ 80%.
-- Citation exact match should be tracked separately.
-- Hybrid search latency ≤ 500ms p95 under dev assumptions.
-- QA API response ≤ 10s under dev assumptions.
+Use Advanced RAG evaluation to compare retrieval and strict generation behavior against baselines.
 
-## OOP and Docstring Rules
-
-Expected components:
+Important metrics include:
 
 ```text
-HybridRetriever
-DenseRetriever
-SparseRetriever
-RRFFusion
-LegalReranker
-TimeAwareFilter
-ContextPacker
-CitationValidator
-ConfidenceScorer
+Recall@10
+MRR@10
+NDCG@10
+evidence_group_coverage@10
+decision_accuracy
+answer_allowed_answer_rate
+fallback_required_fallback_rate
+citation_id_validity_rate
+case_pass_rate
+retrieval_error_count
+generation_error_count
 ```
 
-Rules:
+Do not tune on held-out test. Held-out results are reporting-only.
 
-- Use typed interfaces or protocols for retrievers and rerankers.
-- Do not pass raw untyped dictionaries across module boundaries.
-- Public classes/functions must use Google-style docstrings.
-- Keep retrieval, reranking, generation, and validation separate.
+Do not overwrite official evaluation artifacts unless explicitly scoped by the user.
+
+## Implementation Boundaries
+
+Expected functional components may include:
+
+```text
+DenseRetriever
+SparseBM25Retriever
+RRF fusion
+CoverageAwareQuotaRetriever
+EvidenceSelector
+Legal generation client
+Citation guard
+Fallback policy
+Evaluation workflow
+```
+
+Reranker and time-aware filter components should only be used for separately scoped experiments or future work.
 
 ## Do Not
 
-- Do not increase context size blindly.
-- Do not remove exact-match capability.
-- Do not return documents without legal hierarchy.
-- Do not ignore effective dates.
-- Do not answer when reranked evidence is below threshold.
-- Do not let the LLM invent citations.
+* Do not describe reranking as part of the adopted final pipeline.
+* Do not claim time-aware filtering is active unless explicitly implemented and evaluated.
+* Do not make parent context directly citable.
+* Do not relax citation validation.
+* Do not let the LLM invent laws, articles, clauses, points, dates, penalties, or citations.
+* Do not use model memory as legal evidence.
+* Do not tune on held-out test.
+* Do not run real Qdrant, LLM, embedding, reranking, or full benchmark workflows unless explicitly scoped by the user.

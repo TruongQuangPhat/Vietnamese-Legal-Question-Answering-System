@@ -1,4 +1,4 @@
-"""Tests for Phase 6 legal chunk validation."""
+"""Tests for parent-child chunking legal chunk validation."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Read-only Qdrant index validation for Phase 8 Slice 8H."""
+"""Read-only Qdrant index validation for embedding/indexing index validation."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class IndexValidationError(RuntimeError):
 
 
 class IndexValidationClient(Protocol):
-    """Minimal asynchronous Qdrant surface used by Slice 8H."""
+    """Minimal asynchronous Qdrant surface used by index validation."""
 
     async def get_collection(self, collection_name: str) -> Any:
         """Return collection schema and count metadata."""
@@ -516,7 +516,7 @@ async def validate_index(
     *,
     report_type: str = "index_validation_report",
     run_type: str = "development_index_validation",
-    pipeline_stage: str = "index_validation",
+    workflow_name: str = "index_validation",
     collection_name: str,
     dense_vector_name: str,
     dense_dimension: int,
@@ -529,7 +529,7 @@ async def validate_index(
     check_vectors: bool,
     embedding_model: QueryEmbeddingModel | None,
 ) -> IndexValidationReport:
-    """Run all configured Slice 8H read-only validations and build one report."""
+    """Run all configured index validation read-only validations and build one report."""
     started_at = _utc_now()
     started = time.perf_counter()
     collection = await validate_collection_schema(
@@ -587,7 +587,7 @@ async def validate_index(
     return IndexValidationReport(
         report_type=report_type,
         run_type=run_type,
-        pipeline_stage=pipeline_stage,
+        workflow_name=workflow_name,
         status=report_status,
         collection_name=collection_name,
         dense_vector_name=dense_vector_name,

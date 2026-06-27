@@ -106,3 +106,20 @@ data/eval/*
 !data/eval/manual_retrieval_queries.jsonl
 !data/eval/manual_naive_rag_generation_queries.jsonl
 !data/eval/manual_faithfulness_verdicts.json
+!data/eval/legal_qa_benchmark/
+!data/eval/legal_qa_benchmark/benchmark_queries.jsonl
+!data/eval/legal_qa_benchmark/benchmark_targets.jsonl
+!data/eval/legal_qa_benchmark/benchmark_qrels.jsonl
+!data/eval/legal_qa_benchmark/evidence_groups.jsonl
+!data/eval/legal_qa_benchmark/review_records.jsonl
+!data/eval/legal_qa_benchmark/split_manifest.json
+!data/eval/legal_qa_benchmark/benchmark_manifest.json
+
+# --- Versioned official evaluation artifacts ---
+!artifacts/
+!artifacts/reports/
+!artifacts/reports/evaluation/
+!artifacts/reports/evaluation/**/
+!artifacts/reports/evaluation/**/*.json
+!artifacts/reports/evaluation/**/*.jsonl
+!artifacts/reports/evaluation/**/*.md

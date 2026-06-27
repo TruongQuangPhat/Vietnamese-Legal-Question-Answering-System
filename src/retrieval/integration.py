@@ -133,7 +133,7 @@ class SelectionSmokeReport(BaseModel):
 
     report_type: str = "selection_smoke_report"
     run_type: str = "manual_selection_smoke"
-    pipeline_stage: str = "retrieval_selection_smoke"
+    workflow_name: str = "retrieval_selection_smoke"
     started_at: datetime
     finished_at: datetime
     collection_name: str = Field(..., min_length=1)

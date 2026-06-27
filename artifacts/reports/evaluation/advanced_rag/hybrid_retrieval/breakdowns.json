@@ -1,0 +1,2569 @@
+{
+  "split": {
+    "development": {
+      "query_count": 85,
+      "evaluated_query_count": 85,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 68,
+      "fallback_required_count": 17,
+      "mean_retrieval_latency_ms": 2962.5890002823817,
+      "mrr_at_10": 0.6990779645191411,
+      "ndcg_at_10": 0.6072789689924823,
+      "fallback_diagnostics": {
+        "fallback_case_count": 17,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 3,
+          "rate": 0.17647058823529413
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5882352941176471,
+      "required_direct_coverage_at_1": 0.31496062992125984,
+      "evidence_group_coverage_at_1": 0.31496062992125984,
+      "recall_at_3": 0.7941176470588235,
+      "required_direct_coverage_at_3": 0.48031496062992124,
+      "evidence_group_coverage_at_3": 0.48031496062992124,
+      "recall_at_5": 0.8382352941176471,
+      "required_direct_coverage_at_5": 0.5354330708661418,
+      "evidence_group_coverage_at_5": 0.5354330708661418,
+      "recall_at_10": 0.8970588235294118,
+      "required_direct_coverage_at_10": 0.6141732283464567,
+      "evidence_group_coverage_at_10": 0.6141732283464567
+    },
+    "held_out_test": {
+      "query_count": 43,
+      "evaluated_query_count": 43,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 42,
+      "fallback_required_count": 1,
+      "mean_retrieval_latency_ms": 869.4831137674639,
+      "mrr_at_10": 0.666137566137566,
+      "ndcg_at_10": 0.6601260592724728,
+      "fallback_diagnostics": {
+        "fallback_case_count": 1,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5476190476190477,
+      "required_direct_coverage_at_1": 0.3770491803278688,
+      "evidence_group_coverage_at_1": 0.3770491803278688,
+      "recall_at_3": 0.7857142857142857,
+      "required_direct_coverage_at_3": 0.5901639344262295,
+      "evidence_group_coverage_at_3": 0.5901639344262295,
+      "recall_at_5": 0.8095238095238095,
+      "required_direct_coverage_at_5": 0.6065573770491803,
+      "evidence_group_coverage_at_5": 0.6065573770491803,
+      "recall_at_10": 0.8333333333333334,
+      "required_direct_coverage_at_10": 0.639344262295082,
+      "evidence_group_coverage_at_10": 0.639344262295082
+    }
+  },
+  "primary_domain": {
+    "administrative_government_interaction": {
+      "query_count": 11,
+      "evaluated_query_count": 11,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 8,
+      "fallback_required_count": 3,
+      "mean_retrieval_latency_ms": 1504.1605317273934,
+      "mrr_at_10": 0.7625,
+      "ndcg_at_10": 0.5717331660288989,
+      "fallback_diagnostics": {
+        "fallback_case_count": 3,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.75,
+      "required_direct_coverage_at_1": 0.75,
+      "evidence_group_coverage_at_1": 0.75,
+      "recall_at_3": 0.75,
+      "required_direct_coverage_at_3": 0.75,
+      "evidence_group_coverage_at_3": 0.75,
+      "recall_at_5": 0.75,
+      "required_direct_coverage_at_5": 0.75,
+      "evidence_group_coverage_at_5": 0.75,
+      "recall_at_10": 0.875,
+      "required_direct_coverage_at_10": 0.875,
+      "evidence_group_coverage_at_10": 0.875
+    },
+    "business_banking_tax": {
+      "query_count": 14,
+      "evaluated_query_count": 14,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 12,
+      "fallback_required_count": 2,
+      "mean_retrieval_latency_ms": 916.2542185000087,
+      "mrr_at_10": 0.6544973544973546,
+      "ndcg_at_10": 0.6767199070024892,
+      "fallback_diagnostics": {
+        "fallback_case_count": 2,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5833333333333334,
+      "required_direct_coverage_at_1": 0.5384615384615384,
+      "evidence_group_coverage_at_1": 0.5384615384615384,
+      "recall_at_3": 0.6666666666666666,
+      "required_direct_coverage_at_3": 0.6923076923076923,
+      "evidence_group_coverage_at_3": 0.6923076923076923,
+      "recall_at_5": 0.6666666666666666,
+      "required_direct_coverage_at_5": 0.6923076923076923,
+      "evidence_group_coverage_at_5": 0.6923076923076923,
+      "recall_at_10": 0.9166666666666666,
+      "required_direct_coverage_at_10": 0.9230769230769231,
+      "evidence_group_coverage_at_10": 0.9230769230769231
+    },
+    "civil_family_identity": {
+      "query_count": 14,
+      "evaluated_query_count": 14,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 13,
+      "fallback_required_count": 1,
+      "mean_retrieval_latency_ms": 11318.581791214325,
+      "mrr_at_10": 0.7564102564102565,
+      "ndcg_at_10": 0.6330393500572928,
+      "fallback_diagnostics": {
+        "fallback_case_count": 1,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.6153846153846154,
+      "required_direct_coverage_at_1": 0.22857142857142856,
+      "evidence_group_coverage_at_1": 0.22857142857142856,
+      "recall_at_3": 0.9230769230769231,
+      "required_direct_coverage_at_3": 0.4857142857142857,
+      "evidence_group_coverage_at_3": 0.4857142857142857,
+      "recall_at_5": 0.9230769230769231,
+      "required_direct_coverage_at_5": 0.4857142857142857,
+      "evidence_group_coverage_at_5": 0.4857142857142857,
+      "recall_at_10": 0.9230769230769231,
+      "required_direct_coverage_at_10": 0.5428571428571428,
+      "evidence_group_coverage_at_10": 0.5428571428571428
+    },
+    "civil_procedure_dispute_resolution": {
+      "query_count": 11,
+      "evaluated_query_count": 11,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 11,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 1374.6298820908785,
+      "mrr_at_10": 0.5858585858585859,
+      "ndcg_at_10": 0.6503267296308337,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.36363636363636365,
+      "required_direct_coverage_at_1": 0.18181818181818182,
+      "evidence_group_coverage_at_1": 0.18181818181818182,
+      "recall_at_3": 0.8181818181818182,
+      "required_direct_coverage_at_3": 0.4090909090909091,
+      "evidence_group_coverage_at_3": 0.4090909090909091,
+      "recall_at_5": 0.8181818181818182,
+      "required_direct_coverage_at_5": 0.4090909090909091,
+      "evidence_group_coverage_at_5": 0.4090909090909091,
+      "recall_at_10": 0.9090909090909091,
+      "required_direct_coverage_at_10": 0.5,
+      "evidence_group_coverage_at_10": 0.5
+    },
+    "constitutional_state_rights": {
+      "query_count": 7,
+      "evaluated_query_count": 7,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 7,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 1015.7972578571649,
+      "mrr_at_10": 0.7857142857142857,
+      "ndcg_at_10": 0.7959183577163014,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.7142857142857143,
+      "required_direct_coverage_at_1": 0.5555555555555556,
+      "evidence_group_coverage_at_1": 0.5555555555555556,
+      "recall_at_3": 0.8571428571428571,
+      "required_direct_coverage_at_3": 0.7777777777777778,
+      "evidence_group_coverage_at_3": 0.7777777777777778,
+      "recall_at_5": 0.8571428571428571,
+      "required_direct_coverage_at_5": 0.7777777777777778,
+      "evidence_group_coverage_at_5": 0.7777777777777778,
+      "recall_at_10": 0.8571428571428571,
+      "required_direct_coverage_at_10": 0.8888888888888888,
+      "evidence_group_coverage_at_10": 0.8888888888888888
+    },
+    "consumer_health_education_digital_ip": {
+      "query_count": 16,
+      "evaluated_query_count": 16,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 14,
+      "fallback_required_count": 2,
+      "mean_retrieval_latency_ms": 1436.3562835624748,
+      "mrr_at_10": 0.738095238095238,
+      "ndcg_at_10": 0.6831405720999928,
+      "fallback_diagnostics": {
+        "fallback_case_count": 2,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.7142857142857143,
+      "required_direct_coverage_at_1": 0.45454545454545453,
+      "evidence_group_coverage_at_1": 0.45454545454545453,
+      "recall_at_3": 0.7857142857142857,
+      "required_direct_coverage_at_3": 0.5909090909090909,
+      "evidence_group_coverage_at_3": 0.5909090909090909,
+      "recall_at_5": 0.7857142857142857,
+      "required_direct_coverage_at_5": 0.6818181818181818,
+      "evidence_group_coverage_at_5": 0.6818181818181818,
+      "recall_at_10": 0.7857142857142857,
+      "required_direct_coverage_at_10": 0.7272727272727273,
+      "evidence_group_coverage_at_10": 0.7272727272727273
+    },
+    "criminal_procedure_penalty": {
+      "query_count": 9,
+      "evaluated_query_count": 9,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 7,
+      "fallback_required_count": 2,
+      "mean_retrieval_latency_ms": 780.9301568888966,
+      "mrr_at_10": 0.8333333333333333,
+      "ndcg_at_10": 0.7367699726190509,
+      "fallback_diagnostics": {
+        "fallback_case_count": 2,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 1,
+          "rate": 0.5
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.7142857142857143,
+      "required_direct_coverage_at_1": 0.7142857142857143,
+      "evidence_group_coverage_at_1": 0.7142857142857143,
+      "recall_at_3": 1.0,
+      "required_direct_coverage_at_3": 1.0,
+      "evidence_group_coverage_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "required_direct_coverage_at_5": 1.0,
+      "evidence_group_coverage_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "required_direct_coverage_at_10": 1.0,
+      "evidence_group_coverage_at_10": 1.0
+    },
+    "labor_employment_social_security": {
+      "query_count": 14,
+      "evaluated_query_count": 14,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 11,
+      "fallback_required_count": 3,
+      "mean_retrieval_latency_ms": 1113.213053500041,
+      "mrr_at_10": 0.5,
+      "ndcg_at_10": 0.4882609535099607,
+      "fallback_diagnostics": {
+        "fallback_case_count": 3,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 1,
+          "rate": 0.3333333333333333
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 1,
+          "rate": 0.3333333333333333
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 1,
+          "rate": 0.3333333333333333
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 1,
+          "rate": 0.3333333333333333
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.2727272727272727,
+      "required_direct_coverage_at_1": 0.11538461538461539,
+      "evidence_group_coverage_at_1": 0.11538461538461539,
+      "recall_at_3": 0.6363636363636364,
+      "required_direct_coverage_at_3": 0.3076923076923077,
+      "evidence_group_coverage_at_3": 0.3076923076923077,
+      "recall_at_5": 0.8181818181818182,
+      "required_direct_coverage_at_5": 0.46153846153846156,
+      "evidence_group_coverage_at_5": 0.46153846153846156,
+      "recall_at_10": 0.8181818181818182,
+      "required_direct_coverage_at_10": 0.5,
+      "evidence_group_coverage_at_10": 0.5
+    },
+    "land_real_estate_construction_environment": {
+      "query_count": 14,
+      "evaluated_query_count": 14,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 12,
+      "fallback_required_count": 2,
+      "mean_retrieval_latency_ms": 1453.7411280714423,
+      "mrr_at_10": 0.5347222222222222,
+      "ndcg_at_10": 0.46954635596128685,
+      "fallback_diagnostics": {
+        "fallback_case_count": 2,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.3333333333333333,
+      "required_direct_coverage_at_1": 0.19047619047619047,
+      "evidence_group_coverage_at_1": 0.19047619047619047,
+      "recall_at_3": 0.75,
+      "required_direct_coverage_at_3": 0.42857142857142855,
+      "evidence_group_coverage_at_3": 0.42857142857142855,
+      "recall_at_5": 0.8333333333333334,
+      "required_direct_coverage_at_5": 0.47619047619047616,
+      "evidence_group_coverage_at_5": 0.47619047619047616,
+      "recall_at_10": 0.8333333333333334,
+      "required_direct_coverage_at_10": 0.5238095238095238,
+      "evidence_group_coverage_at_10": 0.5238095238095238
+    },
+    "maritime_transport": {
+      "query_count": 5,
+      "evaluated_query_count": 5,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 4,
+      "fallback_required_count": 1,
+      "mean_retrieval_latency_ms": 653.0443720000221,
+      "mrr_at_10": 0.675,
+      "ndcg_at_10": 0.5365869436400814,
+      "fallback_diagnostics": {
+        "fallback_case_count": 1,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5,
+      "required_direct_coverage_at_1": 0.3333333333333333,
+      "evidence_group_coverage_at_1": 0.3333333333333333,
+      "recall_at_3": 0.75,
+      "required_direct_coverage_at_3": 0.5,
+      "evidence_group_coverage_at_3": 0.5,
+      "recall_at_5": 1.0,
+      "required_direct_coverage_at_5": 0.6666666666666666,
+      "evidence_group_coverage_at_5": 0.6666666666666666,
+      "recall_at_10": 1.0,
+      "required_direct_coverage_at_10": 0.6666666666666666,
+      "evidence_group_coverage_at_10": 0.6666666666666666
+    },
+    "traffic_public_order_sanctions": {
+      "query_count": 13,
+      "evaluated_query_count": 13,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 11,
+      "fallback_required_count": 2,
+      "mean_retrieval_latency_ms": 763.8620824616107,
+      "mrr_at_10": 0.8181818181818182,
+      "ndcg_at_10": 0.6923076923076923,
+      "fallback_diagnostics": {
+        "fallback_case_count": 2,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.8181818181818182,
+      "required_direct_coverage_at_1": 0.47368421052631576,
+      "evidence_group_coverage_at_1": 0.47368421052631576,
+      "recall_at_3": 0.8181818181818182,
+      "required_direct_coverage_at_3": 0.47368421052631576,
+      "evidence_group_coverage_at_3": 0.47368421052631576,
+      "recall_at_5": 0.8181818181818182,
+      "required_direct_coverage_at_5": 0.47368421052631576,
+      "evidence_group_coverage_at_5": 0.47368421052631576,
+      "recall_at_10": 0.8181818181818182,
+      "required_direct_coverage_at_10": 0.47368421052631576,
+      "evidence_group_coverage_at_10": 0.47368421052631576
+    }
+  },
+  "expected_decision": {
+    "answer_allowed": {
+      "query_count": 110,
+      "evaluated_query_count": 110,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 110,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 2451.148437954586,
+      "mrr_at_10": 0.6865007215007216,
+      "ndcg_at_10": 0.6962219283993557,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5727272727272728,
+      "required_direct_coverage_at_1": 0.3351063829787234,
+      "evidence_group_coverage_at_1": 0.3351063829787234,
+      "recall_at_3": 0.7909090909090909,
+      "required_direct_coverage_at_3": 0.5159574468085106,
+      "evidence_group_coverage_at_3": 0.5159574468085106,
+      "recall_at_5": 0.8272727272727273,
+      "required_direct_coverage_at_5": 0.5585106382978723,
+      "evidence_group_coverage_at_5": 0.5585106382978723,
+      "recall_at_10": 0.8727272727272727,
+      "required_direct_coverage_at_10": 0.6223404255319149,
+      "evidence_group_coverage_at_10": 0.6223404255319149
+    },
+    "fallback_required": {
+      "query_count": 18,
+      "evaluated_query_count": 18,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 0,
+      "fallback_required_count": 18,
+      "mean_retrieval_latency_ms": 1087.861707833276,
+      "mrr_at_10": 0.0,
+      "ndcg_at_10": 0.18998448828601042,
+      "fallback_diagnostics": {
+        "fallback_case_count": 18,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 3,
+          "rate": 0.16666666666666666
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.0,
+      "required_direct_coverage_at_1": 0.0,
+      "evidence_group_coverage_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "required_direct_coverage_at_3": 0.0,
+      "evidence_group_coverage_at_3": 0.0,
+      "recall_at_5": 0.0,
+      "required_direct_coverage_at_5": 0.0,
+      "evidence_group_coverage_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "required_direct_coverage_at_10": 0.0,
+      "evidence_group_coverage_at_10": 0.0
+    }
+  },
+  "question_types": {
+    "ambiguous": {
+      "query_count": 14,
+      "evaluated_query_count": 14,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 0,
+      "fallback_required_count": 14,
+      "mean_retrieval_latency_ms": 896.2863827856446,
+      "mrr_at_10": 0.0,
+      "ndcg_at_10": 0.17857142857142858,
+      "fallback_diagnostics": {
+        "fallback_case_count": 14,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 2,
+          "rate": 0.14285714285714285
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 3,
+          "rate": 0.21428571428571427
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 3,
+          "rate": 0.21428571428571427
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 3,
+          "rate": 0.21428571428571427
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.0,
+      "required_direct_coverage_at_1": 0.0,
+      "evidence_group_coverage_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "required_direct_coverage_at_3": 0.0,
+      "evidence_group_coverage_at_3": 0.0,
+      "recall_at_5": 0.0,
+      "required_direct_coverage_at_5": 0.0,
+      "evidence_group_coverage_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "required_direct_coverage_at_10": 0.0,
+      "evidence_group_coverage_at_10": 0.0
+    },
+    "clause_point_lookup": {
+      "query_count": 100,
+      "evaluated_query_count": 100,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 100,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 2595.9986575500357,
+      "mrr_at_10": 0.6701507936507938,
+      "ndcg_at_10": 0.6795348237035769,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.55,
+      "required_direct_coverage_at_1": 0.3089887640449438,
+      "evidence_group_coverage_at_1": 0.3089887640449438,
+      "recall_at_3": 0.78,
+      "required_direct_coverage_at_3": 0.4943820224719101,
+      "evidence_group_coverage_at_3": 0.4943820224719101,
+      "recall_at_5": 0.82,
+      "required_direct_coverage_at_5": 0.5393258426966292,
+      "evidence_group_coverage_at_5": 0.5393258426966292,
+      "recall_at_10": 0.87,
+      "required_direct_coverage_at_10": 0.6067415730337079,
+      "evidence_group_coverage_at_10": 0.6067415730337079
+    },
+    "complete_list": {
+      "query_count": 23,
+      "evaluated_query_count": 23,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 22,
+      "fallback_required_count": 1,
+      "mean_retrieval_latency_ms": 1131.1756099131028,
+      "mrr_at_10": 0.48989898989898994,
+      "ndcg_at_10": 0.3967051403168919,
+      "fallback_diagnostics": {
+        "fallback_case_count": 1,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.3181818181818182,
+      "required_direct_coverage_at_1": 0.07692307692307693,
+      "evidence_group_coverage_at_1": 0.07692307692307693,
+      "recall_at_3": 0.6363636363636364,
+      "required_direct_coverage_at_3": 0.21978021978021978,
+      "evidence_group_coverage_at_3": 0.21978021978021978,
+      "recall_at_5": 0.7272727272727273,
+      "required_direct_coverage_at_5": 0.27472527472527475,
+      "evidence_group_coverage_at_5": 0.27472527472527475,
+      "recall_at_10": 0.7727272727272727,
+      "required_direct_coverage_at_10": 0.34065934065934067,
+      "evidence_group_coverage_at_10": 0.34065934065934067
+    },
+    "conditions_and_exceptions": {
+      "query_count": 19,
+      "evaluated_query_count": 19,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 14,
+      "fallback_required_count": 5,
+      "mean_retrieval_latency_ms": 1134.2594590526126,
+      "mrr_at_10": 0.755952380952381,
+      "ndcg_at_10": 0.5887306964101484,
+      "fallback_diagnostics": {
+        "fallback_case_count": 5,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 1,
+          "rate": 0.2
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 2,
+          "rate": 0.4
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 2,
+          "rate": 0.4
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 2,
+          "rate": 0.4
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5714285714285714,
+      "required_direct_coverage_at_1": 0.27586206896551724,
+      "evidence_group_coverage_at_1": 0.27586206896551724,
+      "recall_at_3": 0.9285714285714286,
+      "required_direct_coverage_at_3": 0.5172413793103449,
+      "evidence_group_coverage_at_3": 0.5172413793103449,
+      "recall_at_5": 1.0,
+      "required_direct_coverage_at_5": 0.5517241379310345,
+      "evidence_group_coverage_at_5": 0.5517241379310345,
+      "recall_at_10": 1.0,
+      "required_direct_coverage_at_10": 0.5862068965517241,
+      "evidence_group_coverage_at_10": 0.5862068965517241
+    },
+    "cross_law": {
+      "query_count": 4,
+      "evaluated_query_count": 4,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 4,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 19708.753374750017,
+      "mrr_at_10": 0.875,
+      "ndcg_at_10": 0.7779855400041827,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.75,
+      "required_direct_coverage_at_1": 0.3,
+      "evidence_group_coverage_at_1": 0.3,
+      "recall_at_3": 1.0,
+      "required_direct_coverage_at_3": 0.7,
+      "evidence_group_coverage_at_3": 0.7,
+      "recall_at_5": 1.0,
+      "required_direct_coverage_at_5": 0.8,
+      "evidence_group_coverage_at_5": 0.8,
+      "recall_at_10": 1.0,
+      "required_direct_coverage_at_10": 0.9,
+      "evidence_group_coverage_at_10": 0.9
+    },
+    "definition": {
+      "query_count": 17,
+      "evaluated_query_count": 17,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 17,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 856.9631051764993,
+      "mrr_at_10": 0.6359477124183006,
+      "ndcg_at_10": 0.6413442392262358,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5882352941176471,
+      "required_direct_coverage_at_1": 0.45454545454545453,
+      "evidence_group_coverage_at_1": 0.45454545454545453,
+      "recall_at_3": 0.6470588235294118,
+      "required_direct_coverage_at_3": 0.5909090909090909,
+      "evidence_group_coverage_at_3": 0.5909090909090909,
+      "recall_at_5": 0.7058823529411765,
+      "required_direct_coverage_at_5": 0.6818181818181818,
+      "evidence_group_coverage_at_5": 0.6818181818181818,
+      "recall_at_10": 0.7647058823529411,
+      "required_direct_coverage_at_10": 0.7727272727272727,
+      "evidence_group_coverage_at_10": 0.7727272727272727
+    },
+    "eligibility": {
+      "query_count": 16,
+      "evaluated_query_count": 16,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 15,
+      "fallback_required_count": 1,
+      "mean_retrieval_latency_ms": 4728.862306624989,
+      "mrr_at_10": 0.7233333333333333,
+      "ndcg_at_10": 0.6667539282807602,
+      "fallback_diagnostics": {
+        "fallback_case_count": 1,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.6,
+      "required_direct_coverage_at_1": 0.42857142857142855,
+      "evidence_group_coverage_at_1": 0.42857142857142855,
+      "recall_at_3": 0.8,
+      "required_direct_coverage_at_3": 0.6190476190476191,
+      "evidence_group_coverage_at_3": 0.6190476190476191,
+      "recall_at_5": 0.8666666666666667,
+      "required_direct_coverage_at_5": 0.6666666666666666,
+      "evidence_group_coverage_at_5": 0.6666666666666666,
+      "recall_at_10": 0.9333333333333333,
+      "required_direct_coverage_at_10": 0.7142857142857143,
+      "evidence_group_coverage_at_10": 0.7142857142857143
+    },
+    "fallback": {
+      "query_count": 18,
+      "evaluated_query_count": 18,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 0,
+      "fallback_required_count": 18,
+      "mean_retrieval_latency_ms": 1087.861707833276,
+      "mrr_at_10": 0.0,
+      "ndcg_at_10": 0.18998448828601042,
+      "fallback_diagnostics": {
+        "fallback_case_count": 18,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 3,
+          "rate": 0.16666666666666666
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.0,
+      "required_direct_coverage_at_1": 0.0,
+      "evidence_group_coverage_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "required_direct_coverage_at_3": 0.0,
+      "evidence_group_coverage_at_3": 0.0,
+      "recall_at_5": 0.0,
+      "required_direct_coverage_at_5": 0.0,
+      "evidence_group_coverage_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "required_direct_coverage_at_10": 0.0,
+      "evidence_group_coverage_at_10": 0.0
+    },
+    "lexical_mismatch": {
+      "query_count": 38,
+      "evaluated_query_count": 38,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 29,
+      "fallback_required_count": 9,
+      "mean_retrieval_latency_ms": 1072.8482460262967,
+      "mrr_at_10": 0.6599069512862615,
+      "ndcg_at_10": 0.56694265503015,
+      "fallback_diagnostics": {
+        "fallback_case_count": 9,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 2,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 2,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 2,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 2,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5862068965517241,
+      "required_direct_coverage_at_1": 0.38636363636363635,
+      "evidence_group_coverage_at_1": 0.38636363636363635,
+      "recall_at_3": 0.6896551724137931,
+      "required_direct_coverage_at_3": 0.5227272727272727,
+      "evidence_group_coverage_at_3": 0.5227272727272727,
+      "recall_at_5": 0.7586206896551724,
+      "required_direct_coverage_at_5": 0.5909090909090909,
+      "evidence_group_coverage_at_5": 0.5909090909090909,
+      "recall_at_10": 0.8620689655172413,
+      "required_direct_coverage_at_10": 0.6818181818181818,
+      "evidence_group_coverage_at_10": 0.6818181818181818
+    },
+    "multi_evidence": {
+      "query_count": 26,
+      "evaluated_query_count": 26,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 26,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 6202.929677923122,
+      "mrr_at_10": 0.5042735042735043,
+      "ndcg_at_10": 0.4274677879885418,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.3076923076923077,
+      "required_direct_coverage_at_1": 0.07692307692307693,
+      "evidence_group_coverage_at_1": 0.07692307692307693,
+      "recall_at_3": 0.6923076923076923,
+      "required_direct_coverage_at_3": 0.2692307692307692,
+      "evidence_group_coverage_at_3": 0.2692307692307692,
+      "recall_at_5": 0.7692307692307693,
+      "required_direct_coverage_at_5": 0.3269230769230769,
+      "evidence_group_coverage_at_5": 0.3269230769230769,
+      "recall_at_10": 0.8076923076923077,
+      "required_direct_coverage_at_10": 0.40384615384615385,
+      "evidence_group_coverage_at_10": 0.40384615384615385
+    },
+    "near_duplicate_provision": {
+      "query_count": 8,
+      "evaluated_query_count": 8,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 8,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 904.51687150005,
+      "mrr_at_10": 0.5729166666666666,
+      "ndcg_at_10": 0.5771200834316595,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5,
+      "required_direct_coverage_at_1": 0.16666666666666666,
+      "evidence_group_coverage_at_1": 0.16666666666666666,
+      "recall_at_3": 0.625,
+      "required_direct_coverage_at_3": 0.2916666666666667,
+      "evidence_group_coverage_at_3": 0.2916666666666667,
+      "recall_at_5": 0.75,
+      "required_direct_coverage_at_5": 0.375,
+      "evidence_group_coverage_at_5": 0.375,
+      "recall_at_10": 0.75,
+      "required_direct_coverage_at_10": 0.4166666666666667,
+      "evidence_group_coverage_at_10": 0.4166666666666667
+    },
+    "paraphrase": {
+      "query_count": 125,
+      "evaluated_query_count": 125,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 107,
+      "fallback_required_count": 18,
+      "mean_retrieval_latency_ms": 2296.1405569360213,
+      "mrr_at_10": 0.7047099836819464,
+      "ndcg_at_10": 0.6376248233393067,
+      "fallback_diagnostics": {
+        "fallback_case_count": 18,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 3,
+          "rate": 0.16666666666666666
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 4,
+          "rate": 0.2222222222222222
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5887850467289719,
+      "required_direct_coverage_at_1": 0.3423913043478261,
+      "evidence_group_coverage_at_1": 0.3423913043478261,
+      "recall_at_3": 0.8130841121495327,
+      "required_direct_coverage_at_3": 0.5271739130434783,
+      "evidence_group_coverage_at_3": 0.5271739130434783,
+      "recall_at_5": 0.8504672897196262,
+      "required_direct_coverage_at_5": 0.5706521739130435,
+      "evidence_group_coverage_at_5": 0.5706521739130435,
+      "recall_at_10": 0.8878504672897196,
+      "required_direct_coverage_at_10": 0.6304347826086957,
+      "evidence_group_coverage_at_10": 0.6304347826086957
+    },
+    "procedure": {
+      "query_count": 36,
+      "evaluated_query_count": 36,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 28,
+      "fallback_required_count": 8,
+      "mean_retrieval_latency_ms": 1380.9864291389176,
+      "mrr_at_10": 0.7123015873015872,
+      "ndcg_at_10": 0.6114650432230232,
+      "fallback_diagnostics": {
+        "fallback_case_count": 8,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 1,
+          "rate": 0.125
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 2,
+          "rate": 0.25
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 2,
+          "rate": 0.25
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 2,
+          "rate": 0.25
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.6071428571428571,
+      "required_direct_coverage_at_1": 0.3953488372093023,
+      "evidence_group_coverage_at_1": 0.3953488372093023,
+      "recall_at_3": 0.8214285714285714,
+      "required_direct_coverage_at_3": 0.5348837209302325,
+      "evidence_group_coverage_at_3": 0.5348837209302325,
+      "recall_at_5": 0.8214285714285714,
+      "required_direct_coverage_at_5": 0.5348837209302325,
+      "evidence_group_coverage_at_5": 0.5348837209302325,
+      "recall_at_10": 0.8571428571428571,
+      "required_direct_coverage_at_10": 0.6046511627906976,
+      "evidence_group_coverage_at_10": 0.6046511627906976
+    },
+    "rights_and_obligations": {
+      "query_count": 67,
+      "evaluated_query_count": 67,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 65,
+      "fallback_required_count": 2,
+      "mean_retrieval_latency_ms": 2311.1361276716925,
+      "mrr_at_10": 0.7293772893772895,
+      "ndcg_at_10": 0.7183833642109492,
+      "fallback_diagnostics": {
+        "fallback_case_count": 2,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.6153846153846154,
+      "required_direct_coverage_at_1": 0.3669724770642202,
+      "evidence_group_coverage_at_1": 0.3669724770642202,
+      "recall_at_3": 0.8461538461538461,
+      "required_direct_coverage_at_3": 0.5688073394495413,
+      "evidence_group_coverage_at_3": 0.5688073394495413,
+      "recall_at_5": 0.8769230769230769,
+      "required_direct_coverage_at_5": 0.6146788990825688,
+      "evidence_group_coverage_at_5": 0.6146788990825688,
+      "recall_at_10": 0.9076923076923077,
+      "required_direct_coverage_at_10": 0.6697247706422018,
+      "evidence_group_coverage_at_10": 0.6697247706422018
+    },
+    "sanction_or_penalty": {
+      "query_count": 15,
+      "evaluated_query_count": 15,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 10,
+      "fallback_required_count": 5,
+      "mean_retrieval_latency_ms": 1050.6935670666583,
+      "mrr_at_10": 0.5833333333333333,
+      "ndcg_at_10": 0.4087286502380972,
+      "fallback_diagnostics": {
+        "fallback_case_count": 5,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5,
+      "required_direct_coverage_at_1": 0.2777777777777778,
+      "evidence_group_coverage_at_1": 0.2777777777777778,
+      "recall_at_3": 0.7,
+      "required_direct_coverage_at_3": 0.3888888888888889,
+      "evidence_group_coverage_at_3": 0.3888888888888889,
+      "recall_at_5": 0.7,
+      "required_direct_coverage_at_5": 0.3888888888888889,
+      "evidence_group_coverage_at_5": 0.3888888888888889,
+      "recall_at_10": 0.7,
+      "required_direct_coverage_at_10": 0.3888888888888889,
+      "evidence_group_coverage_at_10": 0.3888888888888889
+    },
+    "single_article_lookup": {
+      "query_count": 64,
+      "evaluated_query_count": 64,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 64,
+      "fallback_required_count": 0,
+      "mean_retrieval_latency_ms": 2332.134409125032,
+      "mrr_at_10": 0.771937003968254,
+      "ndcg_at_10": 0.8107348339434981,
+      "fallback_diagnostics": {
+        "fallback_case_count": 0,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.6875,
+      "required_direct_coverage_at_1": 0.6666666666666666,
+      "evidence_group_coverage_at_1": 0.6666666666666666,
+      "recall_at_3": 0.84375,
+      "required_direct_coverage_at_3": 0.8333333333333334,
+      "evidence_group_coverage_at_3": 0.8333333333333334,
+      "recall_at_5": 0.875,
+      "required_direct_coverage_at_5": 0.8636363636363636,
+      "evidence_group_coverage_at_5": 0.8636363636363636,
+      "recall_at_10": 0.9375,
+      "required_direct_coverage_at_10": 0.9393939393939394,
+      "evidence_group_coverage_at_10": 0.9393939393939394
+    }
+  },
+  "complete_evidence_required": {
+    "False": {
+      "query_count": 100,
+      "evaluated_query_count": 100,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 83,
+      "fallback_required_count": 17,
+      "mean_retrieval_latency_ms": 1255.4027675300176,
+      "mrr_at_10": 0.7317747179192963,
+      "ndcg_at_10": 0.6711626481090618,
+      "fallback_diagnostics": {
+        "fallback_case_count": 17,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 3,
+          "rate": 0.17647058823529413
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.6385542168674698,
+      "required_direct_coverage_at_1": 0.6235294117647059,
+      "evidence_group_coverage_at_1": 0.6235294117647059,
+      "recall_at_3": 0.8192771084337349,
+      "required_direct_coverage_at_3": 0.8117647058823529,
+      "evidence_group_coverage_at_3": 0.8117647058823529,
+      "recall_at_5": 0.8433734939759037,
+      "required_direct_coverage_at_5": 0.8352941176470589,
+      "evidence_group_coverage_at_5": 0.8352941176470589,
+      "recall_at_10": 0.891566265060241,
+      "required_direct_coverage_at_10": 0.8823529411764706,
+      "evidence_group_coverage_at_10": 0.8823529411764706
+    },
+    "True": {
+      "query_count": 28,
+      "evaluated_query_count": 28,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 27,
+      "fallback_required_count": 1,
+      "mean_retrieval_latency_ms": 5845.270077250058,
+      "mrr_at_10": 0.5473251028806584,
+      "ndcg_at_10": 0.46028100364897034,
+      "fallback_diagnostics": {
+        "fallback_case_count": 1,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.37037037037037035,
+      "required_direct_coverage_at_1": 0.0970873786407767,
+      "evidence_group_coverage_at_1": 0.0970873786407767,
+      "recall_at_3": 0.7037037037037037,
+      "required_direct_coverage_at_3": 0.27184466019417475,
+      "evidence_group_coverage_at_3": 0.27184466019417475,
+      "recall_at_5": 0.7777777777777778,
+      "required_direct_coverage_at_5": 0.3300970873786408,
+      "evidence_group_coverage_at_5": 0.3300970873786408,
+      "recall_at_10": 0.8148148148148148,
+      "required_direct_coverage_at_10": 0.4077669902912621,
+      "evidence_group_coverage_at_10": 0.4077669902912621
+    }
+  },
+  "blocking": {
+    "False": {
+      "query_count": 48,
+      "evaluated_query_count": 48,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 47,
+      "fallback_required_count": 1,
+      "mean_retrieval_latency_ms": 1086.9062933958653,
+      "mrr_at_10": 0.6803782505910164,
+      "ndcg_at_10": 0.6740898513818104,
+      "fallback_diagnostics": {
+        "fallback_case_count": 1,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.574468085106383,
+      "required_direct_coverage_at_1": 0.38571428571428573,
+      "evidence_group_coverage_at_1": 0.38571428571428573,
+      "recall_at_3": 0.7872340425531915,
+      "required_direct_coverage_at_3": 0.6,
+      "evidence_group_coverage_at_3": 0.6,
+      "recall_at_5": 0.8085106382978723,
+      "required_direct_coverage_at_5": 0.6285714285714286,
+      "evidence_group_coverage_at_5": 0.6285714285714286,
+      "recall_at_10": 0.8297872340425532,
+      "required_direct_coverage_at_10": 0.6714285714285714,
+      "evidence_group_coverage_at_10": 0.6714285714285714
+    },
+    "True": {
+      "query_count": 80,
+      "evaluated_query_count": 80,
+      "retrieval_error_count": 0,
+      "answer_allowed_count": 63,
+      "fallback_required_count": 17,
+      "mean_retrieval_latency_ms": 2962.954210412523,
+      "mrr_at_10": 0.6910682791635173,
+      "ndcg_at_10": 0.5955977505843804,
+      "fallback_diagnostics": {
+        "fallback_case_count": 17,
+        "near_miss_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_1": {
+          "count": 3,
+          "rate": 0.17647058823529413
+        },
+        "direct_evidence_retrieved_at_1": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_3": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_3": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_5": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_5": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "near_miss_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "supporting_retrieved_at_10": {
+          "count": 4,
+          "rate": 0.23529411764705882
+        },
+        "direct_evidence_retrieved_at_10": {
+          "count": 0,
+          "rate": 0.0
+        }
+      },
+      "recall_at_1": 0.5714285714285714,
+      "required_direct_coverage_at_1": 0.3050847457627119,
+      "evidence_group_coverage_at_1": 0.3050847457627119,
+      "recall_at_3": 0.7936507936507936,
+      "required_direct_coverage_at_3": 0.4661016949152542,
+      "evidence_group_coverage_at_3": 0.4661016949152542,
+      "recall_at_5": 0.8412698412698413,
+      "required_direct_coverage_at_5": 0.5169491525423728,
+      "evidence_group_coverage_at_5": 0.5169491525423728,
+      "recall_at_10": 0.9047619047619048,
+      "required_direct_coverage_at_10": 0.5932203389830508,
+      "evidence_group_coverage_at_10": 0.5932203389830508
+    }
+  }
+}

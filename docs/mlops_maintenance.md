@@ -807,9 +807,9 @@ All maintenance actions should write structured logs with `maintenance_id`, `cor
 | `docs/legal_parsing.md` | Existing | Legal hierarchy parsing into Phần/Chương/Mục/Điều/Khoản/Điểm |
 | `docs/parent_child_chunking.md` | Existing | Parent-child chunking and citation construction |
 | `docs/processed_jsonl.md` | Existing | Processed Chunk Validation schema and validation |
-| `docs/embedding_indexing.md` | Future extension | Embedding generation and vector indexing |
-| `docs/naive_rag.md` | Future extension | Baseline RAG pipeline |
-| `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, and time-aware filtering |
+| `docs/embedding_indexing.md` | Implemented | BGE-M3 dense index and Qdrant validation |
+| `docs/naive_rag.md` | Implemented baseline | Baseline RAG pipeline |
+| `docs/advanced_rag.md` | Implemented/evaluated | Coverage-aware hybrid retrieval and strict generation |
 | `docs/graphrag_agents.md` | Future extension | GraphRAG and agent orchestration |
-| `docs/evaluation.md` | Future extension | Evaluation metrics, golden QA, and regression gates |
+| `docs/evaluation.md` | Implemented | Benchmark metrics, strict generation evaluation, diagnostics |
 | `docs/api_deployment.md` | Future extension | FastAPI service and deployment strategy |

@@ -1,6 +1,6 @@
-"""Canonical schemas for Phase 5 legal hierarchy parsing.
+"""Canonical schemas for legal hierarchy parsing.
 
-The models in this module describe external Phase 5 data contracts, not the
+The models in this module describe external legal hierarchy parsing data contracts, not the
 full parser implementation. They preserve Vietnamese legal hierarchy metadata
 and structured issue reporting without writing parser artifacts by themselves.
 """
@@ -26,7 +26,7 @@ class LegalNodeLevel(StrEnum):
 
 
 class ParsingIssueCode(StrEnum):
-    """Stable warning and error codes emitted by Phase 5 components."""
+    """Stable warning and error codes emitted by legal hierarchy parsing components."""
 
     NO_ARTICLES_FOUND = "NO_ARTICLES_FOUND"
     INVALID_TREE = "INVALID_TREE"
@@ -146,7 +146,7 @@ class LegalNode(BaseModel):
 
 
 class LegalHierarchyMetadata(BaseModel):
-    """Document-level metadata copied from normalized input and Phase 4 metrics."""
+    """Document-level metadata copied from normalized input and cleaning/normalization metrics."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -155,17 +155,21 @@ class LegalHierarchyMetadata(BaseModel):
     source_domain: str = Field(..., min_length=1, description="Trusted source domain")
     source_type: str = Field(..., min_length=1, description="Source content type")
     raw_artifact_path: str = Field(..., min_length=1, description="Raw HTML artifact path")
-    article_heading_count: int = Field(..., ge=0, description="Phase 4 Article heading count")
+    article_heading_count: int = Field(
+        ..., ge=0, description="cleaning/normalization Article heading count"
+    )
     max_heading_article_number: int = Field(
         ...,
         ge=0,
-        description="Phase 4 maximum real Article heading number",
+        description="cleaning/normalization maximum real Article heading number",
     )
-    has_heading_article_1: bool = Field(..., description="Whether Phase 4 saw Article 1")
+    has_heading_article_1: bool = Field(
+        ..., description="Whether cleaning/normalization saw Article 1"
+    )
     heading_sequence_score: float = Field(
         ...,
         ge=0.0,
-        description="Phase 4 Article heading sequence score",
+        description="cleaning/normalization Article heading sequence score",
     )
 
 
@@ -194,7 +198,7 @@ class LegalHierarchyDocument(BaseModel):
 
     @model_validator(mode="after")
     def validate_root_contract(self) -> LegalHierarchyDocument:
-        """Validate the root Law node invariants required by Phase 5."""
+        """Validate the root Law node invariants required by legal hierarchy parsing."""
         root_nodes = [node for node in self.nodes if node.level == LegalNodeLevel.LAW]
         if len(root_nodes) != 1:
             raise ValueError("hierarchy must contain exactly one root Law node")

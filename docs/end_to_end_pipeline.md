@@ -10,12 +10,25 @@ Unlike general chatbots, Legal QA requires:
 - **Citation validation**: System validates citation accuracy before answering.
 - **Clear fallback**: If no suitable source found, system declines to answer and suggests direct verification.
 
-Current status: **Phase 9 is closed with known limitations**. The corpus has
-52/52 raw artifacts, 52/52 normalized outputs, 52/52 hierarchy outputs, and
-`data/processed/legal_chunks.jsonl` with 40,389 validated chunks. Phase 8
-indexing is complete, and the fallback-aware Naive RAG baseline has a passing
-offline quality gate. Benchmark construction with frozen development/test
-splits is required before claiming Advanced RAG improvement.
+Current status: the corpus and retrieval/generation evaluation stack are
+implemented through final Advanced RAG / strict generation evaluation. The
+corpus has 52/52 raw artifacts, 52/52 normalized outputs, 52/52 hierarchy
+outputs, and `data/processed/legal_chunks.jsonl` with 40,389 validated chunks.
+Dense indexing is complete in Qdrant collection
+`vnlaw_chunks_bgem3_v1_full`. The Naive RAG baseline remains a baseline with
+known limitations. The final adopted retrieval strategy is
+`coverage_aware_quota`; reranking was evaluated but not adopted; time-aware
+filtering, GraphRAG, API deployment, and MLOps remain future/separately scoped.
+
+Current benchmark status:
+
+```text
+benchmark_version = v0.1.0
+query_count = 128
+development = 85
+held_out_test = 43
+held_out_test = reporting_only
+```
 
 ## 2. Quick Start
 
@@ -42,17 +55,17 @@ Embedding & Indexing
   ↓
 Naive RAG (baseline)
   ↓
-Advanced RAG (hybrid + rerank)
+Advanced RAG (coverage-aware hybrid retrieval)
   ↓
 GraphRAG + Agents
   ↓
-Evaluation (RAGAS, golden QA)
+Evaluation (benchmark metrics + strict generation diagnostics)
   ↓
 API / Deployment
 ```
 
-**Important**: Phase 9 closure does not claim production readiness or broad
-Vietnamese legal QA quality. Advanced retrieval work remains separately scoped.
+**Important**: Final benchmark results are engineering evidence, not qualified
+human legal review or production legal-advice certification.
 
 ## 3. Full Architecture
 
@@ -434,7 +447,7 @@ chunks flagged, and 0 source-tail markers in `text`/`parent_text`.
 - `issued_date`, `effective_date`, `expiry_date` properly formatted
 - Zero empty `text` fields
 
-**Status**: Next phase.
+**Status**: Complete and validated.
 
 **Detailed documentation**: `docs/processed_jsonl.md`
 
@@ -442,20 +455,21 @@ chunks flagged, and 0 source-tail markers in `text`/`parent_text`.
 
 ### Phase 8 — Embedding & Indexing
 
-**Goal**: Create vector embeddings (dense + sparse) from child chunks and build hybrid search index.
+**Goal**: Create BGE-M3 dense embeddings from child chunks and build the Qdrant
+dense index used by retrieval.
 
 **Input**: `data/processed/*.jsonl` (only runs after validation passes).
 
 **Pipeline Summary**:
-- Embedding model selection: BGE-M3 (native dense + sparse support)
+- Embedding model selection: `BAAI/bge-m3`
 - Batch embedding generation with async workers
 - Vector schema:
   - `vector`: dense embedding (float32[1024])
-  - `sparse_vector`: sparse representation (BM25/lexical weights)
+  - sparse vectors are not stored in the current Qdrant collection
   - `payload`: full chunk metadata including: `law_id`, `law_name`, `law_type`, `legal_status`, `article_number`, `article_title`, `clause_number`, `point_label`, `hierarchy_path`, `citation`, `effective_date`, `issued_date`, `expiry_date`, `source_url`, `source_domain`, `source_type`, `parent_id`, `parent_text`, `text_hash`, `metadata`
-- Vector store: Qdrant (hybrid search)
+- Vector store: Qdrant dense index
 - Metadata filtering: filter by `law_id`, `effective_date` ranges, article ranges
-- Effective-date filtering: retrieval-time filtering (only include those in effect at query date)
+- Effective-date filtering: future/not adopted in the final evaluated pipeline
 - Source traceability: each vector payload contains full `source_url` and `citation`
 - Index refresh strategy: incremental updates for new laws, periodic full reindex
 
@@ -464,12 +478,13 @@ across 52 legal documents.
 
 **Validation Criteria**:
 - Collection size matches total chunks (no missing vectors)
-- Hybrid search works: dense-only, sparse-only, hybrid RRF
+- Dense search works with payload metadata. Sparse BM25 and RRF fusion are
+  implemented outside the current Qdrant vector collection.
 - Metadata filters work correctly (filter by law_id, effective_date)
 - Retrieval latency < target (e.g., <100ms p95)
-- Point-in-time effective date filtering is accurate
+- Point-in-time effective date filtering is not adopted yet.
 
-**Status**: Future extension
+**Status**: Complete and validated.
 
 **Detailed documentation**: `docs/embedding_indexing.md`
 
@@ -500,7 +515,8 @@ across 52 legal documents.
 - Baseline evaluation on golden QA dataset (answer relevance > threshold)
 - Latency < target (e.g., <2s end-to-end)
 
-**Status**: Future extension
+**Status**: Closed with known limitations. It remains the dense baseline, not
+the final adopted workflow.
 
 **Detailed documentation**: `docs/naive_rag.md`
 
@@ -508,7 +524,9 @@ across 52 legal documents.
 
 ### Phase 10 — Advanced RAG
 
-**Goal**: Enhance retrieval quality with hybrid dense+sparse, RRF fusion, reranking, and time-aware filtering.
+**Goal**: Enhance retrieval quality with dense+sparse retrieval, fixed RRF
+fusion, coverage-aware quota retrieval, strict evidence selection, citation
+guarding, and answerability fallback.
 
 **Input**: Query, Qdrant index.
 
@@ -517,21 +535,24 @@ across 52 legal documents.
   - Dense retrieval (vector similarity)
   - Sparse retrieval (BM25 on text)
   - Hybrid: combine with Reciprocal Rank Fusion (RRF)
-- Reranker: cross-encoder (e.g., BGE-reranker) re-rank top-50 → top-10
-- Confidence scoring: normalized score from reranker + metadata boosts (effective date recency, law priority)
+- Reranking: evaluated separately with `BAAI/bge-reranker-v2-m3` but not
+  adopted.
+- Confidence and fallback behavior: answer only from selected citable child
+  evidence; fallback when evidence is insufficient.
 - Citation validation: cross-check citations in answer against retrieved context
-- Time-aware retrieval: filter by `effective_date` relative to query date (only include laws in effect at query time)
+- Time-aware retrieval: future/not adopted.
 - Output: reordered, confidence-scored chunks
 
-**Output**: Top-k reranked chunks with confidence scores.
+**Output**: Top-k coverage-aware retrieval results and selected citable child
+evidence for strict generation.
 
 **Validation Criteria**:
-- Precision@k > Naive RAG baseline
-- Reranker improves relevance (human eval or synthetic)
-- Time-aware filtering is accurate (excludes repealed/amended laws)
-- Citation validation catches unsupported claims
+- Retrieval metrics on frozen benchmark `v0.1.0`.
+- Strict generation metrics with citation ID guard.
+- Safe fallback behavior for expected `fallback_required` cases.
 
-**Status**: Future extension
+**Status**: Implemented and evaluated. Final adopted retrieval is
+`coverage_aware_quota`. Reranking was not adopted.
 
 **Detailed documentation**: `docs/advanced_rag.md`
 
@@ -805,17 +826,18 @@ Each phase must pass its gate before proceeding to the next.
 | `docs/raw_corpus_audit.md` | Existing | Raw artifact audit procedure |
 | `docs/cleaning_normalization.md` | Existing | HTML-to-text, Unicode, whitespace handling |
 | `docs/legal_parsing.md` | Implemented | Legal hierarchy parsing algorithm and edge cases |
-| `docs/parent_child_chunking.md` | In Progress | Parent-child chunking design, chunk schema, and citation construction |
+| `docs/parent_child_chunking.md` | Implemented | Parent-child chunking design, chunk schema, and citation construction |
 | `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
-| `docs/embedding_indexing.md` | Future extension | Embedding model choice, vector store setup, indexing strategy |
-| `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
-| `docs/advanced_rag.md` | Future extension | Hybrid retrieval, RRF, reranking, time-aware filtering |
+| `docs/embedding_indexing.md` | Implemented | BGE-M3 dense index and Qdrant validation |
+| `docs/naive_rag.md` | Implemented baseline | Baseline RAG implementation |
+| `docs/advanced_rag.md` | Implemented and evaluated | Coverage-aware hybrid retrieval and strict generation |
 | `docs/graphrag_agents.md` | Future extension | Legal graph schema, traversal, agent orchestration |
-| `docs/evaluation.md` | Future extension | Evaluation metrics, golden QA dataset, CI gates |
-| `docs/api_deployment.md` | Future extension | FastAPI endpoints, Docker deployment, security |
+| `docs/evaluation.md` | Implemented | Benchmark metrics, strict generation evaluation, diagnostics |
+| `docs/api_deployment.md` | Future/separately scoped | FastAPI endpoints, Docker deployment, security |
 | `docs/mlops_maintenance.md` | Future extension | Corpus updates, index refresh, monitoring, runbooks |
 
-**Legend**: Existing (file present), Planned (next to create), Future extension (design complete but implementation later)
+**Legend**: future/separately scoped means design notes exist, but the feature
+is not part of the adopted evaluated pipeline.
 
 ---
 
@@ -865,7 +887,8 @@ MAX_ARTICLE_NUMBER_MISMATCH.
 
 ### Phase 7.5 — LLM-Assisted Corpus Audit & Context Refresh — Complete
 
-Decision: Go with watch items. See `docs/phase75_llm_corpus_audit.md`.
+Decision: Go with watch items. Historical semantic-audit details are preserved
+in project history; current status is summarized in `PROJECT_CONTEXT.md`.
 
 ### Phase 8 — Embedding & Indexing — Complete and validated
 
@@ -876,12 +899,15 @@ schema, payload, vector, filter, and retrieval sanity validation passed.
 
 ### Phase 9 — Retrieval / Naive RAG — Closed with known limitations
 
-### Phase 10 — Advanced RAG — Future extension
+### Phase 10 — Advanced RAG — Implemented and evaluated
+
+Final adopted retrieval is `coverage_aware_quota`. Reranking was evaluated but
+not adopted. Time-aware filtering is not adopted.
 
 ### Phase 11 — GraphRAG & Agents — Future extension
 
-### Phase 12 — Evaluation — Future extension
+### Phase 12 — Evaluation — Implemented for frozen benchmark and strict generation
 
-### Phase 13 — API & Deployment — Future extension
+### Phase 13 — API & Deployment — Future/separately scoped
 
-### Phase 14 — MLOps & Maintenance — Future extension
+### Phase 14 — MLOps & Maintenance — Future/separately scoped

@@ -1,4 +1,4 @@
-"""Dense BGE-M3 embedding wrapper for the constrained Phase 8 pilot.
+"""Dense BGE-M3 embedding wrapper for the constrained embedding/indexing pilot.
 
 Heavy model dependencies are imported lazily. The wrapper accepts an injected
 encoder for unit tests and never connects to Qdrant or persists vectors.

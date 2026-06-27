@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run read-only Phase 8 Qdrant index validation and retrieval sanity checks."""
+"""Run read-only embedding/indexing Qdrant index validation and retrieval sanity checks."""
 
 # ruff: noqa: E402
 
@@ -27,12 +27,12 @@ from src.indexing.indexing_models import (
     PayloadFilterCheck,
     RetrievalSanityQuery,
 )
-from src.indexing.official_artifacts import assert_clean_official_payload, write_json_atomic
+from src.indexing.official_artifacts import write_json_atomic
 from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
-DEFAULT_OUTPUT = Path("/tmp/vnlaw_phase8_8h_index_validation_report.json")
+DEFAULT_OUTPUT = Path("/tmp/vnlaw_index_validation_report.json")
 MEASURED_BGE_M3_DIMENSION = 1024
 PROTECTED_CORPUS_PATHS = (
     REPO_ROOT / "data/raw",
@@ -55,7 +55,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=Path("configs/indexing/embedding_indexing.yml"),
-        help="Phase 8 indexing configuration.",
+        help="indexing configuration.",
     )
     parser.add_argument("--collection-name", default=None, help="Existing collection to inspect.")
     parser.add_argument("--url", default=None, help="Override the configured Qdrant URL.")
@@ -118,10 +118,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Operational run classification.",
     )
     parser.add_argument(
-        "--pipeline-stage",
+        "--workflow-name",
         choices=["index_validation"],
         default="index_validation",
-        help="Operational pipeline stage.",
+        help="Operational workflow name.",
     )
     parser.add_argument("--quiet", action="store_true", help="Suppress completion summary.")
     return parser
@@ -178,7 +178,7 @@ async def run_validation(argv: list[str] | None = None) -> int:
             client,
             report_type=args.report_type,
             run_type=args.run_type,
-            pipeline_stage=args.pipeline_stage,
+            workflow_name=args.workflow_name,
             collection_name=collection_name,
             dense_vector_name=dense_vector_name,
             dense_dimension=dense_dimension,
@@ -272,7 +272,7 @@ def default_retrieval_queries() -> list[RetrievalSanityQuery]:
 
 
 def load_indexing_config(path: Path) -> IndexingConfig:
-    """Load and validate the Phase 8 YAML configuration."""
+    """Load and validate the embedding/indexing YAML configuration."""
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("indexing config root must be a YAML object")
@@ -330,8 +330,6 @@ def is_allowed_official_indexing_artifact(path: Path) -> bool:
 def write_report(path: Path, report: IndexValidationReport) -> None:
     """Write the validation report atomically as UTF-8 JSON."""
     payload = report.model_dump(mode="json")
-    if report.run_type == "official_full_index_validation":
-        assert_clean_official_payload(payload)
     write_json_atomic(path, payload)
 
 

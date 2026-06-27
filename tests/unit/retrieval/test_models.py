@@ -54,7 +54,7 @@ def test_retrieval_filters_reject_blank_optional_strings() -> None:
 
 
 def test_default_retrieval_config_loads() -> None:
-    """The repository retrieval config matches the completed Phase 8 index."""
+    """The repository retrieval config matches the completed embedding/indexing index."""
     payload = yaml.safe_load(Path("configs/retrieval/retrieval.yml").read_text())
     config = RetrievalConfig.model_validate(payload)
 

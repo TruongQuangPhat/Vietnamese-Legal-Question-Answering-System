@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from src.indexing.indexing_models import ProcessedCorpusValidationSummary
 
-FORBIDDEN_OFFICIAL_TERMINOLOGY = re.compile(r"(?i:phase|slice)|8F|8G|8H")
 _WARNING_DISTRIBUTION_EXCLUDED_FIELDS = {"deferred_resolution", "examples"}
 
 
@@ -64,7 +62,6 @@ def build_processed_corpus_validation_summary(
         warning_distribution_summary=clean_warning_distribution,
         blocking_reasons=_require_string_list(embedding, "blocking_reasons"),
     )
-    assert_clean_official_payload(summary.model_dump(mode="json"))
     return summary
 
 
@@ -121,7 +118,6 @@ def sanitize_official_indexing_run(
         payload = _read_json_object(path)
         report_type = payload.get("report_type")
         if report_type == "indexing_report":
-            payload.pop("readiness_for_" + "phase" + "9", None)
             if summary_path.is_file():
                 payload["processed_validation_report_path"] = _display_path(summary_path)
             write_json_atomic(path, payload)
@@ -135,16 +131,7 @@ def sanitize_official_indexing_run(
         raw_path.unlink()
         changed.append(raw_path)
 
-    for path in sorted(resolved_run_dir.glob("*.json")):
-        assert_clean_official_payload(_read_json_object(path))
     return changed
-
-
-def assert_clean_official_payload(payload: dict[str, Any]) -> None:
-    """Reject any key or string value containing development terminology."""
-    violation = _find_forbidden_term(payload)
-    if violation is not None:
-        raise OfficialArtifactError(f"forbidden official artifact terminology at {violation}")
 
 
 def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
@@ -176,25 +163,6 @@ def _display_path(path: Path) -> str:
         return str(path.relative_to(Path.cwd().resolve()))
     except ValueError:
         return str(path)
-
-
-def _find_forbidden_term(value: Any, path: str = "$") -> str | None:
-    if isinstance(value, dict):
-        for key, item in value.items():
-            key_path = f"{path}.{key}"
-            if FORBIDDEN_OFFICIAL_TERMINOLOGY.search(str(key)):
-                return key_path
-            violation = _find_forbidden_term(item, key_path)
-            if violation is not None:
-                return violation
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            violation = _find_forbidden_term(item, f"{path}[{index}]")
-            if violation is not None:
-                return violation
-    elif isinstance(value, str) and FORBIDDEN_OFFICIAL_TERMINOLOGY.search(value):
-        return path
-    return None
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:

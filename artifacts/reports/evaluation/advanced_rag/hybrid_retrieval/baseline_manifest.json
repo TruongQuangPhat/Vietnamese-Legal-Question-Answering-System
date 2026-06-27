@@ -1,0 +1,87 @@
+{
+  "report_type": "frozen_hybrid_retrieval_baseline_manifest",
+  "benchmark_version": "v0.1.0",
+  "benchmark_manifest_sha256": "1f26e4e39ee2edab31a5951a4e252d4c5434511e6447c24af3e907fbab720c68",
+  "split_manifest_sha256": "94ceaccefa8e335054e9e28f194011e2beb254b5b991c1503ca2e53cbe33c217",
+  "retrieval_method": "fixed_rrf_hybrid",
+  "dense_config_path": "configs/retrieval/retrieval.yml",
+  "dense_config_sha256": "760fa10d1ab4430d43a60718268cba5e3c39c72fb46990ccf0e000c5bff14032",
+  "dense_config": {
+    "schema_version": "0.1.0",
+    "embedding": {
+      "model_name": "BAAI/bge-m3",
+      "model_revision": null,
+      "device": "cpu",
+      "batch_size": 1,
+      "max_length": 8192,
+      "normalize_embeddings": true
+    },
+    "qdrant": {
+      "url": "http://localhost:6333",
+      "collection_name": "vnlaw_chunks_bgem3_v1_full",
+      "timeout_seconds": 60.0
+    },
+    "dense_retrieval": {
+      "vector_name": "dense",
+      "expected_vector_dim": 1024,
+      "top_k": 10
+    }
+  },
+  "sparse_config": {
+    "retrieval_method": "sparse_bm25",
+    "bm25": {
+      "k1": 1.5,
+      "b": 0.75
+    },
+    "normalization": "Unicode NFC plus casefold",
+    "tokenizer": "Python Unicode regex [^\\W_]+"
+  },
+  "dense_candidate_k": 50,
+  "sparse_candidate_k": 50,
+  "final_top_k": 10,
+  "rrf_k": 60,
+  "qdrant_collection_name": "vnlaw_chunks_bgem3_v1_full",
+  "qdrant_collection_info": {
+    "points_count": 40389,
+    "vectors_count": null,
+    "vectors": {
+      "dense": {
+        "size": 1024,
+        "distance": "Cosine"
+      }
+    }
+  },
+  "vector_name": "dense",
+  "embedding_model": "BAAI/bge-m3",
+  "chunk_source_path": "data/processed/legal_chunks.jsonl",
+  "chunk_source_sha256": "95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c",
+  "dense_baseline_manifest_sha256": "356855d5a372945a48f4586d02d89abbc422b93d3c916e8eb455575711570714",
+  "sparse_baseline_manifest_sha256": "ddff7cd3295b70071a2d4cdc3a7d69f6e5f97f422e32b7a453d3bc79028251dd",
+  "run_timestamp": "2026-06-26T15:39:41.489133+00:00",
+  "git_commit": "cc6392146365906d104e25faf3f706b9ae425098",
+  "command": [
+    "python",
+    "scripts/evaluation/run_frozen_hybrid_retrieval_baseline.py",
+    "--output-dir",
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval"
+  ],
+  "query_count": 128,
+  "artifacts_produced": [
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval/case_results.jsonl",
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval/metrics_all.json",
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval/metrics_development.json",
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval/metrics_held_out_test.json",
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval/breakdowns.json",
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval/baseline_manifest.json",
+    "artifacts/reports/evaluation/advanced_rag/hybrid_retrieval/summary.md"
+  ],
+  "known_limitations": [
+    "retrieval-only evaluation",
+    "no generation",
+    "no reranking",
+    "fixed RRF parameters",
+    "held_out_test evaluated once and not used for tuning",
+    "held_out_test excludes high-risk sanction/criminal QA",
+    "qualified human legal review has not occurred"
+  ]
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a safely bounded and resumable Phase 8 indexing job."""
+"""Run a safely bounded and resumable indexing job."""
 
 # ruff: noqa: E402
 
@@ -34,7 +34,6 @@ from src.indexing.indexing_service import (
 )
 from src.indexing.official_artifacts import (
     OfficialArtifactError,
-    assert_clean_official_payload,
     build_processed_corpus_validation_summary_from_path,
     write_json_atomic,
 )
@@ -42,7 +41,7 @@ from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_c
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
-DEFAULT_OUTPUT = Path("/tmp/vnlaw_phase8_8g_indexing_report.json")
+DEFAULT_OUTPUT = Path("/tmp/vnlaw_indexing_report.json")
 DEFAULT_DRY_RUN_LIMIT = 100
 MEASURED_BGE_M3_DIMENSION = 1024
 PROTECTED_CORPUS_PATHS = (
@@ -72,7 +71,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=Path("configs/indexing/embedding_indexing.yml"),
-        help="Phase 8 indexing configuration.",
+        help="indexing configuration.",
     )
     parser.add_argument("--collection-name", default=None, help="Target existing collection.")
     parser.add_argument("--url", default=None, help="Override the configured Qdrant URL.")
@@ -158,10 +157,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Operational run classification.",
     )
     parser.add_argument(
-        "--pipeline-stage",
+        "--workflow-name",
         choices=["embedding_indexing"],
         default="embedding_indexing",
-        help="Operational pipeline stage.",
+        help="Operational workflow name.",
     )
     parser.add_argument("--quiet", action="store_true", help="Suppress completion summary.")
     return parser
@@ -264,7 +263,7 @@ async def run_indexing(argv: list[str] | None = None) -> int:
             input_path=str(args.input),
             report_type=args.report_type,
             run_type=args.run_type,
-            pipeline_stage=args.pipeline_stage,
+            workflow_name=args.workflow_name,
             text_template=template,
             law_id=args.law_id,
             limit=limit,
@@ -315,7 +314,7 @@ async def run_indexing(argv: list[str] | None = None) -> int:
 
 
 def load_indexing_config(path: Path) -> IndexingConfig:
-    """Load and validate the Phase 8 YAML configuration."""
+    """Load and validate the embedding/indexing YAML configuration."""
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("indexing config root must be a YAML object")
@@ -451,8 +450,6 @@ def is_allowed_official_indexing_artifact(path: Path) -> bool:
 def write_report(path: Path, report: IndexingReport) -> None:
     """Write an indexing report atomically as UTF-8 JSON."""
     payload = report.model_dump(mode="json")
-    if report.run_type == "official_full_indexing":
-        assert_clean_official_payload(payload)
     write_json_atomic(path, payload)
 
 

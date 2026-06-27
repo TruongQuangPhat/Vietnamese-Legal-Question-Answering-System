@@ -1,4 +1,4 @@
-"""Tests for deterministic Phase 5 legal hierarchy construction."""
+"""Tests for deterministic legal hierarchy construction."""
 
 from __future__ import annotations
 

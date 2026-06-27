@@ -1,0 +1,73 @@
+{
+  "query_count": 128,
+  "evaluated_query_count": 128,
+  "retrieval_error_count": 0,
+  "answer_allowed_count": 110,
+  "fallback_required_count": 18,
+  "mean_retrieval_latency_ms": 266.30704832813194,
+  "mrr_at_10": 0.6481782106782107,
+  "ndcg_at_10": 0.6019167458568216,
+  "fallback_diagnostics": {
+    "fallback_case_count": 18,
+    "near_miss_retrieved_at_1": {
+      "count": 0,
+      "rate": 0.0
+    },
+    "supporting_retrieved_at_1": {
+      "count": 2,
+      "rate": 0.1111111111111111
+    },
+    "direct_evidence_retrieved_at_1": {
+      "count": 0,
+      "rate": 0.0
+    },
+    "near_miss_retrieved_at_3": {
+      "count": 0,
+      "rate": 0.0
+    },
+    "supporting_retrieved_at_3": {
+      "count": 3,
+      "rate": 0.16666666666666666
+    },
+    "direct_evidence_retrieved_at_3": {
+      "count": 0,
+      "rate": 0.0
+    },
+    "near_miss_retrieved_at_5": {
+      "count": 0,
+      "rate": 0.0
+    },
+    "supporting_retrieved_at_5": {
+      "count": 3,
+      "rate": 0.16666666666666666
+    },
+    "direct_evidence_retrieved_at_5": {
+      "count": 0,
+      "rate": 0.0
+    },
+    "near_miss_retrieved_at_10": {
+      "count": 0,
+      "rate": 0.0
+    },
+    "supporting_retrieved_at_10": {
+      "count": 4,
+      "rate": 0.2222222222222222
+    },
+    "direct_evidence_retrieved_at_10": {
+      "count": 0,
+      "rate": 0.0
+    }
+  },
+  "recall_at_1": 0.5363636363636364,
+  "required_direct_coverage_at_1": 0.31382978723404253,
+  "evidence_group_coverage_at_1": 0.31382978723404253,
+  "recall_at_3": 0.7454545454545455,
+  "required_direct_coverage_at_3": 0.4946808510638298,
+  "evidence_group_coverage_at_3": 0.4946808510638298,
+  "recall_at_5": 0.7818181818181819,
+  "required_direct_coverage_at_5": 0.5904255319148937,
+  "evidence_group_coverage_at_5": 0.5904255319148937,
+  "recall_at_10": 0.8636363636363636,
+  "required_direct_coverage_at_10": 0.7446808510638298,
+  "evidence_group_coverage_at_10": 0.7446808510638298
+}

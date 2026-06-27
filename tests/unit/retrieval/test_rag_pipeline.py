@@ -9,7 +9,12 @@ import pytest
 from src.retrieval.evaluation import ExpectedTarget
 from src.retrieval.generation import RagGenerationConfig
 from src.retrieval.llm_client import LLMResponse, MockLLMClient
-from src.retrieval.models import RetrievalResult, RetrievedChunk
+from src.retrieval.models import (
+    RetrievalIssue,
+    RetrievalIssueSeverity,
+    RetrievalResult,
+    RetrievedChunk,
+)
 from src.retrieval.rag_pipeline import run_naive_rag
 from src.retrieval.selection import AnswerabilityDecision, EvidenceSelectionConfig
 
@@ -85,6 +90,13 @@ async def test_needs_review_selection_does_not_call_llm() -> None:
                     clause_number="4",
                     text="4. Người sử dụng lao động có trách nhiệm...",
                     parent_text="Điều 113. Nghỉ hằng năm ...",
+                    issues=[
+                        RetrievalIssue(
+                            code="ambiguous_candidate",
+                            severity=RetrievalIssueSeverity.WARNING,
+                            message="candidate needs review before answer use",
+                        )
+                    ],
                 )
             ]
         )
@@ -154,6 +166,65 @@ async def test_answer_allowed_selection_calls_llm_once_and_maps_citation() -> No
     assert result.used_evidence[0].is_directly_citable is True
     assert result.used_evidence[0].parent_context_included_in_prompt is False
     assert "safe_citable_text" not in result.model_dump()["used_evidence"][0]
+
+
+@pytest.mark.asyncio
+async def test_empty_expected_targets_force_fallback_without_llm_call() -> None:
+    """Evaluation mode can represent a reviewed fallback-required query explicitly."""
+    retriever = FakeRetriever(_result([_chunk(text="Related but insufficient legal text.")]))
+    llm = MockLLMClient([_llm_response("Không được gọi [E1]")])
+
+    result = await run_naive_rag(
+        query="Câu hỏi đã được đánh dấu phải fallback",
+        retriever=retriever,
+        llm_client=llm,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        expected_targets=[],
+    )
+
+    assert result.decision == AnswerabilityDecision.FALLBACK_REQUIRED
+    assert result.llm_called is False
+    assert llm.requests == []
+    assert "exact_target_missing_in_eval_mode" in result.fallback_reasons
+
+
+@pytest.mark.asyncio
+async def test_empty_expected_targets_do_not_force_fallback_when_gate_disabled() -> None:
+    """Disabling the eval target gate preserves previous selection behavior."""
+    retriever = FakeRetriever(_result([_chunk(text="Related legal text.")]))
+    llm = MockLLMClient([_llm_response("Câu trả lời có trích dẫn [E1].")])
+
+    result = await run_naive_rag(
+        query="Câu hỏi kiểm tra gate tắt",
+        retriever=retriever,
+        llm_client=llm,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        selection_config=EvidenceSelectionConfig(enable_eval_exact_target_gate=False),
+        expected_targets=[],
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.llm_called is True
+    assert len(llm.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_absent_expected_targets_do_not_force_production_fallback() -> None:
+    """No-eval mode does not infer fallback solely from missing target metadata."""
+    retriever = FakeRetriever(_result([_chunk(text="Citable legal text.")]))
+    llm = MockLLMClient([_llm_response("Câu trả lời có trích dẫn [E1].")])
+
+    result = await run_naive_rag(
+        query="Câu hỏi không có target eval",
+        retriever=retriever,
+        llm_client=llm,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        expected_targets=None,
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.llm_called is True
+    assert len(llm.requests) == 1
 
 
 @pytest.mark.asyncio
@@ -258,6 +329,7 @@ def _chunk(
     citation: str | None = "Điều 2, Bộ luật Dân sự 2015",
     text: str = "Quyền dân sự được công nhận, tôn trọng, bảo vệ.",
     parent_text: str | None = None,
+    issues: list[RetrievalIssue] | None = None,
 ) -> RetrievedChunk:
     return RetrievedChunk(
         rank=rank,
@@ -278,7 +350,7 @@ def _chunk(
         source_domain="thuvienphapluat.vn",
         metadata={},
         warnings=[],
-        issues=[],
+        issues=issues or [],
     )
 
 

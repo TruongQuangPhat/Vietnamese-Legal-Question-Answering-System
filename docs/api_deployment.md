@@ -548,9 +548,9 @@ All errors logged with `request_id` for correlation. Responses do not expose int
 | `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
 | `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
 | `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
-| `docs/embedding_indexing.md` | Future extension | Embedding model and Qdrant indexing |
-| `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
-| `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, time-aware filtering |
+| `docs/embedding_indexing.md` | Implemented | BGE-M3 dense index and Qdrant validation |
+| `docs/naive_rag.md` | Implemented baseline | Baseline RAG implementation |
+| `docs/advanced_rag.md` | Implemented/evaluated | Coverage-aware hybrid retrieval and strict generation |
 | `docs/graphrag_agents.md` | Future extension | Legal graph schema, traversal, agent orchestration |
-| `docs/evaluation.md` | Future extension | Evaluation metrics, golden QA dataset, CI gates |
+| `docs/evaluation.md` | Implemented | Benchmark metrics, strict generation evaluation, diagnostics |
 | `docs/mlops_maintenance.md` | Future extension | Corpus updates, index refresh, monitoring, runbooks |

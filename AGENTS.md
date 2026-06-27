@@ -57,6 +57,7 @@ scripts/
   corpus/
   indexing/
   retrieval/
+  evaluation/
 ```
 
 Scripts must remain thin wrappers that:
@@ -73,28 +74,34 @@ Do not place reusable business logic in scripts.
 - `src/ingestion/` — registry, crawling, raw audit, cleaning, storage.
 - `src/processing/` — legal hierarchy parsing, chunking, processed JSONL validation.
 - `src/indexing/` — embedding and Qdrant indexing/validation.
-- `src/retrieval/` — dense retrieval, evidence construction and selection, Naive RAG generation, evaluation, manual review export, and offline quality gate.
+- `src/retrieval/` — dense retrieval, local BM25 sparse retrieval, RRF fusion, coverage-aware quota retrieval, evidence construction and selection, RAG pipeline behavior, citation guard integration, and fallback behavior.
+- `src/generation/` — LLM client wrappers, prompt rendering, answer formatting, and generation-specific helpers where implemented.
+- `src/evaluation/` — frozen benchmark schemas, metrics, retrieval evaluation, strict generation evaluation, evidence diagnostics, error analysis, and artifact contracts.
 - `src/services/` — orchestration where a service boundary already exists.
-- `src/api/`, `src/evaluation/`, `src/monitoring/`, `src/security/` — future or separately scoped functionality.
+- `src/api/`, `src/monitoring/`, `src/security/` — future or separately scoped functionality.
 
 Use the existing repository layout rather than introducing parallel abstractions.
 
-## 5. Current Baseline Status
 
-The Naive RAG baseline is closed and validated with known limitations.
+## 5. Current Project Status
+
+The Naive RAG baseline is closed with known limitations. The final adopted evaluated workflow uses coverage-aware hybrid retrieval and strict generation with citation ID and answerability fallback guards.
 
 Current durable state:
 
 - 52 legal documents are registered, crawled, audited, cleaned, parsed, and chunked.
 - `data/processed/legal_chunks.jsonl` contains 40,389 validated chunks.
 - Qdrant collection `vnlaw_chunks_bgem3_v1_full` contains 40,389 BGE-M3 dense vectors.
-- Dense retrieval, evidence safety/selection, fallback-aware generation, citation guard, repeatable generation evaluation, evidence previews, manual claim-to-citation review, prompt precision hardening, and the offline quality gate are implemented.
+- Dense retrieval, local BM25 sparse retrieval, fixed RRF fusion, coverage-aware quota retrieval, evidence safety/selection, fallback-aware generation, citation ID guard, answerability fallback guard, repeatable generation evaluation, evidence previews, manual claim-to-citation review, prompt precision hardening, and offline diagnostics are implemented.
 - The current offline gate status is `quality_gate_passed`.
 - The five-case suite is a small regression baseline, not a held-out benchmark proving broad Vietnamese legal QA quality.
-- `marriage_conditions_generation` remains a non-blocking partial case with completeness/scope warnings.
-- The annual-leave control remains a correct dense-only fallback case.
+- Frozen benchmark `v0.1.0` contains 128 queries: 85 development and 43 held-out reporting-only cases.
+- Final adopted retrieval is `coverage_aware_quota`.
+- Reranking was evaluated but not adopted.
+- Final strict generation all-split metrics include decision accuracy `0.875`, fallback-required fallback rate `1.000`, citation ID validity `1.000`, retrieval errors `0`, and generation errors `0`.
 
-See `PROJECT_CONTEXT.md` and `docs/naive_rag.md` for current status and technical details.
+See `PROJECT_CONTEXT.md`, `docs/advanced_rag.md`, `docs/evaluation.md`, and `docs/naive_rag.md` for current status and technical details.
+
 
 ## 6. Functional Naming Rule
 
@@ -164,6 +171,8 @@ data/raw/
 data/interim/
 data/reports/
 data/processed/legal_chunks.jsonl
+data/eval/
+artifacts/reports/evaluation/
 ```
 
 Additional rules:
@@ -183,8 +192,12 @@ Unless explicitly scoped:
 - do not upsert points;
 - do not update payloads;
 - do not re-index;
+- do not re-embed the corpus;
+- do not run real embedding inference;
+- do not run real reranking inference;
+- do not run full benchmark workflows;
 - use Qdrant read-only for retrieval/evaluation;
-- do not call OpenRouter for tasks that can run offline;
+- do not call OpenRouter or other LLM providers for tasks that can run offline;
 - never print or serialize API keys;
 - never dump environment variables;
 - never write Authorization headers or tokens to reports.
@@ -205,15 +218,18 @@ It may be used to verify:
 - answer precision regressions;
 - reviewed claim-to-citation verdicts.
 
-It must not be used to claim that an advanced system is broadly better than the Naive RAG baseline.
+It must not be used to claim broad Vietnamese legal QA quality.
 
-Before comparing Naive RAG with advanced retrieval:
+The frozen benchmark `v0.1.0` is the current comparative benchmark. Use the
+development split for implementation and tuning. Keep the held-out split
+reporting-only.
 
-1. Build a broader reviewed benchmark.
-2. Freeze a development split and a held-out test split.
-3. Use the development split for tuning.
-4. Keep the held-out test split untouched until configurations are fixed.
-5. Compare systems with the same corpus, chunking, generator, prompt, selection policy, and evaluation code unless a controlled ablation explicitly changes one component.
+When comparing systems, keep corpus, chunking, generator, prompt,
+evidence-selection policy, fallback policy, and evaluation code fixed unless a
+controlled ablation explicitly changes one component.
+
+Reranking is not part of the final adopted pipeline unless a future task
+explicitly scopes a new ablation.
 
 If model training or fine-tuning is introduced, use train/validation/test splits.
 
@@ -245,25 +261,25 @@ If model training or fine-tuning is introduced, use train/validation/test splits
 Use relevant subsets of:
 
 ```bash
-uv run python -m py_compile <touched-python-files>
-uv run pytest <relevant-tests> -q
+env UV_CACHE_DIR=/tmp/vnlaw-uv-cache find src scripts tests -name '*.py' -exec uv run python -m py_compile {} +
+
+uv run pytest tests/unit -q --durations=30
+uv run pytest tests/integration -q --durations=30
+
 uv run ruff check src scripts tests
-uv run ruff format --check <touched-files-or-directories>
+uv run ruff format --check src scripts tests
+
 uv lock --check
 git diff --check
 ```
 
+For small tasks, targeted checks are acceptable first:
+
+```bash
+uv run python -m py_compile <touched-python-files>
+uv run pytest <relevant-tests> -q
+uv run ruff check <touched-files-or-directories>
+uv run ruff format --check <touched-files-or-directories>
+```
+
 Do not reformat unrelated legacy files merely to make a broad check pass.
-
-## 14. Do Not Do Without Explicit Scope
-
-- Do not mutate protected corpus paths.
-- Do not re-index Qdrant.
-- Do not bypass evidence selection or fallback gates.
-- Do not let parent context become directly citable evidence.
-- Do not weaken quality-gate thresholds to force a pass.
-- Do not invent legal expectations for new evaluation cases.
-- Do not implement GraphRAG, agents, API, UI, deployment, fine-tuning, or MLOps as part of an unrelated task.
-- Do not introduce phase-labelled implementation names.
-- Do not create duplicate context mirrors.
-- Do not copy secrets or local settings into repository instructions.

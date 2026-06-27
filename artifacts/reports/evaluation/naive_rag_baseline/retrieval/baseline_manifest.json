@@ -1,0 +1,68 @@
+{
+  "report_type": "frozen_dense_retrieval_baseline_manifest",
+  "benchmark_version": "v0.1.0",
+  "benchmark_manifest_sha256": "1f26e4e39ee2edab31a5951a4e252d4c5434511e6447c24af3e907fbab720c68",
+  "split_manifest_sha256": "94ceaccefa8e335054e9e28f194011e2beb254b5b991c1503ca2e53cbe33c217",
+  "retrieval_config_path": "configs/retrieval/retrieval.yml",
+  "retrieval_config_sha256": "760fa10d1ab4430d43a60718268cba5e3c39c72fb46990ccf0e000c5bff14032",
+  "retrieval_config": {
+    "schema_version": "0.1.0",
+    "embedding": {
+      "model_name": "BAAI/bge-m3",
+      "model_revision": null,
+      "device": "cpu",
+      "batch_size": 1,
+      "max_length": 8192,
+      "normalize_embeddings": true
+    },
+    "qdrant": {
+      "url": "http://localhost:6333",
+      "collection_name": "vnlaw_chunks_bgem3_v1_full",
+      "timeout_seconds": 60.0
+    },
+    "dense_retrieval": {
+      "vector_name": "dense",
+      "expected_vector_dim": 1024,
+      "top_k": 10
+    }
+  },
+  "qdrant_collection_name": "vnlaw_chunks_bgem3_v1_full",
+  "qdrant_collection_info": {
+    "points_count": 40389,
+    "vectors_count": null,
+    "vectors": {
+      "dense": {
+        "size": 1024,
+        "distance": "Cosine"
+      }
+    }
+  },
+  "embedding_model": "BAAI/bge-m3",
+  "vector_name": "dense",
+  "top_k": 10,
+  "run_timestamp": "2026-06-22T09:20:14.413124+00:00",
+  "git_commit": "30a31ed52683cb27d800a35513e624ca4f86c95b",
+  "command": [
+    "python",
+    "scripts/evaluation/run_frozen_retrieval_baseline.py",
+    "--output-dir",
+    "artifacts/reports/evaluation/naive_rag_baseline/retrieval"
+  ],
+  "artifacts_produced": [
+    "artifacts/reports/evaluation/naive_rag_baseline/retrieval/case_results.jsonl",
+    "artifacts/reports/evaluation/naive_rag_baseline/retrieval/metrics_all.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/retrieval/metrics_development.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/retrieval/metrics_held_out_test.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/retrieval/baseline_manifest.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/retrieval/summary.md"
+  ],
+  "known_limitations": [
+    "retrieval-only baseline",
+    "no generation",
+    "no reranking",
+    "no sparse retrieval",
+    "no query rewriting",
+    "held_out_test excludes high-risk sanction/criminal QA",
+    "qualified human legal review has not occurred"
+  ]
+}

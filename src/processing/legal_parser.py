@@ -1,4 +1,4 @@
-"""Per-document parser facade for Phase 5 legal hierarchy parsing."""
+"""Per-document parser facade for legal hierarchy parsing."""
 
 from __future__ import annotations
 
@@ -132,11 +132,11 @@ class LegalParserExecutionResult(BaseModel):
 
 
 class LegalParser:
-    """Compose Phase 5 parsing components for exactly one document.
+    """Compose legal hierarchy parsing components for exactly one document.
 
     The parser facade orchestrates normalized input, deterministic heading
     recognition, span segmentation, hierarchy building, and read-only tree
-    validation. It does not duplicate stage internals, process batches, or
+    validation. It does not duplicate component internals, process batches, or
     write generated artifacts.
     """
 
@@ -198,7 +198,7 @@ class LegalParser:
                 source_file=source_file,
                 error=_exception_issue(
                     code=ParsingIssueCode.SCHEMA_VALIDATION_FAILED,
-                    message="Normalized input failed Phase 5 schema validation.",
+                    message="Normalized input failed legal hierarchy parsing schema validation.",
                     law_id=fallback_law_id,
                     exc=exc,
                     source_file=source_file,
@@ -299,7 +299,7 @@ class LegalParser:
                 warnings=inherited_warnings,
                 error=_exception_issue(
                     code=ParsingIssueCode.SCHEMA_VALIDATION_FAILED,
-                    message="Phase 5 schema construction failed.",
+                    message="legal hierarchy parsing schema construction failed.",
                     law_id=artifact.law_id,
                     exc=exc,
                     source_file=source_file,

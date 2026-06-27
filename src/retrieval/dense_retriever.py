@@ -1,4 +1,4 @@
-"""Read-only dense retrieval over the Phase 8 Qdrant collection."""
+"""Read-only dense retrieval over the embedding/indexing Qdrant collection."""
 
 from __future__ import annotations
 

@@ -343,7 +343,7 @@ def build_evidence_packet(
         )
 
     parent_policy = _parent_context_policy(chunk, child_text, parent_text, settings)
-    citation_scope = _citation_scope(chunk, parent_policy)
+    citation_scope = _citation_scope(chunk, parent_policy, child_text)
     auxiliary_context = _auxiliary_context(parent_text, parent_policy)
     if parent_policy == ParentContextPolicy.AUXILIARY_ONLY:
         issues.append(
@@ -507,12 +507,13 @@ def _parent_context_policy(
 def _citation_scope(
     chunk: RetrievedChunk,
     parent_policy: ParentContextPolicy,
+    child_text: EvidenceText | None,
 ) -> CitationScope:
     if not chunk.citation:
         return CitationScope.MISSING_CITATION
     if parent_policy == ParentContextPolicy.CITABLE_ARTICLE_CONTEXT:
         return CitationScope.ARTICLE_CONTEXT
-    if parent_policy == ParentContextPolicy.AUXILIARY_ONLY:
+    if parent_policy == ParentContextPolicy.AUXILIARY_ONLY and child_text is None:
         return CitationScope.UNSAFE_PARENT_CONTEXT
     return CitationScope.CHILD_EXACT
 

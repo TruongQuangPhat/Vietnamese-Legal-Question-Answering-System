@@ -1,4 +1,4 @@
-"""Tests for deterministic Phase 6 parent-child chunk selection."""
+"""Tests for deterministic parent-child chunk selection."""
 
 from __future__ import annotations
 
@@ -240,7 +240,7 @@ def test_mixed_document_preserves_source_order() -> None:
 
 
 def test_collision_resolved_node_ids_are_preserved() -> None:
-    """Resolved Phase 5 node IDs are used directly for chunk IDs."""
+    """Resolved legal hierarchy parsing node IDs are used directly for chunk IDs."""
     assert _chunk_ids("sample_hierarchy_collision_ids.json") == [
         "TEST_LAW__root__article_1__clause_1__point_a__chunk",
         "TEST_LAW__root__article_1__clause_1__point_a__occurrence_2__chunk",

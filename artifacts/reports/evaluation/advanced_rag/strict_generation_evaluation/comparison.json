@@ -1,0 +1,216 @@
+{
+  "report_type": "strict_generation_comparison",
+  "workflow_name": "strict_generation_evaluation",
+  "retrieval_strategy": "coverage_aware_quota",
+  "base_generation_baseline": "generation_baseline",
+  "systems": {
+    "generation_baseline": {
+      "all": {
+        "query_count": 128,
+        "generation_error_count": 0,
+        "expected_answer_allowed_count": 110,
+        "expected_fallback_required_count": 18,
+        "pipeline_answer_count": 49,
+        "pipeline_fallback_count": 79,
+        "decision_accuracy": 0.4296875,
+        "answer_allowed_answer_rate": 0.39090909090909093,
+        "fallback_required_fallback_rate": 0.6666666666666666,
+        "citation_id_validity_rate": 1.0,
+        "selected_required_direct_coverage": 0.35696969696969705,
+        "selected_evidence_group_coverage": 0.35696969696969705,
+        "missing_required_evidence_rate": 0.6727272727272727,
+        "unsupported_or_uncited_claim_rate": 0.0,
+        "unsupported_or_uncited_claim_check": "citation_id_guard_only",
+        "case_pass_rate": 0.375,
+        "case_partial_rate": 0.0546875,
+        "case_fail_rate": 0.5703125,
+        "mean_latency_ms": 865.412511609378,
+        "fallback_behavior": {
+          "fallback_cases": 79,
+          "fallback_without_llm_count": 79,
+          "fallback_with_citations_count": 0
+        },
+        "retrieval_error_count": 0
+      },
+      "development": {
+        "query_count": 85,
+        "generation_error_count": 0,
+        "expected_answer_allowed_count": 68,
+        "expected_fallback_required_count": 17,
+        "pipeline_answer_count": 40,
+        "pipeline_fallback_count": 45,
+        "decision_accuracy": 0.5294117647058824,
+        "answer_allowed_answer_rate": 0.5,
+        "fallback_required_fallback_rate": 0.6470588235294118,
+        "citation_id_validity_rate": 1.0,
+        "selected_required_direct_coverage": 0.4524509803921569,
+        "selected_evidence_group_coverage": 0.4524509803921569,
+        "missing_required_evidence_rate": 0.5882352941176471,
+        "unsupported_or_uncited_claim_rate": 0.0,
+        "unsupported_or_uncited_claim_check": "citation_id_guard_only",
+        "case_pass_rate": 0.4588235294117647,
+        "case_partial_rate": 0.07058823529411765,
+        "case_fail_rate": 0.47058823529411764,
+        "mean_latency_ms": 916.8549064471282,
+        "fallback_behavior": {
+          "fallback_cases": 45,
+          "fallback_without_llm_count": 45,
+          "fallback_with_citations_count": 0
+        },
+        "retrieval_error_count": 0
+      },
+      "held_out_test": {
+        "query_count": 43,
+        "generation_error_count": 0,
+        "expected_answer_allowed_count": 42,
+        "expected_fallback_required_count": 1,
+        "pipeline_answer_count": 9,
+        "pipeline_fallback_count": 34,
+        "decision_accuracy": 0.23255813953488372,
+        "answer_allowed_answer_rate": 0.21428571428571427,
+        "fallback_required_fallback_rate": 1.0,
+        "citation_id_validity_rate": 1.0,
+        "selected_required_direct_coverage": 0.20238095238095238,
+        "selected_evidence_group_coverage": 0.20238095238095238,
+        "missing_required_evidence_rate": 0.8095238095238095,
+        "unsupported_or_uncited_claim_rate": 0.0,
+        "unsupported_or_uncited_claim_check": "citation_id_guard_only",
+        "case_pass_rate": 0.20930232558139536,
+        "case_partial_rate": 0.023255813953488372,
+        "case_fail_rate": 0.7674418604651163,
+        "mean_latency_ms": 763.7240566975463,
+        "fallback_behavior": {
+          "fallback_cases": 34,
+          "fallback_without_llm_count": 34,
+          "fallback_with_citations_count": 0
+        },
+        "retrieval_error_count": 0
+      }
+    },
+    "strict_generation_evaluation": {
+      "all": {
+        "query_count": 128,
+        "generation_error_count": 0,
+        "expected_answer_allowed_count": 110,
+        "expected_fallback_required_count": 18,
+        "pipeline_answer_count": 55,
+        "pipeline_fallback_count": 73,
+        "decision_accuracy": 0.4453125,
+        "answer_allowed_answer_rate": 0.42727272727272725,
+        "fallback_required_fallback_rate": 0.5555555555555556,
+        "citation_id_validity_rate": 1.0,
+        "selected_required_direct_coverage": 0.3725252525252525,
+        "selected_evidence_group_coverage": 0.3725252525252525,
+        "missing_required_evidence_rate": 0.6818181818181818,
+        "unsupported_or_uncited_claim_rate": 0.0,
+        "unsupported_or_uncited_claim_check": "citation_id_guard_only",
+        "case_pass_rate": 0.3515625,
+        "case_partial_rate": 0.09375,
+        "case_fail_rate": 0.5546875,
+        "mean_latency_ms": 2170.266336343754,
+        "fallback_behavior": {
+          "fallback_cases": 73,
+          "fallback_without_llm_count": 73,
+          "fallback_with_citations_count": 0
+        },
+        "retrieval_error_count": 0
+      },
+      "development": {
+        "query_count": 85,
+        "generation_error_count": 0,
+        "expected_answer_allowed_count": 68,
+        "expected_fallback_required_count": 17,
+        "pipeline_answer_count": 34,
+        "pipeline_fallback_count": 51,
+        "decision_accuracy": 0.43529411764705883,
+        "answer_allowed_answer_rate": 0.39705882352941174,
+        "fallback_required_fallback_rate": 0.5882352941176471,
+        "citation_id_validity_rate": 1.0,
+        "selected_required_direct_coverage": 0.3240196078431372,
+        "selected_evidence_group_coverage": 0.3240196078431372,
+        "missing_required_evidence_rate": 0.75,
+        "unsupported_or_uncited_claim_rate": 0.0,
+        "unsupported_or_uncited_claim_check": "citation_id_guard_only",
+        "case_pass_rate": 0.3176470588235294,
+        "case_partial_rate": 0.11764705882352941,
+        "case_fail_rate": 0.5647058823529412,
+        "mean_latency_ms": 2510.161751811767,
+        "fallback_behavior": {
+          "fallback_cases": 51,
+          "fallback_without_llm_count": 51,
+          "fallback_with_citations_count": 0
+        },
+        "retrieval_error_count": 0
+      },
+      "held_out_test": {
+        "query_count": 43,
+        "generation_error_count": 0,
+        "expected_answer_allowed_count": 42,
+        "expected_fallback_required_count": 1,
+        "pipeline_answer_count": 21,
+        "pipeline_fallback_count": 22,
+        "decision_accuracy": 0.46511627906976744,
+        "answer_allowed_answer_rate": 0.47619047619047616,
+        "fallback_required_fallback_rate": 0.0,
+        "citation_id_validity_rate": 1.0,
+        "selected_required_direct_coverage": 0.45105820105820105,
+        "selected_evidence_group_coverage": 0.45105820105820105,
+        "missing_required_evidence_rate": 0.5714285714285714,
+        "unsupported_or_uncited_claim_rate": 0.0,
+        "unsupported_or_uncited_claim_check": "citation_id_guard_only",
+        "case_pass_rate": 0.4186046511627907,
+        "case_partial_rate": 0.046511627906976744,
+        "case_fail_rate": 0.5348837209302325,
+        "mean_latency_ms": 1498.380049953497,
+        "fallback_behavior": {
+          "fallback_cases": 22,
+          "fallback_without_llm_count": 22,
+          "fallback_with_citations_count": 0
+        },
+        "retrieval_error_count": 0
+      }
+    }
+  },
+  "deltas": {
+    "all": {
+      "decision_accuracy_delta": 0.015625,
+      "answer_allowed_answer_rate_delta": 0.03636363636363632,
+      "fallback_required_fallback_rate_delta": -0.11111111111111105,
+      "selected_evidence_group_coverage_delta": 0.015555555555555434,
+      "case_pass_rate_delta": -0.0234375,
+      "citation_id_validity_rate_delta": 0.0,
+      "retrieval_error_count_delta": 0,
+      "generation_error_count_delta": 0
+    },
+    "development": {
+      "decision_accuracy_delta": -0.09411764705882353,
+      "answer_allowed_answer_rate_delta": -0.10294117647058826,
+      "fallback_required_fallback_rate_delta": -0.05882352941176472,
+      "selected_evidence_group_coverage_delta": -0.1284313725490197,
+      "case_pass_rate_delta": -0.1411764705882353,
+      "citation_id_validity_rate_delta": 0.0,
+      "retrieval_error_count_delta": 0,
+      "generation_error_count_delta": 0
+    },
+    "held_out_test": {
+      "decision_accuracy_delta": 0.23255813953488372,
+      "answer_allowed_answer_rate_delta": 0.26190476190476186,
+      "fallback_required_fallback_rate_delta": -1.0,
+      "selected_evidence_group_coverage_delta": 0.24867724867724866,
+      "case_pass_rate_delta": 0.20930232558139536,
+      "citation_id_validity_rate_delta": 0.0,
+      "retrieval_error_count_delta": 0,
+      "generation_error_count_delta": 0
+    }
+  },
+  "key_questions": {
+    "decision_accuracy_improved": true,
+    "answer_allowed_answer_rate_improved": true,
+    "fallback_required_fallback_rate_remained_safe": false,
+    "selected_evidence_group_coverage_improved": true,
+    "case_pass_rate_improved": false,
+    "citation_validity_remained_strict": true,
+    "retrieval_error_count_acceptable": true,
+    "generation_error_count_acceptable": true
+  }
+}

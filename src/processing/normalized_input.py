@@ -1,4 +1,4 @@
-"""Typed Phase 5 loading for normalized legal artifacts.
+"""Typed legal hierarchy parsing loading for normalized legal artifacts.
 
 This module only validates parser input and compares the optional
 `cleaned.txt` diagnostic artifact. It never mutates source text, writes corpus
@@ -17,7 +17,7 @@ from src.processing.legal_hierarchy_models import ParsingIssueCode, StructuredPa
 
 
 class NormalizedArtifactMarkers(BaseModel):
-    """Phase 4 legal marker metrics required by Phase 5 parsing."""
+    """cleaning/normalization legal marker metrics required by legal hierarchy parsing."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -29,7 +29,7 @@ class NormalizedArtifactMarkers(BaseModel):
 
 
 class NormalizedArtifactMetadata(BaseModel):
-    """Phase 4 metadata required by Phase 5 parsing."""
+    """cleaning/normalization metadata required by legal hierarchy parsing."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -37,21 +37,21 @@ class NormalizedArtifactMetadata(BaseModel):
 
 
 class NormalizedLegalArtifact(BaseModel):
-    """Validated `normalized.json` input for Phase 5.
+    """Validated `normalized.json` input for legal hierarchy parsing.
 
     Attributes:
         law_id: Stable law identifier.
         law_name: Legal document name.
         source_url: Trusted source URL.
         source_domain: Trusted source domain.
-        source_type: Source content type as produced by Phase 4.
+        source_type: Source content type as produced by cleaning/normalization.
         raw_artifact_path: Raw artifact path used for traceability.
         normalized_text: Authoritative source text for parser offsets.
-        text_stats: Phase 4 text statistics.
-        markers: Phase 4 legal marker metrics.
-        warnings: Phase 4 warnings carried for diagnostics.
-        metadata: Phase 4 metadata, including cleaner version.
-        candidate_info: Phase 4 extraction diagnostics.
+        text_stats: cleaning/normalization text statistics.
+        markers: cleaning/normalization legal marker metrics.
+        warnings: cleaning/normalization warnings carried for diagnostics.
+        metadata: cleaning/normalization metadata, including cleaner version.
+        candidate_info: cleaning/normalization extraction diagnostics.
 
     Legal assumptions:
         `normalized_text` is authoritative. The loader does not strip,
@@ -84,7 +84,7 @@ class NormalizedInputLoadResult(BaseModel):
 
 
 def load_normalized_artifact(path: Path) -> NormalizedLegalArtifact:
-    """Load and validate a Phase 4 `normalized.json` artifact.
+    """Load and validate a cleaning/normalization `normalized.json` artifact.
 
     Args:
         path: Path to `data/interim/{LAW_ID}/normalized.json` or a test fixture.
@@ -96,7 +96,7 @@ def load_normalized_artifact(path: Path) -> NormalizedLegalArtifact:
     Raises:
         FileNotFoundError: If the artifact path does not exist.
         json.JSONDecodeError: If the file is not valid JSON.
-        pydantic.ValidationError: If the required Phase 5 input contract is
+        pydantic.ValidationError: If the required legal hierarchy parsing input contract is
             missing or invalid.
 
     Legal assumptions:

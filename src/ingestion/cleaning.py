@@ -752,7 +752,7 @@ def remove_safe_boilerplate(text: str) -> str:
             continue
 
         # 4. Preserving bare numbering (formerly removed) to avoid damaging structure
-        # during the cleaning phase before the legal parser.
+        # during the cleaning workflow before the legal parser.
 
         # 5. Remove if the line matches a known boilerplate phrase exactly
         if any(bp == stripped for bp in SAFE_BOILERPLATE):

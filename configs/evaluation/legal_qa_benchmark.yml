@@ -1,0 +1,20 @@
+schema_version: "1.0"
+# Scoped v0.1 benchmark release. Held-out scope is low/medium-risk eligible
+# cases only; high-risk cases without qualified human legal review remain
+# development-only.
+benchmark_version: "v0.1.0"
+# Provisional benchmark design default, not an approved final benchmark split ratio.
+development_ratio: 0.7
+split_seed: 20260619
+grouping_fields:
+  - case_family_id
+  - source_provision_group_id
+stratification_fields:
+  - primary_domain
+  - expected_decision
+  - blocking
+  - question_types
+  - complete_evidence_required
+require_independent_review_for_held_out: true
+require_chunk_qrels_for_frozen_answer_allowed: true
+preserve_vietnamese_diacritics: true

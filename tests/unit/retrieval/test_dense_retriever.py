@@ -101,7 +101,7 @@ def fake_qdrant_models(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def make_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a representative Phase 8 Qdrant payload."""
+    """Build a representative embedding/indexing Qdrant payload."""
     payload: dict[str, Any] = {
         "schema_version": "0.1.0",
         "chunk_id": "chunk-1",

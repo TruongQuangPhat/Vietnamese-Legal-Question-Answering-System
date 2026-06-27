@@ -1,0 +1,52 @@
+{
+  "report_type": "frozen_sparse_retrieval_baseline_manifest",
+  "benchmark_version": "v0.1.0",
+  "benchmark_manifest_sha256": "1f26e4e39ee2edab31a5951a4e252d4c5434511e6447c24af3e907fbab720c68",
+  "split_manifest_sha256": "94ceaccefa8e335054e9e28f194011e2beb254b5b991c1503ca2e53cbe33c217",
+  "retrieval_method": "sparse_bm25",
+  "chunk_source_path": "data/processed/legal_chunks.jsonl",
+  "chunk_source_sha256": "95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c",
+  "top_k": 10,
+  "bm25": {
+    "k1": 1.5,
+    "b": 0.75,
+    "document_count": 40389,
+    "average_document_length": 113.17348783084503
+  },
+  "tokenization_normalization": {
+    "normalization": "Unicode NFC plus casefold",
+    "tokenizer": "Python Unicode regex [^\\W_]+",
+    "vietnamese_diacritics": "preserved",
+    "stemming": "none",
+    "stopwords": "none"
+  },
+  "run_timestamp": "2026-06-26T15:12:47.165415+00:00",
+  "git_commit": "331e77b2bdd8997dcfaa439923a4be1059982b48",
+  "command": [
+    "python",
+    "scripts/evaluation/run_frozen_sparse_retrieval_baseline.py",
+    "--output-dir",
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval"
+  ],
+  "query_count": 128,
+  "artifacts_produced": [
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval/case_results.jsonl",
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval/metrics_all.json",
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval/metrics_development.json",
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval/metrics_held_out_test.json",
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval/breakdowns.json",
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval/baseline_manifest.json",
+    "artifacts/reports/evaluation/advanced_rag/sparse_retrieval/summary.md"
+  ],
+  "known_limitations": [
+    "sparse lexical retrieval only",
+    "no dense retrieval in this run",
+    "no hybrid fusion",
+    "no reranking",
+    "no LLM generation",
+    "BM25 may miss semantic paraphrases",
+    "held_out_test is evaluated once and must not be used for tuning",
+    "held_out_test excludes high-risk sanction/criminal QA",
+    "qualified human legal review has not occurred"
+  ]
+}

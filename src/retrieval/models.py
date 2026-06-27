@@ -1,7 +1,7 @@
 """Typed contracts for dense retrieval baseline dense retrieval.
 
 The models in this module represent query input, safe payload filters, retrieved
-legal evidence, and retrieval-level diagnostics. They preserve Phase 8 payload
+legal evidence, and retrieval-level diagnostics. They preserve embedding/indexing payload
 fields without exposing raw Qdrant payload dictionaries to downstream
 generation code.
 """
@@ -67,7 +67,7 @@ class RetrievalIssue(BaseModel):
 
 
 class RetrievalFilters(BaseModel):
-    """Safe exact-match filters supported by the Phase 8 payload schema.
+    """Safe exact-match filters supported by the embedding/indexing payload schema.
 
     Legal assumptions:
         These filters do not implement temporal validity. dense retrieval baseline must not
@@ -249,7 +249,8 @@ class RetrievalResult(BaseModel):
         vector_name: Named vector used for dense search.
         top_k: Requested top-k result count.
         elapsed_ms: Wall-clock retrieval time in milliseconds.
-        query_vector_dimension: Dimension of the validated query vector.
+        query_vector_dimension: Dimension of the validated dense query vector,
+            or 0 for retrieval methods that do not use dense vectors.
         results: Ranked retrieval candidates.
         issues: Retrieval-level issues not tied to a specific chunk.
     """
@@ -261,7 +262,7 @@ class RetrievalResult(BaseModel):
     vector_name: str = Field(DEFAULT_DENSE_VECTOR_NAME, min_length=1)
     top_k: int = Field(..., gt=0)
     elapsed_ms: float = Field(..., ge=0.0)
-    query_vector_dimension: int = Field(..., gt=0)
+    query_vector_dimension: int = Field(..., ge=0)
     filters: RetrievalFilters = Field(default_factory=RetrievalFilters)
     results: list[RetrievedChunk] = Field(default_factory=list)
     issues: list[RetrievalIssue] = Field(default_factory=list)
@@ -314,5 +315,7 @@ class RetrievalConfig(BaseModel):
     def validate_query_embedding_contract(self) -> RetrievalConfig:
         """Require the configured dense vector dimension to match BGE-M3 v1."""
         if self.dense_retrieval.expected_vector_dim != DEFAULT_DENSE_DIMENSION:
-            raise ValueError("dense retrieval baseline expects 1024-dimensional BGE-M3 dense vectors")
+            raise ValueError(
+                "dense retrieval baseline expects 1024-dimensional BGE-M3 dense vectors"
+            )
         return self

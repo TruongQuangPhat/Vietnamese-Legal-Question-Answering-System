@@ -227,7 +227,7 @@ class DenseRetrievalEvaluationReport(BaseModel):
 
     report_type: str = "dense_retrieval_evaluation_report"
     run_type: str = "manual_dense_retrieval_sanity"
-    pipeline_stage: str = "retrieval_evaluation"
+    workflow_name: str = "retrieval_evaluation"
     started_at: datetime
     finished_at: datetime
     collection_name: str = Field(..., min_length=1)

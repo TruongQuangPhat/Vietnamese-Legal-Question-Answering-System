@@ -1,4 +1,4 @@
-"""Tests for the Phase 6 legal chunking CLI entrypoint."""
+"""Tests for the parent-child chunking legal chunking CLI entrypoint."""
 
 from __future__ import annotations
 

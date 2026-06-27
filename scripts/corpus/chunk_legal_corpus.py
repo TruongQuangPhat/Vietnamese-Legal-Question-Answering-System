@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Command-line entrypoint for Phase 6 parent-child legal chunking.
+"""Command-line entrypoint for parent-child legal chunking.
 
 Usage:
     uv run python scripts/corpus/chunk_legal_corpus.py \
@@ -41,11 +41,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     """Build the parent-child chunking CLI argument parser.
 
     Returns:
-        Configured `argparse.ArgumentParser` for Phase 6 service invocation.
+        Configured `argparse.ArgumentParser` for parent-child chunking service invocation.
     """
     parser = argparse.ArgumentParser(
         prog="scripts/corpus/chunk_legal_corpus.py",
-        description="Chunk Phase 5 Vietnamese legal hierarchy JSON into Phase 6 JSONL.",
+        description="Chunk legal hierarchy parsing Vietnamese legal hierarchy JSON into parent-child chunking JSONL.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -95,14 +95,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the Phase 6 parent-child chunking CLI.
+    """Run the parent-child chunking CLI.
 
     Args:
         argv: Optional argument vector for tests. When omitted, argparse reads
             from `sys.argv`.
 
     Returns:
-        Process exit code according to the Phase 6 CLI policy.
+        Process exit code according to the parent-child chunking CLI policy.
     """
     parser = build_arg_parser()
     args = parser.parse_args(argv)

@@ -123,7 +123,7 @@ class LegalSpanSegmenter:
         Legal assumptions:
             Only candidates classified as `certain` may become segmented legal
             units. Root Law construction and parent-child relationships are
-            deferred to later Phase 5 steps.
+            deferred to later legal hierarchy parsing steps.
         """
         headings = sorted(
             [

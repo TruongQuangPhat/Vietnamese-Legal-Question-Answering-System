@@ -1,13 +1,13 @@
-"""Phase 7 processed JSONL validator.
+"""Processed JSONL validator.
 
-This module implements the core JSONL validation pipeline for Phase 7.
+This module implements the core JSONL validation pipeline for processed JSONL validation.
 It streams ``data/processed/legal_chunks.jsonl`` line-by-line, validates
 each row as a ``LegalChunk``, checks required field completeness by
 ``chunk_kind``, enforces global ``chunk_id`` uniqueness, and accumulates
 counters for the validation report. It also reconciles corpus-level counts
-against the Phase 6 chunking report.
+against the parent-child chunking report.
 
-This validator is independent from Phase 6's ``LegalChunkValidator``.
+This validator is independent from parent-child chunking's ``LegalChunkValidator``.
 It reuses ``LegalChunk`` for schema validation but has its own issue codes
 and report model. Hash integrity, count reconciliation, citation structure,
 hierarchy traceability, contamination checks, repealed metadata auditing, and
@@ -87,10 +87,10 @@ _PAYLOAD_RECOMMENDED_SOURCE_FIELDS = (
 
 
 class ProcessedJsonlValidator:
-    """Phase 7 core validator for the processed chunk JSONL file.
+    """Core validator for the processed chunk JSONL file.
 
     Streams the JSONL file, validates each chunk, and produces a
-    ``ProcessedJsonlValidationReport``. Checks implemented in Slice 2:
+    ``ProcessedJsonlValidationReport``. Core checks:
 
     1. JSONL parseability — every line parses as valid JSON.
     2. ``LegalChunk`` schema validation — every row validates.
@@ -99,11 +99,11 @@ class ProcessedJsonlValidator:
     5. Global ``chunk_id`` uniqueness.
     6. Basic counters and distribution summaries.
 
-    Slice 3A adds hash integrity, Slice 3B adds count reconciliation, Slice 3C
-    adds citation structure, Slice 3D adds hierarchy traceability, Slice 3E
-    adds contamination auditing, Slice 3F audits repealed/empty metadata, and
-    Slice 3G adds text-length readiness summaries, Slice 3H audits payload
-    readiness, Slice 3I summarizes embedding readiness, and Slice 3J audits
+    hash-integrity check adds hash integrity, count-reconciliation check adds count reconciliation, citation-structure check
+    adds citation structure, hierarchy-traceability check adds hierarchy traceability, contamination audit
+    adds contamination auditing, repeal-metadata audit audits repealed/empty metadata, and
+    text-length readiness check adds text-length readiness summaries, payload-readiness check audits payload
+    readiness, embedding-readiness summary summarizes embedding readiness, and warning-distribution audit audits
     warning distribution.
     """
 
@@ -111,7 +111,7 @@ class ProcessedJsonlValidator:
         """Initialize the validator with a config.
 
         Args:
-            config: Phase 7 validation configuration including thresholds,
+            config: processed JSONL validation configuration including thresholds,
             marker lists, and file paths.
         """
         self.config = config
@@ -120,7 +120,7 @@ class ProcessedJsonlValidator:
         self,
         input_path: Path,
     ) -> ProcessedJsonlValidationReport:
-        """Run validation checks through Slice 3J on the processed JSONL.
+        """Run validation checks through warning-distribution audit on the processed JSONL.
 
         Streams the file line-by-line, validates each row, and builds
         a ``ProcessedJsonlValidationReport`` with counters and capped
@@ -421,7 +421,7 @@ class ProcessedJsonlValidator:
 
             if not report_path.exists():
                 _warning(
-                    "Phase 6 chunking report is missing",
+                    "parent-child chunking report is missing",
                     {"reason": "report_missing"},
                 )
                 return 0, 1
@@ -430,27 +430,27 @@ class ProcessedJsonlValidator:
                 chunking_report = json.loads(report_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError as exc:
                 _warning(
-                    "Phase 6 chunking report contains invalid JSON",
+                    "parent-child chunking report contains invalid JSON",
                     {"reason": "invalid_json", "error": str(exc)},
                 )
                 return 0, 1
             except (OSError, UnicodeError) as exc:
                 _warning(
-                    "Phase 6 chunking report could not be read",
+                    "parent-child chunking report could not be read",
                     {"reason": "report_unreadable", "error": str(exc)},
                 )
                 return 0, 1
 
             if not isinstance(chunking_report, dict):
                 _warning(
-                    "Phase 6 chunking report root is not a JSON object",
+                    "parent-child chunking report root is not a JSON object",
                     {"reason": "report_root_not_object"},
                 )
                 return 0, 1
 
             if "total_chunks" not in chunking_report:
                 _warning(
-                    "Phase 6 chunking report is missing total_chunks",
+                    "parent-child chunking report is missing total_chunks",
                     {"reason": "total_chunks_missing"},
                 )
                 return 0, 1
@@ -462,7 +462,7 @@ class ProcessedJsonlValidator:
                 or expected_total < 0
             ):
                 _warning(
-                    "Phase 6 chunking report has invalid total_chunks",
+                    "parent-child chunking report has invalid total_chunks",
                     {
                         "reason": "total_chunks_invalid",
                         "raw_total_chunks": expected_total,
@@ -475,7 +475,7 @@ class ProcessedJsonlValidator:
 
             if expected_total != total_lines:
                 _failure(
-                    "JSONL line count does not match Phase 6 total_chunks",
+                    "JSONL line count does not match parent-child chunking total_chunks",
                     {
                         "expected_total": expected_total,
                         "observed_total": total_lines,
@@ -488,7 +488,7 @@ class ProcessedJsonlValidator:
                 expected_by_level = chunking_report["chunks_by_level"]
                 if not isinstance(expected_by_level, dict):
                     _warning(
-                        "Phase 6 chunks_by_level is malformed",
+                        "parent-child chunking chunks_by_level is malformed",
                         {"reason": "chunks_by_level_malformed"},
                     )
                     warning_count += 1
@@ -497,7 +497,7 @@ class ProcessedJsonlValidator:
                         observed = chunks_by_level.get(str(level), 0)
                         if expected != observed:
                             _failure(
-                                "JSONL level count does not match Phase 6 report",
+                                "JSONL level count does not match parent-child chunking report",
                                 {
                                     "level": str(level),
                                     "expected": expected,
@@ -510,13 +510,13 @@ class ProcessedJsonlValidator:
                 expected_by_law = chunking_report["chunks_by_law"]
                 if not isinstance(expected_by_law, dict):
                     _warning(
-                        "Phase 6 chunks_by_law is malformed",
+                        "parent-child chunking chunks_by_law is malformed",
                         {"reason": "chunks_by_law_malformed"},
                     )
                     warning_count += 1
                 elif len(expected_by_law) != len(chunks_by_law):
                     _warning(
-                        "JSONL law count does not match Phase 6 report",
+                        "JSONL law count does not match parent-child chunking report",
                         {
                             "expected_law_count": len(expected_by_law),
                             "observed_law_count": len(chunks_by_law),
@@ -1356,7 +1356,9 @@ def _build_warning_distribution_summary(
         },
         "deferred_resolution": {
             "should_resolve_now": False,
-            "reason": ("Slice 3J only audits warning distribution; resolution is deferred."),
+            "reason": (
+                "warning-distribution audit only audits warning distribution; resolution is deferred."
+            ),
             "recommended_next_actions": [
                 "Review warning concentration by law, chunk kind, field, and marker.",
                 "Define warning policy separately before production indexing.",
@@ -1424,7 +1426,7 @@ def _build_embedding_readiness_summary(
     text_length_summary: dict[str, Any],
     payload_readiness_summary: dict[str, Any],
 ) -> dict[str, Any]:
-    """Build the final Phase 7 decision for proceeding to embedding."""
+    """Build the final processed JSONL validation decision for proceeding to embedding."""
     payload_ready_rate = float(payload_readiness_summary.get("ready_rate", 0.0))
     payload_ready_chunks = int(payload_readiness_summary.get("ready_chunks", 0))
     payload_not_ready_chunks = int(payload_readiness_summary.get("not_ready_chunks", 0))
@@ -1463,21 +1465,21 @@ def _build_embedding_readiness_summary(
     if not embedding_ready:
         readiness_status = "blocked"
         recommended_next_actions = [
-            "Resolve all blocking validation categories before Phase 8 embedding/indexing.",
-            "Re-run Phase 7 validation after correcting source pipeline outputs.",
+            "Resolve all blocking validation categories before embedding/indexing.",
+            "Re-run processed JSONL validation after correcting source pipeline outputs.",
             "Do not mutate processed chunks inside the readiness summary.",
         ]
     elif warnings_total > 0:
         readiness_status = "ready_with_warnings"
         recommended_next_actions = [
-            "Proceed to Phase 8 embedding/indexing only if ready_with_warnings is acceptable.",
+            "Proceed to embedding/indexing only if ready_with_warnings is acceptable.",
             "Before production indexing, review deferred warning distribution.",
             "Do not mutate processed chunks during readiness summary.",
         ]
     else:
         readiness_status = "ready"
         recommended_next_actions = [
-            "Proceed to Phase 8 embedding/indexing.",
+            "Proceed to embedding/indexing.",
             "Preserve the validated payload, text, and hash contracts.",
             "Do not mutate processed chunks during indexing preparation.",
         ]
@@ -1488,7 +1490,7 @@ def _build_embedding_readiness_summary(
             {
                 "category": "contamination_warnings",
                 "count": contamination_warnings,
-                "source_slice": "3E",
+                "source_check": "contamination_audit",
                 "recommended_action": (
                     "Run warning distribution audit by law_id, chunk_kind, field, and marker."
                 ),
@@ -1499,7 +1501,7 @@ def _build_embedding_readiness_summary(
             {
                 "category": "short_text_warnings",
                 "count": short_text_warnings,
-                "source_slice": "3G",
+                "source_check": "text_length_readiness",
                 "recommended_action": (
                     "Audit short chunks by law_id, chunk_kind, citation, and "
                     "repealed metadata before deciding drop/merge policy."
@@ -2038,7 +2040,7 @@ def _scan_repealed_patterns(
 def _check_citation_structure(chunk: LegalChunk) -> list[tuple[str, str]]:
     """Return required citation components missing for a supported chunk kind.
 
-    Unknown chunk kinds are outside Slice 3C and are not failed here. Missing
+    Unknown chunk kinds are outside citation-structure check and are not failed here. Missing
     hierarchy metadata values are handled by required-field validation, so
     this helper skips checks whose expected value is absent.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backward-compatible wrapper for the fallback-aware Naive RAG Naive RAG workflow."""
+"""Backward-compatible wrapper for the fallback-aware Naive RAG workflow."""
 
 # ruff: noqa: E402
 

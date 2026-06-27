@@ -1,0 +1,41 @@
+{
+  "report_type": "development_reranking_ablation_manifest",
+  "benchmark_version": "v0.1.0",
+  "benchmark_manifest_sha256": "1f26e4e39ee2edab31a5951a4e252d4c5434511e6447c24af3e907fbab720c68",
+  "split_manifest_sha256": "94ceaccefa8e335054e9e28f194011e2beb254b5b991c1503ca2e53cbe33c217",
+  "base_retrieval_method": "coverage_aware_quota",
+  "base_retrieval_strategy": "coverage_aware_quota",
+  "base_retrieval_manifest_sha256": "44ddf44b3471636314db732383528a548ca0ffa1dfd04caa9ec9d9f17bb6a215",
+  "selection_split": "development",
+  "reranker_model": "BAAI/bge-reranker-v2-m3",
+  "reranker_device": "cpu",
+  "reranker_dependency": "transformers==5.10.2; torch",
+  "normalization_method": "per-query min-max for mixed-score variants",
+  "candidate_query_count": 85,
+  "qdrant_collection_name": "vnlaw_chunks_bgem3_v1_full",
+  "vector_name": "dense",
+  "embedding_model": "BAAI/bge-m3",
+  "chunk_source_path": "data/processed/legal_chunks.jsonl",
+  "chunk_source_sha256": "95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c",
+  "run_timestamp": "2026-06-27T04:05:11.535502+00:00",
+  "git_commit": "38a91f24a7d7339d0827e6e172bebb726025e9ef",
+  "command": [
+    "python",
+    "scripts/evaluation/run_reranking_ablation.py",
+    "--reranker-model",
+    "BAAI/bge-reranker-v2-m3",
+    "--device",
+    "cpu",
+    "--output-dir",
+    "artifacts/reports/evaluation/advanced_rag/reranking_ablation"
+  ],
+  "known_limitations": [
+    "development-only ablation",
+    "retrieval-only evaluation",
+    "no generation",
+    "no fallback gate change",
+    "fixed ablation search space",
+    "held_out_test not used for config selection",
+    "reranker model dependency may affect reproducibility"
+  ]
+}

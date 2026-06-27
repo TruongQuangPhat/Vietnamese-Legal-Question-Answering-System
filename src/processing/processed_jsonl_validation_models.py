@@ -1,9 +1,9 @@
-"""Phase 7 processed JSONL validation models.
+"""processed JSONL validation models.
 
-This module defines the data contracts for the Phase 7 validation gate:
+This module defines the data contracts for the processed JSONL validation gate:
 issue codes, structured issues, the validation report, and the config model.
-Phase 7 validates ``data/processed/legal_chunks.jsonl`` as a safe input for
-Phase 8 embedding/indexing. It does not implement embedding or indexing.
+processed JSONL validation validates ``data/processed/legal_chunks.jsonl`` as a safe input for
+embedding/indexing. It does not implement embedding or indexing.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProcessedJsonlValidationIssueCode(StrEnum):
-    """Stable issue and warning codes emitted by the Phase 7 validator."""
+    """Stable issue and warning codes emitted by the processed JSONL validation validator."""
 
     JSONL_PARSE_ERROR = "JSONL_PARSE_ERROR"
     SCHEMA_VALIDATION_FAILED = "SCHEMA_VALIDATION_FAILED"
@@ -39,10 +39,10 @@ class ProcessedJsonlValidationIssueCode(StrEnum):
 
 
 class ProcessedJsonlIssue(BaseModel):
-    """Structured Phase 7 validation issue or warning.
+    """Structured processed JSONL validation issue or warning.
 
     Attributes:
-        code: Stable Phase 7 issue code.
+        code: Stable processed JSONL validation issue code.
         message: Human-readable description of the issue.
         law_id: Law identifier associated with the issue.
         chunk_id: Affected chunk identifier, when available.
@@ -52,7 +52,9 @@ class ProcessedJsonlIssue(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    code: ProcessedJsonlValidationIssueCode = Field(..., description="Stable Phase 7 issue code")
+    code: ProcessedJsonlValidationIssueCode = Field(
+        ..., description="Stable processed JSONL validation issue code"
+    )
     message: str = Field(..., min_length=1, description="Human-readable issue message")
     law_id: str = Field(..., min_length=1, description="Stable law identifier")
     chunk_id: str | None = Field(None, description="Affected chunk identifier")
@@ -61,10 +63,10 @@ class ProcessedJsonlIssue(BaseModel):
 
 
 class ProcessedJsonlValidationReport(BaseModel):
-    """Phase 7 validation gate report for processed chunk JSONL.
+    """processed JSONL validation gate report for processed chunk JSONL.
 
     Written to ``artifacts/reports/chunking/processed_jsonl_validation_report.json``.
-    Confirms that ``data/processed/legal_chunks.jsonl`` is safe for Phase 8
+    Confirms that ``data/processed/legal_chunks.jsonl`` is safe for embedding/indexing
     embedding/indexing.
 
     Design note: ``errors_total`` and ``warnings_total`` are the authoritative
@@ -79,7 +81,7 @@ class ProcessedJsonlValidationReport(BaseModel):
         finished_at: ISO-8601 UTC finish timestamp.
         duration_seconds: Total validation duration in seconds.
         input_path: Path to the validated JSONL file.
-        chunking_report_path: Path to the Phase 6 chunking report.
+        chunking_report_path: Path to the parent-child chunking report.
         hierarchy_dir: Path to hierarchy JSON directory, or null if skipped.
         traceability_checks_skipped: True when hierarchy traceability was not run.
         total_lines: Total JSONL lines processed.
@@ -87,7 +89,7 @@ class ProcessedJsonlValidationReport(BaseModel):
         invalid_chunks: Chunks that failed at least one check.
         jsonl_parse_failures: Lines that failed JSON parsing.
         schema_failures: Rows that failed LegalChunk schema validation.
-        required_field_failures: Chunks missing required Phase 8 fields.
+        required_field_failures: Chunks missing required embedding/indexing fields.
         duplicate_chunk_ids: Duplicate chunk_id values detected.
         count_reconciliation_failures: Count mismatches against chunking report.
         hash_mismatches: Chunks whose stored hash differs from recomputed hash.
@@ -119,7 +121,9 @@ class ProcessedJsonlValidationReport(BaseModel):
     finished_at: str = Field(..., min_length=1, description="ISO-8601 UTC finish time")
     duration_seconds: float = Field(..., ge=0.0, description="Validation duration in seconds")
     input_path: str = Field(..., min_length=1, description="Validated JSONL path")
-    chunking_report_path: str = Field(..., min_length=1, description="Phase 6 chunking report path")
+    chunking_report_path: str = Field(
+        ..., min_length=1, description="parent-child chunking report path"
+    )
     hierarchy_dir: str | None = Field(None, description="Hierarchy JSON directory path or null")
     traceability_checks_skipped: bool = Field(
         False, description="True if hierarchy traceability was not run"
@@ -131,7 +135,7 @@ class ProcessedJsonlValidationReport(BaseModel):
     jsonl_parse_failures: int = Field(0, ge=0, description="Lines that failed JSON parsing")
     schema_failures: int = Field(0, ge=0, description="Rows failing LegalChunk schema validation")
     required_field_failures: int = Field(
-        0, ge=0, description="Chunks missing required Phase 8 fields"
+        0, ge=0, description="Chunks missing required embedding/indexing fields"
     )
     duplicate_chunk_ids: int = Field(0, ge=0, description="Duplicate chunk_id values detected")
     count_reconciliation_failures: int = Field(
@@ -212,7 +216,7 @@ class ProcessedJsonlValidationReport(BaseModel):
 
 
 class ProcessedJsonlValidationConfig(BaseModel):
-    """Configuration for the Phase 7 processed JSONL validator.
+    """Configuration for the processed JSONL validator.
 
     Loaded from ``configs/processing/processed_jsonl_validation.yml``.
     Controls thresholds, marker lists, and file paths.
@@ -221,7 +225,7 @@ class ProcessedJsonlValidationConfig(BaseModel):
         schema_version: Config schema version.
         validator_version: Validator version string.
         input_path: Path to the processed JSONL file.
-        chunking_report_path: Path to the Phase 6 chunking report.
+        chunking_report_path: Path to the parent-child chunking report.
         hierarchy_dir: Path to hierarchy JSON directory.
         report_path: Output path for the validation report.
         require_hierarchy_traceability: Whether hierarchy checks are mandatory.
@@ -248,7 +252,7 @@ class ProcessedJsonlValidationConfig(BaseModel):
     chunking_report_path: str = Field(
         "artifacts/reports/chunking/chunking_report.json",
         min_length=1,
-        description="Phase 6 chunking report path",
+        description="parent-child chunking report path",
     )
     hierarchy_dir: str | None = Field(
         "data/interim", description="Hierarchy JSON directory or null"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Command-line entrypoint for Phase 5 legal hierarchy parsing.
+"""Command-line entrypoint for legal hierarchy parsing.
 
 Usage:
     uv run python scripts/corpus/parse_legal_hierarchy.py \
@@ -48,7 +48,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="scripts/corpus/parse_legal_hierarchy.py",
-        description="Parse normalized Vietnamese legal documents into Phase 5 hierarchy JSON.",
+        description="Parse normalized Vietnamese legal documents into legal hierarchy parsing hierarchy JSON.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -98,7 +98,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the Phase 5 legal hierarchy parsing CLI.
+    """Run the legal hierarchy parsing CLI.
 
     Args:
         argv: Optional argument vector for tests. When omitted, argparse reads

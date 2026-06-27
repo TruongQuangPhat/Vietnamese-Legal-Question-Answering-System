@@ -1,5 +1,9 @@
 # Project Setup & Development Principles
 
+> Historical note: this setup document preserves early engineering principles
+> and scaffolding guidance. Use `README.md` and `PROJECT_CONTEXT.md` for the
+> current implemented/evaluated project state.
+
 ## Overview
 
 This document describes the development environment, coding standards, and architectural principles for the VnLaw-QA system. Proper setup ensures consistent tooling, dependency management, and quality enforcement across the Vietnamese Legal QA pipeline.

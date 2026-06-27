@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "benchmark_version": "v0.1.0",
+  "freeze_date": "2026-06-21T11:47:44.374157Z",
+  "record_counts": {
+    "queries": 128,
+    "legal_targets": 207,
+    "evidence_judgments": 207,
+    "evidence_groups": 188,
+    "review_records": 256
+  },
+  "raw_file_sha256": {
+    "queries": "d4527a7c72ffc8517f710916e2c9564dd621dab855cf880d508a47c3b7ee3558",
+    "legal_targets": "e2e2f08414b758271fb533f53e81a81de289c86b77e0a1469b8aef59849a7bf5",
+    "evidence_judgments": "9d7a281f3027ace506e35c2ae41fb2034eef600f3cbb63dc54d9a29c54dd02b3",
+    "evidence_groups": "1506456748dbab06e3e8afdb89803facba388498d9a84f3e86295880aa9d5aec",
+    "review_records": "dc0ad8cb482bb849c6fa97baa7fc73e0ec3b0d5d6aa89842a461311780f7bbb6",
+    "split_manifest": "94ceaccefa8e335054e9e28f194011e2beb254b5b991c1503ca2e53cbe33c217"
+  },
+  "canonical_content_sha256": {
+    "queries": "12a8187a1245b2d220598d942a75567933a1733effec21217934b54327e93084",
+    "legal_targets": "ab787dff694a01b066a317d62b2c1c995b0aee7e478d5e1a62bf077d901ed451",
+    "evidence_judgments": "cbf4c6a99e50851644c0eee4265a5e544edcb38c5ba70610d7c495e06314cde8",
+    "evidence_groups": "65cc71f135d79a2a61683b303ba0dd4a388076edfe98cdf7cbae05ff948ebe0f",
+    "review_records": "387300aa0b62523e881b787055db40306993768f48b3a59067c4213c00cf7358",
+    "split_manifest": "9c994737b9186f63e3ab1d9a987b1c6ca33f6362183aa5f46042e3ce17544cc3"
+  },
+  "corpus_registry_raw_file_sha256": "1042c9e8b0c29d3c4da28cd16f32bbc367ba0d77cd06c84f50638fc7811f79fa",
+  "processed_chunks_raw_file_sha256": "95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c",
+  "split_manifest_raw_file_sha256": "94ceaccefa8e335054e9e28f194011e2beb254b5b991c1503ca2e53cbe33c217",
+  "split_manifest_canonical_content_sha256": "9c994737b9186f63e3ab1d9a987b1c6ca33f6362183aa5f46042e3ce17544cc3",
+  "manifest_canonical_content_sha256": "aa350306fa2301324a2e9f27733c66db2825dbdef10601202f9793563d690310",
+  "review_status": "frozen",
+  "change_log": [
+    "Scoped v0.1.0 benchmark freeze with low/medium-risk held-out only; high-risk cases without qualified human legal review remain development-only."
+  ]
+}

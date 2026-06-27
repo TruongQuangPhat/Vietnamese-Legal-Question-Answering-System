@@ -1,7 +1,7 @@
-"""Deterministic Phase 6 parent-child chunk selection.
+"""Deterministic parent-child chunk selection.
 
-This module converts one already-validated Phase 5 legal hierarchy document
-into in-memory Phase 6 chunks. It does not discover files, write JSONL,
+This module converts one already-validated legal hierarchy document
+into in-memory parent-child chunking chunks. It does not discover files, write JSONL,
 validate corpus-wide uniqueness, generate embeddings, or repair legal text.
 """
 
@@ -32,7 +32,7 @@ CHUNKER_VERSION = "v0.1.0"
 class LegalChunker:
     """Create parent-child chunks from one canonical legal hierarchy document.
 
-    The chunker uses the final deterministic Phase 5 node IDs directly. It
+    The chunker uses the final deterministic legal hierarchy parsing node IDs directly. It
     selects Article fallback chunks, Clause chunks, or Point chunks according
     to the parent-child policy, while preserving each chunk's parent Article
     text and offsets for downstream retrieval and citation validation.
@@ -305,7 +305,7 @@ def _source_warning_codes(
     source: LegalNode,
     article: LegalNode,
 ) -> list[str]:
-    """Return Phase 5 warning codes that directly affect this chunk."""
+    """Return legal hierarchy parsing warning codes that directly affect this chunk."""
     node_ids = {source.node_id, article.node_id}
     return [warning.code.value for warning in warnings if warning.node_id in node_ids]
 
@@ -354,8 +354,8 @@ def _source_integrity_warnings(
 ) -> list[ChunkingIssue]:
     """Return source-slicing warnings when root text is available for checking.
 
-    Real Phase 5 hierarchy documents store root Law text as the complete
-    normalized document, which lets Phase 6 compare chunk offsets against exact
+    Real legal hierarchy parsing hierarchy documents store root Law text as the complete
+    normalized document, which lets parent-child chunking compare chunk offsets against exact
     source slices. Small legacy unit fixtures may not include full root text;
     those are skipped here and will be replaced by validator-focused fixtures
     in later slices.

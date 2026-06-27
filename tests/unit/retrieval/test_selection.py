@@ -11,7 +11,7 @@ from src.retrieval.evidence import (
     EvidenceSafetyLevel,
     build_evidence_packet,
 )
-from src.retrieval.models import RetrievedChunk
+from src.retrieval.models import RetrievalIssue, RetrievalIssueSeverity, RetrievedChunk
 from src.retrieval.selection import (
     AnswerabilityDecision,
     EvidenceRejectionReason,
@@ -39,6 +39,7 @@ def make_chunk(
     parent_text: str | None = None,
     source_url: str | None = "https://thuvienphapluat.vn/example",
     source_domain: str | None = "thuvienphapluat.vn",
+    issues: list[RetrievalIssue] | None = None,
 ) -> RetrievedChunk:
     """Build one retrieved chunk for selection tests."""
     return RetrievedChunk(
@@ -57,6 +58,7 @@ def make_chunk(
         parent_text=parent_text,
         source_url=source_url,
         source_domain=source_domain,
+        issues=issues or [],
     )
 
 
@@ -173,12 +175,12 @@ def test_caution_evidence_with_citable_child_text_can_be_selected() -> None:
     )
 
     assert result.selected_count == 1
-    assert result.decision == AnswerabilityDecision.NEEDS_REVIEW
-    assert result.selected_evidence[0].citation_scope == CitationScope.UNSAFE_PARENT_CONTEXT
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.selected_evidence[0].citation_scope == CitationScope.CHILD_EXACT
 
 
-def test_only_caution_parent_context_fallbacks_by_default() -> None:
-    """Default config treats parent-context-only selected evidence as fallback."""
+def test_citable_child_with_auxiliary_parent_context_allows_answer_by_default() -> None:
+    """Auxiliary parent context does not block a citation-ready child packet."""
     caution = make_packet(
         clause_number="4",
         citation="Khoản 4, Điều 113, Bộ luật Lao động",
@@ -188,8 +190,51 @@ def test_only_caution_parent_context_fallbacks_by_default() -> None:
 
     result = select_evidence_for_answer(make_bundle([caution]))
 
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.selected_count == 1
+    assert result.selected_evidence[0].citation_scope == CitationScope.CHILD_EXACT
+    assert FallbackReasonCode.PARENT_CONTEXT_ONLY not in {
+        reason.code for reason in result.fallback_reasons
+    }
+
+
+def test_parent_context_without_child_text_still_fallbacks() -> None:
+    """Parent context alone remains non-citable."""
+    parent_only = make_packet(
+        citation="Khoản 4, Điều 113, Bộ luật Lao động",
+        text=None,
+        parent_text="Điều 113. Nghỉ hằng năm\n1. Người lao động được nghỉ...",
+    )
+
+    result = select_evidence_for_answer(make_bundle([parent_only]))
+
     assert result.decision == AnswerabilityDecision.FALLBACK_REQUIRED
-    assert FallbackReasonCode.PARENT_CONTEXT_ONLY in {
+    assert result.selected_count == 0
+    assert result.rejected_evidence[0].packet.safety_level == EvidenceSafetyLevel.UNSAFE
+    assert (
+        EvidenceRejectionReason.MISSING_REQUIRED_CHILD_TEXT in result.rejected_evidence[0].reasons
+    )
+
+
+def test_auxiliary_parent_context_does_not_rescue_ambiguous_caution() -> None:
+    """Non-auxiliary caution still blocks answerability."""
+    ambiguous = make_packet(
+        citation="Khoản 4, Điều 113, Bộ luật Lao động",
+        text="4. Người sử dụng lao động có trách nhiệm quy định lịch nghỉ hằng năm.",
+        parent_text="Điều 113. Nghỉ hằng năm\n1. Người lao động được nghỉ...",
+        issues=[
+            RetrievalIssue(
+                code="ambiguous_candidate",
+                severity=RetrievalIssueSeverity.WARNING,
+                message="candidate needs review before answer use",
+            )
+        ],
+    )
+
+    result = select_evidence_for_answer(make_bundle([ambiguous]))
+
+    assert result.decision == AnswerabilityDecision.NEEDS_REVIEW
+    assert FallbackReasonCode.ALL_SELECTED_EVIDENCE_CAUTION in {
         reason.code for reason in result.fallback_reasons
     }
 
@@ -442,6 +487,36 @@ def test_expected_target_caution_packet_can_be_selected_ahead_of_non_target_safe
     assert result.selected_count == 1
     assert result.selected_evidence[0].chunk_id == "article-2-clause-1"
     assert result.selected_evidence[0].safety_level == EvidenceSafetyLevel.CAUTION
+
+
+def test_required_child_evidence_with_auxiliary_parent_context_passes_eval_gate() -> None:
+    """A retrieved target child remains selectable when parent context is auxiliary."""
+    target = make_packet(
+        chunk_id="article-2-clause-1",
+        law_id="BLDS_2015",
+        article_number="2",
+        clause_number="1",
+        citation="Khoản 1, Điều 2, Bộ luật Dân sự 2015",
+        text="1. Ở nước Cộng hòa xã hội chủ nghĩa Việt Nam, các quyền dân sự...",
+        parent_text="Điều 2. Công nhận, tôn trọng, bảo vệ và bảo đảm quyền dân sự...",
+    )
+    expected = [
+        ExpectedTarget(
+            law_id="BLDS_2015",
+            article_number="2",
+            clause_number="1",
+            point_label=None,
+            match_level="clause",
+        )
+    ]
+
+    result = select_evidence_for_answer(make_bundle([target]), expected_targets=expected)
+
+    assert result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    assert result.selected_count == 1
+    assert result.selected_evidence[0].chunk_id == "article-2-clause-1"
+    assert result.selected_evidence[0].citation_scope == CitationScope.CHILD_EXACT
+    assert result.selected_evidence[0].has_auxiliary_context is True
 
 
 def test_expected_target_sorting_does_not_treat_sibling_clause_as_match() -> None:

@@ -1,0 +1,295 @@
+{
+  "administrative_government_interaction": {
+    "case_count": 11,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 3,
+      "fallback_required_answered": 3,
+      "selected_evidence_empty": 3,
+      "required_evidence_not_retrieved": 2,
+      "required_evidence_retrieved_but_not_selected": 1,
+      "selected_but_incomplete_required_group_coverage": 0,
+      "parent_context_only_fallback": 1,
+      "all_selected_evidence_caution": 1,
+      "exact_target_missing_in_eval_mode": 2,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 1,
+      "fallback_policy": 3,
+      "none": 5,
+      "retrieval": 2
+    },
+    "selection_bottleneck_count": 1,
+    "selection_bottleneck_rate": 0.09090909090909091,
+    "selected_evidence_empty_count": 3,
+    "required_evidence_not_retrieved_count": 2,
+    "required_evidence_retrieved_but_not_selected_count": 1
+  },
+  "business_banking_tax": {
+    "case_count": 14,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 7,
+      "fallback_required_answered": 1,
+      "selected_evidence_empty": 8,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 7,
+      "selected_but_incomplete_required_group_coverage": 0,
+      "parent_context_only_fallback": 8,
+      "all_selected_evidence_caution": 8,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 8,
+      "fallback_policy": 1,
+      "none": 5
+    },
+    "selection_bottleneck_count": 8,
+    "selection_bottleneck_rate": 0.5714285714285714,
+    "selected_evidence_empty_count": 8,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 7
+  },
+  "civil_family_identity": {
+    "case_count": 14,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 7,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 8,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 7,
+      "selected_but_incomplete_required_group_coverage": 1,
+      "parent_context_only_fallback": 8,
+      "all_selected_evidence_caution": 8,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 9,
+      "none": 5
+    },
+    "selection_bottleneck_count": 9,
+    "selection_bottleneck_rate": 0.6428571428571429,
+    "selected_evidence_empty_count": 8,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 7
+  },
+  "civil_procedure_dispute_resolution": {
+    "case_count": 11,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 6,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 6,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 6,
+      "selected_but_incomplete_required_group_coverage": 1,
+      "parent_context_only_fallback": 6,
+      "all_selected_evidence_caution": 6,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 7,
+      "none": 4
+    },
+    "selection_bottleneck_count": 7,
+    "selection_bottleneck_rate": 0.6363636363636364,
+    "selected_evidence_empty_count": 6,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 6
+  },
+  "constitutional_state_rights": {
+    "case_count": 7,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 1,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 1,
+      "required_evidence_not_retrieved": 1,
+      "required_evidence_retrieved_but_not_selected": 0,
+      "selected_but_incomplete_required_group_coverage": 0,
+      "parent_context_only_fallback": 1,
+      "all_selected_evidence_caution": 1,
+      "exact_target_missing_in_eval_mode": 1,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "none": 6,
+      "retrieval": 1
+    },
+    "selection_bottleneck_count": 0,
+    "selection_bottleneck_rate": 0.0,
+    "selected_evidence_empty_count": 1,
+    "required_evidence_not_retrieved_count": 1,
+    "required_evidence_retrieved_but_not_selected_count": 0
+  },
+  "consumer_health_education_digital_ip": {
+    "case_count": 16,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 7,
+      "fallback_required_answered": 1,
+      "selected_evidence_empty": 8,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 7,
+      "selected_but_incomplete_required_group_coverage": 2,
+      "parent_context_only_fallback": 8,
+      "all_selected_evidence_caution": 8,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 10,
+      "fallback_policy": 1,
+      "none": 5
+    },
+    "selection_bottleneck_count": 10,
+    "selection_bottleneck_rate": 0.625,
+    "selected_evidence_empty_count": 8,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 7
+  },
+  "criminal_procedure_penalty": {
+    "case_count": 9,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 5,
+      "fallback_required_answered": 1,
+      "selected_evidence_empty": 6,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 5,
+      "selected_but_incomplete_required_group_coverage": 0,
+      "parent_context_only_fallback": 6,
+      "all_selected_evidence_caution": 6,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 6,
+      "fallback_policy": 1,
+      "none": 2
+    },
+    "selection_bottleneck_count": 6,
+    "selection_bottleneck_rate": 0.6666666666666666,
+    "selected_evidence_empty_count": 6,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 5
+  },
+  "labor_employment_social_security": {
+    "case_count": 14,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 6,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 9,
+      "required_evidence_not_retrieved": 1,
+      "required_evidence_retrieved_but_not_selected": 5,
+      "selected_but_incomplete_required_group_coverage": 4,
+      "parent_context_only_fallback": 9,
+      "all_selected_evidence_caution": 9,
+      "exact_target_missing_in_eval_mode": 1,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 12,
+      "none": 1,
+      "retrieval": 1
+    },
+    "selection_bottleneck_count": 12,
+    "selection_bottleneck_rate": 0.8571428571428571,
+    "selected_evidence_empty_count": 9,
+    "required_evidence_not_retrieved_count": 1,
+    "required_evidence_retrieved_but_not_selected_count": 5
+  },
+  "land_real_estate_construction_environment": {
+    "case_count": 14,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 11,
+      "fallback_required_answered": 1,
+      "selected_evidence_empty": 12,
+      "required_evidence_not_retrieved": 1,
+      "required_evidence_retrieved_but_not_selected": 10,
+      "selected_but_incomplete_required_group_coverage": 1,
+      "parent_context_only_fallback": 12,
+      "all_selected_evidence_caution": 12,
+      "exact_target_missing_in_eval_mode": 1,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 12,
+      "fallback_policy": 1,
+      "retrieval": 1
+    },
+    "selection_bottleneck_count": 12,
+    "selection_bottleneck_rate": 0.8571428571428571,
+    "selected_evidence_empty_count": 12,
+    "required_evidence_not_retrieved_count": 1,
+    "required_evidence_retrieved_but_not_selected_count": 10
+  },
+  "maritime_transport": {
+    "case_count": 5,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 1,
+      "fallback_required_answered": 1,
+      "selected_evidence_empty": 1,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 1,
+      "selected_but_incomplete_required_group_coverage": 1,
+      "parent_context_only_fallback": 1,
+      "all_selected_evidence_caution": 1,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 2,
+      "fallback_policy": 1,
+      "none": 2
+    },
+    "selection_bottleneck_count": 2,
+    "selection_bottleneck_rate": 0.4,
+    "selected_evidence_empty_count": 1,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 1
+  },
+  "traffic_public_order_sanctions": {
+    "case_count": 13,
+    "diagnostic_counts": {
+      "answer_allowed_fallback": 9,
+      "fallback_required_answered": 0,
+      "selected_evidence_empty": 11,
+      "required_evidence_not_retrieved": 0,
+      "required_evidence_retrieved_but_not_selected": 9,
+      "selected_but_incomplete_required_group_coverage": 2,
+      "parent_context_only_fallback": 11,
+      "all_selected_evidence_caution": 11,
+      "exact_target_missing_in_eval_mode": 0,
+      "citation_guard_fallback": 0,
+      "retrieval_error": 0,
+      "generation_error": 0
+    },
+    "likely_bottleneck_counts": {
+      "evidence_selection": 13
+    },
+    "selection_bottleneck_count": 13,
+    "selection_bottleneck_rate": 1.0,
+    "selected_evidence_empty_count": 11,
+    "required_evidence_not_retrieved_count": 0,
+    "required_evidence_retrieved_but_not_selected_count": 9
+  }
+}
