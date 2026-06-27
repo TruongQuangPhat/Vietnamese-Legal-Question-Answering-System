@@ -1,11 +1,11 @@
 ---
 name: vnlaw-data-ingestion
-description: Use for registry-driven legal crawling, raw source storage, source metadata, batch ingestion, retry/rate-limit policy, and raw corpus audit for VnLaw-QA.
+description: Use for registry-driven legal crawling, raw source storage, source metadata, batch ingestion, retry/rate-limit policy, raw corpus audit, and ingestion maintenance for VnLaw-QA.
 ---
 
 # Data Ingestion Skill
 
-Use this skill when implementing, reviewing, or debugging legal data ingestion.
+Use this skill when maintaining, reviewing, or debugging legal data ingestion and raw corpus acquisition.
 
 The preferred ingestion workflow is registry-driven:
 
@@ -14,21 +14,27 @@ configs/laws/corpus_registry.yml
   → async crawler
   → raw artifact storage
   → metadata.json
+  → raw corpus audit
   → cleaning/normalization
   → legal parsing
   → parent-child chunking
   → processed JSONL
-  → verification
+  → embedding/indexing readiness
 ```
 
-For the crawling/audit phase, focus only on reliable corpus acquisition, raw
-storage, and raw artifact validation. Parsing, chunking, JSONL validation,
-embedding, Qdrant, Neo4j, Advanced RAG, and GraphRAG belong to later gates.
+## Current Status
 
-Phase 4 Cleaning & Normalization, Phase 5 Legal Hierarchy Parsing, and Phase 6
-Parent-child Chunking are complete and hardened. The current next engineering
-phase is Phase 7 Processed Chunk Validation & Embedding Readiness over
-`data/processed/legal_chunks.jsonl`.
+The registry-driven ingestion workflow is implemented for the current 52-document Vietnamese legal corpus. Downstream cleaning, legal parsing, parent-child chunking, processed JSONL validation, embedding/indexing, retrieval, and strict generation evaluation have also been completed.
+
+Use this skill for maintenance, debugging, audit, or regression fixes in crawling and raw artifact handling. Do not expand ingestion behavior unless a concrete raw-corpus defect is proven with direct examples, traceable metadata, and tests.
+
+Raw corpus paths are protected. Do not modify `data/raw/**`, `data/interim/**`, `data/reports/**`, or `data/processed/legal_chunks.jsonl` unless the user explicitly scopes that operation.
+
+Workflow-level integration tests for corpus processing exist under:
+
+```text
+tests/integration/corpus/
+```
 
 ## Trusted Source
 
@@ -40,7 +46,7 @@ https://thuvienphapluat.vn
 
 Do not crawl other domains unless explicitly approved.
 
-Prefer VBHN documents when available. If no VBHN exists, preserve original law and amendment chronology with effective-date metadata.
+Prefer VBHN documents when available. If no VBHN exists, preserve original law and amendment chronology with effective-date metadata when available.
 
 ## Expected Files
 
@@ -66,6 +72,7 @@ tests/unit/ingestion/test_crawler.py
 tests/unit/ingestion/test_audit.py
 tests/unit/services/test_crawl_service.py
 tests/unit/services/test_raw_audit_service.py
+tests/integration/corpus/
 ```
 
 ## Corpus Registry
@@ -92,15 +99,17 @@ corpus:
     notes: null
 ```
 
-The crawler must support:
+The crawler should support:
 
-- crawl all `pending` laws;
-- crawl by tier;
-- crawl by group;
-- crawl by explicit `law_id`;
-- crawl from a temporary approved URL list;
-- continue after individual target failures;
-- report a final crawl summary.
+* crawl all `pending` laws;
+* crawl by tier;
+* crawl by group;
+* crawl by explicit `law_id`;
+* crawl from a temporary approved URL list;
+* continue after individual target failures;
+* report a final crawl summary.
+
+Do not hardcode corpus URLs in Python source code.
 
 ## Raw Storage Contract
 
@@ -158,18 +167,18 @@ Do not overwrite raw artifacts without traceability or content-hash history.
 
 ## Crawler Rules
 
-- Use async I/O.
-- Use conservative rate limiting.
-- Default delay: 2 seconds per host.
-- Default batch concurrency: 2.
-- Absolute max concurrency: 3 unless explicitly approved.
-- Use retries with exponential backoff.
-- Use a valid User-Agent.
-- Validate source domain before crawling.
-- Store raw HTML/PDF/DOC/DOCX before parsing.
-- Compute content hash for every raw artifact.
-- Record actionable failure metadata.
-- Never use `except Exception: pass`.
+* Use async I/O.
+* Use conservative rate limiting.
+* Default delay: 2 seconds per host.
+* Default batch concurrency: 2.
+* Absolute max concurrency: 3 unless explicitly approved.
+* Use retries with exponential backoff.
+* Use a valid User-Agent.
+* Validate source domain before crawling.
+* Store raw HTML/PDF/DOC/DOCX before parsing.
+* Compute content hash for every raw artifact.
+* Record actionable failure metadata.
+* Never use `except Exception: pass`.
 
 ## OOP and Code Quality Rules
 
@@ -189,13 +198,15 @@ CrawlStatusWriter
 
 Rules:
 
-- Use Pydantic models at data boundaries.
-- Keep crawler, parser, chunker, embedder, vector store, and graph store separate.
-- Do not create a god class that performs crawling, parsing, embedding, and ingestion together.
-- Public classes and functions must have Google-style docstrings.
-- Docstrings must explain purpose, args, returns, raises, side effects, and traceability assumptions.
+* Use Pydantic models at data boundaries.
+* Keep crawler, parser, chunker, embedder, vector store, and graph store separate.
+* Do not create a god class that performs crawling, parsing, embedding, and ingestion together.
+* Public classes and functions must have Google-style docstrings.
+* Docstrings must explain purpose, args, returns, raises, side effects, and traceability assumptions.
 
 ## Commands
+
+These commands touch protected corpus/artifact paths. Run them only when the user explicitly scopes a real corpus ingestion or audit task.
 
 Crawl one law for debugging:
 
@@ -237,7 +248,7 @@ uv run python scripts/corpus/audit_raw_corpus.py \
   --output artifacts/reports/audit/raw_corpus_audit.json
 ```
 
-Run cleaning & normalization:
+Run cleaning and normalization:
 
 ```bash
 uv run python scripts/corpus/clean_raw_corpus.py \
@@ -246,25 +257,31 @@ uv run python scripts/corpus/clean_raw_corpus.py \
   --report artifacts/reports/cleaning/cleaning_report.json
 ```
 
-## Definition of Done
+For tests, prefer tiny fixtures, mocks/fakes, and `tmp_path` instead of real corpus paths.
 
-- [ ] `configs/laws/corpus_registry.yml` exists and contains the approved 52-law corpus.
-- [ ] Batch crawler supports registry-driven crawling.
-- [ ] Single-law crawling still works for debugging.
-- [ ] Every crawled law has `latest/main.html` and `latest/metadata.json`.
-- [ ] Each crawl run writes a batch report to `artifacts/reports/crawling/crawl_report.json` by default.
-- [ ] Every raw artifact has a content hash.
-- [ ] Failed crawls are traceable and actionable.
-- [ ] Attachment-based documents are handled or marked `manual_review`.
-- [ ] Raw corpus audit reports missing/corrupt artifacts before cleaning.
-- [ ] No parser, chunker, embedding, vector DB, or graph DB work is mixed into the crawling service.
+## Maintenance Checklist
+
+Use this checklist when changing ingestion behavior:
+
+* [ ] Registry-driven crawling still works.
+* [ ] Single-law crawling still works for debugging.
+* [ ] Every crawled law has `latest/main.html` and `latest/metadata.json`.
+* [ ] Every raw artifact has a content hash.
+* [ ] Failed crawls are traceable and actionable.
+* [ ] Attachment-based documents are handled or marked `manual_review`.
+* [ ] Raw corpus audit reports missing/corrupt artifacts before cleaning.
+* [ ] Crawler changes do not modify parser, chunker, embedding, vector DB, or graph DB logic.
+* [ ] Unit tests cover the changed behavior.
+* [ ] Integration tests use tiny fixtures and do not require real crawling unless explicitly scoped.
 
 ## Do Not
 
-- Do not crawl unapproved sources.
-- Do not hardcode corpus URLs in Python source code.
-- Do not parse directly from network responses.
-- Do not skip raw source storage.
-- Do not suppress crawler/parser errors.
-- Do not overwrite raw or processed artifacts without traceability.
-- Do not mix crawler, parser, embedding, vector DB, and graph DB logic in one class.
+* Do not crawl unapproved sources.
+* Do not hardcode corpus URLs in Python source code.
+* Do not parse directly from network responses.
+* Do not skip raw source storage.
+* Do not suppress crawler/parser errors.
+* Do not overwrite raw or processed artifacts without traceability.
+* Do not mix crawler, parser, embedding, vector DB, and graph DB logic in one class.
+* Do not modify protected corpus outputs unless explicitly scoped.
+* Do not run real crawling, cleaning, or audit commands as part of routine validation.

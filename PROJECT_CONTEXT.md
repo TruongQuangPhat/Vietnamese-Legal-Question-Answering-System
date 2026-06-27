@@ -29,8 +29,8 @@ Corpus registry
 -> parent-child chunking
 -> processed chunk validation
 -> BGE-M3 dense indexing in Qdrant
--> dense retrieval
--> sparse BM25 retrieval
+-> Qdrant dense retrieval
+-> local BM25 sparse retrieval
 -> fixed RRF fusion
 -> coverage-aware quota retrieval
 -> evidence construction and selection
@@ -53,15 +53,19 @@ src/
   ingestion/    # registry, crawl, audit, cleaning, storage
   processing/   # hierarchy parsing, chunking, JSONL validation
   indexing/     # embedding and Qdrant indexing/validation
-  retrieval/    # retrieval, evidence, selection, generation, evaluation, quality gate
+  retrieval/    # retrieval, fusion, evidence construction/selection, RAG pipeline behavior, citation/fallback integration where currently implemented
+  generation/   # generation-specific helpers where implemented
   services/     # existing orchestration services
-  evaluation/   # benchmark schemas, metrics, workflows, diagnostics
+  evaluation/   # benchmark schemas, metrics, workflows, diagnostics, artifact contracts
   api/          # not part of the adopted evaluated pipeline
   monitoring/   # separately scoped
   security/     # separately scoped
 ```
 
 Scripts are thin wrappers. Reusable logic belongs under `src/`.
+
+BM25 sparse retrieval is local/manual in the current final pipeline. It is not a Qdrant sparse named-vector index.
+
 
 ## 3. Legal QA Safety Invariants
 
@@ -277,13 +281,16 @@ artifacts/reports/evaluation/
 
 Unless explicitly requested:
 
-- do not call OpenRouter/Gemini/API;
-- do not call real Qdrant retrieval;
-- do not write to Qdrant;
-- do not recreate/delete Qdrant collections;
-- do not re-embed or re-index the corpus;
-- do not run reranking inference;
-- do not run full benchmark or strict generation evaluation.
+* do not call OpenRouter/Gemini/API;
+* do not run real Qdrant-backed retrieval or evaluation;
+* do not write to Qdrant;
+* do not recreate/delete Qdrant collections;
+* do not re-embed or re-index the corpus;
+* do not run real embedding inference;
+* do not run reranking inference;
+* do not run full benchmark or strict generation evaluation.
+
+When real retrieval/evaluation is explicitly scoped, keep Qdrant read-only unless the task explicitly scopes indexing, payload mutation, collection recreation, or upsert behavior.
 
 ## 10. Durable Documentation
 
@@ -299,3 +306,19 @@ Unless explicitly requested:
 
 Historical roadmap/journal docs are not authoritative when they conflict with
 this file.
+
+## 11. Future or Separately Scoped Work
+
+The following are not part of the current adopted evaluated pipeline unless a future task explicitly scopes, implements, and evaluates them:
+
+* GraphRAG / Neo4j graph traversal;
+* multi-agent retrieval or orchestration;
+* API/backend deployment;
+* UI;
+* time-aware legal filtering;
+* cross-encoder reranking as an adopted pipeline component;
+* fine-tuning;
+* production monitoring or MLOps infrastructure;
+* new trusted legal-source architecture.
+
+Reranking was evaluated as an ablation and was not adopted. Held-out results are reporting-only and must not be used for tuning.

@@ -1,11 +1,26 @@
 ---
 name: vnlaw-source-corpus
-description: Use when adding, validating, crawling, prioritizing, or versioning Vietnamese legal data sources and corpus registry entries.
+description: Use when adding, validating, crawling, prioritizing, or versioning Vietnamese legal data sources, corpus registry entries, trusted source metadata, and raw corpus maintenance.
 ---
 
 # Source Corpus and Legal Data Registry Skill
 
-Use this skill for source, crawl, and corpus registry tasks.
+Use this skill for trusted source selection, crawl planning, corpus registry tasks, and legal source metadata maintenance.
+
+## Current Status
+
+The current corpus is registry-driven and contains 52 Vietnamese legal documents from the trusted source. The processed corpus currently has 40,389 validated legal chunks.
+
+Use this skill for maintenance, validation, review, or explicitly scoped corpus expansion. Do not modify the corpus registry, crawl new sources, or mutate protected corpus artifacts unless the user explicitly scopes that task.
+
+Protected paths include:
+
+```text
+data/raw/**
+data/interim/**
+data/reports/**
+data/processed/legal_chunks.jsonl
+```
 
 ## Trusted Source
 
@@ -31,10 +46,12 @@ When no VBHN exists:
 
 ```text
 1. Crawl the original law.
-2. Crawl amendments chronologically.
-3. Record effective and expiry dates.
-4. Resolve applicable version at query time.
+2. Crawl amendments chronologically when explicitly scoped.
+3. Record effective and expiry dates when available.
+4. Preserve version metadata for future or separately scoped time-aware validity handling.
 ```
+
+Do not claim query-time legal validity resolution unless a time-aware workflow is explicitly implemented and evaluated.
 
 ## Law ID Naming Convention
 
@@ -71,6 +88,8 @@ configs/laws/corpus_registry.yml
 
 This file is the source of truth for crawl targets and legal metadata.
 
+Do not hardcode corpus URLs in Python source code.
+
 ## Corpus Registry Entry
 
 Recommended fields:
@@ -92,6 +111,8 @@ priority: "high"
 notes: ""
 ```
 
+Preserve enough metadata for downstream legal hierarchy parsing, citation traceability, retrieval filters, and future validity handling.
+
 ## Crawl Status Values
 
 Recommended values:
@@ -107,32 +128,39 @@ failed
 manual_review
 ```
 
-Use `manual_review` for unusual pages, missing URLs, or documents embedded as PDF/DOC/DOCX when parser support is incomplete.
+Use `manual_review` for unusual pages, missing URLs, ambiguous legal versions, or documents embedded as PDF/DOC/DOCX when parser support is incomplete.
 
 ## Crawl Safety
 
-- Respect rate limiting.
-- Use a clear User-Agent.
-- Cache raw artifacts under `data/raw/{law_id}/latest/`, preserving timestamped
-  snapshots under `data/raw/{law_id}/crawls/{timestamp}/` when refreshed.
-- Never overwrite raw source without timestamp/hash traceability.
-- Preserve source URL and parser version in every processed node.
+* Respect rate limiting.
+* Use a clear User-Agent.
+* Validate source domain before crawling.
+* Cache raw artifacts under `data/raw/{law_id}/latest/`.
+* Preserve timestamped snapshots under `data/raw/{law_id}/crawls/{timestamp}/` when refreshed.
+* Never overwrite raw source without timestamp/hash traceability.
+* Preserve source URL and parser/version metadata in downstream outputs.
+* Do not run real crawling unless explicitly scoped.
 
 ## Verification
 
-For each added law:
+For each added or modified law:
 
-- verify URL is from trusted source;
-- verify Law ID follows naming convention;
-- verify article count against source within ±2%;
-- verify hierarchy extraction;
-- verify metadata completeness;
-- add parser tests for representative structures.
+* verify URL is from trusted source;
+* verify Law ID follows naming convention;
+* verify source metadata is complete;
+* verify raw artifact storage is traceable;
+* verify article count against source within acceptable tolerance when parsing is involved;
+* verify hierarchy extraction when parsing is involved;
+* add or update parser/chunking tests for representative structures when the change affects downstream processing.
+
+Prefer small fixtures and `tmp_path` for tests. Do not use real crawl outputs in routine tests unless explicitly scoped.
 
 ## Do Not
 
-- Do not add unapproved sources.
-- Do not use vague Law IDs.
-- Do not mix original law and VBHN without version metadata.
-- Do not omit effective-date metadata when it is available.
-- Do not hardcode corpus URLs in Python source code.
+* Do not add unapproved sources.
+* Do not use vague Law IDs.
+* Do not mix original law and VBHN without version metadata.
+* Do not omit effective-date metadata when it is available.
+* Do not hardcode corpus URLs in Python source code.
+* Do not modify protected corpus artifacts unless explicitly scoped.
+* Do not run real crawling, cleaning, parsing, chunking, embedding, or indexing as routine validation.

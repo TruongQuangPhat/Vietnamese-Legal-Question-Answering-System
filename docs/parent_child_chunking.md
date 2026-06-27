@@ -250,13 +250,10 @@ long parent_text chunks >20,000 chars:   0
 Phase 6 still intentionally keeps the full Article parent context. Do not split
 Article parent text in Phase 6 using arbitrary character or token windows.
 
-## Next Phase
+## Downstream Status
 
-Next phase:
-
-```text
-Phase 7 — Processed Chunk Validation & Embedding Readiness
-```
-
-Phase 8 embedding/indexing should embed `text` only and keep `parent_text` as
-retrieval/LLM context payload.
+Processed JSONL validation, BGE-M3 dense indexing, Naive RAG, and Advanced RAG
+evaluation are now implemented. The downstream indexing contract remains:
+embed `text` only and keep `parent_text` as auxiliary retrieval/LLM context.
+Parent context is not directly citable; generated citations must map to
+selected child evidence.

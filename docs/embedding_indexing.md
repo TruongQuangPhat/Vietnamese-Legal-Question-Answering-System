@@ -8,7 +8,9 @@ embeddings and a metadata-preserving Qdrant index.
 Status: complete and validated. All 40,389 chunks are indexed in
 `vnlaw_chunks_bgem3_v1_full` with `BAAI/bge-m3`, named dense vector `dense`,
 dimension 1024, cosine distance, and `text_only`. Sparse indexing remains
-disabled for v1.
+disabled for the Qdrant collection. The adopted Advanced RAG workflow uses a
+local BM25 sparse retriever over processed chunks, then fuses dense and sparse
+results outside Qdrant.
 
 Official reports are under:
 
@@ -369,5 +371,5 @@ All errors include collection name and batch range for debugging.
 | `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
 | `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
 | `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
-| `docs/naive_rag.md` | Future extension | Baseline RAG implementation |
-| `docs/advanced_rag.md` | Future extension | Hybrid retrieval, reranking, time-aware filtering |
+| `docs/naive_rag.md` | Implemented baseline | Baseline RAG implementation |
+| `docs/advanced_rag.md` | Implemented/evaluated | Coverage-aware hybrid retrieval and strict generation |

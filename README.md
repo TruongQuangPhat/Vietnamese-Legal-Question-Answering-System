@@ -31,33 +31,36 @@ Corpus registry
 -> parent-child chunking
 -> processed JSONL validation
 -> dense Qdrant indexing
--> sparse BM25 retrieval
+-> Qdrant dense retrieval
+-> local BM25 sparse retrieval
 -> fixed RRF fusion
 -> coverage-aware quota retrieval
 -> evidence selection
 -> strict generation
--> citation guard
+-> citation ID guard
 -> answerability fallback guard
 -> evaluation outputs
 ```
 
-Important evidence rule: the child chunk is the citable evidence unit. Parent
-article context is auxiliary context only and is not directly citable.
+Important evidence rule: the child chunk is the citable evidence unit. Parent article context is auxiliary context only and is not directly citable.
+
+BM25 sparse retrieval is local/manual in the current final pipeline. It is not a Qdrant sparse named-vector index.
 
 Main source modules:
 
-| Path | Responsibility |
-| --- | --- |
-| `src/ingestion/` | Corpus registry, crawling support, raw audit, cleaning, and storage utilities. |
-| `src/processing/` | Legal hierarchy parsing, parent-child chunking, and processed JSONL validation. |
-| `src/indexing/` | Embedding, Qdrant indexing, and index validation utilities. |
-| `src/retrieval/` | Dense retrieval, evidence construction/selection, generation, citation guard, fallback behavior, and quality gates. |
-| `src/evaluation/` | Frozen benchmark schemas, metrics, retrieval comparisons, strict generation evaluation, and offline diagnostics. |
-| `src/services/` | Existing orchestration services where a service boundary is already used. |
-| `scripts/` | Thin CLI wrappers for corpus, indexing, retrieval, and evaluation workflows. |
+| Path              | Responsibility                                                                                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/ingestion/`  | Corpus registry, crawling support, raw audit, cleaning, and storage utilities.                                                                                                                                            |
+| `src/processing/` | Legal hierarchy parsing, parent-child chunking, and processed JSONL validation.                                                                                                                                           |
+| `src/indexing/`   | Embedding, Qdrant indexing, and index validation utilities.                                                                                                                                                               |
+| `src/retrieval/`  | Dense retrieval, local BM25 retrieval, RRF fusion, coverage-aware quota retrieval, evidence construction/selection, citation guard integration, fallback behavior, and RAG pipeline behavior where currently implemented. |
+| `src/generation/` | Generation-specific helpers where implemented.                                                                                                                                                                            |
+| `src/evaluation/` | Frozen benchmark schemas, metrics, retrieval comparisons, strict generation evaluation, evidence diagnostics, and offline diagnostics.                                                                                    |
+| `src/services/`   | Existing orchestration services where a service boundary is already used.                                                                                                                                                 |
+| `scripts/`        | Thin CLI wrappers for corpus, indexing, retrieval, and evaluation workflows.                                                                                                                                              |
 
-API deployment, GraphRAG, fine-tuning, and time-aware filtering are not part of
-the adopted evaluated pipeline.
+API deployment, GraphRAG, fine-tuning, production MLOps, and time-aware filtering are not part of the adopted evaluated pipeline.
+
 
 ## Current Results
 
@@ -139,14 +142,15 @@ VnLaw-QA/
 └── artifacts/    # generated reports and evaluation outputs when present
 ```
 
-Protected corpus paths should not be modified unless an official corpus rerun
-is explicitly scoped:
+Protected corpus, benchmark, and official evaluation paths should not be modified unless an official rerun is explicitly scoped:
 
 ```text
 data/raw/
 data/interim/
 data/reports/
 data/processed/legal_chunks.jsonl
+data/eval/
+artifacts/reports/evaluation/
 ```
 
 ## Setup
@@ -169,62 +173,35 @@ Optional provider secrets belong in environment variables or an uncommitted
 
 ## Common Commands
 
-Run unit and integration tests:
+Run safe validation:
 
 ```bash
-uv run pytest tests/unit -q
-uv run pytest tests/integration -q
-```
+env UV_CACHE_DIR=/tmp/vnlaw-uv-cache find src scripts tests -name '*.py' -exec uv run python -m py_compile {} +
 
-Run style checks:
+uv run pytest tests/unit -q --durations=30
+uv run pytest tests/integration -q --durations=30
 
-```bash
 uv run ruff check src scripts tests
 uv run ruff format --check src scripts tests
+
 uv lock --check
+git diff --check
 ```
 
-Validate processed chunks:
+Check protected paths before committing:
 
 ```bash
-uv run python scripts/corpus/validate_processed_jsonl.py \
-  --input data/processed/legal_chunks.jsonl \
-  --config configs/processing/processed_jsonl_validation.yml \
-  --output /tmp/processed_jsonl_validation_report.json \
-  --pretty
+git diff --name-only -- \
+  data/raw \
+  data/interim \
+  data/reports \
+  data/processed/legal_chunks.jsonl \
+  data/eval
+
+git diff --name-only -- artifacts/reports/evaluation
 ```
 
-Validate the frozen benchmark:
-
-```bash
-uv run python scripts/evaluation/validate_benchmark.py \
-  --queries data/eval/legal_qa_benchmark/benchmark_queries.jsonl \
-  --legal-targets data/eval/legal_qa_benchmark/benchmark_targets.jsonl \
-  --evidence-judgments data/eval/legal_qa_benchmark/benchmark_qrels.jsonl \
-  --evidence-groups data/eval/legal_qa_benchmark/evidence_groups.jsonl \
-  --review-records data/eval/legal_qa_benchmark/review_records.jsonl \
-  --split-manifest data/eval/legal_qa_benchmark/split_manifest.json \
-  --benchmark-manifest data/eval/legal_qa_benchmark/benchmark_manifest.json \
-  --processed-chunks data/processed/legal_chunks.jsonl
-```
-
-Run the final strict generation evaluation manually only when Qdrant is
-available read-only, OpenRouter credentials are configured, and the existing
-benchmark/retrieval artifacts are present:
-
-```bash
-uv run --extra qdrant --extra embedding python \
-  scripts/evaluation/run_strict_generation_evaluation.py \
-  --coverage-retrieval-dir artifacts/reports/evaluation/advanced_rag/coverage_aware_retrieval \
-  --generation-baseline-dir artifacts/reports/evaluation/naive_rag_baseline/generation \
-  --output-dir artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answerability_fallback_guard \
-  --collection-name vnlaw_chunks_bgem3_v1_full \
-  --url http://localhost:6333 \
-  --device cpu \
-  --provider openrouter
-```
-
-Do not run the real evaluation command for documentation or code review tasks.
+Expected output is usually empty unless the task explicitly scoped corpus, benchmark, or official evaluation artifact changes.
 
 ## Evaluation
 

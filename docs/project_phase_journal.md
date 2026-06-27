@@ -1,5 +1,10 @@
 # VnLaw-QA Project Phase Journal
 
+> Historical note: this journal records earlier implementation chronology. It
+> may not reflect the final adopted Advanced RAG / strict generation pipeline.
+> Use `README.md`, `PROJECT_CONTEXT.md`, `docs/advanced_rag.md`, and
+> `docs/evaluation.md` for the current system summary.
+
 ## 1. Purpose
 
 This document is the detailed engineering journal for VnLaw-QA. It records

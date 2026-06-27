@@ -5,19 +5,29 @@
 This file is the canonical durable evaluation reference for VnLaw-QA. It
 defines the legal QA benchmark protocol, schema contract, validation behavior,
 split and freeze policy, review policy, metrics contract, and CLI usage for
-controlled comparison of the frozen Naive RAG baseline and future retrieval
-variants.
+controlled comparison of the frozen Naive RAG baseline, adopted Advanced RAG
+retrieval, and strict generation workflows.
 
 Authority and supporting references:
 
 - `AGENTS.md` remains the canonical repository instruction source.
 - `PROJECT_CONTEXT.md` remains the canonical current-state and roadmap source.
 - `docs/naive_rag.md` remains the canonical Naive RAG technical reference.
-- `docs/advanced_rag.md` remains the Advanced RAG design reference.
-- `docs/phase10_tracer.md` is the active Phase 10 operational dashboard.
+- `docs/advanced_rag.md` remains the final Advanced RAG technical reference.
 
-This document does not claim that Advanced RAG is already better than the
-frozen Naive RAG baseline.
+Current benchmark state:
+
+```text
+benchmark_version = v0.1.0
+query_count = 128
+development = 85
+held_out_test = 43
+answer_allowed = 110
+fallback_required = 18
+held_out_test = reporting_only
+```
+
+No qualified human legal review has been completed for final generated claims.
 
 ## Evaluation Architecture
 
@@ -28,15 +38,18 @@ src/evaluation/benchmark/
 scripts/evaluation/
 configs/evaluation/legal_qa_benchmark.yml
 tests/unit/evaluation/benchmark/
-tests/integration/evaluation/test_benchmark_workflow.py
+tests/integration/evaluation/
 ```
 
 This layer is separate from the Naive RAG regression logic under
-`src/retrieval/` and `scripts/retrieval/`. It currently implements benchmark
-schemas, deterministic loaders, validation, grouped splitting, fingerprinting,
-freeze support, and thin CLI wrappers. It does not implement sparse retrieval,
-BM25, RRF, fusion, reranking, GraphRAG, API, UI, fine-tuning, benchmark
-metrics, or baseline execution.
+`src/retrieval/` and `scripts/retrieval/`. It implements benchmark schemas,
+deterministic loaders, validation, grouped splitting, fingerprinting, freeze
+support, retrieval metrics, sparse/hybrid/coverage-aware comparison workflows,
+strict generation evaluation, offline error analysis, evidence selection
+diagnostics, and thin CLI wrappers.
+
+GraphRAG, API/UI, fine-tuning, and production deployment remain separately
+scoped future work.
 
 ## Safety and Legal Accuracy Principles
 
@@ -660,7 +673,37 @@ Exit codes:
 
 ## Metrics Contract
 
-Required metric groups are defined but not yet implemented in this layer.
+Core retrieval and strict generation metrics are implemented for the frozen
+`v0.1.0` benchmark. Some exploratory metric groups below remain design targets
+for future evaluation expansion.
+
+Final adopted retrieval, all split:
+
+```text
+retrieval_strategy = coverage_aware_quota
+Recall@10 = 0.9545454545
+MRR@10 = 0.6883910534
+NDCG@10 = 0.6465347419
+evidence_group_coverage@10 = 0.7712765957
+```
+
+Final adopted strict generation, all split:
+
+```text
+workflow_name = strict_generation_evaluation
+retrieval_strategy = coverage_aware_quota
+decision_accuracy = 0.875
+answer_allowed_answer_rate = 0.8545454545
+fallback_required_fallback_rate = 1.0
+selected_evidence_group_coverage = 0.7861616162
+case_pass_rate = 0.7578125
+citation_id_validity_rate = 1.0
+retrieval_error_count = 0
+generation_error_count = 0
+```
+
+Reranking was evaluated with `BAAI/bge-reranker-v2-m3` and was not adopted:
+`decision = no_adoption_no_eligible_reranker`.
 
 Retrieval:
 
@@ -715,7 +758,7 @@ Operational:
 ```text
 retrieval latency
 fusion latency
-reranking latency
+reranking latency (only for future ablations; not final pipeline)
 selection latency
 generation latency
 end-to-end latency
@@ -754,11 +797,14 @@ reinterpreted.
 - The scoped `v0.1.0` held-out split contains low/medium-risk eligible cases
   only; high-risk sanction, penalty, criminal, and fallback-safety held-out
   coverage is deferred until qualified human legal review occurs.
-- Metric computation for the broader benchmark is not implemented yet.
+- Core retrieval and strict generation metric computation is implemented for
+  benchmark `v0.1.0`; broader claim-level semantic metrics still require human
+  review.
 - Temporal/version-sensitive held-out coverage is excluded because current
   processed chunk metadata is insufficient for defensible temporal labels.
 - Semantic regression overlap detection is not fully automatic.
-- Preferred-domain expansion beyond scoped `v0.1.0`, numeric relevance gains,
-  sparse architecture, and reranker choices remain open.
+- Preferred-domain expansion beyond scoped `v0.1.0` remains open.
+- Reranking was evaluated but not adopted in the final pipeline.
+- Citation ID validity does not prove full semantic legal faithfulness.
 - There is no overwrite mode for frozen benchmark manifests. Corrections
   should normally use a new benchmark version and output path.

@@ -1,28 +1,64 @@
 ---
 name: vnlaw-legal-parsing-chunking
-description: Use when implementing legal hierarchy parsing, Regex/AST extraction, parent-child chunking, legal metadata schemas, cross-reference extraction, and JSONL chunk output.
+description: Use when maintaining or debugging Vietnamese legal hierarchy parsing, regex/AST extraction, parent-child chunking, legal metadata schemas, cross-reference extraction, and processed JSONL chunk output.
 ---
 
 # Legal Parsing and Parent-Child Chunking Skill
 
-Use this skill for Vietnamese legal hierarchy extraction and parent-child chunk creation.
+Use this skill for Vietnamese legal hierarchy extraction, parent-child chunk creation, and processed JSONL validation.
 
-This skill should run after cleaning/normalization and before embedding/indexing.
-Current project status: Phase 5 Legal Hierarchy Parsing is complete and
-hardened. Phase 6 Parent-child Chunking is complete and validated with
-`data/processed/legal_chunks.jsonl`, 34 successes, 18 successes with warnings,
-0 failed laws, 40,389 chunks, 0 source-tail markers in `text`/`parent_text`,
-and 180 empty/repealed chunks flagged. Phase 7 validation and Phase 7.5
-semantic audit are complete with 0 hard errors and a **Go with watch items**
-decision. Do not modify hierarchy/chunks or start Phase 8 work unless a
-separate task is explicitly scoped. Before indexing, rerun Phase 7 and
-preserve short chunks, authority phrases, parent context, citations, hashes,
-source metadata, and repeal flags.
+This skill runs after cleaning/normalization and before embedding/indexing.
+
+## Current Status
+
+Legal hierarchy parsing, parent-child chunking, processed JSONL validation, and semantic audit are implemented and validated for the current corpus.
+
+Current processed chunk state:
+
+```text
+processed JSONL = data/processed/legal_chunks.jsonl
+valid chunks = 40,389
+failed laws = 0
+duplicate chunk IDs = 0
+bad JSONL lines = 0
+hard validation errors = 0
+```
+
+Chunking results include:
+
+```text
+34 laws successful
+18 laws successful with warnings
+1,322 article chunks
+20,643 clause chunks
+18,424 point chunks
+180 empty/repealed chunks flagged
+0 source-tail markers in text
+0 source-tail markers in parent_text
+0 selection-rule issues
+0 chunk invariant issues
+```
+
+Use this skill for maintenance, debugging, regression fixes, or schema review. Do not modify hierarchy output, regenerate chunks, or overwrite `data/processed/legal_chunks.jsonl` unless the user explicitly scopes that operation.
+
+Protected paths include:
+
+```text
+data/raw/**
+data/interim/**
+data/reports/**
+data/processed/legal_chunks.jsonl
+```
+
+Workflow-level integration tests for corpus processing now exist under:
+
+```text
+tests/integration/corpus/
+```
 
 ## Goal
 
-Use the completed deterministic legal hierarchy to create and validate
-schema-valid legal chunks after the parser gate has passed.
+Use the deterministic legal hierarchy to create and validate schema-valid legal chunks.
 
 ```text
 data/interim/{LAW_ID}/hierarchy.json
@@ -67,7 +103,7 @@ PATTERNS = {
 
 Regex patterns are not enough by themselves. The final output must be a validated hierarchy.
 
-## Implemented Phase 6 Output
+## Implemented Output
 
 ```text
 data/processed/legal_chunks.jsonl
@@ -75,26 +111,7 @@ artifacts/reports/chunking/chunking_report.json
 artifacts/reports/chunking/full_corpus_validation_report.json
 ```
 
-Validated result:
-
-```text
-34 laws successful
-18 laws successful with warnings
-0 failed laws
-40,389 chunks
-1,322 article chunks
-20,643 clause chunks
-18,424 point chunks
-180 empty/repealed chunks flagged
-0 source-tail markers in text
-0 source-tail markers in parent_text
-0 duplicate chunk IDs
-0 bad JSONL lines
-0 selection-rule issues
-0 chunk invariant issues
-```
-
-Official command:
+Chunk generation command:
 
 ```bash
 uv run python scripts/corpus/chunk_legal_corpus.py \
@@ -105,6 +122,8 @@ uv run python scripts/corpus/chunk_legal_corpus.py \
   --verbose \
   --no-color
 ```
+
+This command writes protected processed data. Run it only when the user explicitly scopes a real chunk regeneration task.
 
 ## Required Data Fields
 
@@ -131,11 +150,12 @@ Use Pydantic V2 models at external boundaries.
 
 Rules:
 
-- child chunk = Article, Clause, or Point according to legal hierarchy;
-- parent context = full Article;
-- vector embedding should use `text`;
-- LLM context should use `parent_text` plus metadata;
-- chunk IDs must be deterministic and use Phase 5 `node_id`.
+* child chunk = Article, Clause, or Point according to legal hierarchy;
+* parent context = full Article;
+* vector embedding should use citable child `text`;
+* LLM context may use `parent_text` as auxiliary context;
+* parent context is not directly citable;
+* chunk IDs must be deterministic and based on stable parser/source node metadata.
 
 Never split legal text by arbitrary character windows.
 
@@ -165,7 +185,7 @@ If a reference cannot be resolved safely, mark it unresolved instead of guessing
 
 ## OOP and Docstring Rules
 
-Expected components:
+Relevant components may include:
 
 ```text
 scripts/corpus/parse_legal_hierarchy.py
@@ -173,37 +193,46 @@ src/services/legal_parsing_service.py
 src/processing/legal_parser.py
 tests/unit/processing/test_legal_parser.py
 
-Phase 6 implemented:
 LegalChunk
 LegalChunker
 LegalChunkValidator
 ChunkingService
 scripts/corpus/chunk_legal_corpus.py
+tests/unit/services/test_legal_parsing_service.py
+tests/unit/services/test_chunking_service.py
+tests/integration/corpus/test_legal_parsing_chunking_workflow.py
 ```
 
 Rules:
 
-- Keep HTML parsing, legal hierarchy parsing, chunking, and validation separate.
-- Use typed models rather than raw dictionaries.
-- Public classes/functions must have Google-style docstrings.
-- Docstrings must explain hierarchy assumptions and edge cases.
+* Keep HTML parsing, legal hierarchy parsing, chunking, and validation separate.
+* Use typed models rather than raw dictionaries.
+* Public classes/functions must have Google-style docstrings where project style requires it.
+* Docstrings must explain hierarchy assumptions and edge cases.
 
 ## Verification
 
-- Article count matches source within ±2%.
-- Every chunk has law metadata.
-- Every chunk has hierarchy metadata.
-- Every chunk has source URL and crawl timestamp.
-- Parent-child relationship is deterministic.
-- JSONL rerun is deterministic for `data/processed/legal_chunks.jsonl`.
-- Parser tests cover at least three law templates.
-- Edge cases include Article, Clause, Point, Roman numerals, and Vietnamese `đ`.
+When changing parser or chunker behavior, verify:
+
+* Article count matches source within acceptable tolerance.
+* Every chunk has law metadata.
+* Every chunk has hierarchy metadata.
+* Every citable chunk has citation/source metadata.
+* Parent-child relationship is deterministic.
+* JSONL output is deterministic.
+* Parser tests cover multiple law templates.
+* Edge cases include Article, Clause, Point, Roman numerals, and Vietnamese `đ`.
+* Short chunks, authority phrases, citations, hashes, source metadata, and repeal/status flags are preserved.
+
+Prefer unit tests and tiny integration fixtures. Do not use or overwrite the real processed JSONL unless explicitly scoped.
 
 ## Do Not
 
-- Do not use arbitrary character splitting.
-- Do not collapse Article/Clause/Point hierarchy.
-- Do not drop parent Article context.
-- Do not fabricate cross-reference targets.
-- Do not emit chunks that fail schema validation.
-- Do not mix parser logic with embedding or vector store logic.
+* Do not use arbitrary character splitting.
+* Do not collapse Article/Clause/Point hierarchy.
+* Do not drop parent Article context.
+* Do not make parent context directly citable.
+* Do not fabricate cross-reference targets.
+* Do not emit chunks that fail schema validation.
+* Do not mix parser logic with embedding or vector store logic.
+* Do not regenerate or overwrite protected chunk outputs unless explicitly scoped.

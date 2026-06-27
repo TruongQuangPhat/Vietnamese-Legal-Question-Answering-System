@@ -1,132 +1,112 @@
 ---
+
 name: vnlaw-naive-rag
-description: Use when building the first Naive RAG baseline, simple retrieval, baseline prompt, strict citation generation, fallback handling, and baseline evaluation.
+description: Use when maintaining, debugging, or extending the Naive RAG baseline, including simple retrieval, evidence packing, strict legal prompting, citation validation, fallback handling, and baseline evaluation.
 ---
 
 # Naive RAG Baseline Skill
 
-Use this skill to build the first working legal QA baseline before Advanced RAG or GraphRAG.
-Current project status: Naive RAG is a future phase. Do not create API,
-retrieval, or generation modules until parser, chunking, processed JSONL,
-embedding, and indexing gates have passed.
+Use this skill when working on the baseline legal QA/RAG pipeline.
+
+Naive RAG is no longer a future-only plan. It is the baseline system used for comparison against Advanced RAG. The current best evaluated workflow uses coverage-aware hybrid retrieval and strict generation with an answerability fallback guard, but Naive RAG remains important as a simple, reproducible baseline.
 
 ## Goal
 
-Build the simplest reliable legal QA pipeline.
+Maintain a simple and safe legal QA pipeline:
 
 ```text
 query
-  → simple retrieval
-  → parent context packing
-  → legal QA prompt
-  → strict citation answer
+  → baseline retrieval
+  → evidence selection / context packing
+  → strict legal QA prompt
+  → LLM generation
   → citation validation
   → fallback if unsupported
+  → baseline evaluation
 ```
 
-## Expected Future Files
+## Baseline Role
+
+Naive RAG should be kept simple and reliable.
+
+Use it to:
+
+* provide a reproducible baseline for later retrieval/generation improvements;
+* test strict legal prompting and citation validation;
+* verify fallback behavior when evidence is insufficient;
+* compare against Advanced RAG and strict generation workflows.
+
+Do not use Naive RAG as the final best system if the task is about reporting current benchmark results. For current final metrics, refer to Advanced RAG / strict generation evaluation documentation.
+
+## Retrieval Guidance
+
+Keep baseline retrieval simple:
 
 ```text
-src/retrieval/vector_store.py
-src/generation/llm_client.py
-src/generation/prompts.py
-src/generation/context_packer.py
-src/generation/citation_validator.py
-src/api/routes/qa.py
-src/api/schemas.py
-
-data/eval/golden_qa_v1.jsonl
-src/evaluation/ragas_evaluator.py
-scripts/run_ragas_evaluation.py
-artifacts/reports/evaluation/
-artifacts/metrics/evaluation/
-artifacts/runs/evaluations/
-tests/unit/generation/
-tests/unit/retrieval/
-tests/unit/evaluation/
+dense retrieval or simple retrieval strategy
+top-k evidence candidates
+evidence selection
+strict prompt context
 ```
 
-## Baseline Retrieval
-
-Start simple:
-
-```text
-dense vector search OR BM25
-top-k candidates
-parent article context
-strict citation prompt
-```
-
-Avoid complex query rewriting, graph traversal, multi-agent orchestration, or fine-tuning at this stage.
+Avoid adding complex reranking, query decomposition, graph traversal, multi-agent orchestration, or benchmark-specific policy into the Naive RAG baseline.
 
 ## Prompt Requirements
 
 The LLM must be instructed to:
 
-- answer only from provided context;
-- cite every legal claim;
-- use Article/Clause/Point hierarchy;
-- say it cannot find the rule when context is insufficient;
-- avoid professional legal advice;
-- distinguish quote from analysis.
+* answer only from provided evidence;
+* cite every legal claim using selected citation IDs;
+* preserve Article/Clause/Point hierarchy when available;
+* say it cannot find enough legal basis when context is insufficient;
+* avoid professional legal advice;
+* not use model memory as legal evidence.
 
-## Baseline Answer Format
+## Citation and Fallback Requirements
 
-```text
-Legal issue:
-Applicable regulation:
-Answer:
-Sources:
-Limitations:
-```
-
-## Minimum Fallback Behavior
-
-Use fallback when:
+Fallback is required when:
 
 ```text
-retrieval returns no useful context
-top evidence is below confidence threshold
+retrieval returns no useful evidence
+selected evidence is empty
+evidence is unsafe or parent-context-only
+required citation metadata is missing
 citation validation fails
-question is outside the current corpus
+the question is outside the current corpus
+the evidence is insufficient to answer safely
 ```
 
-## OOP and Docstring Rules
+Parent context may be included as auxiliary context, but it must not be treated as directly citable evidence.
 
-Expected components:
+## Evaluation Guidance
 
-```text
-NaiveRetriever
-ContextPacker
-LegalPromptBuilder
-BaseLLMClient
-CitationValidator
-FallbackPolicy
-QAService
-```
+Naive RAG evaluation should remain reproducible and comparable.
 
-Rules:
+When changing Naive RAG behavior:
 
-- Keep retrieval, generation, citation validation, and API route logic separate.
-- Use typed models for candidates, evidence packets, citations, and responses.
-- Public classes/functions must have Google-style docstrings.
-- Docstrings must explain legal/RAG assumptions and fallback behavior.
+* keep benchmark inputs unchanged;
+* do not tune on held-out test;
+* report decision accuracy, answer rate, safe fallback rate, citation validity, evidence coverage, and case pass rate when available;
+* compare results against the latest Advanced RAG / strict generation workflow only as a baseline comparison;
+* do not overwrite official evaluation artifacts unless explicitly asked.
 
-## Definition of Done
+## Implementation Boundaries
 
-- [ ] `/api/v1/qa` can answer from ingested corpus.
-- [ ] Strict citation format is present.
-- [ ] Unsupported questions trigger fallback.
-- [ ] Golden QA evaluation can run.
-- [ ] Empty retrieval is tested.
-- [ ] Low-confidence fallback is tested.
-- [ ] Citation validation is tested.
-- [ ] No uncited legal claim is returned.
+When working on this skill:
+
+* keep retrieval, evidence selection, prompting, generation, citation validation, and fallback policy separated;
+* use typed models for candidates, evidence packets, citations, and responses;
+* preserve legal hierarchy metadata;
+* keep public classes/functions documented with Google-style docstrings where project style requires it;
+* use tests with mocks/fakes for LLMs, retrievers, and external services.
 
 ## Do Not
 
-- Do not over-engineer the baseline.
-- Do not add GraphRAG before the baseline works.
-- Do not allow uncited legal claims.
-- Do not use model memory as legal evidence.
-- Do not skip citation validation.
+* Do not over-engineer the baseline.
+* Do not add GraphRAG or agent orchestration to Naive RAG.
+* Do not make parent context directly citable.
+* Do not allow uncited legal claims.
+* Do not fabricate laws, articles, clauses, points, dates, penalties, or citations.
+* Do not use model memory as legal evidence.
+* Do not skip citation validation.
+* Do not call real LLMs, Qdrant, embeddings, or full benchmark pipelines unless the user explicitly scopes that run.

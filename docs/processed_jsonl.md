@@ -16,8 +16,9 @@ Phase 7 does not implement embedding or indexing — it is a validation gate.
 
 Current result: Phase 7 is complete with 40,389 valid chunks, 0 invalid
 chunks, 0 hard errors, and 8,206 accepted non-blocking warnings. The warning
-follow-up W1-W3 is closed. The Phase 7.5 semantic audit records a
-**Go with watch items** decision in `docs/phase75_llm_corpus_audit.md`.
+follow-up W1-W3 is closed. A historical semantic audit recorded a **Go with
+watch items** decision; current full-system status is summarized in
+`PROJECT_CONTEXT.md`.
 
 ## Current Input
 
