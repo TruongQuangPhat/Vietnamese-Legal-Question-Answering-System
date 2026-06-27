@@ -1,0 +1,1574 @@
+{
+  "report_type": "development_fusion_ablation_results",
+  "benchmark_version": "v0.1.0",
+  "selection_rule": {
+    "primary": "highest development evidence_group_coverage@10",
+    "tie_breakers": [
+      "required_direct_coverage@10",
+      "Recall@10",
+      "MRR@10",
+      "NDCG@10",
+      "lower mean retrieval latency",
+      "simpler config"
+    ]
+  },
+  "held_out_test_used_for_selection": false,
+  "selected_config_id": "selected_coverage_aware_quota",
+  "selected_config": {
+    "config_id": "selected_coverage_aware_quota",
+    "mode": "quota",
+    "dense_candidate_k": 50,
+    "sparse_candidate_k": 50,
+    "final_top_k": 10,
+    "rrf_k": 60,
+    "dense_weight": 1.0,
+    "sparse_weight": 1.5,
+    "quota": {
+      "fused_best": 5,
+      "sparse_quota": 4,
+      "dense_quota": 1
+    },
+    "diversity": null,
+    "simplicity_rank": 12
+  },
+  "selected_development_metrics": {
+    "query_count": 85,
+    "evaluated_query_count": 85,
+    "retrieval_error_count": 0,
+    "answer_allowed_count": 68,
+    "fallback_required_count": 17,
+    "mean_retrieval_latency_ms": 1972.5385934352744,
+    "mrr_at_10": 0.6917016806722689,
+    "ndcg_at_10": 0.6173938889779291,
+    "fallback_diagnostics": {
+      "fallback_case_count": 17,
+      "near_miss_retrieved_at_1": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "supporting_retrieved_at_1": {
+        "count": 3,
+        "rate": 0.17647058823529413
+      },
+      "direct_evidence_retrieved_at_1": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "near_miss_retrieved_at_3": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "supporting_retrieved_at_3": {
+        "count": 4,
+        "rate": 0.23529411764705882
+      },
+      "direct_evidence_retrieved_at_3": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "near_miss_retrieved_at_5": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "supporting_retrieved_at_5": {
+        "count": 4,
+        "rate": 0.23529411764705882
+      },
+      "direct_evidence_retrieved_at_5": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "near_miss_retrieved_at_10": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "supporting_retrieved_at_10": {
+        "count": 4,
+        "rate": 0.23529411764705882
+      },
+      "direct_evidence_retrieved_at_10": {
+        "count": 0,
+        "rate": 0.0
+      }
+    },
+    "recall_at_1": 0.5588235294117647,
+    "required_direct_coverage_at_1": 0.2992125984251969,
+    "evidence_group_coverage_at_1": 0.2992125984251969,
+    "recall_at_3": 0.7941176470588235,
+    "required_direct_coverage_at_3": 0.48031496062992124,
+    "evidence_group_coverage_at_3": 0.48031496062992124,
+    "recall_at_5": 0.8382352941176471,
+    "required_direct_coverage_at_5": 0.5196850393700787,
+    "evidence_group_coverage_at_5": 0.5196850393700787,
+    "recall_at_10": 0.9558823529411765,
+    "required_direct_coverage_at_10": 0.7480314960629921,
+    "evidence_group_coverage_at_10": 0.7480314960629921
+  },
+  "variants": [
+    {
+      "config": {
+        "config_id": "equal_weight_rrf",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.0,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 0
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6990779645191411,
+        "ndcg_at_10": 0.6072789689924823,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5882352941176471,
+        "required_direct_coverage_at_1": 0.31496062992125984,
+        "evidence_group_coverage_at_1": 0.31496062992125984,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5354330708661418,
+        "evidence_group_coverage_at_5": 0.5354330708661418,
+        "recall_at_10": 0.8970588235294118,
+        "required_direct_coverage_at_10": 0.6141732283464567,
+        "evidence_group_coverage_at_10": 0.6141732283464567
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "sparse_weight_1_25",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.25,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 1
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6773692810457517,
+        "ndcg_at_10": 0.5913889718773002,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5275590551181102,
+        "evidence_group_coverage_at_5": 0.5275590551181102,
+        "recall_at_10": 0.8970588235294118,
+        "required_direct_coverage_at_10": 0.6062992125984252,
+        "evidence_group_coverage_at_10": 0.6062992125984252
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "sparse_weight_1_5",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 2
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6798202614379086,
+        "ndcg_at_10": 0.5909130061894119,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.8970588235294118,
+        "required_direct_coverage_at_10": 0.5984251968503937,
+        "evidence_group_coverage_at_10": 0.5984251968503937
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "sparse_weight_2",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 2.0,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 3
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6809640522875818,
+        "ndcg_at_10": 0.5904044054284344,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.8088235294117647,
+        "required_direct_coverage_at_3": 0.4881889763779528,
+        "evidence_group_coverage_at_3": 0.4881889763779528,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.9117647058823529,
+        "required_direct_coverage_at_10": 0.6062992125984252,
+        "evidence_group_coverage_at_10": 0.6062992125984252
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "dense_weight_1_25",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.25,
+        "sparse_weight": 1.0,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 4
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.683718487394958,
+        "ndcg_at_10": 0.5947620320047589,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5735294117647058,
+        "required_direct_coverage_at_1": 0.30708661417322836,
+        "evidence_group_coverage_at_1": 0.30708661417322836,
+        "recall_at_3": 0.7647058823529411,
+        "required_direct_coverage_at_3": 0.47244094488188976,
+        "evidence_group_coverage_at_3": 0.47244094488188976,
+        "recall_at_5": 0.8088235294117647,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.8676470588235294,
+        "required_direct_coverage_at_10": 0.5905511811023622,
+        "evidence_group_coverage_at_10": 0.5905511811023622
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "sparse_weight_1_5_pool_50_100",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 100,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 5
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6767156862745098,
+        "ndcg_at_10": 0.5859843022132798,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.8676470588235294,
+        "required_direct_coverage_at_10": 0.5748031496062992,
+        "evidence_group_coverage_at_10": 0.5748031496062992
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "sparse_weight_1_5_pool_100_100",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 100,
+        "sparse_candidate_k": 100,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 6
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6822303921568628,
+        "ndcg_at_10": 0.5947624367410341,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8529411764705882,
+        "required_direct_coverage_at_5": 0.5275590551181102,
+        "evidence_group_coverage_at_5": 0.5275590551181102,
+        "recall_at_10": 0.8970588235294118,
+        "required_direct_coverage_at_10": 0.5905511811023622,
+        "evidence_group_coverage_at_10": 0.5905511811023622
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "sparse_weight_2_pool_50_100",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 100,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 2.0,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 7
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6809640522875818,
+        "ndcg_at_10": 0.5896559255672702,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.8088235294117647,
+        "required_direct_coverage_at_3": 0.4881889763779528,
+        "evidence_group_coverage_at_3": 0.4881889763779528,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.9117647058823529,
+        "required_direct_coverage_at_10": 0.5984251968503937,
+        "evidence_group_coverage_at_10": 0.5984251968503937
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "sparse_weight_2_pool_100_100",
+        "mode": "weighted_rrf",
+        "dense_candidate_k": 100,
+        "sparse_candidate_k": 100,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 2.0,
+        "quota": null,
+        "diversity": null,
+        "simplicity_rank": 8
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6858660130718955,
+        "ndcg_at_10": 0.5954088080155119,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.8235294117647058,
+        "required_direct_coverage_at_3": 0.49606299212598426,
+        "evidence_group_coverage_at_3": 0.49606299212598426,
+        "recall_at_5": 0.8529411764705882,
+        "required_direct_coverage_at_5": 0.5275590551181102,
+        "evidence_group_coverage_at_5": 0.5275590551181102,
+        "recall_at_10": 0.9264705882352942,
+        "required_direct_coverage_at_10": 0.6062992125984252,
+        "evidence_group_coverage_at_10": 0.6062992125984252
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "quota_fused6_sparse3_dense1",
+        "mode": "quota",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": {
+          "fused_best": 6,
+          "sparse_quota": 3,
+          "dense_quota": 1
+        },
+        "diversity": null,
+        "simplicity_rank": 9
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6894257703081235,
+        "ndcg_at_10": 0.6141655032039659,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.9558823529411765,
+        "required_direct_coverage_at_10": 0.7244094488188977,
+        "evidence_group_coverage_at_10": 0.7244094488188977
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "quota_fused5_sparse3_dense2",
+        "mode": "quota",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": {
+          "fused_best": 5,
+          "sparse_quota": 3,
+          "dense_quota": 2
+        },
+        "diversity": null,
+        "simplicity_rank": 10
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6917016806722689,
+        "ndcg_at_10": 0.6104303282364111,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.9558823529411765,
+        "required_direct_coverage_at_10": 0.7007874015748031,
+        "evidence_group_coverage_at_10": 0.7007874015748031
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "quota_fused4_sparse4_dense2",
+        "mode": "quota",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": {
+          "fused_best": 4,
+          "sparse_quota": 4,
+          "dense_quota": 2
+        },
+        "diversity": null,
+        "simplicity_rank": 11
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6948529411764707,
+        "ndcg_at_10": 0.6173642677820953,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.9117647058823529,
+        "required_direct_coverage_at_5": 0.5669291338582677,
+        "evidence_group_coverage_at_5": 0.5669291338582677,
+        "recall_at_10": 0.9558823529411765,
+        "required_direct_coverage_at_10": 0.7322834645669292,
+        "evidence_group_coverage_at_10": 0.7322834645669292
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "selected_coverage_aware_quota",
+        "mode": "quota",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": {
+          "fused_best": 5,
+          "sparse_quota": 4,
+          "dense_quota": 1
+        },
+        "diversity": null,
+        "simplicity_rank": 12
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6917016806722689,
+        "ndcg_at_10": 0.6173938889779291,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5196850393700787,
+        "evidence_group_coverage_at_5": 0.5196850393700787,
+        "recall_at_10": 0.9558823529411765,
+        "required_direct_coverage_at_10": 0.7480314960629921,
+        "evidence_group_coverage_at_10": 0.7480314960629921
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "diversity_penalty_0_001",
+        "mode": "diversity",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": null,
+        "diversity": {
+          "diversity_penalty": 0.001,
+          "prefer_distinct_clause_point": false
+        },
+        "simplicity_rank": 13
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6752859477124185,
+        "ndcg_at_10": 0.5821540559365517,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7794117647058824,
+        "required_direct_coverage_at_3": 0.4566929133858268,
+        "evidence_group_coverage_at_3": 0.4566929133858268,
+        "recall_at_5": 0.8235294117647058,
+        "required_direct_coverage_at_5": 0.5118110236220472,
+        "evidence_group_coverage_at_5": 0.5118110236220472,
+        "recall_at_10": 0.8823529411764706,
+        "required_direct_coverage_at_10": 0.5905511811023622,
+        "evidence_group_coverage_at_10": 0.5905511811023622
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "diversity_penalty_0_002",
+        "mode": "diversity",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": null,
+        "diversity": {
+          "diversity_penalty": 0.002,
+          "prefer_distinct_clause_point": false
+        },
+        "simplicity_rank": 14
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6695669934640524,
+        "ndcg_at_10": 0.5740995565595812,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7794117647058824,
+        "required_direct_coverage_at_3": 0.4409448818897638,
+        "evidence_group_coverage_at_3": 0.4409448818897638,
+        "recall_at_5": 0.8382352941176471,
+        "required_direct_coverage_at_5": 0.5039370078740157,
+        "evidence_group_coverage_at_5": 0.5039370078740157,
+        "recall_at_10": 0.8823529411764706,
+        "required_direct_coverage_at_10": 0.5669291338582677,
+        "evidence_group_coverage_at_10": 0.5669291338582677
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    },
+    {
+      "config": {
+        "config_id": "diversity_penalty_0_001_distinct_detail",
+        "mode": "diversity",
+        "dense_candidate_k": 50,
+        "sparse_candidate_k": 50,
+        "final_top_k": 10,
+        "rrf_k": 60,
+        "dense_weight": 1.0,
+        "sparse_weight": 1.5,
+        "quota": null,
+        "diversity": {
+          "diversity_penalty": 0.001,
+          "prefer_distinct_clause_point": true
+        },
+        "simplicity_rank": 15
+      },
+      "development_metrics": {
+        "query_count": 85,
+        "evaluated_query_count": 85,
+        "retrieval_error_count": 0,
+        "answer_allowed_count": 68,
+        "fallback_required_count": 17,
+        "mean_retrieval_latency_ms": 1972.5385934352744,
+        "mrr_at_10": 0.6767740429505136,
+        "ndcg_at_10": 0.5845727815209565,
+        "fallback_diagnostics": {
+          "fallback_case_count": 17,
+          "near_miss_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_1": {
+            "count": 3,
+            "rate": 0.17647058823529413
+          },
+          "direct_evidence_retrieved_at_1": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_3": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_3": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_5": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_5": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "near_miss_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          },
+          "supporting_retrieved_at_10": {
+            "count": 4,
+            "rate": 0.23529411764705882
+          },
+          "direct_evidence_retrieved_at_10": {
+            "count": 0,
+            "rate": 0.0
+          }
+        },
+        "recall_at_1": 0.5588235294117647,
+        "required_direct_coverage_at_1": 0.2992125984251969,
+        "evidence_group_coverage_at_1": 0.2992125984251969,
+        "recall_at_3": 0.7941176470588235,
+        "required_direct_coverage_at_3": 0.48031496062992124,
+        "evidence_group_coverage_at_3": 0.48031496062992124,
+        "recall_at_5": 0.8235294117647058,
+        "required_direct_coverage_at_5": 0.5118110236220472,
+        "evidence_group_coverage_at_5": 0.5118110236220472,
+        "recall_at_10": 0.8823529411764706,
+        "required_direct_coverage_at_10": 0.5905511811023622,
+        "evidence_group_coverage_at_10": 0.5905511811023622
+      },
+      "query_count": 85,
+      "retrieval_error_count": 0
+    }
+  ]
+}

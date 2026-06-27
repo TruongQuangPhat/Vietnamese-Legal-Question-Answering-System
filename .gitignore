@@ -114,3 +114,12 @@ data/eval/*
 !data/eval/legal_qa_benchmark/review_records.jsonl
 !data/eval/legal_qa_benchmark/split_manifest.json
 !data/eval/legal_qa_benchmark/benchmark_manifest.json
+
+# --- Versioned official evaluation artifacts ---
+!artifacts/
+!artifacts/reports/
+!artifacts/reports/evaluation/
+!artifacts/reports/evaluation/**/
+!artifacts/reports/evaluation/**/*.json
+!artifacts/reports/evaluation/**/*.jsonl
+!artifacts/reports/evaluation/**/*.md

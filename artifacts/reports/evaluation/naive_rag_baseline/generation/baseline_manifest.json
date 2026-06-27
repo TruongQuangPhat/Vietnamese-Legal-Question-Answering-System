@@ -1,0 +1,49 @@
+{
+  "report_type": "frozen_naive_rag_generation_baseline_manifest",
+  "benchmark_version": "v0.1.0",
+  "benchmark_manifest_sha256": "1f26e4e39ee2edab31a5951a4e252d4c5434511e6447c24af3e907fbab720c68",
+  "split_manifest_sha256": "94ceaccefa8e335054e9e28f194011e2beb254b5b991c1503ca2e53cbe33c217",
+  "dense_retrieval_baseline_manifest_sha256": "356855d5a372945a48f4586d02d89abbc422b93d3c916e8eb455575711570714",
+  "generation_config": {
+    "provider": "openrouter",
+    "model": "google/gemini-2.5-flash",
+    "temperature": 0.0,
+    "max_tokens": 1024,
+    "timeout_s": 30.0,
+    "include_auxiliary_context": true,
+    "fail_on_invalid_citation": false
+  },
+  "llm_provider_config_path": "configs/llm/openrouter.yml",
+  "llm_provider_config_sha256": "785265468dd64a2b65f46de8bd68da839fa764ae44e3fbf8ea3908b3e214ed87",
+  "retrieval_config_path": "configs/retrieval/retrieval.yml",
+  "retrieval_config_sha256": "760fa10d1ab4430d43a60718268cba5e3c39c72fb46990ccf0e000c5bff14032",
+  "run_timestamp": "2026-06-22T09:41:45.214535+00:00",
+  "git_commit": "8f724d68b17c1be0bd6779e52e84319bedaa64cd",
+  "command": [
+    "python",
+    "scripts/evaluation/run_frozen_generation_baseline.py",
+    "--output-dir",
+    "artifacts/reports/evaluation/naive_rag_baseline/generation"
+  ],
+  "sample_mode": false,
+  "query_count": 128,
+  "artifacts_produced": [
+    "artifacts/reports/evaluation/naive_rag_baseline/generation/case_results.jsonl",
+    "artifacts/reports/evaluation/naive_rag_baseline/generation/metrics_all.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/generation/metrics_development.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/generation/metrics_held_out_test.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/generation/breakdowns.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/generation/baseline_manifest.json",
+    "artifacts/reports/evaluation/naive_rag_baseline/generation/summary.md"
+  ],
+  "known_limitations": [
+    "Naive RAG baseline only",
+    "uses frozen dense retrieval results from F1",
+    "no hybrid retrieval",
+    "no reranking",
+    "no query rewriting",
+    "held_out_test excludes high-risk sanction/criminal QA",
+    "qualified human legal review has not occurred",
+    "LLM outputs may be nondeterministic unless temperature/seed are fixed"
+  ]
+}
