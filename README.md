@@ -1,146 +1,162 @@
 # VnLaw-QA
 
-VnLaw-QA is a Vietnamese legal question-answering and retrieval-augmented
-generation project focused on trusted legal sources, hierarchy-preserving data
-processing, traceable citations, and safe fallback when evidence is
-insufficient.
+VnLaw-QA is a Vietnamese legal question-answering system using
+Retrieval-Augmented Generation with legal hierarchy-aware corpus processing,
+hybrid retrieval, strict citation validation, and conservative fallback
+control. The system supports legal research; it is not a replacement for
+professional legal advice.
 
-## What This Project Is
+## Highlights
 
-VnLaw-QA is a legal research support system for Vietnamese law. It builds a
-trusted legal corpus, cleans and parses legal documents into hierarchy-aware
-chunks, indexes those chunks for retrieval, and evaluates retrieval and RAG
-behavior under strict citation and fallback rules.
-
-The project emphasizes deterministic corpus processing before any LLM usage.
-Legal text is kept traceable from the original trusted source through raw,
-intermediate, processed, retrieval, and answer-evaluation artifacts.
-
-## What This Project Is Not
-
-- It is not a generic chatbot.
-- It is not a replacement for professional legal advice.
-- It must not give confident legal answers without trusted evidence.
-- It must not fabricate laws, articles, clauses, points, penalties, dates, or
-  citations.
-- It must not treat a valid citation ID as proof that a generated claim is
-  semantically faithful.
-
-## Core Principles
-
-- Use a trusted legal corpus, currently centered on `thuvienphapluat.vn`.
-- Preserve Vietnamese legal hierarchy: `Phần -> Chương -> Mục -> Điều ->
-  Khoản -> Điểm`.
-- Prefer consolidated legal documents (`VBHN`) when available.
-- Keep retrieval and generation citation-first.
-- Fall back safely when evidence is missing, incomplete, unsafe, or indirect.
-- Keep preprocessing deterministic before using LLMs.
-- Keep secrets, Qdrant storage, model caches, and runtime state out of Git.
+- 52 trusted Vietnamese legal documents.
+- 40,389 validated parent-child legal chunks.
+- Dense retrieval with `BAAI/bge-m3` in Qdrant.
+- Sparse BM25 retrieval and fixed RRF fusion.
+- Adopted coverage-aware hybrid retrieval strategy:
+  `coverage_aware_quota`.
+- Strict evidence selection with citable child evidence only.
+- Citation ID guard and answerability fallback guard.
+- Reproducible frozen benchmark `v0.1.0` with 128 queries.
+- Workflow-level integration tests for corpus, retrieval, and evaluation
+  workflows using tiny fixtures and fake dependencies.
 
 ## Architecture
 
-High-level flow:
-
 ```text
-trusted legal sources
--> raw corpus
+Corpus registry
+-> trusted-source crawling
+-> raw corpus audit
 -> cleaning and normalization
 -> legal hierarchy parsing
 -> parent-child chunking
--> processed chunk validation
--> embedding and indexing
--> retrieval
--> evidence construction and selection
--> generation and evaluation
+-> processed JSONL validation
+-> dense Qdrant indexing
+-> sparse BM25 retrieval
+-> fixed RRF fusion
+-> coverage-aware quota retrieval
+-> evidence selection
+-> strict generation
+-> citation guard
+-> answerability fallback guard
+-> evaluation outputs
 ```
+
+Important evidence rule: the child chunk is the citable evidence unit. Parent
+article context is auxiliary context only and is not directly citable.
 
 Main source modules:
 
 | Path | Responsibility |
 | --- | --- |
-| `src/ingestion/` | Corpus registry loading, crawling support, raw audit, cleaning, and storage utilities. |
+| `src/ingestion/` | Corpus registry, crawling support, raw audit, cleaning, and storage utilities. |
 | `src/processing/` | Legal hierarchy parsing, parent-child chunking, and processed JSONL validation. |
-| `src/indexing/` | Embedding model integration and Qdrant indexing/validation utilities. |
-| `src/retrieval/` | Dense retrieval, evidence construction, evidence selection, Naive RAG generation, review export, and quality gates. |
-| `src/evaluation/` | Frozen benchmark schemas, validation, metrics, and controlled retrieval comparison utilities. |
-| `src/generation/` | Reserved home for generation-specific code when split from retrieval orchestration. |
+| `src/indexing/` | Embedding, Qdrant indexing, and index validation utilities. |
+| `src/retrieval/` | Dense retrieval, evidence construction/selection, generation, citation guard, fallback behavior, and quality gates. |
+| `src/evaluation/` | Frozen benchmark schemas, metrics, retrieval comparisons, strict generation evaluation, and offline diagnostics. |
 | `src/services/` | Existing orchestration services where a service boundary is already used. |
-| `src/api/`, `src/monitoring/`, `src/security/` | Separately scoped application, observability, and security surfaces. |
+| `scripts/` | Thin CLI wrappers for corpus, indexing, retrieval, and evaluation workflows. |
 
-Scripts under `scripts/` are thin CLI wrappers. Reusable logic belongs under
-`src/`.
+API deployment, GraphRAG, fine-tuning, and time-aware filtering are not part of
+the adopted evaluated pipeline.
 
-## Pipeline Overview
+## Current Results
+
+### Retrieval
+
+Frozen benchmark: `v0.1.0`, 128 queries.
+
+| System | Recall@10 | MRR@10 | NDCG@10 | evidence_group_coverage@10 |
+| --- | ---: | ---: | ---: | ---: |
+| Dense BGE-M3 baseline | 0.845 | 0.657 | 0.610 | 0.569 |
+| Coverage-aware quota hybrid | 0.955 | 0.688 | 0.647 | 0.771 |
+
+Adopted retrieval configuration:
 
 ```text
-Legal corpus registry
--> crawling and raw audit
--> cleaning and normalization
--> hierarchy parsing
--> parent-child chunking
--> processed corpus validation
--> embedding and Qdrant indexing
--> retrieval
--> evidence selection
--> generation and evaluation
+retrieval_strategy = coverage_aware_quota
+dense_candidate_k = 50
+sparse_candidate_k = 50
+final_top_k = 10
+rrf_k = 60
+dense_weight = 1.0
+sparse_weight = 1.5
+quota = fused_best 5, sparse_quota 4, dense_quota 1
 ```
 
-The validated processed corpus is `data/processed/legal_chunks.jsonl`. Runtime
-reports and benchmark outputs live under `artifacts/reports/`.
+Reranking was evaluated with `BAAI/bge-reranker-v2-m3` and was not adopted
+because no eligible configuration passed the adoption thresholds.
 
-## Current Capabilities
+### Strict generation
 
-- Registry-driven Vietnamese legal corpus ingestion.
-- Raw corpus audit and immutable raw artifact policy.
-- Deterministic cleaning and normalization for trusted legal HTML.
-- Hierarchy-preserving legal parser.
-- Parent-child legal chunking without arbitrary character-window splitting.
-- Processed chunk validation and embedding-readiness checks.
-- BGE-M3 dense indexing in Qdrant.
-- Sparse BM25 and hybrid retrieval evaluation utilities.
-- Evidence construction and strict evidence-selection gate.
-- Fallback-aware Naive RAG baseline.
-- Citation-ID guard and manual faithfulness review workflow.
-- Frozen legal QA benchmark validation and retrieval/generation evaluation
-  workflow.
+Final adopted workflow:
+`strict_generation_evaluation_answerability_fallback_guard`.
 
-For current metrics, benchmark status, and stage-level decisions, read
-`PROJECT_CONTEXT.md` and `docs/phase10_tracer.md`.
+Provider/model used for the final evaluation:
+`openrouter` / `google/gemini-2.5-flash`.
 
-## Repository Layout
+| System | Decision accuracy | Answer-allowed answer rate | Fallback-required fallback rate | Selected evidence group coverage | Case pass rate | Citation ID validity | Retrieval errors | Generation errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `generation_baseline` | 0.430 | 0.391 | 0.667 | 0.357 | 0.375 | 1.000 | 0 | 0 |
+| Final strict generation | 0.875 | 0.855 | 1.000 | 0.786 | 0.758 | 1.000 | 0 | 0 |
+
+Split-level final metrics:
+
+| Split | Queries | Decision accuracy | Answer rate | Safe fallback rate | Group coverage | Pass rate | Retrieval errors | Generation errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| all | 128 | 0.875 | 0.855 | 1.000 | 0.786 | 0.758 | 0 | 0 |
+| development | 85 | 0.894 | 0.868 | 1.000 | 0.790 | 0.765 | 0 | 0 |
+| held_out_test | 43 | 0.837 | 0.833 | 1.000 | 0.780 | 0.744 | 0 | 0 |
+
+The held-out split is reporting-only and was not used for tuning.
+
+## Safety and Scope
+
+- No trusted source means no confident legal answer.
+- No traceable citation means the answer is invalid.
+- Do not fabricate laws, articles, clauses, points, procedures, penalties,
+  effective dates, or citations.
+- Preserve hierarchy when available:
+  `Phần -> Chương -> Mục -> Điều -> Khoản -> Điểm`.
+- Prefer consolidated legal documents (`VBHN`) when available.
+- Parent context is auxiliary only and not directly citable.
+- Citation ID validity is required, but it is not full semantic legal
+  faithfulness.
+- If evidence is insufficient, unsafe, indirect, parent-only, or missing
+  required targets in strict evaluation mode, the system must fallback.
+- No qualified human legal review has been completed for final generated
+  claims.
+
+## Repository Structure
 
 ```text
 VnLaw-QA/
-├── configs/
-│   ├── laws/          # trusted legal corpus registry
-│   ├── indexing/      # embedding and Qdrant indexing config
-│   ├── processing/    # parser/chunk/processed JSONL validation config
-│   ├── retrieval/     # retrieval and quality-gate config
-│   ├── evaluation/    # frozen benchmark config
-│   └── llm/           # non-secret LLM provider defaults
-├── data/
-│   ├── raw/           # immutable crawl artifacts
-│   ├── interim/       # derived cleaning and hierarchy artifacts
-│   ├── processed/     # validated legal chunk corpus
-│   └── eval/          # benchmark and reviewed evaluation assets
-├── artifacts/
-│   └── reports/       # generated reports and evaluation artifacts
-├── docs/              # durable technical documentation
-├── scripts/
-│   ├── corpus/        # corpus pipeline CLIs
-│   ├── indexing/      # embedding/Qdrant CLIs
-│   ├── retrieval/     # retrieval, RAG, review, and quality-gate CLIs
-│   └── evaluation/    # benchmark validation and comparison CLIs
-├── src/               # reusable implementation modules
-└── tests/             # unit, integration, regression, and fixtures
+├── configs/      # YAML configuration and benchmark config
+├── data/         # raw, interim, processed, and evaluation data
+├── docs/         # durable technical documentation
+├── scripts/      # CLI wrappers
+├── src/          # reusable implementation modules
+├── tests/        # unit and integration tests
+└── artifacts/    # generated reports and evaluation outputs when present
+```
+
+Protected corpus paths should not be modified unless an official corpus rerun
+is explicitly scoped:
+
+```text
+data/raw/
+data/interim/
+data/reports/
+data/processed/legal_chunks.jsonl
 ```
 
 ## Setup
 
 Requirements:
 
-- Python `>=3.11`
+- Python 3.11+
 - `uv`
+- Qdrant only for real retrieval/evaluation workflows
+- OpenRouter credentials only for real LLM generation evaluation
 
 Install dependencies:
 
@@ -148,22 +164,27 @@ Install dependencies:
 uv sync
 ```
 
-Run the main lightweight checks:
+Optional provider secrets belong in environment variables or an uncommitted
+`.env`. Do not store API keys in configs, docs, reports, or source code.
+
+## Common Commands
+
+Run unit and integration tests:
 
 ```bash
 uv run pytest tests/unit -q
+uv run pytest tests/integration -q
+```
+
+Run style checks:
+
+```bash
 uv run ruff check src scripts tests
 uv run ruff format --check src scripts tests
 uv lock --check
 ```
 
-Some retrieval and generation commands require optional extras, Qdrant, local
-model cache access, or provider credentials. See the component docs before
-running those workflows.
-
-## Common Commands
-
-Validate the processed legal chunk corpus:
+Validate processed chunks:
 
 ```bash
 uv run python scripts/corpus/validate_processed_jsonl.py \
@@ -173,7 +194,7 @@ uv run python scripts/corpus/validate_processed_jsonl.py \
   --pretty
 ```
 
-Validate the frozen legal QA benchmark:
+Validate the frozen benchmark:
 
 ```bash
 uv run python scripts/evaluation/validate_benchmark.py \
@@ -187,86 +208,53 @@ uv run python scripts/evaluation/validate_benchmark.py \
   --processed-chunks data/processed/legal_chunks.jsonl
 ```
 
-Run focused test suites:
+Run the final strict generation evaluation manually only when Qdrant is
+available read-only, OpenRouter credentials are configured, and the existing
+benchmark/retrieval artifacts are present:
 
 ```bash
-uv run pytest tests/unit/processing -q
-uv run pytest tests/unit/retrieval -q
-uv run pytest tests/unit/evaluation -q
+uv run --extra qdrant --extra embedding python \
+  scripts/evaluation/run_strict_generation_evaluation.py \
+  --coverage-retrieval-dir artifacts/reports/evaluation/advanced_rag/coverage_aware_retrieval \
+  --generation-baseline-dir artifacts/reports/evaluation/naive_rag_baseline/generation \
+  --output-dir artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answerability_fallback_guard \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --url http://localhost:6333 \
+  --device cpu \
+  --provider openrouter
 ```
 
-Inspect available CLI options before running corpus, indexing, retrieval, or
-evaluation workflows:
+Do not run the real evaluation command for documentation or code review tasks.
 
-```bash
-uv run python scripts/corpus/validate_processed_jsonl.py --help
-uv run python scripts/retrieval/run_naive_rag.py --help
-uv run python scripts/evaluation/validate_benchmark.py --help
-```
+## Evaluation
 
-Detailed indexing, retrieval, generation, and benchmark commands are documented
-in `docs/embedding_indexing.md`, `docs/naive_rag.md`, and
-`docs/evaluation.md`.
+Benchmark `v0.1.0` contains:
 
-## Data and Artifacts
+- total queries: 128;
+- development split: 85;
+- held-out test split: 43;
+- expected `answer_allowed`: 110;
+- expected `fallback_required`: 18.
 
-- `data/raw/` is immutable crawl state.
-- `data/interim/` contains derived cleaning and hierarchy artifacts.
-- `data/processed/legal_chunks.jsonl` is the validated legal chunk corpus.
-- `data/eval/` contains reviewed evaluation assets and frozen benchmark files.
-- `artifacts/reports/` stores generated crawl, audit, indexing, retrieval, and
-  evaluation reports.
-- Qdrant storage, Hugging Face/model caches, virtual environments, Python
-  caches, runtime logs, and local secrets must not be committed.
+The held-out split is reporting-only, excludes high-risk sanction/criminal QA,
+and has not received qualified human legal review. Results should be interpreted
+as engineering evidence, not a legal-quality certification.
 
-Do not mutate protected corpus paths unless a task explicitly scopes an
-official rerun.
+## Limitations
 
-## Documentation Map
+- The benchmark has only 128 queries.
+- No claim-level qualified human legal review has been completed for final
+  generation outputs.
+- Citation guard validates citation IDs, not complete semantic legal
+  correctness.
+- Held-out test excludes high-risk sanction/criminal QA.
+- Provider output may be nondeterministic.
+- Time-aware filtering is not adopted yet.
+- Cross-encoder reranking was evaluated but not adopted.
+- API deployment is not part of the current evaluated pipeline.
 
-| Document | Purpose |
-| --- | --- |
-| `AGENTS.md` | Repository-wide safety, workflow, protected-path, and validation rules. |
-| `PROJECT_CONTEXT.md` | Canonical current project state, architecture, limitations, and roadmap. |
-| `docs/project_phase_journal.md` | Chronological engineering journal for completed corpus and processing phases. |
-| `docs/phase10_tracer.md` | Operational tracker for frozen benchmark and advanced retrieval evaluation work. |
-| `docs/end_to_end_pipeline.md` | End-to-end architecture and data-flow reference. |
-| `docs/corpus_registry.md` | Trusted corpus registry schema and source policy. |
-| `docs/raw_data_crawling.md` | Registry-driven crawling pipeline. |
-| `docs/raw_corpus_audit.md` | Raw artifact audit rules and validation gates. |
-| `docs/cleaning_normalization.md` | Vietnamese legal text cleaning and normalization details. |
-| `docs/legal_parsing.md` | Legal hierarchy parser design. |
-| `docs/parent_child_chunking.md` | Parent-child chunking design and validation notes. |
-| `docs/processed_jsonl.md` | Processed chunk schema and embedding-readiness validation. |
-| `docs/embedding_indexing.md` | BGE-M3 embedding and Qdrant indexing design. |
-| `docs/naive_rag.md` | Dense retrieval and fallback-aware Naive RAG baseline reference. |
-| `docs/evaluation.md` | Frozen benchmark protocol, schemas, validation, metrics, and CLI usage. |
-| `docs/advanced_rag.md` | Advanced retrieval design notes and controlled-ablation context. |
-| `docs/graphrag_agents.md` | Future GraphRAG and agent design notes. |
-| `docs/api_deployment.md` | Future API/deployment notes. |
-| `docs/mlops_maintenance.md` | Future MLOps and maintenance notes. |
+## License / Acknowledgments
 
-## Development Boundaries
-
-- Do not mutate `data/raw/`, `data/interim/`, `data/reports/`, or
-  `data/processed/legal_chunks.jsonl` without explicit scope.
-- Do not modify frozen benchmark labels, qrels, evidence groups, split
-  assignments, or manifests outside an explicitly scoped benchmark task.
-- Do not recreate, delete, upsert, re-index, or mutate Qdrant collections
-  unless indexing work is explicitly requested.
-- Do not bypass or relax evidence selection, fallback behavior, citation
-  guards, or quality gates without a controlled safety-scoped ablation.
-- Do not use LLMs for deterministic preprocessing.
-- Do not commit runtime state, generated caches, local settings, or secrets.
-- Do not claim production readiness or broad legal QA quality from narrow
-  regression suites.
-
-## Security
-
-Provider credentials belong only in environment variables or an untracked
-local `.env` file. Non-secret provider defaults may live in config files.
-
-Never print, log, serialize, or commit API keys, tokens, Authorization headers,
-or full environment dumps. If a secret is ever committed, remove it from the
-repository history according to the project security policy and rotate the
-credential before merging.
+No repository license file is currently present. Do not assume production or
+legal-advice suitability without additional legal, security, and deployment
+review.

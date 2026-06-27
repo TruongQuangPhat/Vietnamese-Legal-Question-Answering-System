@@ -73,28 +73,34 @@ Do not place reusable business logic in scripts.
 - `src/ingestion/` — registry, crawling, raw audit, cleaning, storage.
 - `src/processing/` — legal hierarchy parsing, chunking, processed JSONL validation.
 - `src/indexing/` — embedding and Qdrant indexing/validation.
-- `src/retrieval/` — dense retrieval, evidence construction and selection, Naive RAG generation, evaluation, manual review export, and offline quality gate.
+- `src/retrieval/` — dense/sparse retrieval, fusion, evidence construction and selection, RAG generation, evaluation, manual review export, and offline quality gate.
 - `src/services/` — orchestration where a service boundary already exists.
-- `src/api/`, `src/evaluation/`, `src/monitoring/`, `src/security/` — future or separately scoped functionality.
+- `src/evaluation/` — frozen benchmark schemas, metrics, strict generation evaluation, and offline diagnostics.
+- `src/api/`, `src/monitoring/`, `src/security/` — future or separately scoped functionality.
 
 Use the existing repository layout rather than introducing parallel abstractions.
 
-## 5. Current Baseline Status
+## 5. Current Project Status
 
-The Naive RAG baseline is closed and validated with known limitations.
+The Naive RAG baseline is closed with known limitations. The final adopted
+evaluated workflow uses coverage-aware hybrid retrieval and strict generation
+with citation and answerability fallback guards.
 
 Current durable state:
 
 - 52 legal documents are registered, crawled, audited, cleaned, parsed, and chunked.
 - `data/processed/legal_chunks.jsonl` contains 40,389 validated chunks.
 - Qdrant collection `vnlaw_chunks_bgem3_v1_full` contains 40,389 BGE-M3 dense vectors.
-- Dense retrieval, evidence safety/selection, fallback-aware generation, citation guard, repeatable generation evaluation, evidence previews, manual claim-to-citation review, prompt precision hardening, and the offline quality gate are implemented.
+- Dense retrieval, local BM25 sparse retrieval, fixed RRF fusion, coverage-aware quota retrieval, evidence safety/selection, fallback-aware generation, strict citation guard, answerability fallback guard, repeatable generation evaluation, evidence previews, manual claim-to-citation review, prompt precision hardening, and offline diagnostics are implemented.
 - The current offline gate status is `quality_gate_passed`.
 - The five-case suite is a small regression baseline, not a held-out benchmark proving broad Vietnamese legal QA quality.
-- `marriage_conditions_generation` remains a non-blocking partial case with completeness/scope warnings.
-- The annual-leave control remains a correct dense-only fallback case.
+- Frozen benchmark `v0.1.0` contains 128 queries: 85 development and 43 held-out reporting-only cases.
+- Final adopted retrieval is `coverage_aware_quota`.
+- Reranking was evaluated but not adopted.
+- Final strict generation all-split metrics include decision accuracy `0.875`, safe fallback rate `1.000`, citation ID validity `1.000`, retrieval errors `0`, and generation errors `0`.
 
-See `PROJECT_CONTEXT.md` and `docs/naive_rag.md` for current status and technical details.
+See `PROJECT_CONTEXT.md`, `docs/advanced_rag.md`, `docs/evaluation.md`, and
+`docs/naive_rag.md` for current status and technical details.
 
 ## 6. Functional Naming Rule
 
@@ -164,6 +170,8 @@ data/raw/
 data/interim/
 data/reports/
 data/processed/legal_chunks.jsonl
+data/eval/
+artifacts/reports/evaluation/
 ```
 
 Additional rules:
@@ -205,15 +213,18 @@ It may be used to verify:
 - answer precision regressions;
 - reviewed claim-to-citation verdicts.
 
-It must not be used to claim that an advanced system is broadly better than the Naive RAG baseline.
+It must not be used to claim broad Vietnamese legal QA quality.
 
-Before comparing Naive RAG with advanced retrieval:
+The frozen benchmark `v0.1.0` is the current comparative benchmark. Use the
+development split for implementation and tuning. Keep the held-out split
+reporting-only.
 
-1. Build a broader reviewed benchmark.
-2. Freeze a development split and a held-out test split.
-3. Use the development split for tuning.
-4. Keep the held-out test split untouched until configurations are fixed.
-5. Compare systems with the same corpus, chunking, generator, prompt, selection policy, and evaluation code unless a controlled ablation explicitly changes one component.
+When comparing systems, keep corpus, chunking, generator, prompt,
+evidence-selection policy, fallback policy, and evaluation code fixed unless a
+controlled ablation explicitly changes one component.
+
+Reranking is not part of the final adopted pipeline unless a future task
+explicitly scopes a new ablation.
 
 If model training or fine-tuning is introduced, use train/validation/test splits.
 

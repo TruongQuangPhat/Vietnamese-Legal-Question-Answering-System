@@ -1,10 +1,12 @@
 # VnLaw-QA Project Context
 
-This file is the canonical current-state summary for repository contributors and coding assistants.
+This file is the canonical current-state summary for repository contributors
+and coding assistants.
 
 ## 1. Project Goal
 
-VnLaw-QA is a Vietnamese legal question-answering and retrieval-augmented generation system designed around:
+VnLaw-QA is a Vietnamese legal question-answering and retrieval-augmented
+generation system designed around:
 
 - trusted legal sources;
 - preserved legal hierarchy;
@@ -13,29 +15,29 @@ VnLaw-QA is a Vietnamese legal question-answering and retrieval-augmented genera
 - safe fallback when evidence is insufficient;
 - reproducible evaluation.
 
-It is not a generic chatbot and is not a replacement for professional legal advice.
+It is a legal research assistant. It is not a generic chatbot and is not a
+replacement for professional legal advice.
 
-## 2. Canonical Architecture
+## 2. Current Architecture
 
 ```text
-Corpus Registry
-→ Registry-driven Crawling
-→ Raw Corpus Audit
-→ Cleaning / Normalization
-→ Legal Hierarchy Parsing
-→ Parent-child Chunking
-→ Processed Chunk Validation
-→ Embedding / Qdrant Indexing
-→ Dense Retrieval
-→ Evidence Construction and Selection
-→ Fallback-aware Naive RAG
-→ Generation Evaluation
-→ Manual Faithfulness Review
-→ Offline Quality Gate
-→ Benchmark-first Advanced Retrieval
-→ GraphRAG / Agents
-→ API / Deployment
-→ MLOps / Maintenance
+Corpus registry
+-> trusted-source crawling
+-> raw corpus audit
+-> cleaning / normalization
+-> legal hierarchy parsing
+-> parent-child chunking
+-> processed chunk validation
+-> BGE-M3 dense indexing in Qdrant
+-> dense retrieval
+-> sparse BM25 retrieval
+-> fixed RRF fusion
+-> coverage-aware quota retrieval
+-> evidence construction and selection
+-> strict generation
+-> citation ID guard
+-> answerability fallback guard
+-> benchmark evaluation and offline diagnostics
 ```
 
 Repository layout:
@@ -44,34 +46,39 @@ Repository layout:
 scripts/
   corpus/       # corpus pipeline CLI entrypoints
   indexing/     # embedding/Qdrant CLI entrypoints
-  retrieval/    # retrieval, Naive RAG, evaluation, and QA CLI entrypoints
-  evaluation/   # legal QA benchmark validation, split, and freeze entrypoints
+  retrieval/    # retrieval, Naive RAG, review, and quality-gate entrypoints
+  evaluation/   # benchmark, retrieval comparison, strict generation, diagnostics
 
 src/
   ingestion/    # registry, crawl, audit, cleaning, storage
   processing/   # hierarchy parsing, chunking, JSONL validation
   indexing/     # embedding and Qdrant indexing/validation
-  retrieval/    # dense retrieval, evidence, selection, generation, evaluation, review, quality gate
+  retrieval/    # retrieval, evidence, selection, generation, evaluation, quality gate
   services/     # existing orchestration services
-  api/          # future/separately scoped
-  evaluation/   # legal QA benchmark schemas, validation, splitting, and freeze support
-  monitoring/   # future/separately scoped
-  security/     # future/separately scoped
+  evaluation/   # benchmark schemas, metrics, workflows, diagnostics
+  api/          # not part of the adopted evaluated pipeline
+  monitoring/   # separately scoped
+  security/     # separately scoped
 ```
 
 Scripts are thin wrappers. Reusable logic belongs under `src/`.
 
-## 3. Core Legal RAG Principles
+## 3. Legal QA Safety Invariants
 
-- No trusted source → no confident answer.
-- No traceable citation → not a valid legal answer.
-- Preserve hierarchy: Phần → Chương → Mục → Điều → Khoản → Điểm.
+- No trusted source means no confident answer.
+- No traceable citation means the answer is invalid.
+- Do not fabricate laws, articles, clauses, points, procedures, penalties,
+  effective dates, or citations.
+- Preserve hierarchy where available:
+  `Phần -> Chương -> Mục -> Điều -> Khoản -> Điểm`.
 - Prefer consolidated legal documents (`VBHN`) when available.
-- Do not invent laws, articles, clauses, points, procedures, penalties, or citations.
 - Auxiliary parent context is not directly citable evidence.
-- If the selected evidence is incomplete or unsafe, use fallback instead of guessing.
-- Citation-ID integrity is separate from semantic faithfulness.
-- Raw data is immutable; derived data is written separately.
+- Generated answers may cite only selected citable child evidence IDs.
+- Citation-ID validity is required, but it does not prove full semantic legal
+  faithfulness.
+- If evidence is insufficient, unsafe, indirect, parent-only, or missing
+  required targets in strict evaluation mode, fallback is required.
+- The system supports legal research, not professional legal advice.
 
 Default trusted source:
 
@@ -79,359 +86,216 @@ Default trusted source:
 https://thuvienphapluat.vn
 ```
 
-## 4. Completed Corpus and Indexing Foundation
+## 4. Corpus and Index State
 
-### Corpus registry and ingestion
-
-- Registry: `configs/laws/corpus_registry.yml`.
 - Legal documents: 52.
-- Crawled: 52/52.
-- Raw audit: 52/52 passed.
-- Cleaned outputs: 52/52 under `data/interim/{LAW_ID}/normalized.json`.
+- Processed chunk file: `data/processed/legal_chunks.jsonl`.
+- Processed chunks: 40,389.
+- Chunking: parent-child legal chunking.
+- One legal child chunk maps to one Qdrant point.
+- Parent context is auxiliary context only and not directly citable.
+- Legal hierarchy is preserved where available.
 
-### Legal parsing and chunking
-
-- Parsed hierarchy artifacts: 52/52.
-- Parsed outputs: `data/interim/{LAW_ID}/hierarchy.json`.
-- Processed corpus: `data/processed/legal_chunks.jsonl`.
-- Valid chunks: 40,389.
-- Invalid chunks: 0.
-- Duplicate chunk IDs: 0.
-- Hard validation errors: 0.
-- Accepted non-blocking warnings remain visible.
-
-Chunk design:
-
-- child unit: Clause or Point where available;
-- parent unit: Article;
-- embedding content: `text`;
-- contextual payload: `parent_text`;
-- arbitrary character-window chunking is not used.
-
-### Embedding and indexing
-
-- Embedding model: `BAAI/bge-m3`.
-- Qdrant collection: `vnlaw_chunks_bgem3_v1_full`.
-- Points: 40,389.
-- Vector name: `dense`.
-- Dimension: 1024.
-- Distance: cosine.
-- Sparse indexing: not enabled in the current baseline.
-- Full count/schema/payload/vector/filter validation passed.
-
-## 5. Naive RAG Baseline Status
-
-Phase 9 is closed with known limitations.
-
-Implemented capabilities:
-
-- typed dense retrieval from Qdrant;
-- warning-aware and hierarchy-aware payload handling;
-- evidence bundle construction;
-- evidence safety and selection gate;
-- `answer_allowed` versus fallback decisions;
-- OpenRouter-backed generation through a provider-neutral client contract;
-- selected-evidence-only prompting;
-- safe Vietnamese fallback without an LLM call;
-- citation-ID guard;
-- repeatable generation evaluation;
-- bounded evidence previews for manual review;
-- manual claim-to-citation verdicts;
-- prompt scope and complete-list hardening;
-- configurable offline quality gate.
-
-Current quality-gate result:
+Dense index:
 
 ```text
-quality_gate_passed
+embedding model: BAAI/bge-m3
+vector name: dense
+vector dimension: 1024
+distance: cosine
+Qdrant collection: vnlaw_chunks_bgem3_v1_full
+point count: 40,389
 ```
 
-Current gate summary:
+Query embedding embeds only the query. The 40,389 corpus chunks are already
+indexed; do not re-embed or re-index unless a task explicitly scopes an
+official indexing rerun.
 
-- hard violations: 0;
-- quality violations: 0;
-- remaining warnings: 2;
-- warnings belong to the non-blocking `marriage_conditions_generation` case.
+## 5. Benchmark State
 
-The annual-leave control remains a correct fallback case:
+Frozen benchmark:
 
 ```text
-decision = fallback_required
-llm_called = false
+benchmark version: v0.1.0
+query count: 128
+development split: 85
+held-out test split: 43
+expected answer_allowed: 110
+expected fallback_required: 18
 ```
 
-Detailed technical documentation:
+The held-out test split is reporting-only and must not drive tuning. It
+excludes high-risk sanction/criminal QA, and no qualified human legal review
+has been completed for final generated claims.
+
+## 6. Final Adopted Retrieval
+
+Adopted strategy:
 
 ```text
-docs/naive_rag.md
+coverage_aware_quota
 ```
 
-## 6. Current Evaluation Assets
-
-Durable evaluation inputs:
+Configuration:
 
 ```text
-data/eval/manual_retrieval_queries.jsonl
-data/eval/manual_naive_rag_generation_queries.jsonl
-data/eval/manual_faithfulness_verdicts.json
-configs/retrieval/quality_gate.yml
+dense_candidate_k = 50
+sparse_candidate_k = 50
+final_top_k = 10
+rrf_k = 60
+dense_weight = 1.0
+sparse_weight = 1.5
+quota = fused_best 5, sparse_quota 4, dense_quota 1
 ```
 
-Reusable CLIs:
+All-split retrieval result:
+
+| Metric | Value |
+| --- | ---: |
+| Recall@10 | 0.9545454545 |
+| MRR@10 | 0.6883910534 |
+| NDCG@10 | 0.6465347419 |
+| evidence_group_coverage@10 | 0.7712765957 |
+
+Dense BGE-M3 top-k=10 baseline:
+
+| Metric | Value |
+| --- | ---: |
+| Recall@10 | 0.8454545455 |
+| MRR@10 | 0.65717 |
+| NDCG@10 | 0.60974 |
+| evidence_group_coverage@10 | 0.56915 |
+
+Reranking ablation:
 
 ```text
-scripts/retrieval/run_dense_retrieval.py
-scripts/retrieval/evaluate_dense_retrieval.py
-scripts/retrieval/run_selection_smoke.py
-scripts/retrieval/run_naive_rag.py
-scripts/retrieval/evaluate_naive_rag_generation.py
-scripts/retrieval/export_naive_rag_manual_review.py
-scripts/retrieval/evaluate_quality_gate.py
+reranker_model = BAAI/bge-reranker-v2-m3
+decision = no_adoption_no_eligible_reranker
+adopted = false
+selected_config = None
 ```
 
-The current five-case generation suite is a regression and safety suite. It has already been used to inspect failures, harden prompting, and validate the quality gate.
+Reranking was evaluated but is not part of the final adopted pipeline.
 
-It is not a held-out benchmark for claiming broad Vietnamese legal QA quality or for proving that an advanced retrieval system is better than the Naive RAG baseline.
+## 7. Final Adopted Strict Generation Workflow
 
-## 7. Known Limitations
-
-1. The reviewed generation suite contains only five cases.
-2. The suite is suitable for regression, not broad generalization.
-3. `marriage_conditions_generation` remains partial/non-blocking.
-4. Complete-list questions require fuller evidence coverage.
-5. Dense-only retrieval still falls back for the annual-leave control case.
-6. Citation-ID validity does not guarantee semantic faithfulness.
-7. Model output may vary across runs.
-8. The current system is not production-ready legal advice.
-9. Sparse retrieval, fusion, and reranking have not yet been evaluated on a frozen comparative benchmark.
-10. The scoped legal QA benchmark `v0.1.0` is frozen, but its held-out split is limited to low/medium-risk eligible cases.
-11. Qualified human legal review has not been completed for high-risk held-out expansion.
-12. `v0.1.0` held-out results must not be used to validate high-risk sanction, penalty, or criminal legal QA.
-
-## 8. Current Next Stage
-
-The next stage should run the frozen Naive RAG baseline on the scoped
-`v0.1.0` benchmark before adding Advanced RAG components.
-
-Do not begin by immediately adding hybrid retrieval. First record the dense
-baseline on the frozen development and held-out splits.
-
-Recommended sequence:
+Workflow:
 
 ```text
-1. Run the current Naive RAG baseline on the frozen `v0.1.0` development split.
-2. Run the current Naive RAG baseline once on the frozen `v0.1.0` held-out split.
-3. Record baseline manifests, metrics, and scoped-release limitations.
-4. Implement sparse retrieval and controlled dense+sparse fusion.
-5. Evaluate hybrid retrieval on the development split.
-6. Add reranking only as a separate ablation.
-7. Run the final comparison once on the held-out test split.
-8. Compare quality, safety, latency, and cost.
+workflow_name = strict_generation_evaluation
+retrieval_strategy = coverage_aware_quota
+provider/model = openrouter / google/gemini-2.5-flash
+reranking_used = false
+held_out_used_for_tuning = false
 ```
 
-If no model is trained, use development and held-out test splits.
+Final adopted run:
 
-If embedding, reranking, routing, or rewriting models are trained/fine-tuned, introduce train/validation/test splits.
+```text
+strict_generation_evaluation_answerability_fallback_guard
+```
 
-## 9. Comparative Evaluation Requirements
+All split:
 
-Naive and advanced systems should use the same:
+| Metric | Value |
+| --- | ---: |
+| query_count | 128 |
+| decision_accuracy | 0.875 |
+| answer_allowed_answer_rate | 0.8545454545 |
+| fallback_required_fallback_rate | 1.0 |
+| selected_evidence_group_coverage | 0.7861616162 |
+| case_pass_rate | 0.7578125 |
+| case_partial_rate | 0.1171875 |
+| case_fail_rate | 0.125 |
+| citation_id_validity_rate | 1.0 |
+| retrieval_error_count | 0 |
+| generation_error_count | 0 |
 
-- legal corpus;
-- chunking;
-- Qdrant snapshot;
-- queries;
-- generator model;
-- prompt;
-- evidence-selection policy;
-- fallback policy;
-- evaluation code.
+Development split:
 
-Only the component under study should change.
+| Metric | Value |
+| --- | ---: |
+| query_count | 85 |
+| decision_accuracy | 0.8941176471 |
+| answer_allowed_answer_rate | 0.8676470588 |
+| fallback_required_fallback_rate | 1.0 |
+| selected_evidence_group_coverage | 0.7897058824 |
+| case_pass_rate | 0.7647058824 |
+| retrieval_error_count | 0 |
+| generation_error_count | 0 |
 
-Recommended retrieval metrics:
+Held-out test split:
 
-- Recall@k;
-- MRR@k;
-- NDCG@k;
-- exact law/article/clause hit rate;
-- complete evidence coverage rate;
-- irrelevant evidence rate.
+| Metric | Value |
+| --- | ---: |
+| query_count | 43 |
+| decision_accuracy | 0.8372093023 |
+| answer_allowed_answer_rate | 0.8333333333 |
+| fallback_required_fallback_rate | 1.0 |
+| selected_evidence_group_coverage | 0.7804232804 |
+| case_pass_rate | 0.7441860465 |
+| retrieval_error_count | 0 |
+| generation_error_count | 0 |
 
-Recommended answer/safety metrics:
+Rejected trial:
 
-- answer-allowed precision;
-- fallback precision/recall;
-- citation-ID coverage;
-- claim support rate;
-- unsupported-claim rate;
-- too-broad-claim rate;
-- missing-key-condition rate;
-- complete-list accuracy;
-- blocking-case pass rate.
+```text
+strict_generation_evaluation_residual_answer_allowed_improvement
+```
 
-Recommended system metrics:
+It was tried but not adopted because development improved while held-out
+regressed and `generation_error_count` became `1`.
 
-- retrieval latency;
-- reranking latency;
-- total response latency;
-- token usage;
-- cost;
-- memory;
-- throughput.
+## 8. Testing State
 
-## 10. Immediate Tasks
+The repository now has workflow-level integration coverage under:
 
-1. Keep Phase 9 documentation consolidated in `docs/naive_rag.md`.
-2. Preserve the current five-case suite as a regression suite.
-3. Design a broader reviewed benchmark without inventing legal expectations.
-4. Freeze development and test splits before tuning advanced retrieval.
-5. Record a reproducible Naive RAG baseline on the frozen benchmark.
-6. Scope hybrid retrieval and reranking as controlled ablations.
-7. Continue carrying forward the marriage-condition completeness warning.
+```text
+tests/integration/corpus/
+tests/integration/retrieval/
+tests/integration/evaluation/
+```
 
-## 11. Out of Scope Until Explicitly Requested
+These tests use tiny fixtures, fake dependencies, and `tmp_path`. They do not
+call real Qdrant, real LLMs, real embedding models, real rerankers, or full
+benchmark workflows.
 
-- GraphRAG and agents.
-- FastAPI and production API contracts.
-- UI implementation.
-- Authentication and user management.
-- Fine-tuning.
-- Production deployment.
-- Monitoring/MLOps implementation.
-- Re-indexing the validated corpus.
-- Mutating protected corpus paths.
+Unit tests cover service, processing, retrieval, and evaluation modules.
 
-## 12. Protected Paths and Runtime State
+## 9. Protected Paths and Runtime Safety
 
-Do not mutate without an explicitly scoped official rerun:
+Do not mutate these paths unless the user explicitly scopes an official rerun:
 
 ```text
 data/raw/
 data/interim/
 data/reports/
 data/processed/legal_chunks.jsonl
-```
-
-Do not commit:
-
-- Qdrant storage;
-- Hugging Face/model caches;
-- virtual environments;
-- Python caches;
-- generated runtime evaluation reports;
-- local secrets.
-
-Qdrant should be read-only unless a task explicitly scopes indexing or collection migration.
-
-## 13. Important Paths
-
-```text
-AGENTS.md
-PROJECT_CONTEXT.md
-.codex/context/INSTRUCTION_INDEX.md
-.agents/skills/README.md
-.agents/skills/SKILL_INDEX.md
-configs/laws/corpus_registry.yml
-configs/retrieval/quality_gate.yml
-data/processed/legal_chunks.jsonl
 data/eval/
-artifacts/reports/indexing/
-src/ingestion/
-src/processing/
-src/indexing/
-src/retrieval/
-scripts/corpus/
-scripts/indexing/
-scripts/retrieval/
-docs/naive_rag.md
-docs/advanced_rag.md
-docs/evaluation.md
+artifacts/reports/evaluation/
 ```
 
-## 14. Core Commands
+Unless explicitly requested:
 
-### Test and lint
+- do not call OpenRouter/Gemini/API;
+- do not call real Qdrant retrieval;
+- do not write to Qdrant;
+- do not recreate/delete Qdrant collections;
+- do not re-embed or re-index the corpus;
+- do not run reranking inference;
+- do not run full benchmark or strict generation evaluation.
 
-```bash
-uv run pytest
-uv run ruff check src scripts tests
-uv run ruff format --check src scripts tests
-uv lock --check
-git diff --check
-```
+## 10. Durable Documentation
 
-### Run Naive RAG
+- `README.md` — professional project overview, setup, commands, and final
+  results.
+- `docs/advanced_rag.md` — adopted coverage-aware retrieval and strict
+  generation evaluation details.
+- `docs/evaluation.md` — benchmark and metrics protocol.
+- `docs/embedding_indexing.md` — BGE-M3/Qdrant index contract.
+- `docs/naive_rag.md` — baseline dense RAG reference.
+- `docs/parent_child_chunking.md` and `docs/processed_jsonl.md` — chunk and
+  processed JSONL contracts.
 
-```bash
-uv run --extra qdrant --extra embedding python \
-  scripts/retrieval/run_naive_rag.py \
-  --query "Trẻ em dưới 6 tuổi được hưởng bảo hiểm y tế như thế nào?" \
-  --collection-name vnlaw_chunks_bgem3_v1_full \
-  --url http://localhost:6333 \
-  --top-k 20 \
-  --device cpu \
-  --provider openrouter
-```
-
-### Run generation evaluation
-
-```bash
-uv run --extra qdrant --extra embedding python \
-  scripts/retrieval/evaluate_naive_rag_generation.py \
-  --queries data/eval/manual_naive_rag_generation_queries.jsonl \
-  --collection-name vnlaw_chunks_bgem3_v1_full \
-  --url http://localhost:6333 \
-  --top-k 20 \
-  --device cpu \
-  --provider openrouter \
-  --include-evidence-preview \
-  --evidence-preview-chars 500 \
-  --output artifacts/reports/retrieval/naive_rag_generation_eval.json
-```
-
-### Run offline quality gate
-
-```bash
-uv run python scripts/retrieval/evaluate_quality_gate.py \
-  --generation-report artifacts/reports/retrieval/naive_rag_generation_eval.json \
-  --faithfulness-verdicts data/eval/manual_faithfulness_verdicts.json \
-  --policy configs/retrieval/quality_gate.yml \
-  --output artifacts/reports/retrieval/quality_gate.json
-```
-
-Runtime reports under `artifacts/reports/` should remain ignored unless explicitly designated as durable artifacts.
-
-## 15. Roadmap
-
-| Stage | Status |
-| --- | --- |
-| Corpus registry, crawl, audit, cleaning | Complete |
-| Legal hierarchy parsing and parent-child chunking | Complete |
-| Processed JSONL validation and corpus audit | Complete |
-| BGE-M3 embedding and dense Qdrant indexing | Complete |
-| Dense retrieval and fallback-aware Naive RAG | Complete |
-| Generation evaluation, faithfulness review, prompt hardening, quality gate | Complete |
-| Phase 9 closure | Complete with known limitations |
-| Benchmark construction and frozen split | Complete for scoped `v0.1.0` |
-| Frozen Naive RAG baseline on benchmark | Next |
-| Advanced retrieval comparison | Future |
-| GraphRAG and agents | Future |
-| API and UI | Future |
-| Deployment and MLOps | Future |
-
-Branch guidance:
-
-```text
-feature/data-crawling           done
-feature/raw-corpus-audit        done
-feature/cleaning-normalization  done
-feature/legal-parser-chunking   done
-feature/processed-jsonl         done
-feature/embedding-indexing      done
-feature/naive-rag               done
-feature/advanced-rag            next
-feature/graphrag-agents         future
-feature/evaluation              future
-feature/api-deployment          future
-```
+Historical roadmap/journal docs are not authoritative when they conflict with
+this file.
