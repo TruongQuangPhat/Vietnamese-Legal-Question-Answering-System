@@ -237,6 +237,3 @@ This project is licensed under the MIT License. See `LICENSE` for details.
 This system is intended for legal research and engineering evaluation only. Do
 not assume production or legal-advice suitability without additional legal,
 security, and deployment review.
-No repository license file is currently present. Do not assume production or
-legal-advice suitability without additional legal, security, and deployment
-review.
