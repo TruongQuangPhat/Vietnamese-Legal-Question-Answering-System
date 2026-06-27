@@ -36,7 +36,7 @@ DEFAULT_ABLATION_DIR = Path("artifacts/reports/evaluation/advanced_rag/fusion_ab
 DEFAULT_COMPARISON_DIR = Path("artifacts/reports/evaluation/advanced_rag/retrieval_comparison")
 DEFAULT_DENSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/naive_rag_baseline/retrieval")
 DEFAULT_SPARSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/sparse_retrieval")
-DEFAULT_G2_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/hybrid_retrieval")
+DEFAULT_FIXED_RRF_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/hybrid_retrieval")
 DEFAULT_CHUNKS = Path("data/processed/legal_chunks.jsonl")
 DEFAULT_QUERIES = Path("data/eval/legal_qa_benchmark/benchmark_queries.jsonl")
 DEFAULT_TARGETS = Path("data/eval/legal_qa_benchmark/benchmark_targets.jsonl")
@@ -49,7 +49,7 @@ EVALUATION_REPORTS_ROOT = REPO_ROOT / "artifacts/reports/evaluation"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build the selected G3 retrieval CLI parser."""
+    """Build the selected coverage-aware retrieval CLI parser."""
     parser = argparse.ArgumentParser(
         prog="scripts/evaluation/run_coverage_aware_hybrid_retrieval.py",
         description="Run selected coverage-aware hybrid retrieval over the frozen benchmark.",
@@ -72,18 +72,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--comparison-dir", type=Path, default=DEFAULT_COMPARISON_DIR)
     parser.add_argument("--dense-reference-dir", type=Path, default=DEFAULT_DENSE_REFERENCE_DIR)
     parser.add_argument("--sparse-reference-dir", type=Path, default=DEFAULT_SPARSE_REFERENCE_DIR)
-    parser.add_argument("--g2-reference-dir", type=Path, default=DEFAULT_G2_REFERENCE_DIR)
+    parser.add_argument(
+        "--fixed-rrf-reference-dir",
+        type=Path,
+        default=DEFAULT_FIXED_RRF_REFERENCE_DIR,
+    )
     parser.add_argument("--quiet", action="store_true")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the async selected G3 retrieval command."""
+    """Run the async selected coverage-aware retrieval command."""
     return asyncio.run(run_command(argv))
 
 
 async def run_command(argv: list[str] | None = None) -> int:
-    """Run selected G3 retrieval and write artifacts."""
+    """Run selected coverage-aware retrieval and write artifacts."""
     args = build_arg_parser().parse_args(argv)
     client: Any | None = None
     try:
@@ -175,7 +179,7 @@ def _paths_from_args(args: argparse.Namespace) -> FusionAblationPaths:
         dense_config=args.config,
         dense_reference_dir=args.dense_reference_dir,
         sparse_reference_dir=args.sparse_reference_dir,
-        g2_reference_dir=args.g2_reference_dir,
+        fixed_rrf_reference_dir=args.fixed_rrf_reference_dir,
         output_dir=args.output_dir,
     )
 

@@ -162,8 +162,8 @@ def test_write_hybrid_outputs_creates_required_artifacts(tmp_path: Path) -> None
     assert manifest["sparse_candidate_k"] == 50
     assert manifest["final_top_k"] == 10
     assert manifest["rrf_k"] == 60
-    assert manifest["f1_dense_baseline_manifest_sha256"]
-    assert manifest["g1_sparse_baseline_manifest_sha256"]
+    assert manifest["dense_baseline_manifest_sha256"]
+    assert manifest["sparse_baseline_manifest_sha256"]
     assert not _contains_secret_like_key(manifest)
 
 

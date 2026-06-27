@@ -1,4 +1,4 @@
-"""Typed contracts for Phase 8 embedding and indexing.
+"""Typed contracts for embedding and indexing.
 
 This module defines configuration, embedding output, vector payload, and
 report schemas only. It does not load models, connect to Qdrant, embed text,
@@ -35,7 +35,7 @@ class IndexingIssueSeverity(StrEnum):
 class EmbeddingInput(BaseModel):
     """One validated legal chunk prepared for future embedding.
 
-    ``embedding_text`` is a separate immutable value derived by a later slice.
+    ``embedding_text`` is a separate immutable value derived by a later workflow.
     This contract does not rewrite or mutate the canonical ``LegalChunk.text``.
     """
 
@@ -122,8 +122,8 @@ class DenseEmbedding(BaseModel):
 class SparseEmbedding(BaseModel):
     """Optional sparse vector output for one legal chunk.
 
-    Sparse vectors are disabled by default in Slice 8A configuration. When a
-    later slice emits one, this contract requires aligned non-empty indices
+    Sparse vectors are disabled by default in the indexing configuration. When a
+    later workflow emits one, this contract requires aligned non-empty indices
     and finite values.
     """
 
@@ -177,10 +177,10 @@ class SparseEmbedding(BaseModel):
 
 
 class VectorPayload(BaseModel):
-    """Legal metadata payload stored beside vectors in a later slice.
+    """Legal metadata payload stored beside vectors in a later workflow.
 
     Temporal and domain-enrichment fields are nullable or empty by default.
-    Their absence must be preserved rather than inferred during Phase 8.
+    Their absence must be preserved rather than inferred during embedding/indexing.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -274,7 +274,7 @@ class VectorPayload(BaseModel):
 
 
 class IndexingInputConfig(BaseModel):
-    """Paths to validated Phase 7 input and its gate configuration."""
+    """Paths to validated processed JSONL input and its gate configuration."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -373,13 +373,11 @@ class IndexingRuntimeConfig(BaseModel):
 
 
 class IndexingConfig(BaseModel):
-    """Complete Phase 8 embedding and indexing configuration contract."""
+    """Complete embedding and indexing configuration contract."""
 
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field(..., min_length=1)
-    phase: Literal["8"] = "8"
-    slice: Literal["8A"] = "8A"
     input: IndexingInputConfig = Field(default_factory=IndexingInputConfig)
     embedding: EmbeddingModelConfig
     sparse: SparseVectorConfig = Field(default_factory=SparseVectorConfig)
@@ -432,7 +430,7 @@ class ProcessedCorpusValidationSummary(BaseModel):
         "processed_corpus_validation_summary"
     )
     run_type: Literal["official_full_indexing"] = "official_full_indexing"
-    pipeline_stage: Literal["corpus_validation"] = "corpus_validation"
+    workflow_name: Literal["corpus_validation"] = "corpus_validation"
     input_path: str = Field(..., min_length=1)
     total_lines: int = Field(..., ge=0)
     valid_chunks: int = Field(..., ge=0)
@@ -538,7 +536,7 @@ class IndexingReport(BaseModel):
     schema_version: str = Field(..., min_length=1)
     report_type: Literal["indexing_report"] = "indexing_report"
     run_type: str = Field("development_indexing", min_length=1)
-    pipeline_stage: Literal["embedding_indexing"] = "embedding_indexing"
+    workflow_name: Literal["embedding_indexing"] = "embedding_indexing"
     status: Literal[
         "planned",
         "running",
@@ -621,7 +619,7 @@ class IndexingCheckpoint(BaseModel):
     schema_version: str = Field("0.1.0", min_length=1)
     checkpoint_type: Literal["indexing_checkpoint"] = "indexing_checkpoint"
     run_type: str = Field("development_indexing", min_length=1)
-    pipeline_stage: Literal["embedding_indexing"] = "embedding_indexing"
+    workflow_name: Literal["embedding_indexing"] = "embedding_indexing"
     indexing_run_id: str = Field(..., min_length=1)
     collection_name: str = Field(..., min_length=1)
     dense_vector_name: str = Field(..., min_length=1)
@@ -638,23 +636,6 @@ class IndexingCheckpoint(BaseModel):
     failed_chunk_ids: list[str] = Field(default_factory=list)
     started_at: str | None = None
     updated_at: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_legacy_metadata(cls, value: Any) -> Any:
-        """Accept legacy development labels without retaining them on output."""
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        legacy_phase = normalized.pop("phase", None)
-        legacy_slice = normalized.pop("slice", None)
-        if (legacy_phase is None) != (legacy_slice is None):
-            raise ValueError("legacy checkpoint phase and slice must appear together")
-        if legacy_phase is not None and legacy_phase != "8":
-            raise ValueError(f"unsupported legacy checkpoint phase {legacy_phase!r}")
-        if legacy_slice is not None and legacy_slice not in {"8F", "8G"}:
-            raise ValueError(f"unsupported legacy checkpoint slice {legacy_slice!r}")
-        return normalized
 
     @model_validator(mode="after")
     def validate_progress_consistency(self) -> IndexingCheckpoint:
@@ -828,7 +809,7 @@ class IndexValidationReport(BaseModel):
     schema_version: str = Field("0.1.0", min_length=1)
     report_type: Literal["index_validation_report"] = "index_validation_report"
     run_type: str = Field("development_index_validation", min_length=1)
-    pipeline_stage: Literal["index_validation"] = "index_validation"
+    workflow_name: Literal["index_validation"] = "index_validation"
     status: Literal["success", "warning", "failed"]
     collection_name: str = Field(..., min_length=1)
     dense_vector_name: str = Field(..., min_length=1)

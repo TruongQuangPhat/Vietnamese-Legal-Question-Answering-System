@@ -45,7 +45,7 @@ FusionMode = Literal["weighted_rrf", "quota", "diversity"]
 
 @dataclass(frozen=True)
 class CoverageAwareFusionConfig:
-    """One G3 coverage-aware fusion ablation configuration."""
+    """One coverage-aware fusion ablation configuration."""
 
     config_id: str
     mode: FusionMode
@@ -115,7 +115,7 @@ class CoverageAwareFusionConfig:
 
 @dataclass(frozen=True)
 class FusionAblationPaths:
-    """Paths used by the G3 development-only ablation runner."""
+    """Paths used by the development-only fusion ablation runner."""
 
     file_set: BenchmarkFileSet
     split_manifest: Path
@@ -124,7 +124,7 @@ class FusionAblationPaths:
     dense_config: Path
     dense_reference_dir: Path
     sparse_reference_dir: Path
-    g2_reference_dir: Path
+    fixed_rrf_reference_dir: Path
     output_dir: Path
 
 
@@ -133,55 +133,149 @@ class FusionAblationError(RuntimeError):
 
 
 def default_ablation_configs() -> list[CoverageAwareFusionConfig]:
-    """Return the fixed development-only G3 ablation search space."""
+    """Return the fixed development-only fusion ablation search space."""
     configs = [
         CoverageAwareFusionConfig(
-            "A0", "weighted_rrf", 50, 50, 10, 60, 1.0, 1.0, simplicity_rank=0
+            "equal_weight_rrf", "weighted_rrf", 50, 50, 10, 60, 1.0, 1.0, simplicity_rank=0
         ),
         CoverageAwareFusionConfig(
-            "A1", "weighted_rrf", 50, 50, 10, 60, 1.0, 1.25, simplicity_rank=1
+            "sparse_weight_1_25", "weighted_rrf", 50, 50, 10, 60, 1.0, 1.25, simplicity_rank=1
         ),
         CoverageAwareFusionConfig(
-            "A2", "weighted_rrf", 50, 50, 10, 60, 1.0, 1.5, simplicity_rank=2
+            "sparse_weight_1_5", "weighted_rrf", 50, 50, 10, 60, 1.0, 1.5, simplicity_rank=2
         ),
         CoverageAwareFusionConfig(
-            "A3", "weighted_rrf", 50, 50, 10, 60, 1.0, 2.0, simplicity_rank=3
+            "sparse_weight_2", "weighted_rrf", 50, 50, 10, 60, 1.0, 2.0, simplicity_rank=3
         ),
         CoverageAwareFusionConfig(
-            "A4", "weighted_rrf", 50, 50, 10, 60, 1.25, 1.0, simplicity_rank=4
+            "dense_weight_1_25", "weighted_rrf", 50, 50, 10, 60, 1.25, 1.0, simplicity_rank=4
         ),
         CoverageAwareFusionConfig(
-            "B1", "weighted_rrf", 50, 100, 10, 60, 1.0, 1.5, simplicity_rank=5
+            "sparse_weight_1_5_pool_50_100",
+            "weighted_rrf",
+            50,
+            100,
+            10,
+            60,
+            1.0,
+            1.5,
+            simplicity_rank=5,
         ),
         CoverageAwareFusionConfig(
-            "B2", "weighted_rrf", 100, 100, 10, 60, 1.0, 1.5, simplicity_rank=6
+            "sparse_weight_1_5_pool_100_100",
+            "weighted_rrf",
+            100,
+            100,
+            10,
+            60,
+            1.0,
+            1.5,
+            simplicity_rank=6,
         ),
         CoverageAwareFusionConfig(
-            "B3", "weighted_rrf", 50, 100, 10, 60, 1.0, 2.0, simplicity_rank=7
+            "sparse_weight_2_pool_50_100",
+            "weighted_rrf",
+            50,
+            100,
+            10,
+            60,
+            1.0,
+            2.0,
+            simplicity_rank=7,
         ),
         CoverageAwareFusionConfig(
-            "B4", "weighted_rrf", 100, 100, 10, 60, 1.0, 2.0, simplicity_rank=8
+            "sparse_weight_2_pool_100_100",
+            "weighted_rrf",
+            100,
+            100,
+            10,
+            60,
+            1.0,
+            2.0,
+            simplicity_rank=8,
         ),
         CoverageAwareFusionConfig(
-            "C1", "quota", 50, 50, 10, 60, 1.0, 1.5, 6, 3, 1, simplicity_rank=9
+            "quota_fused6_sparse3_dense1",
+            "quota",
+            50,
+            50,
+            10,
+            60,
+            1.0,
+            1.5,
+            6,
+            3,
+            1,
+            simplicity_rank=9,
         ),
         CoverageAwareFusionConfig(
-            "C2", "quota", 50, 50, 10, 60, 1.0, 1.5, 5, 3, 2, simplicity_rank=10
+            "quota_fused5_sparse3_dense2",
+            "quota",
+            50,
+            50,
+            10,
+            60,
+            1.0,
+            1.5,
+            5,
+            3,
+            2,
+            simplicity_rank=10,
         ),
         CoverageAwareFusionConfig(
-            "C3", "quota", 50, 50, 10, 60, 1.0, 1.5, 4, 4, 2, simplicity_rank=11
+            "quota_fused4_sparse4_dense2",
+            "quota",
+            50,
+            50,
+            10,
+            60,
+            1.0,
+            1.5,
+            4,
+            4,
+            2,
+            simplicity_rank=11,
         ),
         CoverageAwareFusionConfig(
-            "C4", "quota", 50, 50, 10, 60, 1.0, 1.5, 5, 4, 1, simplicity_rank=12
+            "selected_coverage_aware_quota",
+            "quota",
+            50,
+            50,
+            10,
+            60,
+            1.0,
+            1.5,
+            5,
+            4,
+            1,
+            simplicity_rank=12,
         ),
         CoverageAwareFusionConfig(
-            "D1", "diversity", 50, 50, 10, 60, 1.0, 1.5, diversity_penalty=0.001, simplicity_rank=13
+            "diversity_penalty_0_001",
+            "diversity",
+            50,
+            50,
+            10,
+            60,
+            1.0,
+            1.5,
+            diversity_penalty=0.001,
+            simplicity_rank=13,
         ),
         CoverageAwareFusionConfig(
-            "D2", "diversity", 50, 50, 10, 60, 1.0, 1.5, diversity_penalty=0.002, simplicity_rank=14
+            "diversity_penalty_0_002",
+            "diversity",
+            50,
+            50,
+            10,
+            60,
+            1.0,
+            1.5,
+            diversity_penalty=0.002,
+            simplicity_rank=14,
         ),
         CoverageAwareFusionConfig(
-            "D3",
+            "diversity_penalty_0_001_distinct_detail",
             "diversity",
             50,
             50,
@@ -207,7 +301,7 @@ async def run_development_ablation(
     embedding_model: str,
     command: list[str],
 ) -> dict[str, Any]:
-    """Run development-only G3 fusion ablation and write artifacts."""
+    """Run development-only fusion ablation and write artifacts."""
     dataset = load_benchmark_dataset(paths.file_set)
     split_manifest = load_split_manifest(paths.split_manifest)
     benchmark_manifest = load_benchmark_manifest(paths.benchmark_manifest)
@@ -271,14 +365,14 @@ async def run_development_ablation(
         "embedding_model": embedding_model,
         "chunk_source_path": str(paths.chunk_source),
         "chunk_source_sha256": sha256_file(paths.chunk_source),
-        "f1_dense_baseline_manifest_sha256": sha256_file(
+        "dense_baseline_manifest_sha256": sha256_file(
             paths.dense_reference_dir / "baseline_manifest.json"
         ),
-        "g1_sparse_baseline_manifest_sha256": sha256_file(
+        "sparse_baseline_manifest_sha256": sha256_file(
             paths.sparse_reference_dir / "baseline_manifest.json"
         ),
-        "g2_hybrid_baseline_manifest_sha256": sha256_file(
-            paths.g2_reference_dir / "baseline_manifest.json"
+        "fixed_rrf_baseline_manifest_sha256": sha256_file(
+            paths.fixed_rrf_reference_dir / "baseline_manifest.json"
         ),
         "run_timestamp": datetime.now(UTC).isoformat(),
         "git_commit": git_commit_or_unknown(),
@@ -339,7 +433,7 @@ async def run_final_coverage_aware_report(
     vector_name: str,
     command: list[str],
 ) -> list[dict[str, Any]]:
-    """Run the selected G3 config on all/development/held-out splits once."""
+    """Run the selected coverage-aware config on all benchmark splits once."""
     ablation_results = load_ablation_results(ablation_dir / "ablation_results.json")
     selected_config = config_from_payload(ablation_results["selected_config"])
     dataset = load_benchmark_dataset(paths.file_set)
@@ -377,7 +471,7 @@ async def run_final_coverage_aware_report(
         dense_config_payload=dense_config_payload,
         dense_reference_dir=paths.dense_reference_dir,
         sparse_reference_dir=paths.sparse_reference_dir,
-        g2_reference_dir=paths.g2_reference_dir,
+        fixed_rrf_reference_dir=paths.fixed_rrf_reference_dir,
         fusion_ablation_manifest=ablation_dir / "ablation_manifest.json",
         config=selected_config,
         qdrant_collection_name=qdrant_collection_name,
@@ -386,12 +480,12 @@ async def run_final_coverage_aware_report(
         vector_name=vector_name,
         command=command,
     )
-    write_g3_comparison(
+    write_coverage_aware_comparison(
         comparison_dir=comparison_dir,
         dense_dir=paths.dense_reference_dir,
         sparse_dir=paths.sparse_reference_dir,
-        g2_dir=paths.g2_reference_dir,
-        g3_dir=output_dir,
+        fixed_rrf_dir=paths.fixed_rrf_reference_dir,
+        coverage_aware_dir=output_dir,
     )
     return case_results
 
@@ -408,7 +502,7 @@ def write_coverage_aware_outputs(
     dense_config_payload: dict[str, Any],
     dense_reference_dir: Path,
     sparse_reference_dir: Path,
-    g2_reference_dir: Path,
+    fixed_rrf_reference_dir: Path,
     fusion_ablation_manifest: Path,
     config: CoverageAwareFusionConfig,
     qdrant_collection_name: str,
@@ -417,7 +511,7 @@ def write_coverage_aware_outputs(
     vector_name: str,
     command: list[str],
 ) -> None:
-    """Write final selected G3 coverage-aware retrieval artifacts."""
+    """Write final selected coverage-aware retrieval artifacts."""
     output_dir.mkdir(parents=True, exist_ok=True)
     all_metrics = aggregate_case_metrics(case_results)
     breakdowns = build_breakdowns(case_results)
@@ -453,14 +547,14 @@ def write_coverage_aware_outputs(
         "embedding_model": embedding_model,
         "chunk_source_path": str(chunk_source_path),
         "chunk_source_sha256": sha256_file(chunk_source_path),
-        "f1_dense_baseline_manifest_sha256": sha256_file(
+        "dense_baseline_manifest_sha256": sha256_file(
             dense_reference_dir / "baseline_manifest.json"
         ),
-        "g1_sparse_baseline_manifest_sha256": sha256_file(
+        "sparse_baseline_manifest_sha256": sha256_file(
             sparse_reference_dir / "baseline_manifest.json"
         ),
-        "g2_hybrid_baseline_manifest_sha256": sha256_file(
-            g2_reference_dir / "baseline_manifest.json"
+        "fixed_rrf_baseline_manifest_sha256": sha256_file(
+            fixed_rrf_reference_dir / "baseline_manifest.json"
         ),
         "fusion_ablation_manifest_sha256": sha256_file(fusion_ablation_manifest),
         "run_timestamp": datetime.now(UTC).isoformat(),
@@ -501,36 +595,36 @@ def write_coverage_aware_outputs(
     )
 
 
-def write_g3_comparison(
+def write_coverage_aware_comparison(
     *,
     comparison_dir: Path,
     dense_dir: Path,
     sparse_dir: Path,
-    g2_dir: Path,
-    g3_dir: Path,
+    fixed_rrf_dir: Path,
+    coverage_aware_dir: Path,
 ) -> None:
-    """Write comparison artifacts including F1, G1, G2, and selected G3."""
+    """Write comparison artifacts for the active retrieval strategies."""
     comparison_dir.mkdir(parents=True, exist_ok=True)
     systems = {
-        "f1_dense": {
+        "dense_bge_m3_baseline": {
             "retrieval_method": "dense_bge_m3",
             "metrics": load_system_metrics(dense_dir),
             "breakdowns": load_system_breakdowns(dense_dir),
         },
-        "g1_sparse_bm25": {
+        "sparse_bm25_baseline": {
             "retrieval_method": "sparse_bm25",
             "metrics": load_system_metrics(sparse_dir),
             "breakdowns": load_system_breakdowns(sparse_dir),
         },
-        "g2_hybrid_rrf": {
+        "fixed_rrf_hybrid": {
             "retrieval_method": "hybrid_dense_sparse_rrf",
-            "metrics": load_system_metrics(g2_dir),
-            "breakdowns": load_system_breakdowns(g2_dir),
+            "metrics": load_system_metrics(fixed_rrf_dir),
+            "breakdowns": load_system_breakdowns(fixed_rrf_dir),
         },
-        "g3_coverage_aware": {
-            "retrieval_method": "coverage_aware_hybrid",
-            "metrics": load_system_metrics(g3_dir),
-            "breakdowns": load_system_breakdowns(g3_dir),
+        "coverage_aware_quota": {
+            "retrieval_method": "coverage_aware_quota",
+            "metrics": load_system_metrics(coverage_aware_dir),
+            "breakdowns": load_system_breakdowns(coverage_aware_dir),
         },
     }
     comparison = {
@@ -545,46 +639,53 @@ def write_g3_comparison(
             for label, payload in systems.items()
         },
         "deltas": {
-            "g3_vs_dense": _delta_metrics(
-                systems["g3_coverage_aware"]["metrics"], systems["f1_dense"]["metrics"]
+            "coverage_aware_vs_dense": _delta_metrics(
+                systems["coverage_aware_quota"]["metrics"],
+                systems["dense_bge_m3_baseline"]["metrics"],
             ),
-            "g3_vs_sparse": _delta_metrics(
-                systems["g3_coverage_aware"]["metrics"], systems["g1_sparse_bm25"]["metrics"]
+            "coverage_aware_vs_sparse": _delta_metrics(
+                systems["coverage_aware_quota"]["metrics"],
+                systems["sparse_bm25_baseline"]["metrics"],
             ),
-            "g3_vs_g2": _delta_metrics(
-                systems["g3_coverage_aware"]["metrics"], systems["g2_hybrid_rrf"]["metrics"]
+            "coverage_aware_vs_fixed_rrf": _delta_metrics(
+                systems["coverage_aware_quota"]["metrics"],
+                systems["fixed_rrf_hybrid"]["metrics"],
             ),
         },
         "key_questions": {
-            "g3_improves_development_group_coverage_over_g2": systems["g3_coverage_aware"][
+            "coverage_aware_improves_development_group_coverage_over_fixed_rrf": systems[
+                "coverage_aware_quota"
+            ]["metrics"]["development"]["evidence_group_coverage_at_10"]
+            > systems["fixed_rrf_hybrid"]["metrics"]["development"][
+                "evidence_group_coverage_at_10"
+            ],
+            "coverage_aware_recovers_sparse_development_group_coverage": systems[
+                "coverage_aware_quota"
+            ]["metrics"]["development"]["evidence_group_coverage_at_10"]
+            >= systems["sparse_bm25_baseline"]["metrics"]["development"][
+                "evidence_group_coverage_at_10"
+            ],
+            "coverage_aware_preserves_fixed_rrf_all_recall": systems["coverage_aware_quota"][
                 "metrics"
-            ]["development"]["evidence_group_coverage_at_10"]
-            > systems["g2_hybrid_rrf"]["metrics"]["development"]["evidence_group_coverage_at_10"],
-            "g3_recovers_sparse_development_group_coverage": systems["g3_coverage_aware"][
+            ]["all"]["recall_at_10"]
+            >= systems["fixed_rrf_hybrid"]["metrics"]["all"]["recall_at_10"],
+            "coverage_aware_preserves_dense_held_out_recall": systems["coverage_aware_quota"][
                 "metrics"
-            ]["development"]["evidence_group_coverage_at_10"]
-            >= systems["g1_sparse_bm25"]["metrics"]["development"]["evidence_group_coverage_at_10"],
-            "g3_preserves_g2_all_recall": systems["g3_coverage_aware"]["metrics"]["all"][
-                "recall_at_10"
-            ]
-            >= systems["g2_hybrid_rrf"]["metrics"]["all"]["recall_at_10"],
-            "g3_preserves_dense_held_out_recall": systems["g3_coverage_aware"]["metrics"][
-                "held_out_test"
-            ]["recall_at_10"]
-            >= systems["f1_dense"]["metrics"]["held_out_test"]["recall_at_10"],
+            ]["held_out_test"]["recall_at_10"]
+            >= systems["dense_bge_m3_baseline"]["metrics"]["held_out_test"]["recall_at_10"],
         },
-        "interpretation": "G3 is selected on development evidence-group coverage only; held_out_test is reported once after selection.",
-        "recommendation": "Use Stage H reranking ablation if retrieval coverage remains insufficient; consider gate/selection ablations only as separate safety-scoped work.",
+        "interpretation": "Coverage-aware quota retrieval is selected on development evidence-group coverage only; held_out_test is reported once after selection.",
+        "recommendation": "Use reranking only as a separate controlled ablation; keep gate or selection-policy changes separately safety-scoped.",
     }
     assert_manifest_has_no_secret_keys(comparison)
     write_json_atomic(comparison_dir / "comparison.json", comparison)
     (comparison_dir / "comparison.md").write_text(
-        render_g3_comparison_markdown(comparison), encoding="utf-8"
+        render_coverage_aware_comparison_markdown(comparison), encoding="utf-8"
     )
 
 
 def load_ablation_results(path: Path) -> dict[str, Any]:
-    """Load G3 ablation result JSON."""
+    """Load coverage-aware fusion ablation result JSON."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise FusionAblationError(f"ablation result root must be an object: {path}")
@@ -596,7 +697,7 @@ def config_from_payload(payload: dict[str, Any]) -> CoverageAwareFusionConfig:
     quota = payload.get("quota") or {}
     diversity = payload.get("diversity") or {}
     return CoverageAwareFusionConfig(
-        config_id=payload["config_id"],
+        config_id=str(payload["config_id"]),
         mode=payload["mode"],
         dense_candidate_k=payload["dense_candidate_k"],
         sparse_candidate_k=payload["sparse_candidate_k"],
@@ -673,7 +774,7 @@ def render_coverage_aware_summary(
     breakdowns: dict[str, dict[str, dict[str, Any]]],
     manifest: dict[str, Any],
 ) -> str:
-    """Render Markdown summary for selected G3 retrieval."""
+    """Render Markdown summary for selected coverage-aware retrieval."""
     lines = [
         "# Frozen Coverage-Aware Hybrid Retrieval",
         "",
@@ -709,8 +810,8 @@ def render_coverage_aware_summary(
     return "\n".join(lines)
 
 
-def render_g3_comparison_markdown(comparison: dict[str, Any]) -> str:
-    """Render comparison Markdown including selected G3."""
+def render_coverage_aware_comparison_markdown(comparison: dict[str, Any]) -> str:
+    """Render comparison Markdown including coverage-aware retrieval."""
     lines = [
         "# Advanced Retrieval Comparison",
         "",

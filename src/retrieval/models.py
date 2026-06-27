@@ -1,7 +1,7 @@
 """Typed contracts for dense retrieval baseline dense retrieval.
 
 The models in this module represent query input, safe payload filters, retrieved
-legal evidence, and retrieval-level diagnostics. They preserve Phase 8 payload
+legal evidence, and retrieval-level diagnostics. They preserve embedding/indexing payload
 fields without exposing raw Qdrant payload dictionaries to downstream
 generation code.
 """
@@ -67,7 +67,7 @@ class RetrievalIssue(BaseModel):
 
 
 class RetrievalFilters(BaseModel):
-    """Safe exact-match filters supported by the Phase 8 payload schema.
+    """Safe exact-match filters supported by the embedding/indexing payload schema.
 
     Legal assumptions:
         These filters do not implement temporal validity. dense retrieval baseline must not

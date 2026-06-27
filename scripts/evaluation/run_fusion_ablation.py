@@ -30,7 +30,7 @@ EXIT_FAILURE = 1
 DEFAULT_OUTPUT_DIR = Path("artifacts/reports/evaluation/advanced_rag/fusion_ablation")
 DEFAULT_DENSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/naive_rag_baseline/retrieval")
 DEFAULT_SPARSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/sparse_retrieval")
-DEFAULT_G2_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/hybrid_retrieval")
+DEFAULT_FIXED_RRF_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/hybrid_retrieval")
 DEFAULT_CHUNKS = Path("data/processed/legal_chunks.jsonl")
 DEFAULT_QUERIES = Path("data/eval/legal_qa_benchmark/benchmark_queries.jsonl")
 DEFAULT_TARGETS = Path("data/eval/legal_qa_benchmark/benchmark_targets.jsonl")
@@ -43,7 +43,7 @@ EVALUATION_REPORTS_ROOT = REPO_ROOT / "artifacts/reports/evaluation"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build the G3 fusion ablation CLI parser."""
+    """Build the coverage-aware fusion ablation CLI parser."""
     parser = argparse.ArgumentParser(
         prog="scripts/evaluation/run_fusion_ablation.py",
         description="Run development-only coverage-aware fusion ablation.",
@@ -64,7 +64,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--dense-reference-dir", type=Path, default=DEFAULT_DENSE_REFERENCE_DIR)
     parser.add_argument("--sparse-reference-dir", type=Path, default=DEFAULT_SPARSE_REFERENCE_DIR)
-    parser.add_argument("--g2-reference-dir", type=Path, default=DEFAULT_G2_REFERENCE_DIR)
+    parser.add_argument(
+        "--fixed-rrf-reference-dir",
+        type=Path,
+        default=DEFAULT_FIXED_RRF_REFERENCE_DIR,
+    )
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -159,7 +163,7 @@ def _paths_from_args(args: argparse.Namespace) -> FusionAblationPaths:
         dense_config=args.config,
         dense_reference_dir=args.dense_reference_dir,
         sparse_reference_dir=args.sparse_reference_dir,
-        g2_reference_dir=args.g2_reference_dir,
+        fixed_rrf_reference_dir=args.fixed_rrf_reference_dir,
         output_dir=args.output_dir,
     )
 

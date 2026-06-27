@@ -104,16 +104,16 @@ def _judgment(
 
 
 def _review(
-    stage: ReviewStage,
+    review_step: ReviewStage,
     query_id: str = "q1",
     status: ReviewStatus = ReviewStatus.PRIMARY_REVIEWED,
     **updates: object,
 ) -> ReviewRecord:
     payload = {
-        "id": f"{query_id}_{stage.value}",
+        "id": f"{query_id}_{review_step.value}",
         "query_id": query_id,
-        "review_stage": stage,
-        "reviewer_id": f"reviewer_{stage.value}",
+        "review_stage": review_step,
+        "reviewer_id": f"reviewer_{review_step.value}",
         "status": status,
         "reviewed_fields": ["expected_decision"],
         "reviewed_at": datetime(2026, 1, 1),

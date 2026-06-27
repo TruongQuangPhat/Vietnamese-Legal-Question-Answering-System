@@ -72,7 +72,7 @@ def ping_diagnostics() -> str:
 
 @dataclass
 class CorpusInventory:
-    """Inventory counts for the legal corpus at different stages."""
+    """Inventory counts for the legal corpus at different workflow steps."""
 
     registry_entries: int = 0
     main_html_files: int = 0
@@ -138,7 +138,7 @@ def compute_corpus_inventory(
     interim_dir: Path,
     report_dir: Path,
 ) -> dict[str, Any]:
-    """Count files at each stage of the pipeline.
+    """Count files at each workflow step.
 
     Args:
         registry_path: Path to corpus registry YAML.
@@ -157,27 +157,27 @@ def compute_corpus_inventory(
             data = _load_registry(registry_path)
             inventory.registry_entries = len(data)
         except Exception as exc:
-            errors.append({"stage": "registry", "error": str(exc)})
+            errors.append({"operation": "registry", "error": str(exc)})
 
     if raw_dir.exists():
         try:
             inventory.main_html_files = len(list(raw_dir.rglob("main.html")))
             inventory.metadata_json_files = len(list(raw_dir.rglob("metadata.json")))
         except Exception as exc:
-            errors.append({"stage": "raw_dir", "error": str(exc)})
+            errors.append({"operation": "raw_dir", "error": str(exc)})
 
     if interim_dir.exists():
         try:
             inventory.normalized_json_files = len(list(interim_dir.rglob("normalized.json")))
             inventory.cleaned_txt_files = len(list(interim_dir.rglob("cleaned.txt")))
         except Exception as exc:
-            errors.append({"stage": "interim_dir", "error": str(exc)})
+            errors.append({"operation": "interim_dir", "error": str(exc)})
 
     if report_dir.exists():
         try:
             inventory.report_files = len([path for path in report_dir.rglob("*") if path.is_file()])
         except Exception as exc:
-            errors.append({"stage": "report_dir", "error": str(exc)})
+            errors.append({"operation": "report_dir", "error": str(exc)})
 
     return _build_report("corpus_inventory", [inventory.to_dict()], errors)
 
@@ -228,7 +228,7 @@ def audit_all_raw_html(raw_dir: Path) -> tuple[list[HTMLPatternProfile], list[di
         try:
             profiles.append(profile_raw_html(law_id, artifact_dir / "main.html"))
         except Exception as exc:
-            errors.append({"law_id": law_id, "stage": "html_pattern_audit", "error": str(exc)})
+            errors.append({"law_id": law_id, "operation": "html_pattern_audit", "error": str(exc)})
     return profiles, errors
 
 
@@ -252,7 +252,11 @@ def compute_selector_candidate_audit(raw_dir: Path) -> dict[str, Any]:
                 records.append(_profile_selector(law_id, soup, selector))
         except Exception as exc:
             errors.append(
-                {"law_id": law_id, "stage": "selector_candidate_audit", "error": str(exc)}
+                {
+                    "law_id": law_id,
+                    "operation": "selector_candidate_audit",
+                    "error": str(exc),
+                }
             )
 
     return _build_report("selector_candidate_audit", records, errors)
@@ -301,7 +305,13 @@ def compute_cleaning_quality_audit(interim_dir: Path) -> dict[str, Any]:
                 }
             )
         except Exception as exc:
-            errors.append({"law_id": law_id, "stage": "cleaning_quality_audit", "error": str(exc)})
+            errors.append(
+                {
+                    "law_id": law_id,
+                    "operation": "cleaning_quality_audit",
+                    "error": str(exc),
+                }
+            )
 
     return _build_report("cleaning_quality_audit", records, errors)
 
@@ -360,7 +370,11 @@ def compute_raw_vs_cleaning_comparison(raw_dir: Path, interim_dir: Path) -> dict
             records.append(comparison.to_dict())
         except Exception as exc:
             errors.append(
-                {"law_id": law_id, "stage": "raw_vs_cleaning_comparison", "error": str(exc)}
+                {
+                    "law_id": law_id,
+                    "operation": "raw_vs_cleaning_comparison",
+                    "error": str(exc),
+                }
             )
 
     return _build_report("raw_vs_cleaning_comparison", records, errors)
@@ -384,7 +398,7 @@ def compute_pattern_groups(registry_path: Path, raw_dir: Path, interim_dir: Path
     try:
         registry_entries = _load_registry(registry_path)
     except Exception as exc:
-        errors.append({"stage": "pattern_groups", "error": str(exc)})
+        errors.append({"operation": "pattern_groups", "error": str(exc)})
 
     if not registry_entries:
         registry_entries = [{"law_id": law_id, "name": law_id} for law_id in sorted(raw_artifacts)]
@@ -393,7 +407,12 @@ def compute_pattern_groups(registry_path: Path, raw_dir: Path, interim_dir: Path
     for entry in registry_entries:
         law_id = str(entry.get("law_id") or "")
         if not law_id:
-            errors.append({"stage": "pattern_groups", "error": "registry entry missing law_id"})
+            errors.append(
+                {
+                    "operation": "pattern_groups",
+                    "error": "registry entry missing law_id",
+                }
+            )
             continue
         try:
             name = str(entry.get("name") or entry.get("law_name") or law_id)
@@ -409,7 +428,7 @@ def compute_pattern_groups(registry_path: Path, raw_dir: Path, interim_dir: Path
                 }
             )
         except Exception as exc:
-            errors.append({"law_id": law_id, "stage": "pattern_groups", "error": str(exc)})
+            errors.append({"law_id": law_id, "operation": "pattern_groups", "error": str(exc)})
 
     items = [
         {"group": group_name, "law_count": len(laws), "laws": laws}

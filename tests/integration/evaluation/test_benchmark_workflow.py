@@ -214,14 +214,14 @@ def _group(query_id: str, chunk_id: str) -> dict[str, object]:
 
 def _review(
     query_id: str,
-    stage: ReviewStage,
+    review_step: ReviewStage,
     record_id: str,
     status: ReviewStatus,
 ) -> dict[str, object]:
     return {
         "id": record_id,
         "query_id": query_id,
-        "review_stage": stage.value,
+        "review_stage": review_step.value,
         "reviewer_id": f"reviewer_{record_id}",
         "status": status.value,
         "reviewed_fields": ["expected_decision", "legal_targets"],

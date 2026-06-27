@@ -1,4 +1,4 @@
-"""Read-only validation for canonical Phase 5 legal hierarchy documents."""
+"""Read-only validation for canonical legal hierarchy documents."""
 
 from __future__ import annotations
 
@@ -77,7 +77,7 @@ class LegalTreeValidator:
     """Validate a completed legal hierarchy document without mutation.
 
     The validator inspects structural relationships, IDs, offsets, text slices,
-    reachability, legal parent-child levels, and Phase 4 Article metrics. It
+    reachability, legal parent-child levels, and cleaning/normalization Article metrics. It
     returns structured issues and never repairs or rewrites the input document.
     """
 
@@ -584,7 +584,7 @@ class LegalTreeValidator:
         state: _ValidationState,
         nodes: list[LegalNode],
     ) -> None:
-        """Validate Article presence and Phase 4 metric compatibility."""
+        """Validate Article presence and cleaning/normalization metric compatibility."""
         articles = [node for node in nodes if node.level == LegalNodeLevel.ARTICLE]
         if not articles:
             self._append_error(
@@ -602,7 +602,7 @@ class LegalTreeValidator:
                 state,
                 StructuredParsingIssue(
                     code=ParsingIssueCode.MISSING_ARTICLE_1,
-                    message="Phase 4 expected Article 1 but parsed hierarchy does not contain it.",
+                    message="cleaning/normalization expected Article 1 but parsed hierarchy does not contain it.",
                     law_id=state.document.law_id,
                     context={"expected": True, "actual": False},
                 ),
@@ -616,7 +616,7 @@ class LegalTreeValidator:
                 state,
                 StructuredParsingIssue(
                     code=ParsingIssueCode.ARTICLE_COUNT_MISMATCH,
-                    message="Parsed article count differs from Phase 4 heading count.",
+                    message="Parsed article count differs from cleaning/normalization heading count.",
                     law_id=state.document.law_id,
                     context={"expected": expected_count, "actual": actual_count},
                 ),
@@ -636,7 +636,7 @@ class LegalTreeValidator:
                 state,
                 StructuredParsingIssue(
                     code=ParsingIssueCode.MAX_ARTICLE_NUMBER_MISMATCH,
-                    message="Parsed maximum Article number differs from Phase 4 metric.",
+                    message="Parsed maximum Article number differs from cleaning/normalization metric.",
                     law_id=state.document.law_id,
                     context={"expected": expected_max, "actual": actual_max},
                 ),

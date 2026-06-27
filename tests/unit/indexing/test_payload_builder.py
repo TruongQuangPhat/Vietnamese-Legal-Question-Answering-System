@@ -1,4 +1,4 @@
-"""Unit tests for deterministic Phase 8 vector payload construction."""
+"""Unit tests for deterministic embedding/indexing vector payload construction."""
 
 from __future__ import annotations
 

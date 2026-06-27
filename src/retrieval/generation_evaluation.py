@@ -205,7 +205,7 @@ class GenerationEvalReport(BaseModel):
 
     report_type: str = "naive_rag_generation_evaluation"
     run_type: str = "manual_generation_eval"
-    pipeline_stage: str = "retrieval_naive_rag_generation"
+    workflow_name: str = "retrieval_naive_rag_generation"
     status: GenerationEvalStatus
     started_at: str
     finished_at: str

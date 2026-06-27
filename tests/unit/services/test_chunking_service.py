@@ -1,4 +1,4 @@
-"""Tests for the Phase 6 batch chunking service."""
+"""Tests for the parent-child chunking batch chunking service."""
 
 from __future__ import annotations
 

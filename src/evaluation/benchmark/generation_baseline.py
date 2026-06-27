@@ -31,7 +31,7 @@ def evaluate_generation_case(
         result: ``RagAnswerResult``-compatible object from the Naive RAG
             pipeline, or ``None`` when a pipeline error occurred before a
             result could be built.
-        retrieved_chunks: F1 retrieval result summaries for this query.
+        retrieved_chunks: Dense retrieval result summaries for this query.
         judgments: Benchmark qrels for this query.
         groups: Evidence groups for this query.
         elapsed_ms: Wall-clock generation pipeline latency.

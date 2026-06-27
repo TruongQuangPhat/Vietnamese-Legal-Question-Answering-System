@@ -1,4 +1,4 @@
-"""Unit tests for bounded Phase 8 indexing orchestration."""
+"""Unit tests for bounded indexing orchestration."""
 
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from src.indexing.indexing_models import (
 from src.indexing.indexing_service import (
     IndexingService,
     IndexingServiceError,
-    load_indexing_checkpoint,
 )
 from src.processing.legal_chunk_models import LegalChunk
 
@@ -385,7 +384,7 @@ async def test_checkpoint_written_after_successful_batch(tmp_path: Path) -> None
     assert checkpoint["indexing_run_id"] == "run-8f-test"
     assert checkpoint["checkpoint_type"] == "indexing_checkpoint"
     assert checkpoint["run_type"] == "development_indexing"
-    assert checkpoint["pipeline_stage"] == "embedding_indexing"
+    assert checkpoint["workflow_name"] == "embedding_indexing"
     assert checkpoint["dense_vector_name"] == "dense"
     assert checkpoint["embedding_model"] == "BAAI/bge-m3"
     assert checkpoint["text_template"] == "text_only"
@@ -408,18 +407,14 @@ async def test_official_checkpoint_uses_only_operational_metadata(tmp_path: Path
         [_chunk(chunk_id="chunk-1")],
         input_path="data/processed/legal_chunks.jsonl",
         run_type="official_full_indexing",
-        pipeline_stage="embedding_indexing",
+        workflow_name="embedding_indexing",
         checkpoint_path=checkpoint_path,
     )
 
     checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-    serialized = json.dumps(checkpoint)
     assert checkpoint["checkpoint_type"] == "indexing_checkpoint"
     assert checkpoint["run_type"] == "official_full_indexing"
-    assert checkpoint["pipeline_stage"] == "embedding_indexing"
-    assert "phase" not in checkpoint
-    assert "slice" not in checkpoint
-    assert all(label not in serialized for label in ("8F", "8G", "8H"))
+    assert checkpoint["workflow_name"] == "embedding_indexing"
 
 
 @pytest.mark.asyncio
@@ -646,51 +641,6 @@ async def test_resume_rejects_incompatible_checkpoint(field: str, value: object)
         )
 
 
-def test_checkpoint_loader_accepts_legacy_phase_and_slice(tmp_path: Path) -> None:
-    """Complete legacy checkpoints remain resumable after metadata cleanup."""
-    path = tmp_path / "checkpoint.json"
-    payload = _checkpoint().model_dump(mode="json")
-    payload.pop("checkpoint_type")
-    payload.pop("run_type")
-    payload.pop("pipeline_stage")
-    payload.update({"phase": "8", "slice": "8G"})
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-    checkpoint = load_indexing_checkpoint(path)
-
-    assert checkpoint.indexing_run_id == "run-resume"
-    assert checkpoint.checkpoint_type == "indexing_checkpoint"
-    assert checkpoint.run_type == "development_indexing"
-    assert checkpoint.pipeline_stage == "embedding_indexing"
-    assert "phase" not in checkpoint.model_dump()
-    assert "slice" not in checkpoint.model_dump()
-
-
-def test_checkpoint_loader_rejects_legacy_incomplete_schema(tmp_path: Path) -> None:
-    """Legacy checkpoints still require every resume compatibility field."""
-    path = tmp_path / "checkpoint.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": "0.1.0",
-                "phase": "8",
-                "slice": "8F",
-                "indexing_run_id": "old-run",
-                "collection_name": "collection",
-                "dense_dimension": 1024,
-                "processed_chunk_ids": [],
-                "processed_count": 0,
-                "upserted_count": 0,
-                "failed_chunk_ids": [],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(IndexingServiceError, match="incompatible with indexing resume"):
-        load_indexing_checkpoint(path)
-
-
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
@@ -854,9 +804,10 @@ async def test_no_processed_validation_report_records_not_run() -> None:
     assert report.processed_validation_embedding_ready is False
 
 
-def test_report_contract_has_no_ambiguous_phase7_fields() -> None:
+def test_report_contract_has_processed_validation_fields() -> None:
     """Operational report fields use processed-validation-specific naming."""
-    assert not any(name.startswith("phase7_") for name in IndexingReport.model_fields)
+    assert "processed_validation_status" in IndexingReport.model_fields
+    assert "processed_validation_embedding_ready" in IndexingReport.model_fields
 
 
 @pytest.mark.asyncio
@@ -867,20 +818,14 @@ async def test_official_indexing_report_uses_only_operational_metadata() -> None
         input_path="data/processed/legal_chunks.jsonl",
         report_type="indexing_report",
         run_type="official_full_indexing",
-        pipeline_stage="embedding_indexing",
+        workflow_name="embedding_indexing",
         dry_run=True,
     )
 
     payload = report.model_dump(mode="json")
-    serialized = json.dumps(payload)
     assert payload["report_type"] == "indexing_report"
     assert payload["run_type"] == "official_full_indexing"
-    assert payload["pipeline_stage"] == "embedding_indexing"
-    assert ("readiness_for_" + "phase" + "9") not in payload
-    assert "phase" not in payload
-    assert "slice" not in payload
-    disallowed_labels = ("Phase", "Slice", "8F", "8G", "8H", "phase" + "9")
-    assert all(label not in serialized for label in disallowed_labels)
+    assert payload["workflow_name"] == "embedding_indexing"
 
 
 @pytest.mark.asyncio

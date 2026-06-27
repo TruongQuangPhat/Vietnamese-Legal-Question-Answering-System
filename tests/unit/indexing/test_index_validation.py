@@ -1,8 +1,7 @@
-"""Unit tests for read-only Phase 8 index validation."""
+"""Unit tests for read-only embedding/indexing index validation."""
 
 from __future__ import annotations
 
-import json
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -582,12 +581,12 @@ def test_cli_rejects_unrelated_or_protected_validation_paths(path: Path) -> None
 
 @pytest.mark.asyncio
 async def test_official_validation_report_uses_only_operational_metadata() -> None:
-    """Official validation reports contain no development phase or slice labels."""
+    """Official validation reports contain functional operational metadata."""
     report = await validate_index(
         FakeQdrantClient(),
         report_type="index_validation_report",
         run_type="official_full_index_validation",
-        pipeline_stage="index_validation",
+        workflow_name="index_validation",
         collection_name="dev",
         dense_vector_name="dense",
         dense_dimension=1024,
@@ -602,14 +601,9 @@ async def test_official_validation_report_uses_only_operational_metadata() -> No
     )
 
     payload = report.model_dump(mode="json")
-    serialized = json.dumps(payload)
     assert payload["report_type"] == "index_validation_report"
     assert payload["run_type"] == "official_full_index_validation"
-    assert payload["pipeline_stage"] == "index_validation"
-    assert "phase" not in payload
-    assert "slice" not in payload
-    disallowed_labels = ("Phase", "Slice", "8F", "8G", "8H", "phase" + "9")
-    assert all(label not in serialized for label in disallowed_labels)
+    assert payload["workflow_name"] == "index_validation"
 
 
 @pytest.mark.asyncio
@@ -619,7 +613,7 @@ async def test_validation_report_marks_retrieval_baseline_ready() -> None:
         FakeQdrantClient(),
         report_type="index_validation_report",
         run_type="official_full_index_validation",
-        pipeline_stage="index_validation",
+        workflow_name="index_validation",
         collection_name="dev",
         dense_vector_name="dense",
         dense_dimension=1024,

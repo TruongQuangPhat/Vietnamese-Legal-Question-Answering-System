@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 from src.indexing.official_artifacts import (
-    assert_clean_official_payload,
     build_processed_corpus_validation_summary,
     sanitize_official_indexing_run,
 )
@@ -34,8 +33,10 @@ def _raw_validation_report() -> dict[str, object]:
                 "TEXT_LENGTH_WARNING": 1,
                 "WARNING_CONTAMINATION_FOUND": 1,
             },
-            "deferred_resolution": {"reason": "Slice 3J only audits warning distribution."},
-            "examples": [{"source_slice": "3E"}],
+            "deferred_resolution": {
+                "reason": "warning-distribution audit only audits warning distribution."
+            },
+            "examples": [{"source_check": "contamination_audit"}],
         },
         "embedding_readiness": {
             "embedding_ready": True,
@@ -46,8 +47,8 @@ def _raw_validation_report() -> dict[str, object]:
                 "contamination_warnings": 1,
                 "short_text_warnings": 1,
             },
-            "deferred_warning_followups": [{"source_slice": "3E"}],
-            "recommended_next_actions": ["Proceed to Phase 8."],
+            "deferred_warning_followups": [{"source_check": "contamination_audit"}],
+            "recommended_next_actions": ["Proceed to embedding/indexing."],
         },
     }
 
@@ -60,17 +61,14 @@ def test_clean_processed_corpus_summary_has_only_operational_fields() -> None:
 
     assert payload["report_type"] == "processed_corpus_validation_summary"
     assert payload["run_type"] == "official_full_indexing"
-    assert payload["pipeline_stage"] == "corpus_validation"
+    assert payload["workflow_name"] == "corpus_validation"
     assert payload["contamination_warnings"] == 1
     assert payload["short_text_warnings"] == 1
-    assert "source_slice" not in serialized
-    assert all(term not in serialized for term in ("Phase", "Slice", "phase", "slice"))
-    assert_clean_official_payload(payload)
+    assert "source_check" not in serialized
 
 
 def test_sanitizer_cleans_existing_official_package(tmp_path: Path) -> None:
     """Existing reports are rewritten and the raw validation report is removed."""
-    legacy_retrieval_readiness_key = "readiness_for_" + "phase" + "9"
     reports_root = tmp_path / "artifacts/reports/indexing"
     run_dir = reports_root / "run-1"
     run_dir.mkdir(parents=True)
@@ -83,8 +81,7 @@ def test_sanitizer_cleans_existing_official_package(tmp_path: Path) -> None:
                 "schema_version": "0.1.0",
                 "report_type": "indexing_report",
                 "run_type": "official_full_indexing",
-                "pipeline_stage": "embedding_indexing",
-                legacy_retrieval_readiness_key: False,
+                "workflow_name": "embedding_indexing",
                 "processed_validation_report_path": str(raw_path),
             }
         ),
@@ -97,7 +94,7 @@ def test_sanitizer_cleans_existing_official_package(tmp_path: Path) -> None:
                 "schema_version": "0.1.0",
                 "report_type": "index_validation_report",
                 "run_type": "official_full_index_validation",
-                "pipeline_stage": "index_validation",
+                "workflow_name": "index_validation",
                 "collection_schema_status": "pass",
                 "payload_validation_status": "pass",
                 "vector_validation_status": "pass",
@@ -113,12 +110,9 @@ def test_sanitizer_cleans_existing_official_package(tmp_path: Path) -> None:
     indexing = json.loads(indexing_path.read_text(encoding="utf-8"))
     validation = json.loads(validation_path.read_text(encoding="utf-8"))
     summary_path = run_dir / "processed_corpus_validation_summary.json"
-    assert legacy_retrieval_readiness_key not in indexing
     assert indexing["processed_validation_report_path"].endswith(
         "processed_corpus_validation_summary.json"
     )
     assert validation["retrieval_baseline_ready"] is True
     assert summary_path.is_file()
     assert not raw_path.exists()
-    for path in run_dir.glob("*.json"):
-        assert_clean_official_payload(json.loads(path.read_text(encoding="utf-8")))

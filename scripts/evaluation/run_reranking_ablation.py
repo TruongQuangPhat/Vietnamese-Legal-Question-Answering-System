@@ -40,7 +40,7 @@ DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 DEFAULT_OUTPUT_DIR = Path("artifacts/reports/evaluation/advanced_rag/reranking_ablation")
 DEFAULT_DENSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/naive_rag_baseline/retrieval")
 DEFAULT_SPARSE_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/sparse_retrieval")
-DEFAULT_G2_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/hybrid_retrieval")
+DEFAULT_FIXED_RRF_REFERENCE_DIR = Path("artifacts/reports/evaluation/advanced_rag/hybrid_retrieval")
 DEFAULT_BASE_REFERENCE_DIR = Path(
     "artifacts/reports/evaluation/advanced_rag/coverage_aware_retrieval"
 )
@@ -80,7 +80,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--dense-reference-dir", type=Path, default=DEFAULT_DENSE_REFERENCE_DIR)
     parser.add_argument("--sparse-reference-dir", type=Path, default=DEFAULT_SPARSE_REFERENCE_DIR)
-    parser.add_argument("--g2-reference-dir", type=Path, default=DEFAULT_G2_REFERENCE_DIR)
+    parser.add_argument(
+        "--fixed-rrf-reference-dir",
+        type=Path,
+        default=DEFAULT_FIXED_RRF_REFERENCE_DIR,
+    )
     parser.add_argument(
         "--base-reference-dir",
         type=Path,
@@ -186,7 +190,7 @@ def _paths_from_args(args: argparse.Namespace) -> RerankingBenchmarkPaths:
         dense_config=args.config,
         dense_reference_dir=args.dense_reference_dir,
         sparse_reference_dir=args.sparse_reference_dir,
-        g2_reference_dir=args.g2_reference_dir,
+        fixed_rrf_reference_dir=args.fixed_rrf_reference_dir,
         base_reference_dir=args.base_reference_dir,
         output_dir=args.output_dir,
     )

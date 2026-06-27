@@ -199,7 +199,7 @@ class SparseBM25Retriever:
             query: Query text or a prevalidated retrieval query.
             top_k: Optional top-k override for string queries.
             collection_name: Optional logical collection label.
-            filters: Unsupported for sparse BM25 in Stage G1.
+            filters: Unsupported for the sparse BM25 baseline.
 
         Returns:
             Typed retrieval result with ranked legal chunks.
@@ -214,7 +214,7 @@ class SparseBM25Retriever:
             filters=filters,
         )
         if retrieval_query.filters.has_conditions():
-            raise SparseRetrieverError("sparse BM25 retrieval does not support filters in Stage G1")
+            raise SparseRetrieverError("sparse BM25 baseline does not support filters")
 
         started = time.perf_counter()
         query_tokens = tokenize_sparse_text(retrieval_query.query)

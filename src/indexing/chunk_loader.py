@@ -1,4 +1,4 @@
-"""Read-only streaming loader for Phase 8 embedding inputs.
+"""Read-only streaming loader for embedding inputs.
 
 The loader validates each JSONL row against the canonical ``LegalChunk``
 schema and maps it deterministically to an ``EmbeddingInput``. It does not

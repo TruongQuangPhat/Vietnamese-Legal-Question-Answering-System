@@ -1,4 +1,4 @@
-"""Batch service orchestration for Phase 6 parent-child chunking."""
+"""Batch service orchestration for parent-child chunking."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ class ChunkingServiceResult(BaseModel):
     """In-memory result of one batch chunking service run.
 
     Attributes:
-        report: Canonical Phase 6 chunking report.
+        report: Canonical parent-child chunking report.
         output_path: Path where JSONL chunks were written.
         report_path: Path where the report was written.
         failed_law_ids: Law IDs with failed per-law results.
@@ -122,7 +122,7 @@ class ChunkingServiceError(RuntimeError):
 
 
 class ChunkingService:
-    """Run Phase 6 chunking over a deterministic batch of hierarchy artifacts.
+    """Run parent-child chunking over a deterministic batch of hierarchy artifacts.
 
     The service coordinates discovery, hierarchy loading, pre-chunk tree
     validation, chunk creation, chunk validation, JSONL writing, and report
@@ -157,7 +157,7 @@ class ChunkingService:
         law_ids: list[str] | None = None,
         overwrite: bool = False,
     ) -> ChunkingServiceResult:
-        """Chunk selected hierarchy documents and write Phase 6 outputs.
+        """Chunk selected hierarchy documents and write parent-child chunking outputs.
 
         Args:
             input_dir: Directory containing `{LAW_ID}/hierarchy.json` inputs.
@@ -229,7 +229,7 @@ class ChunkingService:
                 issue = _exception_issue(
                     law_id=item.law_id,
                     code=ChunkingIssueCode.SCHEMA_VALIDATION_FAILED,
-                    message="Hierarchy input failed Phase 6 schema validation.",
+                    message="Hierarchy input failed parent-child chunking schema validation.",
                     exc=exc,
                     context={"hierarchy_path": str(item.hierarchy_path)},
                 )
@@ -325,7 +325,7 @@ def discover_hierarchy_inputs(
 
 
 def load_hierarchy_document(path: Path) -> LegalHierarchyDocument:
-    """Load and validate one Phase 5 `hierarchy.json` artifact."""
+    """Load and validate one legal hierarchy parsing `hierarchy.json` artifact."""
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
     return LegalHierarchyDocument.model_validate(payload)

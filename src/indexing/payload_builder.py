@@ -1,4 +1,4 @@
-"""Deterministic vector payload mapping for Phase 8 Slice 8D.
+"""Deterministic vector payload mapping for embedding/indexing payload mapping.
 
 This module maps validated legal chunks to typed payloads and deterministic
 point identifiers. It does not generate vectors, import Qdrant, connect to a
@@ -25,7 +25,7 @@ def build_vector_payload(
     """Build a traceability-preserving payload from one validated legal chunk.
 
     Args:
-        chunk: Canonical Phase 6 legal chunk. The object and its nested fields
+        chunk: Canonical parent-child chunking legal chunk. The object and its nested fields
             are not modified.
         embedding_model: Model identifier associated with the future vector.
         embedding_revision: Optional pinned model revision.
@@ -42,7 +42,7 @@ def build_vector_payload(
     Legal assumptions:
         Temporal, status, and domain enrichment is not inferred from citation,
         law name, URL, or any other chunk field. Unknown values remain null or
-        empty according to the Phase 8 payload policy.
+        empty according to the embedding/indexing payload policy.
     """
     _require_non_blank(embedding_model, field_name="embedding_model")
     _require_non_blank(indexing_run_id, field_name="indexing_run_id")

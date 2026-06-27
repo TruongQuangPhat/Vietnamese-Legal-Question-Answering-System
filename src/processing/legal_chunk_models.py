@@ -1,7 +1,7 @@
-"""Canonical schemas for Phase 6 parent-child legal chunking.
+"""Canonical schemas for parent-child legal chunking.
 
 The models in this module describe the chunk-level data contracts produced by
-the Phase 6 chunker. Each chunk preserves citation traceability to the
+the parent-child chunking chunker. Each chunk preserves citation traceability to the
 original legal hierarchy and carries deterministic identifiers, offsets, and
 hashes suitable for embedding and retrieval pipelines.
 """
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ChunkingIssueCode(StrEnum):
-    """Stable warning and error codes emitted by the Phase 6 chunker."""
+    """Stable warning and error codes emitted by the parent-child chunking chunker."""
 
     MISSING_HIERARCHY_INPUT = "MISSING_HIERARCHY_INPUT"
     SCHEMA_VALIDATION_FAILED = "SCHEMA_VALIDATION_FAILED"
@@ -38,7 +38,7 @@ class ChunkingIssueCode(StrEnum):
 
 
 class ChunkingLevel(StrEnum):
-    """Allowed chunk hierarchy levels produced by the Phase 6 chunker."""
+    """Allowed chunk hierarchy levels produced by the parent-child chunking chunker."""
 
     ARTICLE = "article"
     CLAUSE = "clause"
@@ -62,9 +62,9 @@ class ChunkingMetadata(BaseModel):
             traceability.
         is_source_unit_repealed: Whether the selected source unit itself
             contains a repealed placeholder, including Clause and Point chunks.
-        source_warnings: Phase 5 warning codes that affect this chunk's
+        source_warnings: legal hierarchy parsing warning codes that affect this chunk's
             source node (e.g., EMPTY_ARTICLE_NODE, NODE_ID_COLLISION_RESOLVED).
-        caveat_references: Phase 5 caveat reference strings for this chunk's
+        caveat_references: legal hierarchy parsing caveat reference strings for this chunk's
             source node, if any.
     """
 
@@ -80,11 +80,11 @@ class ChunkingMetadata(BaseModel):
     )
     source_warnings: list[str] = Field(
         default_factory=list,
-        description="Phase 5 warning codes affecting this chunk's source node",
+        description="legal hierarchy parsing warning codes affecting this chunk's source node",
     )
     caveat_references: list[str] = Field(
         default_factory=list,
-        description="Phase 5 caveat references for this chunk's source node",
+        description="legal hierarchy parsing caveat references for this chunk's source node",
     )
 
 
@@ -126,7 +126,7 @@ class ChunkingIssue(BaseModel):
 
 
 class ChunkValidationSummary(BaseModel):
-    """Aggregated validation counters for Phase 6 chunk and JSONL checks.
+    """Aggregated validation counters for parent-child chunking chunk and JSONL checks.
 
     Attributes:
         total_chunks_checked: Number of chunks inspected by the validator.
@@ -211,7 +211,7 @@ class LegalChunk(BaseModel):
         text_hash: SHA-256 hex digest of ``text``.
         parent_text_hash: SHA-256 hex digest of ``parent_text``.
         metadata: Deterministic chunk metadata including empty/repealed
-            flags and Phase 5 warning references.
+            flags and legal hierarchy parsing warning references.
         warnings: Structured chunk-level issues or warnings.
 
     Legal assumptions:
@@ -325,10 +325,10 @@ class ChunkingSummary(BaseModel):
 
 
 class ChunkingReport(BaseModel):
-    """Canonical Phase 6 batch chunking report.
+    """Canonical parent-child chunking batch chunking report.
 
     Written to ``artifacts/reports/chunking/chunking_report.json``.
-    Helps decide whether Phase 7 embedding/indexing is safe.
+    Helps decide whether processed JSONL validation embedding/indexing is safe.
 
     Attributes:
         schema_version: Report schema version.

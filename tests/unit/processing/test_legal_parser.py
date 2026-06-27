@@ -1,4 +1,4 @@
-"""Tests for the Phase 5 per-document legal parser facade."""
+"""Tests for the legal hierarchy parsing per-document legal parser facade."""
 
 from __future__ import annotations
 
@@ -494,7 +494,7 @@ def test_remaining_malformed_clause_placeholders_parse_without_warnings(
 
 
 def test_builder_and_validator_warnings_reach_final_result(tmp_path: Path) -> None:
-    """Collision and Phase 4 metric warnings are surfaced by the facade."""
+    """Collision and cleaning/normalization metric warnings are surfaced by the facade."""
     collision_text = "\n".join(
         [
             "Điều 1. Một",
@@ -523,7 +523,7 @@ def test_identical_warnings_dedupe_but_distinct_same_code_warnings_remain(
     load_result = load_normalized_input(normalized_path)
     duplicate = StructuredParsingIssue(
         code=ParsingIssueCode.ARTICLE_COUNT_MISMATCH,
-        message="Parsed article count differs from Phase 4 heading count.",
+        message="Parsed article count differs from cleaning/normalization heading count.",
         law_id="TEST_LAW",
         context={"expected": 2, "actual": 1},
     )

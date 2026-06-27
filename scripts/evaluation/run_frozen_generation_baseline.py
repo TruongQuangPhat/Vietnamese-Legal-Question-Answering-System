@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run frozen Naive RAG generation baseline using F1 retrieval artifacts."""
+"""Run frozen Naive RAG generation baseline using dense retrieval artifacts."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ DEFAULT_LLM_CONFIG = Path("configs/llm/openrouter.yml")
 
 
 class FrozenRetrievalService:
-    """Retriever adapter returning one F1 retrieval result without Qdrant."""
+    """Retriever adapter returning one frozen dense result without Qdrant."""
 
     def __init__(self, retrieval_result: RetrievalResult) -> None:
         self._retrieval_result = retrieval_result
@@ -83,7 +83,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     """Build the frozen generation baseline CLI parser."""
     parser = argparse.ArgumentParser(
         prog="scripts/evaluation/run_frozen_generation_baseline.py",
-        description="Run Naive RAG generation over the frozen legal QA benchmark using F1 retrieval.",
+        description=(
+            "Run Naive RAG generation over the frozen legal QA benchmark using dense retrieval."
+        ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--queries", type=Path, default=DEFAULT_QUERIES)
@@ -117,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 async def run_baseline(argv: list[str] | None = None) -> int:
-    """Run frozen benchmark generation using compatible F1 retrieval results."""
+    """Run frozen benchmark generation using compatible dense retrieval results."""
     args = build_arg_parser().parse_args(argv)
     try:
         validate_cli_arguments(args)
@@ -180,11 +182,11 @@ async def run_baseline(argv: list[str] | None = None) -> int:
             started = perf_counter()
             error: str | None = None
             rag_result: Any | None = None
-            f1_case = retrieval_by_query[query.id]
+            dense_baseline_case = retrieval_by_query[query.id]
             try:
                 retrieval_result = build_retrieval_result(
                     query=query,
-                    f1_case=f1_case,
+                    dense_baseline_case=dense_baseline_case,
                     chunk_lookup=chunk_lookup,
                     collection_name=retrieval_manifest["qdrant_collection_name"],
                     vector_name=retrieval_manifest["vector_name"],
@@ -213,7 +215,7 @@ async def run_baseline(argv: list[str] | None = None) -> int:
                     query=query,
                     split=split_manifest.assignments[query.id].value,
                     result=rag_result,
-                    retrieved_chunks=f1_case["retrieved"],
+                    retrieved_chunks=dense_baseline_case["retrieved"],
                     judgments=judgments_by_query.get(query.id, []),
                     groups=groups_by_query.get(query.id, []),
                     elapsed_ms=elapsed_ms,
@@ -268,11 +270,11 @@ async def run_baseline(argv: list[str] | None = None) -> int:
 def validate_cli_arguments(args: argparse.Namespace) -> None:
     """Validate bounded generation settings and approved artifact paths."""
     if not args.retrieval_dir.is_dir():
-        raise ValueError(f"F1 retrieval artifact directory not found: {args.retrieval_dir}")
+        raise ValueError(f"Dense retrieval artifact directory not found: {args.retrieval_dir}")
     if not (args.retrieval_dir / "baseline_manifest.json").is_file():
-        raise ValueError("F1 retrieval baseline_manifest.json is missing")
+        raise ValueError("Dense retrieval baseline_manifest.json is missing")
     if not (args.retrieval_dir / "case_results.jsonl").is_file():
-        raise ValueError("F1 retrieval case_results.jsonl is missing")
+        raise ValueError("Dense retrieval case_results.jsonl is missing")
     if not args.processed_chunks.is_file():
         raise ValueError(f"processed chunks file not found: {args.processed_chunks}")
     if args.max_tokens <= 0:
@@ -303,9 +305,9 @@ def verify_retrieval_compatibility(
     retrieval_config_path: Path,
     expected_query_count: int,
 ) -> None:
-    """Require F1 retrieval artifacts to match current frozen inputs."""
+    """Require dense retrieval artifacts to match current frozen inputs."""
     if retrieval_manifest.get("benchmark_version") != benchmark_version:
-        raise ValueError("F1 benchmark_version does not match current benchmark")
+        raise ValueError("Dense retrieval benchmark_version does not match current benchmark")
     checks = {
         "benchmark_manifest_sha256": sha256_file(benchmark_manifest_path),
         "split_manifest_sha256": sha256_file(split_manifest_path),
@@ -313,14 +315,15 @@ def verify_retrieval_compatibility(
     }
     for key, current_hash in checks.items():
         if retrieval_manifest.get(key) != current_hash:
-            raise ValueError(f"F1 {key} does not match current file")
+            raise ValueError(f"Dense retrieval {key} does not match current file")
     if len(retrieval_cases) != expected_query_count:
         raise ValueError(
-            f"F1 query count {len(retrieval_cases)} does not match benchmark {expected_query_count}"
+            "Dense retrieval query count "
+            f"{len(retrieval_cases)} does not match benchmark {expected_query_count}"
         )
     error_count = sum(1 for case in retrieval_cases if case.get("retrieval_error"))
     if error_count:
-        raise ValueError(f"F1 retrieval artifacts contain {error_count} retrieval errors")
+        raise ValueError(f"Dense retrieval artifacts contain {error_count} retrieval errors")
 
 
 def select_queries(
@@ -354,16 +357,16 @@ def select_queries(
 def build_retrieval_result(
     *,
     query: BenchmarkQuery,
-    f1_case: dict[str, Any],
+    dense_baseline_case: dict[str, Any],
     chunk_lookup: dict[str, dict[str, Any]],
     collection_name: str,
     vector_name: str,
     top_k: int,
     query_vector_dimension: int,
 ) -> RetrievalResult:
-    """Reconstruct a typed retrieval result from F1 IDs and processed chunks."""
+    """Reconstruct a typed retrieval result from frozen dense IDs and processed chunks."""
     chunks: list[RetrievedChunk] = []
-    for item in f1_case["retrieved"]:
+    for item in dense_baseline_case["retrieved"]:
         chunk_id = item["chunk_id"]
         payload = chunk_lookup.get(chunk_id)
         if payload is None:
@@ -388,7 +391,7 @@ def build_retrieval_result(
         collection_name=collection_name,
         vector_name=vector_name,
         top_k=top_k,
-        elapsed_ms=float(f1_case.get("elapsed_ms") or 0.0),
+        elapsed_ms=float(dense_baseline_case.get("elapsed_ms") or 0.0),
         query_vector_dimension=query_vector_dimension,
         results=chunks,
         issues=[],
@@ -512,7 +515,7 @@ def build_manifest(
         "benchmark_version": benchmark_version,
         "benchmark_manifest_sha256": sha256_file(benchmark_manifest_path),
         "split_manifest_sha256": sha256_file(split_manifest_path),
-        "f1_retrieval_baseline_manifest_sha256": sha256_file(retrieval_manifest_path),
+        "dense_retrieval_baseline_manifest_sha256": sha256_file(retrieval_manifest_path),
         "generation_config": {
             "provider": provider,
             "model": model,
@@ -542,7 +545,7 @@ def build_manifest(
         ],
         "known_limitations": [
             "Naive RAG baseline only",
-            "uses frozen dense retrieval results from F1",
+            "uses frozen dense retrieval results",
             "no hybrid retrieval",
             "no reranking",
             "no query rewriting",
@@ -569,7 +572,7 @@ def render_summary(
         "## Scope",
         "",
         "- Benchmark version is recorded in `baseline_manifest.json`.",
-        "- Uses frozen dense retrieval results from F1.",
+        "- Uses frozen dense retrieval results.",
         f"- LLM provider/model: `{provider}` / `{model}`.",
         f"- Sample mode: `{str(sample_mode).lower()}`.",
         "- No sparse retrieval, fusion, reranking, query rewriting, or Advanced RAG.",

@@ -476,7 +476,7 @@ class BenchmarkValidator:
                 ReviewStatus.PRIMARY_REVIEWED,
                 ReviewStatus.INDEPENDENT_REVIEWED,
                 ReviewStatus.ADJUDICATED,
-            } and not _has_review_stage(reviews, ReviewStage.PRIMARY_ANNOTATION):
+            } and not _has_review_step(reviews, ReviewStage.PRIMARY_ANNOTATION):
                 errors.append(
                     _error(
                         "review_summary_missing_primary_record",
@@ -484,7 +484,7 @@ class BenchmarkValidator:
                         query.id,
                     )
                 )
-            if query.review_status == ReviewStatus.INDEPENDENT_REVIEWED and not _has_review_stage(
+            if query.review_status == ReviewStatus.INDEPENDENT_REVIEWED and not _has_review_step(
                 reviews, ReviewStage.INDEPENDENT_REVIEW
             ):
                 errors.append(
@@ -494,7 +494,7 @@ class BenchmarkValidator:
                         query.id,
                     )
                 )
-            if query.review_status == ReviewStatus.ADJUDICATED and not _has_review_stage(
+            if query.review_status == ReviewStatus.ADJUDICATED and not _has_review_step(
                 reviews, ReviewStage.ADJUDICATION
             ):
                 errors.append(
@@ -513,7 +513,7 @@ class BenchmarkValidator:
                     )
                 )
             if query.review_status == ReviewStatus.FROZEN:
-                if not _has_review_stage(reviews, ReviewStage.PRIMARY_ANNOTATION):
+                if not _has_review_step(reviews, ReviewStage.PRIMARY_ANNOTATION):
                     errors.append(
                         _error(
                             "frozen_missing_primary_review",
@@ -521,7 +521,7 @@ class BenchmarkValidator:
                             query.id,
                         )
                     )
-                if _requires_independent_review(query) and not _has_review_stage(
+                if _requires_independent_review(query) and not _has_review_step(
                     reviews, ReviewStage.INDEPENDENT_REVIEW
                 ):
                     errors.append(
@@ -539,7 +539,7 @@ class BenchmarkValidator:
                             query.id,
                         )
                     )
-                if any(review.disagreements for review in reviews) and not _has_review_stage(
+                if any(review.disagreements for review in reviews) and not _has_review_step(
                     reviews, ReviewStage.ADJUDICATION
                 ):
                     errors.append(
@@ -549,7 +549,7 @@ class BenchmarkValidator:
                             query.id,
                         )
                     )
-            if query.split == BenchmarkSplit.HELD_OUT_TEST and not _has_review_stage(
+            if query.split == BenchmarkSplit.HELD_OUT_TEST and not _has_review_step(
                 reviews, ReviewStage.INDEPENDENT_REVIEW
             ):
                 errors.append(
@@ -565,35 +565,38 @@ class BenchmarkValidator:
         reviews: list[ReviewRecord],
         errors: list[ValidationIssue],
     ) -> None:
-        by_query_stage: dict[tuple[str, ReviewStage], list[ReviewRecord]] = defaultdict(list)
+        by_query_step: dict[tuple[str, ReviewStage], list[ReviewRecord]] = defaultdict(list)
         by_exact: dict[tuple[str, ReviewStage, str, ReviewStatus], list[ReviewRecord]] = (
             defaultdict(list)
         )
         for review in reviews:
-            by_query_stage[(review.query_id, review.review_stage)].append(review)
+            by_query_step[(review.query_id, review.review_stage)].append(review)
             by_exact[
                 (review.query_id, review.review_stage, review.reviewer_id, review.status)
             ].append(review)
-        for (query_id, stage), stage_reviews in by_query_stage.items():
-            statuses = {review.status for review in stage_reviews}
+        for (query_id, review_step), step_reviews in by_query_step.items():
+            statuses = {review.status for review in step_reviews}
             if len(statuses) > 1:
                 errors.append(
                     _error(
                         "contradictory_review_records",
-                        "review records for the same query and stage have conflicting statuses",
+                        "review records for the same query and review step have conflicting statuses",
                         query_id,
-                        stage.value,
+                        review_step.value,
                         {"statuses": sorted(status.value for status in statuses)},
                     )
                 )
-        for (query_id, stage, reviewer_id, status), exact_reviews in by_exact.items():
+        for (query_id, review_step, reviewer_id, status), exact_reviews in by_exact.items():
             if len(exact_reviews) > 1:
                 errors.append(
                     _error(
                         "duplicate_review_record_evidence",
-                        "duplicate review evidence for the same query, stage, reviewer, and status",
+                        (
+                            "duplicate review evidence for the same query, review step, "
+                            "reviewer, and status"
+                        ),
                         query_id,
-                        stage.value,
+                        review_step.value,
                         {"reviewer_id": reviewer_id, "status": status.value},
                     )
                 )
@@ -854,7 +857,7 @@ def load_regression_query_texts(paths: list[Path]) -> set[str]:
     """Load official-normalized query text from existing regression inputs.
 
     The loader is intentionally lightweight and read-only. It records only
-    query text for contamination checks and does not reinterpret Phase 9 labels.
+    query text for contamination checks and does not reinterpret Naive RAG labels.
     """
     query_texts: set[str] = set()
     for path in paths:
@@ -915,8 +918,8 @@ def _is_required_group(groups: list[EvidenceGroup], evidence_group_id: str) -> b
     )
 
 
-def _has_review_stage(reviews: list[ReviewRecord], stage: ReviewStage) -> bool:
-    return any(review.review_stage == stage for review in reviews)
+def _has_review_step(reviews: list[ReviewRecord], review_step: ReviewStage) -> bool:
+    return any(review.review_stage == review_step for review in reviews)
 
 
 def _requires_independent_review(query: BenchmarkQuery) -> bool:

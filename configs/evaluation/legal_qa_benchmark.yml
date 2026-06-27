@@ -3,7 +3,7 @@ schema_version: "1.0"
 # cases only; high-risk cases without qualified human legal review remain
 # development-only.
 benchmark_version: "v0.1.0"
-# Provisional Stage C default, not an approved final benchmark split ratio.
+# Provisional benchmark design default, not an approved final benchmark split ratio.
 development_ratio: 0.7
 split_seed: 20260619
 grouping_fields:

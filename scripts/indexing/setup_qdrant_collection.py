@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Set up only the Phase 8 Qdrant collection schema."""
+"""Set up only the embedding/indexing Qdrant collection schema."""
 
 # ruff: noqa: E402
 
@@ -42,7 +42,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=Path("configs/indexing/embedding_indexing.yml"),
-        help="Phase 8 embedding/indexing configuration.",
+        help="embedding/indexing configuration.",
     )
     parser.add_argument("--url", default=None, help="Override the configured Qdrant URL.")
     parser.add_argument(
@@ -153,7 +153,7 @@ async def run_setup(argv: list[str] | None = None) -> int:
 
 
 def load_indexing_config(path: Path) -> IndexingConfig:
-    """Load and validate the Phase 8 YAML configuration."""
+    """Load and validate the embedding/indexing YAML configuration."""
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("indexing config root must be a YAML object")

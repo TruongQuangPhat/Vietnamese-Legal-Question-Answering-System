@@ -61,7 +61,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=Path("configs/indexing/embedding_indexing.yml"),
-        help="Phase 8 embedding/indexing configuration.",
+        help="embedding/indexing configuration.",
     )
     parser.add_argument(
         "--output",
@@ -206,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def load_indexing_config(path: Path) -> IndexingConfig:
-    """Load and validate Phase 8 YAML configuration."""
+    """Load and validate embedding/indexing YAML configuration."""
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("indexing config root must be a YAML object")
@@ -333,8 +333,8 @@ def build_success_report(
     diagnostics = compute_vector_diagnostics(embeddings)
     return {
         "schema_version": "0.1.0",
-        "phase": "8",
-        "slice": "8C",
+        "report_type": "embedding_pilot_report",
+        "workflow_name": "embedding_pilot",
         "status": "success",
         "input_path": str(args.input),
         "limit": args.limit,
@@ -371,8 +371,8 @@ def build_failure_report(
     embedding = config.embedding if config is not None else None
     return {
         "schema_version": "0.1.0",
-        "phase": "8",
-        "slice": "8C",
+        "report_type": "embedding_pilot_report",
+        "workflow_name": "embedding_pilot",
         "status": "failed",
         "input_path": str(args.input),
         "limit": args.limit,

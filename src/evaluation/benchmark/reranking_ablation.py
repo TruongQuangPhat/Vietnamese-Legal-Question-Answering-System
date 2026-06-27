@@ -95,7 +95,7 @@ class RerankingBenchmarkPaths:
     dense_config: Path
     dense_reference_dir: Path
     sparse_reference_dir: Path
-    g2_reference_dir: Path
+    fixed_rrf_reference_dir: Path
     base_reference_dir: Path
     output_dir: Path
 
@@ -103,14 +103,14 @@ class RerankingBenchmarkPaths:
 def default_reranking_configs() -> list[RerankingConfig]:
     """Return the fixed development-only reranking search space."""
     return [
-        RerankingConfig("H0", 10, 10, 0.0, 1.0, no_rerank=True, simplicity_rank=0),
-        RerankingConfig("H1", 30, 10, 1.0, 0.0, simplicity_rank=1),
-        RerankingConfig("H2", 30, 10, 0.7, 0.3, simplicity_rank=2),
-        RerankingConfig("H3", 30, 10, 0.5, 0.5, simplicity_rank=3),
-        RerankingConfig("H4", 50, 10, 1.0, 0.0, simplicity_rank=4),
-        RerankingConfig("H5", 50, 10, 0.7, 0.3, simplicity_rank=5),
+        RerankingConfig("baseline_no_rerank", 10, 10, 0.0, 1.0, no_rerank=True, simplicity_rank=0),
+        RerankingConfig("pure_reranker_pool30", 30, 10, 1.0, 0.0, simplicity_rank=1),
+        RerankingConfig("mixed_reranker_70_base_30_pool30", 30, 10, 0.7, 0.3, simplicity_rank=2),
+        RerankingConfig("mixed_equal_pool30", 30, 10, 0.5, 0.5, simplicity_rank=3),
+        RerankingConfig("pure_reranker_pool50", 50, 10, 1.0, 0.0, simplicity_rank=4),
+        RerankingConfig("mixed_reranker_70_base_30_pool50", 50, 10, 0.7, 0.3, simplicity_rank=5),
         RerankingConfig(
-            "H6",
+            "quota_preserved_reranker_pool50",
             50,
             10,
             1.0,
@@ -322,7 +322,7 @@ async def run_final_reranked_report(
         comparison_dir=comparison_dir,
         dense_dir=paths.dense_reference_dir,
         sparse_dir=paths.sparse_reference_dir,
-        g2_dir=paths.g2_reference_dir,
+        fixed_rrf_dir=paths.fixed_rrf_reference_dir,
         base_dir=paths.base_reference_dir,
         reranked_dir=paths.output_dir,
         ablation_report=ablation_report,
@@ -336,7 +336,7 @@ def select_reranking_config(
     base_development_metrics: dict[str, Any],
 ) -> dict[str, Any]:
     """Select an eligible reranker using development metrics only."""
-    reranked = [variant for variant in variants if variant["config"]["config_id"] != "H0"]
+    reranked = [variant for variant in variants if not variant["config"]["no_rerank"]]
     eligible = [
         variant
         for variant in reranked
@@ -625,18 +625,18 @@ def write_reranking_comparison(
     comparison_dir: Path,
     dense_dir: Path,
     sparse_dir: Path,
-    g2_dir: Path,
+    fixed_rrf_dir: Path,
     base_dir: Path,
     reranked_dir: Path,
     ablation_report: dict[str, Any],
 ) -> None:
     """Write the advanced retrieval comparison including reranking."""
     systems = {
-        "f1_dense": ("dense_bge_m3", dense_dir),
-        "g1_sparse_bm25": ("sparse_bm25", sparse_dir),
-        "g2_hybrid_rrf": ("hybrid_dense_sparse_rrf", g2_dir),
+        "dense_bge_m3_baseline": ("dense_bge_m3", dense_dir),
+        "sparse_bm25_baseline": ("sparse_bm25", sparse_dir),
+        "fixed_rrf_hybrid": ("hybrid_dense_sparse_rrf", fixed_rrf_dir),
         "coverage_aware_base": ("coverage_aware_hybrid", base_dir),
-        "h_reranked": ("cross_encoder_reranked_coverage_aware", reranked_dir),
+        "reranked_retrieval": ("cross_encoder_reranked_coverage_aware", reranked_dir),
     }
     payload = {
         "report_type": "advanced_retrieval_comparison",
@@ -661,7 +661,7 @@ def write_reranking_comparison(
     }
     payload["deltas"] = {
         "reranked_vs_base": _delta_metrics(
-            payload["systems"]["h_reranked"]["metrics"],
+            payload["systems"]["reranked_retrieval"]["metrics"],
             payload["systems"]["coverage_aware_base"]["metrics"],
         )
     }

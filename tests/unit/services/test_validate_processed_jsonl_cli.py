@@ -1,4 +1,4 @@
-"""Tests for the Phase 7 processed JSONL validation CLI entrypoint."""
+"""Tests for the processed JSONL validation CLI entrypoint."""
 
 from __future__ import annotations
 
@@ -169,7 +169,7 @@ def test_cli_writes_report_for_pass(
     assert exit_code == 0
     assert report["status"] == "pass"
     assert report["embedding_readiness"]["readiness_status"] == "ready"
-    assert "Phase 7 processed JSONL validation complete" in capsys.readouterr().out
+    assert "processed JSONL validation complete" in capsys.readouterr().out
 
 
 def test_cli_writes_pretty_report(tmp_path: Path) -> None:
@@ -279,7 +279,7 @@ def test_cli_summary_includes_embedding_readiness(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Normal summary exposes the Phase 8 gate decision."""
+    """Normal summary exposes the embedding/indexing gate decision."""
     jsonl_path, config_path = _write_fixture(tmp_path, _chunk())
     output_path = tmp_path / "summary.json"
 

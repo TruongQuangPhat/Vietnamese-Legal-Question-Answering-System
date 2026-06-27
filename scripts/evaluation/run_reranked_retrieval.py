@@ -22,7 +22,7 @@ from scripts.evaluation.run_reranking_ablation import (
     DEFAULT_BENCHMARK_MANIFEST,
     DEFAULT_CHUNKS,
     DEFAULT_DENSE_REFERENCE_DIR,
-    DEFAULT_G2_REFERENCE_DIR,
+    DEFAULT_FIXED_RRF_REFERENCE_DIR,
     DEFAULT_GROUPS,
     DEFAULT_QRELS,
     DEFAULT_QUERIES,
@@ -84,7 +84,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--comparison-dir", type=Path, default=DEFAULT_COMPARISON_DIR)
     parser.add_argument("--dense-reference-dir", type=Path, default=DEFAULT_DENSE_REFERENCE_DIR)
     parser.add_argument("--sparse-reference-dir", type=Path, default=DEFAULT_SPARSE_REFERENCE_DIR)
-    parser.add_argument("--g2-reference-dir", type=Path, default=DEFAULT_G2_REFERENCE_DIR)
+    parser.add_argument(
+        "--fixed-rrf-reference-dir",
+        type=Path,
+        default=DEFAULT_FIXED_RRF_REFERENCE_DIR,
+    )
     parser.add_argument(
         "--base-reference-dir",
         type=Path,

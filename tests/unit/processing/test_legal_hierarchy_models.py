@@ -1,4 +1,4 @@
-"""Tests for Phase 5 legal hierarchy schemas and structured issues."""
+"""Tests for legal hierarchy schemas and structured issues."""
 
 from __future__ import annotations
 
@@ -184,7 +184,7 @@ def test_mutable_defaults_are_independent() -> None:
 
 
 def test_invalid_node_level_is_rejected() -> None:
-    """Reject node levels outside the canonical Phase 5 level set."""
+    """Reject node levels outside the canonical legal hierarchy parsing level set."""
     with pytest.raises(ValidationError):
         LegalNode(
             node_id="bad",

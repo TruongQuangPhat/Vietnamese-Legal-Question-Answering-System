@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 processed JSONL validator through Slice 3J."""
+"""Unit tests for the processed JSONL validator through warning-distribution audit."""
 
 from __future__ import annotations
 
@@ -596,16 +596,16 @@ class TestCounts:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3A: Hash integrity tests
+# hash-integrity check: Hash integrity tests
 # ---------------------------------------------------------------------------
 
 
 class TestHashIntegrity:
-    """Hash integrity checks (Slice 3A)."""
+    """Hash integrity checks (hash-integrity check)."""
 
     def test_valid_hashes_pass(self, tmp_path: Path) -> None:
         """Chunks with correct hashes should pass validation."""
-        chunk = _valid_chunk(chunk_id="h_ok")
+        chunk = _valid_chunk(chunk_id="hash_ok")
         jsonl_path = tmp_path / "hash_ok.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
@@ -619,7 +619,7 @@ class TestHashIntegrity:
 
     def test_text_hash_mismatch_detected(self, tmp_path: Path) -> None:
         """A wrong text_hash should be flagged as a hash mismatch."""
-        chunk = _valid_chunk(chunk_id="h_text_bad", text_hash="wrong_hash")
+        chunk = _valid_chunk(chunk_id="hash_text_bad", text_hash="wrong_hash")
         jsonl_path = tmp_path / "hash_text_bad.jsonl"
         _write_jsonl(jsonl_path, [chunk])
 
@@ -637,7 +637,7 @@ class TestHashIntegrity:
     def test_parent_text_hash_mismatch_detected(self, tmp_path: Path) -> None:
         """A wrong parent_text_hash should be flagged as a hash mismatch."""
         chunk = _valid_chunk(
-            chunk_id="h_parent_bad",
+            chunk_id="hash_parent_bad",
             parent_text_hash="wrong_hash",
         )
         jsonl_path = tmp_path / "hash_parent_bad.jsonl"
@@ -656,7 +656,7 @@ class TestHashIntegrity:
     def test_both_hashes_mismatch_increments_once(self, tmp_path: Path) -> None:
         """Both hashes wrong on one line should increment hash_mismatches once."""
         chunk = _valid_chunk(
-            chunk_id="h_both_bad",
+            chunk_id="hash_both_bad",
             text_hash="wrong1",
             parent_text_hash="wrong2",
         )
@@ -674,7 +674,7 @@ class TestHashIntegrity:
     def test_one_line_both_mismatches_is_one_invalid_chunk(self, tmp_path: Path) -> None:
         """A single line with both hashes wrong counts as one invalid chunk."""
         chunk = _valid_chunk(
-            chunk_id="h_one_line",
+            chunk_id="hash_one_line",
             text_hash="wrong",
             parent_text_hash="wrong",
         )
@@ -693,7 +693,7 @@ class TestHashIntegrity:
         rows = []
         for i in range(15):
             chunk = _valid_chunk(
-                chunk_id=f"h_cap_{i}",
+                chunk_id=f"hash_cap_{i}",
                 text_hash=f"wrong_{i}",
             )
             rows.append(chunk.model_dump(mode="json"))
@@ -710,12 +710,12 @@ class TestHashIntegrity:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3B: Count reconciliation tests
+# count-reconciliation check: Count reconciliation tests
 # ---------------------------------------------------------------------------
 
 
 class TestCountReconciliation:
-    """Count reconciliation against the Phase 6 chunking report."""
+    """Count reconciliation against the parent-child chunking report."""
 
     def _write_chunking_report(self, path: Path, data: object) -> None:
         path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
@@ -944,7 +944,7 @@ class TestCountReconciliation:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3C: Citation structural validation tests
+# citation-structure check: Citation structural validation tests
 # ---------------------------------------------------------------------------
 
 
@@ -1222,7 +1222,7 @@ class TestCitationStructure:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3D: Hierarchy traceability validation tests
+# hierarchy-traceability check: Hierarchy traceability validation tests
 # ---------------------------------------------------------------------------
 
 
@@ -1573,7 +1573,7 @@ class TestHierarchyTraceability:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3E: Contamination audit tests
+# contamination audit: Contamination audit tests
 # ---------------------------------------------------------------------------
 
 
@@ -1746,7 +1746,7 @@ class TestContaminationAudit:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3F: Repealed/empty metadata audit tests
+# repeal-metadata audit: Repealed/empty metadata audit tests
 # ---------------------------------------------------------------------------
 
 
@@ -1970,7 +1970,7 @@ class TestRepealedMetadataAudit:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3G: Text length readiness tests
+# text-length readiness check: Text length readiness tests
 # ---------------------------------------------------------------------------
 
 
@@ -2180,7 +2180,7 @@ class TestTextLengthReadiness:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3H: Payload readiness tests
+# payload-readiness check: Payload readiness tests
 # ---------------------------------------------------------------------------
 
 
@@ -2344,12 +2344,12 @@ class TestPayloadReadiness:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3I: Embedding readiness summary tests
+# embedding-readiness summary: Embedding readiness summary tests
 # ---------------------------------------------------------------------------
 
 
 class TestEmbeddingReadinessSummary:
-    """Final Phase 7 readiness decision assembled from prior audit results."""
+    """Final processed JSONL validation readiness decision assembled from prior audit results."""
 
     def _validate_chunk(
         self,
@@ -2473,7 +2473,7 @@ class TestEmbeddingReadinessSummary:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3J: Warning distribution audit tests
+# warning-distribution audit: Warning distribution audit tests
 # ---------------------------------------------------------------------------
 
 
@@ -2723,12 +2723,12 @@ class TestWarningDistributionAudit:
 
 
 # ---------------------------------------------------------------------------
-# Slice 3J scope: later checks are not yet implemented
+# warning-distribution audit scope: later checks are not yet implemented
 # ---------------------------------------------------------------------------
 
 
 class TestSlice3JScope:
-    """Slice 3J audits warning distribution without resolving warnings."""
+    """warning-distribution audit audits warning distribution without resolving warnings."""
 
     def test_count_reconciliation_passes_with_matching_report(self, tmp_path: Path) -> None:
         """Count reconciliation remains neutral when the report matches."""

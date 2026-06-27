@@ -141,7 +141,7 @@ class HeadingRecognitionResult(BaseModel):
 class LegalHeadingRecognizer:
     """Recognize observed Vietnamese legal heading patterns without mutation.
 
-    The recognizer is intentionally narrow for the first Phase 5 slice. It
+    The recognizer is intentionally narrow for the initial legal hierarchy parser. It
     supports the approved Part, Chapter, Section, and Article baseline patterns
     while rejecting inline cross-references and emitting source-note exclusion
     hints for future segmentation.

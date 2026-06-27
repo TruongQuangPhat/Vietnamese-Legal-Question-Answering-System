@@ -1,4 +1,4 @@
-"""Safe Qdrant collection schema setup for Phase 8 Slice 8E.
+"""Safe Qdrant collection schema setup for embedding/indexing Qdrant schema setup.
 
 This module validates or creates collection metadata only. It does not embed
 text, build point payloads, upsert vectors, read the legal corpus, or perform

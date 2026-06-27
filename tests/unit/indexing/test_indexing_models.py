@@ -1,4 +1,4 @@
-"""Unit tests for Phase 8 indexing configuration and typed contracts."""
+"""Unit tests for indexing configuration and typed contracts."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ CONFIG_PATH = Path("configs/indexing/embedding_indexing.yml")
 
 
 def _load_config() -> IndexingConfig:
-    """Load the repository's default Slice 8A YAML configuration."""
+    """Load the repository's default indexing YAML configuration."""
     with CONFIG_PATH.open("r", encoding="utf-8") as file:
         payload = yaml.safe_load(file)
     return IndexingConfig.model_validate(payload)
@@ -91,7 +91,7 @@ def _vector_payload(**overrides: object) -> VectorPayload:
 
 
 class TestIndexingConfig:
-    """Validation tests for the complete Slice 8A configuration."""
+    """Validation tests for the complete indexing configuration."""
 
     def test_default_config_loads(self) -> None:
         config = _load_config()

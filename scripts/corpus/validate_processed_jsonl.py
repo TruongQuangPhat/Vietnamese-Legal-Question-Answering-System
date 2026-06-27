@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Command-line entrypoint for Phase 7 processed JSONL validation.
+"""Command-line entrypoint for processed JSONL validation.
 
 Usage:
     uv run python scripts/corpus/validate_processed_jsonl.py \
@@ -38,14 +38,14 @@ EXIT_WARNING_FAILURE = 2
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build the Phase 7 processed JSONL validation argument parser.
+    """Build the processed JSONL validation argument parser.
 
     Returns:
-        Configured parser with official Phase 7 paths and warning policy.
+        Configured parser with official processed JSONL validation paths and warning policy.
     """
     parser = argparse.ArgumentParser(
         prog="scripts/corpus/validate_processed_jsonl.py",
-        description="Validate Phase 6 legal chunk JSONL for Phase 8 readiness.",
+        description="Validate parent-child chunking legal chunk JSONL for embedding/indexing readiness.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -58,13 +58,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=Path("configs/processing/processed_jsonl_validation.yml"),
-        help="Phase 7 validation YAML configuration.",
+        help="processed JSONL validation YAML configuration.",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=Path("artifacts/reports/chunking/processed_jsonl_validation_report.json"),
-        help="Destination for the complete Phase 7 validation report.",
+        help="Destination for the complete processed JSONL validation report.",
     )
     parser.add_argument(
         "--fail-on-warnings",
@@ -85,7 +85,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run Phase 7 validation and write its complete report.
+    """Run processed JSONL validation and write its complete report.
 
     Args:
         argv: Optional argument vector for tests. When omitted, argparse reads
@@ -127,7 +127,7 @@ def _load_config(
         report_path: Report destination selected by the CLI.
 
     Returns:
-        Validated Phase 7 configuration.
+        Validated processed JSONL validation configuration.
 
     Raises:
         ValueError: If the YAML root is not an object.
@@ -156,7 +156,7 @@ def _write_report(
 
     Args:
         report_path: Destination JSON path.
-        report: Completed Phase 7 report.
+        report: Completed processed JSONL validation report.
         pretty: Whether to indent the JSON for human inspection.
     """
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,9 +174,9 @@ def _print_summary(
     *,
     report_path: Path,
 ) -> None:
-    """Print the concise Phase 7 gate and embedding-readiness summary."""
+    """Print the concise processed JSONL validation gate and embedding-readiness summary."""
     readiness = report.embedding_readiness
-    print("Phase 7 processed JSONL validation complete")
+    print("processed JSONL validation complete")
     print(f"Status: {report.status}")
     print(f"Total lines: {report.total_lines}")
     print(f"Valid chunks: {report.valid_chunks}")
@@ -193,7 +193,7 @@ def _exit_code(
     *,
     fail_on_warnings: bool,
 ) -> int:
-    """Return the official Phase 7 exit code for report status."""
+    """Return the official processed JSONL validation exit code for report status."""
     if report.status == "fail":
         return EXIT_VALIDATION_FAILURE
     if report.status == "pass_with_warnings" and fail_on_warnings:

@@ -1,4 +1,4 @@
-"""Operationally hardened dense-vector indexing for Phase 8 Slice 8G."""
+"""Operationally hardened dense-vector indexing for embedding/indexing resumable indexing."""
 
 from __future__ import annotations
 
@@ -181,7 +181,7 @@ class IndexingService:
         input_path: str,
         report_type: str = "indexing_report",
         run_type: str = "development_indexing",
-        pipeline_stage: str = "embedding_indexing",
+        workflow_name: str = "embedding_indexing",
         text_template: EmbeddingTextTemplate | str = EmbeddingTextTemplate.TEXT_ONLY,
         law_id: str | None = None,
         limit: int | None = None,
@@ -240,7 +240,7 @@ class IndexingService:
 
         count_before: int | None = None
         if reconcile_counts and not dry_run:
-            count_before = await self._read_points_count(issues, stage="before")
+            count_before = await self._read_points_count(issues, timing="before")
 
         iterator = iter(chunks)
         while limit is None or metrics.planned_count < limit:
@@ -307,7 +307,7 @@ class IndexingService:
                         checkpoint_path,
                         input_path=input_path,
                         run_type=run_type,
-                        pipeline_stage=pipeline_stage,
+                        workflow_name=workflow_name,
                         template=template,
                         law_id=law_id,
                         processed_chunk_ids=processed_chunk_ids,
@@ -337,7 +337,7 @@ class IndexingService:
                 checkpoint_path,
                 input_path=input_path,
                 run_type=run_type,
-                pipeline_stage=pipeline_stage,
+                workflow_name=workflow_name,
                 template=template,
                 law_id=law_id,
                 processed_chunk_ids=processed_chunk_ids,
@@ -359,7 +359,7 @@ class IndexingService:
             input_path=input_path,
             report_type=report_type,
             run_type=run_type,
-            pipeline_stage=pipeline_stage,
+            workflow_name=workflow_name,
             template=template,
             law_id=law_id,
             limit=limit,
@@ -601,7 +601,7 @@ class IndexingService:
         self,
         issues: list[IndexingIssue],
         *,
-        stage: str,
+        timing: str,
     ) -> int | None:
         if self._qdrant_client is None:
             return None
@@ -613,7 +613,7 @@ class IndexingService:
                 _issue(
                     code="count_reconciliation_read_failed",
                     severity=IndexingIssueSeverity.WARNING,
-                    message=f"unable to read Qdrant collection count {stage} indexing: {exc}",
+                    message=f"unable to read Qdrant collection count {timing} indexing: {exc}",
                 )
             )
             return None
@@ -670,7 +670,7 @@ class IndexingService:
         *,
         input_path: str,
         run_type: str,
-        pipeline_stage: str,
+        workflow_name: str,
         template: EmbeddingTextTemplate,
         law_id: str | None,
         processed_chunk_ids: list[str],
@@ -679,7 +679,7 @@ class IndexingService:
     ) -> None:
         checkpoint = IndexingCheckpoint(
             run_type=run_type,
-            pipeline_stage=pipeline_stage,
+            workflow_name=workflow_name,
             indexing_run_id=self.indexing_run_id,
             collection_name=self.collection_name,
             dense_vector_name=self.dense_vector_name,
@@ -705,7 +705,7 @@ class IndexingService:
         input_path: str,
         report_type: str,
         run_type: str,
-        pipeline_stage: str,
+        workflow_name: str,
         template: EmbeddingTextTemplate,
         law_id: str | None,
         limit: int | None,
@@ -741,7 +741,7 @@ class IndexingService:
             schema_version="0.1.0",
             report_type=report_type,
             run_type=run_type,
-            pipeline_stage=pipeline_stage,
+            workflow_name=workflow_name,
             status=status,
             processed_validation_status=processed_validation.status,
             processed_validation_report_path=processed_validation.report_path,

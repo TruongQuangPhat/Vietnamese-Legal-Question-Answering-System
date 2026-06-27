@@ -41,22 +41,22 @@ def test_default_ablation_configs_cover_requested_families() -> None:
     configs = default_ablation_configs()
 
     assert {config.config_id for config in configs} == {
-        "A0",
-        "A1",
-        "A2",
-        "A3",
-        "A4",
-        "B1",
-        "B2",
-        "B3",
-        "B4",
-        "C1",
-        "C2",
-        "C3",
-        "C4",
-        "D1",
-        "D2",
-        "D3",
+        "equal_weight_rrf",
+        "sparse_weight_1_25",
+        "sparse_weight_1_5",
+        "sparse_weight_2",
+        "dense_weight_1_25",
+        "sparse_weight_1_5_pool_50_100",
+        "sparse_weight_1_5_pool_100_100",
+        "sparse_weight_2_pool_50_100",
+        "sparse_weight_2_pool_100_100",
+        "quota_fused6_sparse3_dense1",
+        "quota_fused5_sparse3_dense2",
+        "quota_fused4_sparse4_dense2",
+        "selected_coverage_aware_quota",
+        "diversity_penalty_0_001",
+        "diversity_penalty_0_002",
+        "diversity_penalty_0_001_distinct_detail",
     }
     assert all(config.final_top_k == 10 for config in configs)
     assert all(config.rrf_k == 60 for config in configs)
@@ -102,13 +102,15 @@ def test_selection_ignores_held_out_metrics() -> None:
 def test_config_payload_round_trip_for_quota_and_diversity() -> None:
     configs = {config.config_id: config for config in default_ablation_configs()}
 
-    c3 = config_from_payload(configs["C3"].model_dump())
-    d3 = config_from_payload(configs["D3"].model_dump())
+    quota_variant = config_from_payload(configs["quota_fused4_sparse4_dense2"].model_dump())
+    diversity_variant = config_from_payload(
+        configs["diversity_penalty_0_001_distinct_detail"].model_dump()
+    )
 
-    assert c3.quota_config() is not None
-    assert c3.quota_config().sparse_quota == 4
-    assert d3.diversity_config() is not None
-    assert d3.diversity_config().prefer_distinct_clause_point is True
+    assert quota_variant.quota_config() is not None
+    assert quota_variant.quota_config().sparse_quota == 4
+    assert diversity_variant.diversity_config() is not None
+    assert diversity_variant.diversity_config().prefer_distinct_clause_point is True
 
 
 def test_manifest_guard_rejects_secret_shaped_keys() -> None:

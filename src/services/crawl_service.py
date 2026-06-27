@@ -1,6 +1,6 @@
 """Crawl pipeline service.
 
-This module orchestrates the legal document crawling phase, coordinating the
+This module orchestrates the legal document crawling workflow, coordinating the
 registry, selector, crawler, and storage components.
 """
 

@@ -127,7 +127,7 @@ def test_write_sparse_outputs_creates_required_artifacts(tmp_path: Path) -> None
     assert manifest["retrieval_method"] == "sparse_bm25"
     assert manifest["query_count"] == 2
     assert manifest["chunk_source_sha256"]
-    assert "Comparison Against F1 Dense Baseline" in (output_dir / "summary.md").read_text(
+    assert "Comparison Against Dense Baseline" in (output_dir / "summary.md").read_text(
         encoding="utf-8"
     )
     assert not _contains_secret_like_key(manifest)

@@ -31,7 +31,7 @@ from src.retrieval.sparse_retriever import (
     SparseRetrieverError,
 )
 
-F1_DENSE_REFERENCE = {
+DENSE_BASELINE_REFERENCE = {
     "all": {
         "recall_at_10": 0.8454545455,
         "evidence_group_coverage_at_10": 0.5691489362,
@@ -160,7 +160,7 @@ def write_sparse_outputs(
     average_document_length: float,
     command: list[str],
 ) -> None:
-    """Write sparse retrieval artifacts in the F1-compatible structure."""
+    """Write sparse retrieval artifacts in the dense-baseline-compatible structure."""
     output_dir.mkdir(parents=True, exist_ok=True)
     all_metrics = aggregate_case_metrics(case_results)
     breakdowns = build_breakdowns(case_results)
@@ -235,9 +235,9 @@ def write_sparse_outputs(
 
 
 def load_dense_reference_metrics(reference_dir: Path | None) -> dict[str, dict[str, Any]]:
-    """Load F1 dense metrics for read-only summary comparison when available."""
+    """Load dense metrics for read-only summary comparison when available."""
     if reference_dir is None:
-        return F1_DENSE_REFERENCE
+        return DENSE_BASELINE_REFERENCE
     files = {
         "all": reference_dir / "metrics_all.json",
         "development": reference_dir / "metrics_development.json",
@@ -248,9 +248,9 @@ def load_dense_reference_metrics(reference_dir: Path | None) -> dict[str, dict[s
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return F1_DENSE_REFERENCE
+            return DENSE_BASELINE_REFERENCE
         if not isinstance(payload, dict):
-            return F1_DENSE_REFERENCE
+            return DENSE_BASELINE_REFERENCE
         loaded[label] = payload
     return loaded
 
@@ -292,7 +292,7 @@ def render_sparse_summary(
         _metric_line("development", split_metrics["development"]),
         _metric_line("held_out_test", split_metrics["held_out_test"]),
         "",
-        "## Comparison Against F1 Dense Baseline",
+        "## Comparison Against Dense Baseline",
         "",
     ]
     lines.extend(_comparison_lines(all_metrics, split_metrics, dense_reference))
@@ -318,7 +318,7 @@ def render_sparse_summary(
             "",
             "## Next Action",
             "",
-            "- Run G2 hybrid dense+sparse retrieval with RRF as a separate controlled ablation.",
+            "- Run fixed RRF dense+sparse retrieval as a separate controlled ablation.",
             "",
         ]
     )

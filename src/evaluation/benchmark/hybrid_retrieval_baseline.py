@@ -59,7 +59,7 @@ class HybridBenchmarkPaths:
 
 @dataclass(frozen=True)
 class HybridBenchmarkConfig:
-    """Fixed G2 candidate and RRF settings."""
+    """Fixed dense-sparse candidate and RRF settings."""
 
     dense_candidate_k: int = 50
     sparse_candidate_k: int = 50
@@ -235,10 +235,10 @@ def write_hybrid_outputs(
         "embedding_model": embedding_model,
         "chunk_source_path": str(chunk_source_path),
         "chunk_source_sha256": sha256_file(chunk_source_path),
-        "f1_dense_baseline_manifest_sha256": sha256_file(
+        "dense_baseline_manifest_sha256": sha256_file(
             dense_reference_dir / "baseline_manifest.json"
         ),
-        "g1_sparse_baseline_manifest_sha256": sha256_file(
+        "sparse_baseline_manifest_sha256": sha256_file(
             sparse_reference_dir / "baseline_manifest.json"
         ),
         "run_timestamp": datetime.now(UTC).isoformat(),
@@ -285,20 +285,20 @@ def write_retrieval_comparison(
     sparse_dir: Path,
     hybrid_dir: Path,
 ) -> None:
-    """Write comparison artifacts for F1 dense, G1 sparse, and G2 hybrid."""
+    """Write comparison artifacts for dense, sparse, and fixed RRF retrieval."""
     comparison_dir.mkdir(parents=True, exist_ok=True)
     systems = {
-        "f1_dense": {
+        "dense_bge_m3_baseline": {
             "retrieval_method": "dense_bge_m3",
             "metrics": load_system_metrics(dense_dir),
             "breakdowns": load_system_breakdowns(dense_dir),
         },
-        "g1_sparse_bm25": {
+        "sparse_bm25_baseline": {
             "retrieval_method": "sparse_bm25",
             "metrics": load_system_metrics(sparse_dir),
             "breakdowns": load_system_breakdowns(sparse_dir),
         },
-        "g2_hybrid_rrf": {
+        "fixed_rrf_hybrid": {
             "retrieval_method": "hybrid_dense_sparse_rrf",
             "metrics": load_system_metrics(hybrid_dir),
             "breakdowns": load_system_breakdowns(hybrid_dir),
@@ -319,7 +319,10 @@ def write_retrieval_comparison(
         "deltas": _comparison_deltas(systems),
         "key_questions": key_questions,
         "interpretation": _comparison_interpretation(key_questions),
-        "recommendation": "Proceed to Stage H reranking ablation if G2 hybrid preserves or improves retrieval coverage sufficiently for the chosen adoption criteria.",
+        "recommendation": (
+            "Proceed to reranking ablation if fixed RRF preserves or improves retrieval "
+            "coverage sufficiently for the chosen adoption criteria."
+        ),
     }
     write_json_atomic(comparison_dir / "comparison.json", comparison)
     (comparison_dir / "comparison.md").write_text(
@@ -375,7 +378,7 @@ def render_hybrid_summary(
         _metric_line("development", split_metrics["development"]),
         _metric_line("held_out_test", split_metrics["held_out_test"]),
         "",
-        "## Comparison Against F1 Dense and G1 Sparse",
+        "## Comparison Against Dense and Sparse Baselines",
         "",
     ]
     lines.extend(
@@ -402,7 +405,7 @@ def render_hybrid_summary(
             "",
             "## Next Action",
             "",
-            "- Run Stage H reranking ablation as a separate controlled experiment.",
+            "- Run reranking ablation as a separate controlled experiment.",
             "",
         ]
     )
@@ -441,7 +444,7 @@ def render_comparison_markdown(comparison: dict[str, Any]) -> str:
             )
         lines.append("")
     lines.extend(["## Weakest Hybrid Breakdowns", ""])
-    hybrid = systems["g2_hybrid_rrf"]
+    hybrid = systems["fixed_rrf_hybrid"]
     lines.append("### primary_domain")
     lines.append("")
     for row in hybrid["weakest_primary_domains"]:
@@ -510,10 +513,10 @@ def _summary_delta_lines(
 
 
 def _comparison_deltas(systems: dict[str, dict[str, Any]]) -> dict[str, SystemMetrics]:
-    hybrid = systems["g2_hybrid_rrf"]["metrics"]
+    hybrid = systems["fixed_rrf_hybrid"]["metrics"]
     return {
-        "hybrid_vs_dense": _delta_metrics(hybrid, systems["f1_dense"]["metrics"]),
-        "hybrid_vs_sparse": _delta_metrics(hybrid, systems["g1_sparse_bm25"]["metrics"]),
+        "hybrid_vs_dense": _delta_metrics(hybrid, systems["dense_bge_m3_baseline"]["metrics"]),
+        "hybrid_vs_sparse": _delta_metrics(hybrid, systems["sparse_bm25_baseline"]["metrics"]),
     }
 
 
@@ -531,9 +534,9 @@ def _delta_metrics(hybrid: SystemMetrics, baseline: SystemMetrics) -> SystemMetr
 
 
 def _comparison_key_questions(systems: dict[str, dict[str, Any]]) -> dict[str, bool]:
-    dense = systems["f1_dense"]["metrics"]
-    sparse = systems["g1_sparse_bm25"]["metrics"]
-    hybrid = systems["g2_hybrid_rrf"]["metrics"]
+    dense = systems["dense_bge_m3_baseline"]["metrics"]
+    sparse = systems["sparse_bm25_baseline"]["metrics"]
+    hybrid = systems["fixed_rrf_hybrid"]["metrics"]
     return {
         "hybrid_improves_all_recall_over_dense_and_sparse": hybrid["all"]["recall_at_10"]
         > max(dense["all"]["recall_at_10"], sparse["all"]["recall_at_10"]),
@@ -557,11 +560,11 @@ def _comparison_interpretation(key_questions: dict[str, bool]) -> str:
     if all(key_questions.values()):
         return (
             "Hybrid RRF improves the primary all-query metrics while preserving dense held-out "
-            "strength and sparse development coverage, so it is a strong candidate for Stage H."
+            "strength and sparse development coverage, so it is a strong candidate for reranking."
         )
     return (
         "Hybrid RRF is useful for comparison, but at least one target condition was not met. "
-        "Review split-level regressions before adopting it as the default candidate for Stage H."
+        "Review split-level regressions before adopting it as the default candidate for reranking."
     )
 
 

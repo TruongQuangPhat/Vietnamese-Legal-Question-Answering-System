@@ -1,4 +1,4 @@
-"""Read-only validation for Phase 6 legal chunks."""
+"""Read-only validation for parent-child chunking legal chunks."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 # Frozen Coverage-Aware Hybrid Retrieval
 
-- Selected config: `C4`.
+- Selected config: `selected_coverage_aware_quota`.
 - Retrieval method: `coverage_aware_quota`.
 - No generation, LLM call, reranking, or fallback-gate change.
 

@@ -16,7 +16,7 @@
 - `development`: queries=85, Recall@10=0.897, MRR@10=0.699, NDCG@10=0.607, required_direct_coverage@10=0.614, evidence_group_coverage@10=0.614
 - `held_out_test`: queries=43, Recall@10=0.833, MRR@10=0.666, NDCG@10=0.660, required_direct_coverage@10=0.639, evidence_group_coverage@10=0.639
 
-## Comparison Against F1 Dense and G1 Sparse
+## Comparison Against Dense and Sparse Baselines
 
 - `all` vs dense: Recall@10 +0.027; group coverage +0.053. Vs sparse: Recall@10 +0.009; group coverage -0.122.
 - `development` vs dense: Recall@10 +0.103; group coverage +0.110. Vs sparse: Recall@10 -0.029; group coverage -0.157.
@@ -52,4 +52,4 @@
 
 ## Next Action
 
-- Run Stage H reranking ablation as a separate controlled experiment.
+- Run reranking ablation as a separate controlled experiment.

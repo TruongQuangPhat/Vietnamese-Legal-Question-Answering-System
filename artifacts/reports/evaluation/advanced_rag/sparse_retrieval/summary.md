@@ -15,7 +15,7 @@
 - `development`: queries=85, Recall@10=0.926, MRR@10=0.660, NDCG@10=0.598, required_direct_coverage@10=0.772, evidence_group_coverage@10=0.772
 - `held_out_test`: queries=43, Recall@10=0.762, MRR@10=0.629, NDCG@10=0.610, required_direct_coverage@10=0.689, evidence_group_coverage@10=0.689
 
-## Comparison Against F1 Dense Baseline
+## Comparison Against Dense Baseline
 
 - `all`: Recall@10 delta=+0.018; evidence_group_coverage@10 delta=+0.176.
 - `development`: Recall@10 delta=+0.132; evidence_group_coverage@10 delta=+0.268.
@@ -51,4 +51,4 @@
 
 ## Next Action
 
-- Run G2 hybrid dense+sparse retrieval with RRF as a separate controlled ablation.
+- Run fixed dense+sparse RRF retrieval as a separate controlled ablation.
