@@ -9,7 +9,12 @@ import pytest
 from src.retrieval.evaluation import ExpectedTarget
 from src.retrieval.generation import RagGenerationConfig
 from src.retrieval.llm_client import LLMResponse, MockLLMClient
-from src.retrieval.models import RetrievalResult, RetrievedChunk
+from src.retrieval.models import (
+    RetrievalIssue,
+    RetrievalIssueSeverity,
+    RetrievalResult,
+    RetrievedChunk,
+)
 from src.retrieval.rag_pipeline import run_naive_rag
 from src.retrieval.selection import AnswerabilityDecision, EvidenceSelectionConfig
 
@@ -85,6 +90,13 @@ async def test_needs_review_selection_does_not_call_llm() -> None:
                     clause_number="4",
                     text="4. Người sử dụng lao động có trách nhiệm...",
                     parent_text="Điều 113. Nghỉ hằng năm ...",
+                    issues=[
+                        RetrievalIssue(
+                            code="ambiguous_candidate",
+                            severity=RetrievalIssueSeverity.WARNING,
+                            message="candidate needs review before answer use",
+                        )
+                    ],
                 )
             ]
         )
@@ -258,6 +270,7 @@ def _chunk(
     citation: str | None = "Điều 2, Bộ luật Dân sự 2015",
     text: str = "Quyền dân sự được công nhận, tôn trọng, bảo vệ.",
     parent_text: str | None = None,
+    issues: list[RetrievalIssue] | None = None,
 ) -> RetrievedChunk:
     return RetrievedChunk(
         rank=rank,
@@ -278,7 +291,7 @@ def _chunk(
         source_domain="thuvienphapluat.vn",
         metadata={},
         warnings=[],
-        issues=[],
+        issues=issues or [],
     )
 
 

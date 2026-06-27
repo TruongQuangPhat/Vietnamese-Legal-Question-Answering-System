@@ -119,7 +119,7 @@ def test_clause_level_chunk_with_broader_parent_text_is_caution() -> None:
     packet = build_evidence_packet(chunk)
 
     assert packet.safety_level == EvidenceSafetyLevel.CAUTION
-    assert packet.citation_scope == CitationScope.UNSAFE_PARENT_CONTEXT
+    assert packet.citation_scope == CitationScope.CHILD_EXACT
     assert packet.parent_context_policy == ParentContextPolicy.AUXILIARY_ONLY
     assert packet.safe_citable_text is not None
     assert packet.auxiliary_context is not None
@@ -141,7 +141,7 @@ def test_point_level_chunk_with_broader_parent_text_is_caution() -> None:
     )
 
     assert packet.safety_level == EvidenceSafetyLevel.CAUTION
-    assert packet.citation_scope == CitationScope.UNSAFE_PARENT_CONTEXT
+    assert packet.citation_scope == CitationScope.CHILD_EXACT
     assert packet.auxiliary_context is not None
 
 
@@ -257,7 +257,7 @@ def test_annual_leave_sibling_clause_parent_text_is_not_directly_citable() -> No
     packet = build_evidence_packet(chunk)
 
     assert packet.safety_level == EvidenceSafetyLevel.CAUTION
-    assert packet.citation_scope == CitationScope.UNSAFE_PARENT_CONTEXT
+    assert packet.citation_scope == CitationScope.CHILD_EXACT
     assert packet.parent_context_policy == ParentContextPolicy.AUXILIARY_ONLY
     assert packet.safe_citable_text is not None
     assert "Khoản 4" in (packet.citation or "")
