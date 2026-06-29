@@ -6,6 +6,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
+MAX_QUESTION_LENGTH = 4000
+
 
 class LegalQADecision(StrEnum):
     """Legal QA decision values returned by the API."""
@@ -25,7 +27,7 @@ class LegalQARequest(BaseModel):
         include_debug: Reserved for future debug/admin behavior; ignored by the stub.
     """
 
-    question: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=1, max_length=MAX_QUESTION_LENGTH)
     top_k: int = Field(default=10, ge=1, le=20)
     include_evidence: bool = True
     include_debug: bool = False

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from threading import Thread, get_ident
 from typing import Any
@@ -9,7 +10,13 @@ import pytest
 
 from src.api.app import create_app
 from src.api.dependencies import get_legal_qa_service
-from src.api.schemas import LegalQADecision, LegalQARequest, LegalQAResponse, ResponseMetadataDTO
+from src.api.schemas import (
+    MAX_QUESTION_LENGTH,
+    LegalQADecision,
+    LegalQARequest,
+    LegalQAResponse,
+    ResponseMetadataDTO,
+)
 from src.services.legal_qa_api_service import LegalQAService, LegalQAWorkflowRequest
 
 
@@ -109,6 +116,19 @@ async def test_ask_route_rejects_invalid_top_k() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ask_route_rejects_too_long_question() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "x" * (MAX_QUESTION_LENGTH + 1)},
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_ask_route_returns_safe_error_when_service_fails() -> None:
     app = create_app()
 
@@ -142,6 +162,73 @@ async def test_ask_route_returns_safe_error_when_service_fails() -> None:
         "latency_ms": body["metadata"]["latency_ms"],
     }
     assert "secret traceback details" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_ask_route_logs_safe_completion_metadata(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?"},
+        )
+
+    assert response.status_code == 200
+    record = _single_log_record(caplog, "legal_qa_request_completed")
+    assert record.request_id == response.json()["request_id"]
+    assert record.decision == "answered"
+    assert record.retrieval_strategy == "coverage_aware_quota"
+    assert record.warning_count == 0
+    assert record.citation_count == 1
+    assert record.evidence_count == 1
+    assert isinstance(record.latency_ms, int)
+
+
+@pytest.mark.asyncio
+async def test_ask_route_logs_safe_error_metadata(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.WARNING, logger="src.api.routes.legal_qa")
+    app = create_app()
+
+    class FailingLegalQAWorkflow:
+        def run(self, request: LegalQAWorkflowRequest) -> None:
+            raise RuntimeError("secret traceback details")
+
+    async def get_failing_service() -> LegalQAService:
+        return LegalQAService(workflow=FailingLegalQAWorkflow())
+
+    app.dependency_overrides[get_legal_qa_service] = get_failing_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Câu hỏi hợp lệ?"},
+        )
+
+    assert response.status_code == 200
+    record = _single_log_record(caplog, "legal_qa_request_failed")
+    assert record.request_id == response.json()["request_id"]
+    assert record.error_type == "RuntimeError"
+    assert isinstance(record.latency_ms, int)
+    assert "secret traceback details" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_ask_route_does_not_log_raw_question(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
+    raw_question = "Câu hỏi có mã riêng tư SECRET-QUESTION-12345?"
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": raw_question},
+        )
+
+    assert response.status_code == 200
+    assert raw_question not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -184,3 +271,9 @@ async def test_ask_route_offloads_service_answer_from_event_loop() -> None:
     assert response.json()["decision"] == "answered"
     assert answer_thread_ids
     assert answer_thread_ids[0] != event_loop_thread_id
+
+
+def _single_log_record(caplog: pytest.LogCaptureFixture, message: str) -> logging.LogRecord:
+    matching_records = [record for record in caplog.records if record.getMessage() == message]
+    assert len(matching_records) == 1
+    return matching_records[0]
