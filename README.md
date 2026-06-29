@@ -174,6 +174,8 @@ Optional provider secrets belong in environment variables or an uncommitted
 For backend runtime configuration and local smoke checks, see
 `docs/backend-runtime.md`.
 
+For frontend local development, see `apps/frontend/README.md`.
+
 ## Common Commands
 
 Run safe validation:

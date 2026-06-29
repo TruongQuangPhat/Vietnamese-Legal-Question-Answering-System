@@ -12,8 +12,17 @@ Minimal Next.js frontend scaffold for the VnLaw-QA product interface.
 The frontend expects the backend CORS setting to include
 `http://localhost:3000`.
 
-This scaffold does not call the backend yet. The Legal QA ask form will be
-added in a later increment.
+To run the backend in fake mode for local UI checks:
+
+```bash
+cd /home/phat/AI_Project/VnLaw-QA
+LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+Using `python -m uvicorn` ensures uvicorn runs with the project Python
+environment managed by `uv`.
+
+The Legal QA form calls the backend configured by `NEXT_PUBLIC_API_BASE_URL`.
 
 ## API Client
 

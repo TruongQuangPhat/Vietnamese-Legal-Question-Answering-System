@@ -85,13 +85,16 @@ uv sync
 Run safely in fake mode:
 
 ```bash
-LEGAL_QA_SERVICE_MODE=fake uv run uvicorn src.api.app:app --host 127.0.0.1 --port 8000
+LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Using `python -m uvicorn` ensures uvicorn runs with the project Python
+environment managed by `uv`.
 
 The app factory is also available for factory-based startup:
 
 ```bash
-LEGAL_QA_SERVICE_MODE=fake uv run uvicorn src.api.app:create_app --factory --host 127.0.0.1 --port 8000
+LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:create_app --factory --reload --host 0.0.0.0 --port 8000
 ```
 
 ## API Endpoints

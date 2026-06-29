@@ -1,0 +1,125 @@
+"use client";
+
+import { useState } from "react";
+import { ApiRequestError, askLegalQuestion } from "@/lib/legal-qa-client";
+import type { LegalQAResponse } from "@/types/legal-qa";
+import { AnswerPanel } from "./answer-panel";
+import { AskForm } from "./ask-form";
+
+const MAX_QUESTION_LENGTH = 4000;
+const DEFAULT_TOP_K = 10;
+
+type LegalQAWorkspaceProps = {
+  apiBaseUrl: string;
+};
+
+export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
+  const [question, setQuestion] = useState("");
+  const [topK, setTopK] = useState(DEFAULT_TOP_K);
+  const [includeEvidence, setIncludeEvidence] = useState(true);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [response, setResponse] = useState<LegalQAResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function submitQuestion() {
+    const trimmedQuestion = question.trim();
+    const validationMessage = validateQuestion(trimmedQuestion, question.length, topK);
+    if (validationMessage) {
+      setValidationError(validationMessage);
+      return;
+    }
+
+    setValidationError(null);
+    setRequestError(null);
+    setIsLoading(true);
+
+    try {
+      const answer = await askLegalQuestion({
+        question: trimmedQuestion,
+        top_k: topK,
+        include_evidence: includeEvidence,
+        include_debug: false,
+      });
+      setResponse(answer);
+    } catch (error) {
+      setRequestError(toUserFacingError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="grid flex-1 gap-5 py-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
+      <section className="h-fit rounded-md border border-border bg-surface p-5 shadow-panel">
+        <div className="border-b border-border pb-4">
+          <h2 className="text-lg font-semibold">Question workspace</h2>
+          <p className="mt-1 text-sm leading-6 text-muted">
+            Ask a Vietnamese legal question. The backend may answer with
+            citations or return a safe fallback when evidence is insufficient.
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            API: <span className="font-medium text-ink">{apiBaseUrl}</span>
+          </p>
+        </div>
+
+        <div className="mt-5">
+          <AskForm
+            includeEvidence={includeEvidence}
+            isLoading={isLoading}
+            onIncludeEvidenceChange={setIncludeEvidence}
+            onQuestionChange={(value) => {
+              setQuestion(value);
+              if (validationError) {
+                setValidationError(null);
+              }
+            }}
+            onSubmit={submitQuestion}
+            onTopKChange={setTopK}
+            question={question}
+            topK={topK}
+            validationError={validationError}
+          />
+        </div>
+      </section>
+
+      <AnswerPanel
+        errorMessage={requestError}
+        isLoading={isLoading}
+        response={response}
+      />
+    </div>
+  );
+}
+
+function validateQuestion(
+  trimmedQuestion: string,
+  questionLength: number,
+  topK: number,
+): string | null {
+  if (!trimmedQuestion) {
+    return "Vui lòng nhập câu hỏi pháp luật.";
+  }
+  if (questionLength > MAX_QUESTION_LENGTH) {
+    return "Câu hỏi vượt quá giới hạn 4000 ký tự.";
+  }
+  if (!Number.isInteger(topK) || topK < 1 || topK > 20) {
+    return "Giới hạn evidence phải nằm trong khoảng 1-20.";
+  }
+  return null;
+}
+
+function toUserFacingError(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.code === "network_error") {
+      return "Không thể kết nối backend. Kiểm tra API server và NEXT_PUBLIC_API_BASE_URL.";
+    }
+    if (error.code === "http_error") {
+      return "Backend trả về lỗi. Vui lòng thử lại.";
+    }
+    if (error.code === "invalid_json") {
+      return "Phản hồi backend không hợp lệ.";
+    }
+  }
+  return "Đã xảy ra lỗi không xác định.";
+}
