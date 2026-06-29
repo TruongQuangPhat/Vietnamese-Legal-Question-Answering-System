@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from src.api.app import create_app
 from src.api.dependencies import get_legal_qa_service
-from src.api.schemas import LegalQARequest
+from src.services.legal_qa_api_service import LegalQAService, LegalQAWorkflowRequest
 
 
 def test_ask_route_returns_answer_with_fake_service() -> None:
@@ -74,11 +74,14 @@ def test_ask_route_rejects_invalid_top_k() -> None:
 def test_ask_route_returns_safe_error_when_service_fails() -> None:
     app = create_app()
 
-    class FailingLegalQAService:
-        def answer(self, request: LegalQARequest) -> None:
+    class FailingLegalQAWorkflow:
+        def run(self, request: LegalQAWorkflowRequest) -> None:
             raise RuntimeError("secret traceback details")
 
-    app.dependency_overrides[get_legal_qa_service] = FailingLegalQAService
+    def get_failing_service() -> LegalQAService:
+        return LegalQAService(workflow=FailingLegalQAWorkflow())
+
+    app.dependency_overrides[get_legal_qa_service] = get_failing_service
     client = TestClient(app)
 
     response = client.post(
