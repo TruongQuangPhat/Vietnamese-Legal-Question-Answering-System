@@ -213,6 +213,36 @@ make frontend-lint
 make frontend-build
 ```
 
+Build and run the backend container in fake mode:
+
+```bash
+make backend-image
+make backend-container
+```
+
+Equivalent direct commands:
+
+```bash
+docker build -f docker/backend/Dockerfile -t vnlaw-qa-backend:local .
+docker run --rm -p 8000:8000 -e LEGAL_QA_SERVICE_MODE=fake vnlaw-qa-backend:local
+```
+
+Smoke check the running container:
+
+```bash
+curl -s http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+The backend image is for fake-mode local packaging checks. It does not require
+Qdrant, OpenRouter, embedding models, rerankers, or legal corpus data. Real
+mode requires additional runtime setup and is not part of routine validation.
+
 Run safe validation:
 
 ```bash

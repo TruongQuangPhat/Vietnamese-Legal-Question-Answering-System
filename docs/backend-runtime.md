@@ -147,6 +147,50 @@ Expected fake-mode behavior:
 - No Qdrant, OpenRouter, embedding model, reranker, or evaluation workflow is
   called.
 
+## Backend Container
+
+Build the backend image from the repository root:
+
+```bash
+make backend-image
+```
+
+Run the image in fake mode:
+
+```bash
+make backend-container
+```
+
+Equivalent direct commands:
+
+```bash
+docker build -f docker/backend/Dockerfile -t vnlaw-qa-backend:local .
+docker run --rm -p 8000:8000 -e LEGAL_QA_SERVICE_MODE=fake vnlaw-qa-backend:local
+```
+
+Smoke check the running container:
+
+```bash
+curl -s http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+The backend Dockerfile defaults `LEGAL_QA_SERVICE_MODE` to `fake` and starts the
+API with:
+
+```bash
+python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+```
+
+Fake-mode containers do not require Qdrant, OpenRouter, embedding models,
+rerankers, or legal corpus data. Real mode requires additional runtime setup and
+is not part of this container packaging workflow.
+
 ## Real Mode Manual Smoke Checklist
 
 Use this only when intentionally checking real local services.
