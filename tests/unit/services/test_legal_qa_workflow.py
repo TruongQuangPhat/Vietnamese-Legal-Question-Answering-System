@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.api.dependencies import get_legal_qa_service
+import pytest
+
+from src.api.dependencies import clear_legal_qa_service_cache, get_legal_qa_service
 from src.api.schemas import LegalQARequest
+from src.api.settings import get_settings
 from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, RagCitation
 from src.retrieval.llm_client import LLMResponse, MockLLMClient
 from src.retrieval.models import RetrievalResult, RetrievedChunk
@@ -127,6 +130,34 @@ def test_real_workflow_adapter_does_not_mark_reranking_used() -> None:
     assert response.metadata.reranking_used is False
 
 
+async def test_real_workflow_adapter_rejects_active_event_loop() -> None:
+    async def fallback_runner(**_: Any) -> RagAnswerResult:
+        return RagAnswerResult(
+            query="Câu hỏi hợp lệ?",
+            decision=AnswerabilityDecision.FALLBACK_REQUIRED,
+            answer=FALLBACK_ANSWER_VI,
+            fallback_reasons=["no_evidence"],
+            model="google/gemini-2.5-flash",
+            provider="openrouter",
+        )
+
+    workflow = RealLegalQAWorkflow(
+        retriever=StaticRetriever(_retrieval_result([])),
+        llm_client=MockLLMClient([]),
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        runner=fallback_runner,
+    )
+
+    with pytest.raises(RuntimeError, match="worker thread or async adapter"):
+        workflow.run(
+            LegalQAWorkflowRequest(
+                request_id="request-1",
+                question="Câu hỏi hợp lệ?",
+                top_k=10,
+            )
+        )
+
+
 def test_real_workflow_adapter_falls_back_when_answer_lacks_traceable_citations() -> None:
     async def untraceable_answer_runner(**_: Any) -> RagAnswerResult:
         return RagAnswerResult(
@@ -163,10 +194,11 @@ def test_real_workflow_adapter_falls_back_when_answer_lacks_traceable_citations(
     assert "missing_citation_source_url" in response.warnings
 
 
-def test_dependency_provider_uses_fake_workflow_by_default() -> None:
-    get_legal_qa_service.cache_clear()
+async def test_dependency_provider_uses_fake_workflow_by_default() -> None:
+    get_settings.cache_clear()
+    clear_legal_qa_service_cache()
 
-    service = get_legal_qa_service()
+    service = await get_legal_qa_service()
 
     response = service.answer(LegalQARequest(question="Câu hỏi hợp lệ?"))
     assert response.decision == "answered"

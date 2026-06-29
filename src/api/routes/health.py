@@ -8,7 +8,7 @@ router = APIRouter(tags=["system"])
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     """Return a deterministic health response.
 
     Returns:
@@ -18,7 +18,7 @@ def health() -> dict[str, str]:
 
 
 @router.get("/version")
-def version() -> dict[str, str]:
+async def version() -> dict[str, str]:
     """Return deterministic application metadata.
 
     Returns:

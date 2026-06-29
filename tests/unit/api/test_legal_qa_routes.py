@@ -1,24 +1,55 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
+from collections.abc import Callable
+from threading import Thread, get_ident
+from typing import Any
+
+import httpx
+import pytest
 
 from src.api.app import create_app
 from src.api.dependencies import get_legal_qa_service
+from src.api.schemas import LegalQADecision, LegalQARequest, LegalQAResponse, ResponseMetadataDTO
 from src.services.legal_qa_api_service import LegalQAService, LegalQAWorkflowRequest
 
 
-def test_ask_route_returns_answer_with_fake_service() -> None:
-    client = TestClient(create_app())
+@pytest.fixture(autouse=True)
+def use_worker_thread_offload(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("src.api.routes.legal_qa.anyio.to_thread.run_sync", _run_sync_in_thread)
 
-    response = client.post(
-        "/api/v1/legal-qa/ask",
-        json={
-            "question": "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?",
-            "top_k": 10,
-            "include_evidence": True,
-            "include_debug": False,
-        },
-    )
+
+async def _run_sync_in_thread(func: Callable[..., Any], *args: Any, **_: Any) -> Any:
+    result: list[Any] = []
+    errors: list[BaseException] = []
+
+    def worker() -> None:
+        try:
+            result.append(func(*args))
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = Thread(target=worker)
+    thread.start()
+    thread.join()
+    if errors:
+        raise errors[0]
+    return result[0]
+
+
+@pytest.mark.asyncio
+async def test_ask_route_returns_answer_with_fake_service() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?",
+                "top_k": 10,
+                "include_evidence": True,
+                "include_debug": False,
+            },
+        )
 
     body = response.json()
     assert response.status_code == 200
@@ -32,16 +63,18 @@ def test_ask_route_returns_answer_with_fake_service() -> None:
     assert body["metadata"]["reranking_used"] is False
 
 
-def test_ask_route_hides_evidence_when_requested() -> None:
-    client = TestClient(create_app())
+@pytest.mark.asyncio
+async def test_ask_route_hides_evidence_when_requested() -> None:
+    transport = httpx.ASGITransport(app=create_app())
 
-    response = client.post(
-        "/api/v1/legal-qa/ask",
-        json={
-            "question": "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?",
-            "include_evidence": False,
-        },
-    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?",
+                "include_evidence": False,
+            },
+        )
 
     body = response.json()
     assert response.status_code == 200
@@ -49,45 +82,51 @@ def test_ask_route_hides_evidence_when_requested() -> None:
     assert body["evidence"] == []
 
 
-def test_ask_route_rejects_empty_question() -> None:
-    client = TestClient(create_app())
+@pytest.mark.asyncio
+async def test_ask_route_rejects_empty_question() -> None:
+    transport = httpx.ASGITransport(app=create_app())
 
-    response = client.post(
-        "/api/v1/legal-qa/ask",
-        json={"question": "   "},
-    )
-
-    assert response.status_code == 422
-
-
-def test_ask_route_rejects_invalid_top_k() -> None:
-    client = TestClient(create_app())
-
-    response = client.post(
-        "/api/v1/legal-qa/ask",
-        json={"question": "Câu hỏi hợp lệ?", "top_k": 21},
-    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "   "},
+        )
 
     assert response.status_code == 422
 
 
-def test_ask_route_returns_safe_error_when_service_fails() -> None:
+@pytest.mark.asyncio
+async def test_ask_route_rejects_invalid_top_k() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Câu hỏi hợp lệ?", "top_k": 21},
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_ask_route_returns_safe_error_when_service_fails() -> None:
     app = create_app()
 
     class FailingLegalQAWorkflow:
         def run(self, request: LegalQAWorkflowRequest) -> None:
             raise RuntimeError("secret traceback details")
 
-    def get_failing_service() -> LegalQAService:
+    async def get_failing_service() -> LegalQAService:
         return LegalQAService(workflow=FailingLegalQAWorkflow())
 
     app.dependency_overrides[get_legal_qa_service] = get_failing_service
-    client = TestClient(app)
+    transport = httpx.ASGITransport(app=app)
 
-    response = client.post(
-        "/api/v1/legal-qa/ask",
-        json={"question": "Câu hỏi hợp lệ?"},
-    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Câu hỏi hợp lệ?"},
+        )
 
     body = response.json()
     assert response.status_code == 200
@@ -103,3 +142,45 @@ def test_ask_route_returns_safe_error_when_service_fails() -> None:
         "latency_ms": body["metadata"]["latency_ms"],
     }
     assert "secret traceback details" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_ask_route_offloads_service_answer_from_event_loop() -> None:
+    app = create_app()
+    event_loop_thread_id = get_ident()
+    answer_thread_ids: list[int] = []
+
+    class ThreadRecordingService:
+        def answer(self, request: LegalQARequest) -> LegalQAResponse:
+            answer_thread_ids.append(get_ident())
+            return LegalQAResponse(
+                request_id="request-1",
+                decision=LegalQADecision.ANSWERED,
+                answer="Câu trả lời thử nghiệm.",
+                citations=[],
+                evidence=[],
+                warnings=[],
+                metadata=ResponseMetadataDTO(
+                    retrieval_strategy="coverage_aware_quota",
+                    model="stub",
+                    reranking_used=False,
+                    latency_ms=1,
+                ),
+            )
+
+    async def get_thread_recording_service() -> ThreadRecordingService:
+        return ThreadRecordingService()
+
+    app.dependency_overrides[get_legal_qa_service] = get_thread_recording_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Câu hỏi hợp lệ?"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "answered"
+    assert answer_thread_ids
+    assert answer_thread_ids[0] != event_loop_thread_id

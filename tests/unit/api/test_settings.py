@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.api.dependencies import get_legal_qa_service
+from src.api.dependencies import clear_legal_qa_service_cache, get_legal_qa_service
 from src.api.schemas import LegalQARequest
 from src.api.settings import AppSettings, get_settings
 from src.services.legal_qa_workflow import LegalQAServiceMode
@@ -54,12 +54,12 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
     assert runtime_settings.model == "google/gemini-2.5-flash"
 
 
-def test_dependency_provider_uses_settings_default_fake_mode(monkeypatch) -> None:
+async def test_dependency_provider_uses_settings_default_fake_mode(monkeypatch) -> None:
     monkeypatch.delenv("LEGAL_QA_SERVICE_MODE", raising=False)
     get_settings.cache_clear()
-    get_legal_qa_service.cache_clear()
+    clear_legal_qa_service_cache()
 
-    service = get_legal_qa_service()
+    service = await get_legal_qa_service()
 
     response = service.answer(LegalQARequest(question="Câu hỏi hợp lệ?"))
     assert response.decision == "answered"

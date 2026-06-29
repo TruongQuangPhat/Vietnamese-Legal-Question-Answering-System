@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from time import perf_counter
 
+import anyio
 from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_legal_qa_service
@@ -16,7 +17,7 @@ SAFE_ERROR_ANSWER = "Không thể xử lý yêu cầu lúc này. Vui lòng thử
 
 
 @router.post("/ask", response_model=LegalQAResponse)
-def ask_legal_question(
+async def ask_legal_question(
     request: LegalQARequest,
     service: LegalQAService = Depends(get_legal_qa_service),
 ) -> LegalQAResponse:
@@ -34,7 +35,7 @@ def ask_legal_question(
     """
     started_at = perf_counter()
     try:
-        return service.answer(request)
+        return await anyio.to_thread.run_sync(service.answer, request)
     except Exception:
         latency_ms = int((perf_counter() - started_at) * 1000)
         return LegalQAResponse(

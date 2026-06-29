@@ -377,7 +377,11 @@ def _run_async(awaitable: Awaitable[RagAnswerResult]) -> RagAnswerResult:
         asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(awaitable)
-    raise RuntimeError("real legal QA workflow cannot run inside an active event loop")
+    if hasattr(awaitable, "close"):
+        awaitable.close()
+    raise RuntimeError(
+        "real legal QA workflow must be called from a worker thread or async adapter"
+    )
 
 
 def _service_mode(raw_value: str | None) -> LegalQAServiceMode:
