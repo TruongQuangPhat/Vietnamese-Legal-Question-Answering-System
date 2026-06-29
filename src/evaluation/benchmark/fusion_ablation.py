@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from src.evaluation.benchmark.enums import BenchmarkSplit
 from src.evaluation.benchmark.fingerprinting import sha256_file
@@ -32,85 +32,13 @@ from src.evaluation.benchmark.retrieval_baseline import (
 )
 from src.evaluation.benchmark.sparse_retrieval_baseline import write_jsonl_atomic
 from src.indexing.official_artifacts import write_json_atomic
-from src.retrieval.dense_retriever import DenseRetrieverError
-from src.retrieval.fusion import (
-    DiversitySelectionConfig,
-    QuotaSelectionConfig,
-    reciprocal_rank_fusion,
+from src.retrieval.coverage_aware import (
+    CoverageAwareFusionConfig,
+    coverage_aware_config_from_payload,
 )
+from src.retrieval.dense_retriever import DenseRetrieverError
+from src.retrieval.fusion import reciprocal_rank_fusion
 from src.retrieval.sparse_retriever import SparseRetrieverError
-
-FusionMode = Literal["weighted_rrf", "quota", "diversity"]
-
-
-@dataclass(frozen=True)
-class CoverageAwareFusionConfig:
-    """One coverage-aware fusion ablation configuration."""
-
-    config_id: str
-    mode: FusionMode
-    dense_candidate_k: int = 50
-    sparse_candidate_k: int = 50
-    final_top_k: int = 10
-    rrf_k: int = 60
-    dense_weight: float = 1.0
-    sparse_weight: float = 1.0
-    fused_best: int | None = None
-    sparse_quota: int | None = None
-    dense_quota: int | None = None
-    diversity_penalty: float | None = None
-    prefer_distinct_clause_point: bool = False
-    simplicity_rank: int = 0
-
-    def quota_config(self) -> QuotaSelectionConfig | None:
-        """Return quota selector settings when this variant uses quotas."""
-        if self.mode != "quota":
-            return None
-        if self.fused_best is None or self.sparse_quota is None or self.dense_quota is None:
-            raise ValueError(f"quota config {self.config_id} is incomplete")
-        return QuotaSelectionConfig(
-            fused_best=self.fused_best,
-            sparse_quota=self.sparse_quota,
-            dense_quota=self.dense_quota,
-        )
-
-    def diversity_config(self) -> DiversitySelectionConfig | None:
-        """Return diversity selector settings when this variant uses diversity."""
-        if self.mode != "diversity":
-            return None
-        if self.diversity_penalty is None:
-            raise ValueError(f"diversity config {self.config_id} is incomplete")
-        return DiversitySelectionConfig(
-            penalty=self.diversity_penalty,
-            prefer_distinct_clause_point=self.prefer_distinct_clause_point,
-        )
-
-    def model_dump(self) -> dict[str, Any]:
-        """Return a JSON-compatible config dictionary."""
-        return {
-            "config_id": self.config_id,
-            "mode": self.mode,
-            "dense_candidate_k": self.dense_candidate_k,
-            "sparse_candidate_k": self.sparse_candidate_k,
-            "final_top_k": self.final_top_k,
-            "rrf_k": self.rrf_k,
-            "dense_weight": self.dense_weight,
-            "sparse_weight": self.sparse_weight,
-            "quota": {
-                "fused_best": self.fused_best,
-                "sparse_quota": self.sparse_quota,
-                "dense_quota": self.dense_quota,
-            }
-            if self.mode == "quota"
-            else None,
-            "diversity": {
-                "diversity_penalty": self.diversity_penalty,
-                "prefer_distinct_clause_point": self.prefer_distinct_clause_point,
-            }
-            if self.mode == "diversity"
-            else None,
-            "simplicity_rank": self.simplicity_rank,
-        }
 
 
 @dataclass(frozen=True)
@@ -694,24 +622,7 @@ def load_ablation_results(path: Path) -> dict[str, Any]:
 
 def config_from_payload(payload: dict[str, Any]) -> CoverageAwareFusionConfig:
     """Build a typed config from a JSON-compatible payload."""
-    quota = payload.get("quota") or {}
-    diversity = payload.get("diversity") or {}
-    return CoverageAwareFusionConfig(
-        config_id=str(payload["config_id"]),
-        mode=payload["mode"],
-        dense_candidate_k=payload["dense_candidate_k"],
-        sparse_candidate_k=payload["sparse_candidate_k"],
-        final_top_k=payload["final_top_k"],
-        rrf_k=payload["rrf_k"],
-        dense_weight=payload["dense_weight"],
-        sparse_weight=payload["sparse_weight"],
-        fused_best=quota.get("fused_best"),
-        sparse_quota=quota.get("sparse_quota"),
-        dense_quota=quota.get("dense_quota"),
-        diversity_penalty=diversity.get("diversity_penalty"),
-        prefer_distinct_clause_point=bool(diversity.get("prefer_distinct_clause_point", False)),
-        simplicity_rank=payload.get("simplicity_rank", 999),
-    )
+    return coverage_aware_config_from_payload(payload)
 
 
 def assert_manifest_has_no_secret_keys(payload: Any) -> None:

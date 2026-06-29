@@ -29,7 +29,6 @@ from src.evaluation.benchmark.strict_generation_evaluation import (
     BASE_GENERATION_BASELINE,
     RETRIEVAL_STRATEGY,
     WORKFLOW_NAME,
-    CoverageAwareQuotaRetriever,
     FrozenResultRetriever,
     StrictGenerationPaths,
     _expected_targets_for_query,
@@ -38,6 +37,7 @@ from src.evaluation.benchmark.strict_generation_evaluation import (
     evaluate_strict_generation_query,
     write_strict_generation_outputs,
 )
+from src.retrieval.coverage_aware import CoverageAwareQuotaRetriever
 from src.retrieval.dense_retriever import DenseRetrieverError
 from src.retrieval.evaluation import ExpectedTarget
 from src.retrieval.generation import RagGenerationConfig
