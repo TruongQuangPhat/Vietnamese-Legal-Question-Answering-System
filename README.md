@@ -171,6 +171,9 @@ uv sync
 Optional provider secrets belong in environment variables or an uncommitted
 `.env`. Do not store API keys in configs, docs, reports, or source code.
 
+For backend runtime configuration and local smoke checks, see
+`docs/backend-runtime.md`.
+
 ## Common Commands
 
 Run safe validation:
