@@ -78,9 +78,13 @@ Do not place reusable business logic in scripts.
 - `src/generation/` — LLM client wrappers, prompt rendering, answer formatting, and generation-specific helpers where implemented.
 - `src/evaluation/` — frozen benchmark schemas, metrics, retrieval evaluation, strict generation evaluation, evidence diagnostics, error analysis, and artifact contracts.
 - `src/services/` — orchestration where a service boundary already exists.
-- `src/api/`, `src/monitoring/`, `src/security/` — future or separately scoped functionality.
+- `src/api/` — FastAPI Legal QA product API.
+- `apps/frontend/` — Next.js Legal QA product UI.
+- `src/monitoring/`, `src/security/` — future or separately scoped functionality.
 
 Use the existing repository layout rather than introducing parallel abstractions.
+There is intentionally no `apps/backend`; do not create one or move backend
+code out of `src/api`.
 
 
 ## 5. Current Project Status
@@ -99,6 +103,13 @@ Current durable state:
 - Final adopted retrieval is `coverage_aware_quota`.
 - Reranking was evaluated but not adopted.
 - Final strict generation all-split metrics include decision accuracy `0.875`, fallback-required fallback rate `1.000`, citation ID validity `1.000`, retrieval errors `0`, and generation errors `0`.
+- The Legal QA product MVP is complete for fake-mode local demo usage:
+  FastAPI endpoints under `src/api`, Next.js frontend under `apps/frontend`,
+  local Makefile commands, backend/frontend Dockerfiles, and
+  `docker-compose.yml` fake-mode stack.
+- Fake mode is the default local/demo path. It does not require Qdrant,
+  OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
+  manual and must not be used in routine validation.
 
 See `PROJECT_CONTEXT.md`, `docs/advanced_rag.md`, `docs/evaluation.md`, and `docs/naive_rag.md` for current status and technical details.
 
@@ -201,6 +212,11 @@ Unless explicitly scoped:
 - never print or serialize API keys;
 - never dump environment variables;
 - never write Authorization headers or tokens to reports.
+- for local backend development, use
+  `LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000`;
+  do not use `uv run uvicorn`;
+- use `docker-compose.yml` for the fake-mode local stack; do not introduce
+  alternate Compose filenames.
 
 Secrets must come from environment variables or `.env`. Non-secret provider configuration belongs in config files.
 

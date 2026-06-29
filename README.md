@@ -59,7 +59,14 @@ Main source modules:
 | `src/services/`   | Existing orchestration services where a service boundary is already used.                                                                                                                                                 |
 | `scripts/`        | Thin CLI wrappers for corpus, indexing, retrieval, and evaluation workflows.                                                                                                                                              |
 
-API deployment, GraphRAG, fine-tuning, production MLOps, and time-aware filtering are not part of the adopted evaluated pipeline.
+Production API deployment, GraphRAG, fine-tuning, production MLOps, and
+time-aware filtering are not part of the adopted evaluated pipeline.
+
+The local Legal QA product MVP includes a FastAPI backend under `src/api`, a
+Next.js frontend under `apps/frontend`, backend/frontend Dockerfiles, and a
+fake-mode `docker-compose.yml` stack. Fake mode is the default local demo path
+and does not require Qdrant, OpenRouter, embedding models, rerankers, or legal
+corpus data. Real mode remains manual-only.
 
 
 ## Current Results

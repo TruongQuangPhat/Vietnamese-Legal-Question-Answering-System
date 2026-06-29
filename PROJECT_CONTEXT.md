@@ -49,6 +49,9 @@ scripts/
   retrieval/    # retrieval, Naive RAG, review, and quality-gate entrypoints
   evaluation/   # benchmark, retrieval comparison, strict generation, diagnostics
 
+apps/
+  frontend/     # Next.js Legal QA product UI
+
 src/
   ingestion/    # registry, crawl, audit, cleaning, storage
   processing/   # hierarchy parsing, chunking, JSONL validation
@@ -57,14 +60,23 @@ src/
   generation/   # generation-specific helpers where implemented
   services/     # existing orchestration services
   evaluation/   # benchmark schemas, metrics, workflows, diagnostics, artifact contracts
-  api/          # not part of the adopted evaluated pipeline
+  api/          # FastAPI Legal QA product API
   monitoring/   # separately scoped
   security/     # separately scoped
+
+docker/
+  backend/Dockerfile
+  frontend/Dockerfile
+
+docker-compose.yml  # backend + frontend fake-mode local stack
 ```
 
 Scripts are thin wrappers. Reusable logic belongs under `src/`.
 
 BM25 sparse retrieval is local/manual in the current final pipeline. It is not a Qdrant sparse named-vector index.
+
+There is intentionally no `apps/backend`. The backend remains under `src/api`
+and service orchestration remains under `src/services`.
 
 
 ## 3. Legal QA Safety Invariants
@@ -266,7 +278,51 @@ benchmark workflows.
 
 Unit tests cover service, processing, retrieval, and evaluation modules.
 
-## 9. Protected Paths and Runtime Safety
+## 9. Product MVP State
+
+The Legal QA product MVP is complete for fake-mode local demo usage:
+
+- FastAPI backend API under `src/api`;
+- `GET /health`, `GET /version`, and `POST /api/v1/legal-qa/ask`;
+- fake/real Legal QA service mode boundary;
+- runtime settings, CORS, request safety, and safe logging;
+- Next.js frontend under `apps/frontend`;
+- Vietnamese ask UI with answer, citation, evidence, and metadata rendering;
+- Makefile local development commands;
+- backend and frontend Dockerfiles;
+- `docker-compose.yml` fake-mode backend + frontend stack.
+
+Routine local/demo workflow uses fake mode:
+
+```text
+make backend-dev
+make frontend-dev
+make stack-up
+make stack-down
+```
+
+Backend fake-mode development must use:
+
+```bash
+LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+Do not replace it with `uv run uvicorn`.
+
+Frontend browser-facing API URL remains:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+Do not change it to a Docker service hostname for browser-facing local fake
+mode.
+
+Fake mode does not require Qdrant, OpenRouter, embedding models, rerankers, or
+legal corpus data. Real mode is manual-only and should not be used in routine
+validation.
+
+## 10. Protected Paths and Runtime Safety
 
 Do not mutate these paths unless the user explicitly scopes an official rerun:
 
@@ -292,7 +348,7 @@ Unless explicitly requested:
 
 When real retrieval/evaluation is explicitly scoped, keep Qdrant read-only unless the task explicitly scopes indexing, payload mutation, collection recreation, or upsert behavior.
 
-## 10. Durable Documentation
+## 11. Durable Documentation
 
 - `README.md` — professional project overview, setup, commands, and final
   results.
@@ -307,14 +363,14 @@ When real retrieval/evaluation is explicitly scoped, keep Qdrant read-only unles
 Historical roadmap/journal docs are not authoritative when they conflict with
 this file.
 
-## 11. Future or Separately Scoped Work
+## 12. Future or Separately Scoped Work
 
 The following are not part of the current adopted evaluated pipeline unless a future task explicitly scopes, implements, and evaluates them:
 
 * GraphRAG / Neo4j graph traversal;
 * multi-agent retrieval or orchestration;
-* API/backend deployment;
-* UI;
+* production API/backend deployment;
+* production frontend deployment;
 * time-aware legal filtering;
 * cross-encoder reranking as an adopted pipeline component;
 * fine-tuning;
