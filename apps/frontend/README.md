@@ -35,6 +35,46 @@ environment managed by `uv`.
 
 The Legal QA form calls the backend configured by `NEXT_PUBLIC_API_BASE_URL`.
 
+## Container
+
+Build the frontend image from the repository root:
+
+```bash
+make frontend-image
+```
+
+Run the image:
+
+```bash
+make frontend-container
+```
+
+Equivalent direct commands:
+
+```bash
+docker build -f docker/frontend/Dockerfile \
+  -t vnlaw-qa-frontend:local \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
+  .
+```
+
+```bash
+docker run --rm -p 3000:3000 vnlaw-qa-frontend:local
+```
+
+Local smoke:
+
+1. Run the backend on `http://localhost:8000` with `make backend-dev` or
+   `make backend-container`.
+2. Run the frontend container on `http://localhost:3000`.
+3. Open `http://localhost:3000`.
+4. Submit a Vietnamese legal question.
+5. Confirm the fake backend response renders.
+
+The frontend image contains no provider secrets. `NEXT_PUBLIC_API_BASE_URL` is
+browser-facing, is inlined during the Next.js build, and must not contain secret
+values. Keep it as `http://localhost:8000` for this local container workflow.
+
 ## API Client
 
 TypeScript API types live in `src/types/legal-qa.ts`. The Legal QA client lives
