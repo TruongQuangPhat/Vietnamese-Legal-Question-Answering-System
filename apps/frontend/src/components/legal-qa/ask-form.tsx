@@ -37,7 +37,7 @@ export function AskForm({
       <div>
         <div className="mb-2 flex items-center justify-between gap-3">
           <label className="text-sm font-medium text-ink" htmlFor="question">
-            Legal question
+            Câu hỏi pháp lý
           </label>
           <span
             className={`text-xs ${isOverLimit ? "text-[#a93434]" : "text-muted"}`}
@@ -61,8 +61,11 @@ export function AskForm({
 
       <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
         <div>
-          <label className="mb-2 block text-sm font-medium text-ink" htmlFor="top-k">
-            Evidence limit
+          <label
+            className="mb-2 block text-sm font-medium text-ink"
+            htmlFor="top-k"
+          >
+            Số bằng chứng tối đa
           </label>
           <input
             id="top-k"
@@ -84,7 +87,7 @@ export function AskForm({
             onChange={(event) => onIncludeEvidenceChange(event.target.checked)}
             type="checkbox"
           />
-          Include selected evidence
+          Hiển thị bằng chứng được chọn
         </label>
       </div>
 
@@ -93,7 +96,7 @@ export function AskForm({
         disabled={isLoading}
         type="submit"
       >
-        {isLoading ? "Asking..." : "Ask question"}
+        {isLoading ? "Đang gửi..." : "Gửi câu hỏi"}
       </button>
     </form>
   );

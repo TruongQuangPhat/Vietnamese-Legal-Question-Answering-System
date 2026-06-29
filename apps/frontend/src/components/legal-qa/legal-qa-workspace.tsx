@@ -50,13 +50,13 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
   }
 
   return (
-    <div className="grid flex-1 gap-5 py-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
+    <div className="grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
       <section className="h-fit rounded-md border border-border bg-surface p-5 shadow-panel">
         <div className="border-b border-border pb-4">
-          <h2 className="text-lg font-semibold">Question workspace</h2>
+          <h2 className="text-lg font-semibold">Khu vực đặt câu hỏi</h2>
           <p className="mt-1 text-sm leading-6 text-muted">
-            Ask a Vietnamese legal question. The backend may answer with
-            citations or return a safe fallback when evidence is insufficient.
+            Nhập câu hỏi pháp lý bằng tiếng Việt. Backend có thể trả lời kèm
+            trích dẫn hoặc fallback an toàn khi bằng chứng chưa đủ.
           </p>
           <p className="mt-2 text-xs text-muted">
             API: <span className="font-medium text-ink">{apiBaseUrl}</span>
@@ -104,7 +104,7 @@ function validateQuestion(
     return "Câu hỏi vượt quá giới hạn 4000 ký tự.";
   }
   if (!Number.isInteger(topK) || topK < 1 || topK > 20) {
-    return "Giới hạn evidence phải nằm trong khoảng 1-20.";
+    return "Số bằng chứng tối đa phải nằm trong khoảng 1-20.";
   }
   return null;
 }

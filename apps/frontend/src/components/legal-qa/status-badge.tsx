@@ -1,9 +1,9 @@
 import type { LegalQADecision } from "@/types/legal-qa";
 
 const STATUS_LABELS: Record<LegalQADecision, string> = {
-  answered: "Answered",
-  fallback: "Fallback",
-  error: "Error",
+  answered: "Đã trả lời",
+  fallback: "Fallback an toàn",
+  error: "Lỗi",
 };
 
 const STATUS_STYLES: Record<LegalQADecision, string> = {

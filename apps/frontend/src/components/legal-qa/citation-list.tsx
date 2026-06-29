@@ -8,7 +8,7 @@ export function CitationList({ citations }: CitationListProps) {
   if (citations.length === 0) {
     return (
       <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted">
-        No citations returned.
+        Chưa có trích dẫn trong phản hồi này.
       </p>
     );
   }
@@ -29,13 +29,17 @@ export function CitationList({ citations }: CitationListProps) {
               {citation.evidence_id}
             </span>
           </div>
-          <dl className="mt-3 grid gap-2 text-xs text-muted">
+          <dl className="mt-3 grid gap-2 rounded-md bg-surface p-3 text-xs text-muted">
             <div>
-              <dt className="font-medium text-ink">Chunk</dt>
-              <dd>{citation.chunk_id}</dd>
+              <dt className="font-medium text-ink">Văn bản</dt>
+              <dd>{citation.law_id}</dd>
             </div>
             <div>
-              <dt className="font-medium text-ink">Hierarchy</dt>
+              <dt className="font-medium text-ink">Mã chunk</dt>
+              <dd className="break-all">{citation.chunk_id}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-ink">Cấp bậc pháp lý</dt>
               <dd>{citation.hierarchy_path}</dd>
             </div>
           </dl>
@@ -45,7 +49,7 @@ export function CitationList({ citations }: CitationListProps) {
             rel="noreferrer"
             target="_blank"
           >
-            Source document
+            Mở nguồn văn bản
           </a>
         </li>
       ))}

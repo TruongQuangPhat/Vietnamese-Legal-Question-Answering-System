@@ -12,11 +12,11 @@ export default function HomePage() {
             VnLaw-QA
           </p>
           <h1 className="mt-2 text-3xl font-semibold md:text-4xl">
-            Vietnamese Legal QA
+            Hỏi đáp pháp luật Việt Nam
           </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-muted">
-            Ask Vietnamese legal questions and review cited evidence from
-            trusted legal documents.
+          <p className="mt-3 max-w-5xl text-base leading-7 text-muted">
+            Đặt câu hỏi pháp lý và xem câu trả lời kèm trích dẫn, bằng chứng
+            từ văn bản pháp luật đáng tin cậy.
           </p>
         </header>
 
