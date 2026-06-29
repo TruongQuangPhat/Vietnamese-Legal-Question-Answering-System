@@ -5,7 +5,11 @@ from pathlib import Path
 from src.api.dependencies import clear_legal_qa_service_cache, get_legal_qa_service
 from src.api.schemas import LegalQARequest
 from src.api.settings import AppSettings, get_settings
-from src.services.legal_qa_workflow import LegalQAServiceMode
+from src.services.legal_qa_workflow import (
+    DEFAULT_LLM_CONFIG_PATH,
+    DEFAULT_RETRIEVAL_CONFIG_PATH,
+    LegalQAServiceMode,
+)
 
 
 def test_settings_default_to_local_fake_mode() -> None:
@@ -15,6 +19,15 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.log_level == "INFO"
     assert settings.cors_allowed_origins == ["http://localhost:3000"]
     assert settings.legal_qa_service_mode == LegalQAServiceMode.FAKE
+
+
+def test_settings_default_config_paths_exist() -> None:
+    settings = AppSettings.from_env({})
+
+    assert settings.legal_qa_retrieval_config == DEFAULT_RETRIEVAL_CONFIG_PATH
+    assert settings.legal_qa_retrieval_config.is_file()
+    assert settings.legal_qa_llm_config == DEFAULT_LLM_CONFIG_PATH
+    assert settings.legal_qa_llm_config.is_file()
 
 
 def test_settings_parse_cors_allowed_origins() -> None:

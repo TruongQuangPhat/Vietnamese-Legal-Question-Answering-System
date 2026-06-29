@@ -37,12 +37,15 @@ LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
 LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
 LEGAL_QA_QDRANT_URL=http://localhost:6333
 LEGAL_QA_DEVICE=cpu
-LEGAL_QA_MODEL=BAAI/bge-m3
+LEGAL_QA_MODEL=google/gemini-2.5-flash
 ```
 
 `QDRANT_URL` remains the general project-level Qdrant URL used by older scripts
 and workflows. `LEGAL_QA_QDRANT_URL` is the backend Legal QA runtime override
 used by API settings.
+
+`LEGAL_QA_DEVICE` selects the local embedding device in manual real mode.
+`LEGAL_QA_MODEL` is an optional LLM model override for the OpenRouter provider.
 
 Provider keys such as `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, and
 `ANTHROPIC_API_KEY` are not required for fake mode. When needed for manual real
