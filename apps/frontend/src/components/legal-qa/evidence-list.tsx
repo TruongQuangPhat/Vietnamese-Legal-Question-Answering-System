@@ -27,22 +27,19 @@ export function EvidenceList({ citations, evidence }: EvidenceListProps) {
             key={item.evidence_id}
           >
             <details className="group">
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-                <div>
+              <summary className="flex cursor-pointer list-none items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 inline-block shrink-0 text-base leading-5 text-primary transition-transform group-open:rotate-90"
+                >
+                  ›
+                </span>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink">{item.citation}</p>
-                  <p className="mt-1 text-sm text-muted">{item.law_name}</p>
-                  <p className="mt-1 text-xs text-muted">{item.evidence_id}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="rounded-full border border-border bg-[#f8fafc] px-2 py-1 text-xs font-medium text-muted">
-                    score {item.score.toFixed(3)}
-                  </span>
-                  <span className="text-xs font-medium text-primary group-open:hidden">
-                    Mở
-                  </span>
-                  <span className="hidden text-xs font-medium text-primary group-open:inline">
-                    Thu gọn
-                  </span>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    {item.law_name} · score {item.score.toFixed(3)} ·{" "}
+                    {item.evidence_id}
+                  </p>
                 </div>
               </summary>
               <dl className="mt-3 grid gap-2 rounded-md bg-surface p-3 text-xs text-muted md:grid-cols-2">
