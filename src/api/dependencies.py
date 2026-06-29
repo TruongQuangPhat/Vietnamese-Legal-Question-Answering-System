@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from src.api.settings import get_settings
 from src.services.legal_qa_api_service import LegalQAService
 from src.services.legal_qa_workflow import build_legal_qa_service
 
@@ -16,4 +17,5 @@ def get_legal_qa_service() -> LegalQAService:
         Cached Legal QA service. Fake mode is the default; real mode is selected
         only through runtime settings.
     """
-    return build_legal_qa_service()
+    settings = get_settings()
+    return build_legal_qa_service(settings=settings.to_legal_qa_runtime_settings())
