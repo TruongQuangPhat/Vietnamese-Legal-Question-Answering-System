@@ -17,6 +17,12 @@ Runtime settings are read from environment variables by `src/api/settings.py`.
 `.env.example` contains both existing project-level variables and backend API
 runtime variables. It must contain placeholders only.
 
+Committed YAML config under `configs/` stores non-secret runtime defaults such
+as retrieval settings and provider/model defaults. Local `.env` values select
+those config files, override local endpoints/service mode, and provide secrets
+when real mode is used. Do not put provider API keys or tokens in
+`configs/*.yml`.
+
 Backend API settings:
 
 ```env

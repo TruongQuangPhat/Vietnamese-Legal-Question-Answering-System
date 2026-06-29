@@ -195,7 +195,23 @@ Additional rules:
 - Preserve IDs, citations, hierarchy metadata, hashes, source metadata, warning visibility, and repeal flags.
 - Do not split legal text by arbitrary character windows when that breaks legal meaning.
 
-## 10. Qdrant and External-Service Safety
+## 10. Configuration Convention
+
+Committed YAML configuration belongs under `configs/`. These files must be
+safe to commit, reviewable in Git, and limited to reproducible settings such as
+retrieval thresholds, indexing batch sizes, validation rules, benchmark
+configuration, corpus registry metadata, and non-secret provider/model defaults.
+
+Local runtime overrides and secrets belong in an uncommitted `.env`.
+`.env.example` documents variable names only. Use `.env` for provider API keys,
+tokens, local endpoints, service mode, and paths that select committed config
+files, such as `LEGAL_QA_RETRIEVAL_CONFIG` and `LEGAL_QA_LLM_CONFIG`.
+
+Do not put provider API keys, tokens, passwords, or other secrets in
+`configs/*.yml`. Do not put large reviewable settings blocks in `.env`; `.env`
+should select or override runtime values, not replace committed config.
+
+## 11. Qdrant and External-Service Safety
 
 Unless explicitly scoped:
 
@@ -220,7 +236,7 @@ Unless explicitly scoped:
 
 Secrets must come from environment variables or `.env`. Non-secret provider configuration belongs in config files.
 
-## 11. Evaluation Rules
+## 12. Evaluation Rules
 
 The existing five-case suite is a development/regression suite.
 
@@ -249,7 +265,7 @@ explicitly scopes a new ablation.
 
 If model training or fine-tuning is introduced, use train/validation/test splits.
 
-## 12. Required Workflow
+## 13. Required Workflow
 
 ### Before editing
 
@@ -272,7 +288,7 @@ If model training or fine-tuning is introduced, use train/validation/test splits
 6. Confirm protected paths and secrets are clean.
 7. Do not claim success when tests fail.
 
-## 13. Standard Validation
+## 14. Standard Validation
 
 Use relevant subsets of:
 
