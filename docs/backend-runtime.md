@@ -191,6 +191,58 @@ Fake-mode containers do not require Qdrant, OpenRouter, embedding models,
 rerankers, or legal corpus data. Real mode requires additional runtime setup and
 is not part of this container packaging workflow.
 
+## Fake-Mode Compose Stack
+
+Run the backend and frontend together from the repository root with
+`docker-compose.yml`:
+
+```bash
+make stack-up
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+The stack publishes:
+
+- Backend API: `http://localhost:8000`
+- Frontend UI: `http://localhost:3000`
+
+Smoke checks:
+
+```bash
+curl -s http://localhost:8000/health
+curl -I http://localhost:3000
+```
+
+Expected backend response:
+
+```json
+{"status":"ok"}
+```
+
+Shut down the stack:
+
+```bash
+make stack-down
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml down
+```
+
+The Compose stack runs `LEGAL_QA_SERVICE_MODE=fake`, does not mount `.env`, and
+does not require Qdrant, OpenRouter, embedding models, rerankers, or legal
+corpus data. The frontend build argument `NEXT_PUBLIC_API_BASE_URL` remains
+`http://localhost:8000` because browser requests originate from the host
+machine, not from inside the Docker network. Do not put secrets in
+`NEXT_PUBLIC_*` variables.
+
 ## Real Mode Manual Smoke Checklist
 
 Use this only when intentionally checking real local services.

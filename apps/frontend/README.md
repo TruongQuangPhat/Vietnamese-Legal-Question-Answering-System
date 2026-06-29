@@ -75,6 +75,38 @@ The frontend image contains no provider secrets. `NEXT_PUBLIC_API_BASE_URL` is
 browser-facing, is inlined during the Next.js build, and must not contain secret
 values. Keep it as `http://localhost:8000` for this local container workflow.
 
+## Compose
+
+Run the fake-mode backend and frontend stack from `docker-compose.yml` at the
+repository root:
+
+```bash
+make stack-up
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+Open `http://localhost:3000`, submit a Vietnamese legal question, and confirm
+the fake backend response renders. Stop the stack with:
+
+```bash
+make stack-down
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml down
+```
+
+The Compose stack keeps `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` because
+the browser calls the backend through the host port. Do not change it to a
+Docker service hostname until a separately scoped networking design needs it.
+
 ## API Client
 
 TypeScript API types live in `src/types/legal-qa.ts`. The Legal QA client lives

@@ -1,4 +1,4 @@
-.PHONY: backend-dev frontend-dev test-api frontend-lint frontend-build backend-image backend-container frontend-image frontend-container
+.PHONY: backend-dev frontend-dev test-api frontend-lint frontend-build backend-image backend-container frontend-image frontend-container stack-config stack-up stack-down stack-logs
 
 backend-dev:
 	LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
@@ -26,3 +26,15 @@ frontend-image:
 
 frontend-container:
 	docker run --rm -p 3000:3000 vnlaw-qa-frontend:local
+
+stack-config:
+	docker compose -f docker-compose.yml config
+
+stack-up:
+	docker compose -f docker-compose.yml up --build
+
+stack-down:
+	docker compose -f docker-compose.yml down
+
+stack-logs:
+	docker compose -f docker-compose.yml logs -f

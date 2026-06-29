@@ -274,6 +274,54 @@ Local container smoke:
 For this local packaging flow it remains `http://localhost:8000`; Docker Compose
 service-network wiring is intentionally not configured yet.
 
+Run the fake-mode Docker Compose stack defined in `docker-compose.yml`:
+
+```bash
+make stack-up
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Smoke checks:
+
+```bash
+curl -s http://localhost:8000/health
+curl -I http://localhost:3000
+```
+
+Expected backend response:
+
+```json
+{"status":"ok"}
+```
+
+Stop the stack:
+
+```bash
+make stack-down
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml down
+```
+
+The Compose stack runs fake mode only. It does not require Qdrant, OpenRouter,
+embedding models, rerankers, or legal corpus data. `NEXT_PUBLIC_API_BASE_URL`
+is browser-facing and defaults to `http://localhost:8000`; do not put secrets
+in `NEXT_PUBLIC_*` variables. Real-mode Compose will be documented separately.
+
 Run safe validation:
 
 ```bash
