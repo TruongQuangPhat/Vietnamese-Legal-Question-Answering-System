@@ -45,7 +45,9 @@ and workflows. `LEGAL_QA_QDRANT_URL` is the backend Legal QA runtime override
 used by API settings.
 
 `LEGAL_QA_DEVICE` selects the local embedding device in manual real mode.
-`LEGAL_QA_MODEL` is an optional LLM model override for the OpenRouter provider.
+`OPENROUTER_MODEL` is the provider-level default model. `LEGAL_QA_MODEL` is an
+optional Legal QA runtime LLM model override and takes precedence for the API
+runtime when set. It is not an embedding model.
 
 Provider keys such as `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, and
 `ANTHROPIC_API_KEY` are not required for fake mode. When needed for manual real
