@@ -82,7 +82,13 @@ Install dependencies:
 uv sync
 ```
 
-Run safely in fake mode:
+Run safely in fake mode from the repository root:
+
+```bash
+make backend-dev
+```
+
+Equivalent direct command:
 
 ```bash
 LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
@@ -112,7 +118,7 @@ Legal QA request fields:
 
 ## Fake Mode Smoke Test
 
-Start the backend in fake mode, then run:
+Start the backend in fake mode with `make backend-dev`, then run:
 
 ```bash
 curl -s http://localhost:8000/health

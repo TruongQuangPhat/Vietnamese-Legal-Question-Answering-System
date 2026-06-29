@@ -176,7 +176,42 @@ For backend runtime configuration and local smoke checks, see
 
 For frontend local development, see `apps/frontend/README.md`.
 
+## Local Product Development
+
+Run the fake-mode MVP with two terminals.
+
+Backend:
+
+```bash
+make backend-dev
+```
+
+Frontend:
+
+```bash
+make frontend-dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Fake mode returns stub Legal QA responses for local UI and API contract checks.
+It does not require Qdrant, OpenRouter, embedding models, rerankers, or
+benchmark/evaluation workflows. Real mode requires separate manual setup and
+should not be used in routine validation.
+
 ## Common Commands
+
+Run focused product checks:
+
+```bash
+make test-api
+make frontend-lint
+make frontend-build
+```
 
 Run safe validation:
 

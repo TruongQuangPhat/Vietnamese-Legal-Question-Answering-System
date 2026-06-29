@@ -7,16 +7,27 @@ Minimal Next.js frontend scaffold for the VnLaw-QA product interface.
 1. Copy `.env.example` to `.env.local`.
 2. Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`.
 3. Run `npm install`.
-4. Run `npm run dev`.
+4. From the repository root, run `make backend-dev` in one terminal.
+5. From the repository root, run `make frontend-dev` in another terminal.
+6. Open `http://localhost:3000`.
 
 The frontend expects the backend CORS setting to include
 `http://localhost:3000`.
 
-To run the backend in fake mode for local UI checks:
+Fake mode returns stub Legal QA responses for local UI checks. It does not
+require Qdrant, OpenRouter, embedding models, rerankers, or evaluation
+workflows.
+
+Equivalent direct commands:
 
 ```bash
 cd /home/phat/AI_Project/VnLaw-QA
 LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+```bash
+cd /home/phat/AI_Project/VnLaw-QA/apps/frontend
+npm run dev
 ```
 
 Using `python -m uvicorn` ensures uvicorn runs with the project Python
