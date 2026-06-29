@@ -12,5 +12,11 @@ Minimal Next.js frontend scaffold for the VnLaw-QA product interface.
 The frontend expects the backend CORS setting to include
 `http://localhost:3000`.
 
-This scaffold does not call the backend yet. The Legal QA ask form and API
-client will be added in a later increment.
+This scaffold does not call the backend yet. The Legal QA ask form will be
+added in a later increment.
+
+## API Client
+
+TypeScript API types live in `src/types/legal-qa.ts`. The Legal QA client lives
+in `src/lib/legal-qa-client.ts` and reads the backend base URL from
+`NEXT_PUBLIC_API_BASE_URL`.

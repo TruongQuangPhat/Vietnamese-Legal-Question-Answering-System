@@ -1,7 +1,8 @@
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { getApiBaseUrl } from "@/lib/api-config";
 
 export default function HomePage() {
+  const apiBaseUrl = getApiBaseUrl();
+
   return (
     <main className="min-h-screen bg-canvas text-ink">
       <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8">
@@ -30,6 +31,9 @@ export default function HomePage() {
                 <h2 className="text-lg font-semibold">Question workspace</h2>
                 <p className="mt-1 text-sm text-muted">
                   Question input coming next.
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Legal QA API client ready for the next increment.
                 </p>
               </div>
               <span className="rounded-full bg-[#e8f3f1] px-3 py-1 text-xs font-medium text-primary">
