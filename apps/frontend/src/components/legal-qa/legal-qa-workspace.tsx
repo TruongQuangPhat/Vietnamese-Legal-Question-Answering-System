@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  addBackendConversationMessage,
+  ConversationApiError,
+  createBackendConversation,
+  deleteBackendConversation,
+  renameBackendConversation,
+  type BackendConversationRole,
+} from "@/lib/conversation-client";
 import { ApiRequestError, askLegalQuestion } from "@/lib/legal-qa-client";
 import { AskForm } from "./ask-form";
 import { ChatEmptyState } from "./chat-empty-state";
@@ -27,9 +35,23 @@ export function LegalQAWorkspace() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const latestMessageRef = useRef<HTMLDivElement | null>(null);
+  const backendConversationIdsRef = useRef(new Map<string, string>());
+  const backendCreationPromisesRef = useRef(
+    new Map<string, Promise<string | null>>(),
+  );
+  const backendMessageQueuesRef = useRef(new Map<string, Promise<void>>());
+  const deletedConversationIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     const storedConversations = loadConversations();
+    for (const conversation of storedConversations) {
+      if (conversation.backendConversationId) {
+        backendConversationIdsRef.current.set(
+          conversation.id,
+          conversation.backendConversationId,
+        );
+      }
+    }
     setConversations(storedConversations);
     setActiveConversationId(storedConversations[0]?.id ?? null);
     setHasLoadedStorage(true);
@@ -63,6 +85,8 @@ export function LegalQAWorkspace() {
     const userMessage = createUserMessage(trimmedQuestion);
     const assistantMessage = createAssistantLoadingMessage();
     const conversationId = activeConversationId ?? createMessageId();
+    const conversationTitle =
+      activeConversation?.title ?? createConversationTitle(trimmedQuestion);
     const timestamp = new Date().toISOString();
 
     setActiveConversationId(conversationId);
@@ -73,6 +97,13 @@ export function LegalQAWorkspace() {
         [userMessage, assistantMessage],
         timestamp,
       ),
+    );
+    queueMessageSync(
+      conversationId,
+      conversationTitle,
+      activeConversation?.backendConversationId,
+      "user",
+      userMessage.content,
     );
 
     try {
@@ -93,6 +124,13 @@ export function LegalQAWorkspace() {
             response: answer,
           },
         ),
+      );
+      queueMessageSync(
+        conversationId,
+        conversationTitle,
+        activeConversation?.backendConversationId,
+        "assistant",
+        answer.answer,
       );
     } catch (error) {
       const errorMessage = toUserFacingError(error);
@@ -118,6 +156,13 @@ export function LegalQAWorkspace() {
   }
 
   function deleteConversation(conversationId: string) {
+    deletedConversationIdsRef.current.add(conversationId);
+    const backendConversationId =
+      backendConversationIdsRef.current.get(conversationId) ??
+      conversations.find((conversation) => conversation.id === conversationId)
+        ?.backendConversationId;
+    backendConversationIdsRef.current.delete(conversationId);
+
     setConversations((currentConversations) => {
       const remainingConversations = currentConversations.filter(
         (conversation) => conversation.id !== conversationId,
@@ -131,6 +176,12 @@ export function LegalQAWorkspace() {
 
       return remainingConversations;
     });
+
+    if (backendConversationId) {
+      void deleteBackendConversation(backendConversationId).catch(() => {
+        warnBackendSyncFailure("delete");
+      });
+    }
   }
 
   function renameConversation(conversationId: string, title: string) {
@@ -138,6 +189,11 @@ export function LegalQAWorkspace() {
     if (!trimmedTitle) {
       return;
     }
+    const nextTitle = createConversationTitle(trimmedTitle);
+    const backendConversationId =
+      backendConversationIdsRef.current.get(conversationId) ??
+      conversations.find((conversation) => conversation.id === conversationId)
+        ?.backendConversationId;
 
     setConversations((currentConversations) =>
       sortConversations(
@@ -147,12 +203,166 @@ export function LegalQAWorkspace() {
           }
           return {
             ...conversation,
-            title: createConversationTitle(trimmedTitle),
+            title: nextTitle,
             updatedAt: new Date().toISOString(),
           };
         }),
       ),
     );
+
+    if (backendConversationId) {
+      void renameBackendConversation(backendConversationId, nextTitle).catch(
+        () => {
+          warnBackendSyncFailure("rename");
+        },
+      );
+    }
+  }
+
+  function queueMessageSync(
+    conversationId: string,
+    title: string,
+    existingBackendConversationId: string | undefined,
+    role: BackendConversationRole,
+    content: string,
+  ): void {
+    const previousSync =
+      backendMessageQueuesRef.current.get(conversationId) ?? Promise.resolve();
+    const nextSync = previousSync.then(() =>
+      syncMessageToBackend(
+        conversationId,
+        title,
+        existingBackendConversationId,
+        role,
+        content,
+      ),
+    );
+    backendMessageQueuesRef.current.set(conversationId, nextSync);
+    void nextSync.then(() => {
+      if (backendMessageQueuesRef.current.get(conversationId) === nextSync) {
+        backendMessageQueuesRef.current.delete(conversationId);
+      }
+    });
+  }
+
+  async function syncMessageToBackend(
+    conversationId: string,
+    title: string,
+    existingBackendConversationId: string | undefined,
+    role: BackendConversationRole,
+    content: string,
+  ): Promise<void> {
+    const backendConversationId = await ensureBackendConversation(
+      conversationId,
+      title,
+      existingBackendConversationId,
+    );
+    if (!backendConversationId) {
+      return;
+    }
+
+    try {
+      await addBackendConversationMessage(backendConversationId, {
+        role,
+        content,
+      });
+    } catch (error) {
+      if (isMissingBackendConversation(error)) {
+        detachBackendConversationId(conversationId, backendConversationId);
+        const replacementBackendConversationId =
+          await ensureBackendConversation(conversationId, title, undefined);
+        if (replacementBackendConversationId) {
+          try {
+            await addBackendConversationMessage(
+              replacementBackendConversationId,
+              { role, content },
+            );
+            return;
+          } catch {
+            warnBackendSyncFailure("message");
+            return;
+          }
+        }
+      }
+      warnBackendSyncFailure("message");
+    }
+  }
+
+  function detachBackendConversationId(
+    conversationId: string,
+    backendConversationId: string,
+  ): void {
+    if (
+      backendConversationIdsRef.current.get(conversationId) ===
+      backendConversationId
+    ) {
+      backendConversationIdsRef.current.delete(conversationId);
+    }
+    setConversations((currentConversations) =>
+      removeBackendConversationId(
+        currentConversations,
+        conversationId,
+        backendConversationId,
+      ),
+    );
+  }
+
+  async function ensureBackendConversation(
+    conversationId: string,
+    title: string,
+    existingBackendConversationId: string | undefined,
+  ): Promise<string | null> {
+    const knownBackendConversationId =
+      backendConversationIdsRef.current.get(conversationId) ??
+      existingBackendConversationId;
+    if (knownBackendConversationId) {
+      return knownBackendConversationId;
+    }
+
+    const pendingCreation =
+      backendCreationPromisesRef.current.get(conversationId);
+    if (pendingCreation) {
+      return pendingCreation;
+    }
+
+    const creation = createAndAttachBackendConversation(conversationId, title);
+    backendCreationPromisesRef.current.set(conversationId, creation);
+    try {
+      return await creation;
+    } finally {
+      backendCreationPromisesRef.current.delete(conversationId);
+    }
+  }
+
+  async function createAndAttachBackendConversation(
+    conversationId: string,
+    title: string,
+  ): Promise<string | null> {
+    try {
+      const backendConversation = await createBackendConversation(title);
+      if (deletedConversationIdsRef.current.has(conversationId)) {
+        void deleteBackendConversation(backendConversation.id).catch(() => {
+          warnBackendSyncFailure("delete");
+        });
+        return null;
+      }
+
+      backendConversationIdsRef.current.set(
+        conversationId,
+        backendConversation.id,
+      );
+      setConversations((currentConversations) =>
+        attachBackendConversationId(
+          currentConversations,
+          conversationId,
+          backendConversation.id,
+        ),
+      );
+      return backendConversation.id;
+    } catch {
+      warnBackendSyncFailure("create");
+      return null;
+    }
   }
 
   function selectConversation(conversationId: string) {
@@ -290,6 +500,34 @@ function updateConversationMessage(
   );
 }
 
+function attachBackendConversationId(
+  conversations: Conversation[],
+  conversationId: string,
+  backendConversationId: string,
+): Conversation[] {
+  return conversations.map((conversation) =>
+    conversation.id === conversationId
+      ? { ...conversation, backendConversationId }
+      : conversation,
+  );
+}
+
+function removeBackendConversationId(
+  conversations: Conversation[],
+  conversationId: string,
+  backendConversationId: string,
+): Conversation[] {
+  return conversations.map((conversation) => {
+    if (
+      conversation.id !== conversationId ||
+      conversation.backendConversationId !== backendConversationId
+    ) {
+      return conversation;
+    }
+    return { ...conversation, backendConversationId: undefined };
+  });
+}
+
 function createUserMessage(content: string): ChatMessage {
   return {
     id: createMessageId(),
@@ -387,4 +625,14 @@ function toUserFacingError(error: unknown): string {
     }
   }
   return "Không thể nhận câu trả lời lúc này. Vui lòng thử lại.";
+}
+
+function warnBackendSyncFailure(
+  operation: "create" | "message" | "rename" | "delete",
+): void {
+  console.warn(`Conversation backend sync failed during ${operation}.`);
+}
+
+function isMissingBackendConversation(error: unknown): boolean {
+  return error instanceof ConversationApiError && error.status === 404;
 }

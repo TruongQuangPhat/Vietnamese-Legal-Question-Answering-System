@@ -24,10 +24,13 @@ export function ChatSidebar({
   const [editingConversationId, setEditingConversationId] = useState<
     string | null
   >(null);
+  const [pendingDeleteConversationId, setPendingDeleteConversationId] =
+    useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
 
   function startRenaming(conversation: Conversation) {
     setOpenMenuId(null);
+    setPendingDeleteConversationId(null);
     setEditingConversationId(conversation.id);
     setRenameTitle(conversation.title);
   }
@@ -47,14 +50,24 @@ export function ChatSidebar({
     setRenameTitle("");
   }
 
-  function deleteConversation(conversation: Conversation) {
+  function startDeleting(conversation: Conversation) {
     setOpenMenuId(null);
     if (editingConversationId === conversation.id) {
       cancelRename();
     }
-    if (window.confirm("Xóa cuộc trò chuyện này khỏi trình duyệt?")) {
-      onDeleteConversation(conversation.id);
-    }
+    setPendingDeleteConversationId(conversation.id);
+  }
+
+  function confirmDelete(conversationId: string) {
+    setPendingDeleteConversationId(null);
+    onDeleteConversation(conversationId);
+  }
+
+  function toggleMenu(conversationId: string) {
+    setPendingDeleteConversationId(null);
+    setOpenMenuId((currentId) =>
+      currentId === conversationId ? null : conversationId,
+    );
   }
 
   return (
@@ -70,7 +83,12 @@ export function ChatSidebar({
         </div>
         <button
           className="shrink-0 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink transition hover:border-primary hover:text-primary md:mt-4 md:w-full"
-          onClick={onNewChat}
+          onClick={() => {
+            setOpenMenuId(null);
+            setPendingDeleteConversationId(null);
+            cancelRename();
+            onNewChat();
+          }}
           type="button"
         >
           + Cuộc trò chuyện mới
@@ -97,6 +115,11 @@ export function ChatSidebar({
                     onSave={() => saveRename(conversation)}
                     title={renameTitle}
                   />
+                ) : pendingDeleteConversationId === conversation.id ? (
+                  <ConversationDeleteConfirmation
+                    onCancel={() => setPendingDeleteConversationId(null)}
+                    onConfirm={() => confirmDelete(conversation.id)}
+                  />
                 ) : (
                   <>
                     <button
@@ -114,19 +137,15 @@ export function ChatSidebar({
                     <button
                       aria-expanded={openMenuId === conversation.id}
                       aria-label={`Mở menu ${conversation.title}`}
-                      className="rounded-md px-2 py-1 text-xs font-semibold text-muted"
-                      onClick={() =>
-                        setOpenMenuId((currentId) =>
-                          currentId === conversation.id ? null : conversation.id,
-                        )
-                      }
+                      className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition hover:bg-surface hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      onClick={() => toggleMenu(conversation.id)}
                       type="button"
                     >
                       ...
                     </button>
                     {openMenuId === conversation.id ? (
                       <ConversationMenu
-                        onDelete={() => deleteConversation(conversation)}
+                        onDelete={() => startDeleting(conversation)}
                         onRename={() => startRenaming(conversation)}
                       />
                     ) : null}
@@ -162,6 +181,11 @@ export function ChatSidebar({
                       onSave={() => saveRename(conversation)}
                       title={renameTitle}
                     />
+                  ) : pendingDeleteConversationId === conversation.id ? (
+                    <ConversationDeleteConfirmation
+                      onCancel={() => setPendingDeleteConversationId(null)}
+                      onConfirm={() => confirmDelete(conversation.id)}
+                    />
                   ) : (
                     <>
                       <div className="flex items-start gap-2">
@@ -180,14 +204,8 @@ export function ChatSidebar({
                         <button
                           aria-expanded={openMenuId === conversation.id}
                           aria-label={`Mở menu ${conversation.title}`}
-                          className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition hover:bg-[#fff0f0] hover:text-[#a93434] focus:outline-none focus:ring-2 focus:ring-[#a93434]/30"
-                          onClick={() =>
-                            setOpenMenuId((currentId) =>
-                              currentId === conversation.id
-                                ? null
-                                : conversation.id,
-                            )
-                          }
+                          className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition hover:bg-[#f8fafc] hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          onClick={() => toggleMenu(conversation.id)}
                           type="button"
                         >
                           ...
@@ -195,7 +213,7 @@ export function ChatSidebar({
                       </div>
                       {openMenuId === conversation.id ? (
                         <ConversationMenu
-                          onDelete={() => deleteConversation(conversation)}
+                          onDelete={() => startDeleting(conversation)}
                           onRename={() => startRenaming(conversation)}
                         />
                       ) : null}
@@ -212,6 +230,47 @@ export function ChatSidebar({
         </p>
       </div>
     </aside>
+  );
+}
+
+type ConversationDeleteConfirmationProps = {
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+function ConversationDeleteConfirmation({
+  onCancel,
+  onConfirm,
+}: ConversationDeleteConfirmationProps) {
+  return (
+    <div
+      className="min-w-52 flex-1 rounded-md bg-surface p-2 text-ink shadow-sm"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onCancel();
+        }
+      }}
+    >
+      <p className="text-sm font-medium">Xóa cuộc trò chuyện này?</p>
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          autoFocus
+          className="rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted transition hover:bg-[#f8fafc] hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/30"
+          onClick={onCancel}
+          type="button"
+        >
+          Hủy
+        </button>
+        <button
+          className="rounded-md bg-[#a93434] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#8d2c2c] focus:outline-none focus:ring-2 focus:ring-[#a93434]/30"
+          onClick={onConfirm}
+          type="button"
+        >
+          Xóa
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -276,16 +335,16 @@ type ConversationMenuProps = {
 
 function ConversationMenu({ onDelete, onRename }: ConversationMenuProps) {
   return (
-    <div className="absolute right-2 top-9 z-30 w-32 rounded-md border border-border bg-surface p-1 text-sm text-ink shadow-panel">
+    <div className="absolute right-2 top-9 z-30 w-36 rounded-md border border-border bg-surface p-1 text-sm text-ink shadow-panel">
       <button
-        className="block w-full rounded px-3 py-2 text-left hover:bg-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="block w-full rounded px-3 py-2 text-left transition hover:bg-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-primary/30"
         onClick={onRename}
         type="button"
       >
         Đổi tên
       </button>
       <button
-        className="block w-full rounded px-3 py-2 text-left text-[#a93434] hover:bg-[#fff0f0] focus:outline-none focus:ring-2 focus:ring-[#a93434]/30"
+        className="block w-full rounded px-3 py-2 text-left text-[#9f3a38] transition hover:bg-[#fff5f5] focus:outline-none focus:ring-2 focus:ring-[#a93434]/25"
         onClick={onDelete}
         type="button"
       >

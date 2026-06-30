@@ -19,6 +19,7 @@ export type ChatMessage =
 
 export type Conversation = {
   id: string;
+  backendConversationId?: string;
   title: string;
   createdAt: string;
   updatedAt: string;

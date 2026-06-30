@@ -66,6 +66,9 @@ function isConversation(value: unknown): value is Conversation {
   }
   return (
     typeof value.id === "string" &&
+    (!("backendConversationId" in value) ||
+      value.backendConversationId === undefined ||
+      typeof value.backendConversationId === "string") &&
     typeof value.title === "string" &&
     typeof value.createdAt === "string" &&
     typeof value.updatedAt === "string" &&
