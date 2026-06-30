@@ -7,6 +7,8 @@ from enum import StrEnum
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 MAX_QUESTION_LENGTH = 4000
+MAX_LEGAL_QA_CONTEXT_MESSAGES = 8
+MAX_LEGAL_QA_CONTEXT_MESSAGE_LENGTH = 2000
 MAX_CONVERSATION_TITLE_LENGTH = 120
 MAX_MESSAGE_CONTENT_LENGTH = 20_000
 DEFAULT_CONVERSATION_TITLE = "Cuộc trò chuyện mới"
@@ -18,6 +20,25 @@ class LegalQADecision(StrEnum):
     ANSWERED = "answered"
     FALLBACK = "fallback"
     ERROR = "error"
+
+
+class LegalQAContextRole(StrEnum):
+    """Client roles accepted in recent Legal QA conversation context."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class LegalQAContextMessage(BaseModel):
+    """One untrusted conversational message supplied for follow-up context.
+
+    Conversation messages are never legal evidence and cannot be cited as such.
+    Blank content is accepted at the API boundary and removed during preparation.
+    """
+
+    role: LegalQAContextRole
+    content: str = Field(max_length=MAX_LEGAL_QA_CONTEXT_MESSAGE_LENGTH)
+    created_at: AwareDatetime | None = None
 
 
 class ConversationMessageRole(StrEnum):
@@ -120,12 +141,19 @@ class LegalQARequest(BaseModel):
 
     Attributes:
         question: Vietnamese legal question. It is stripped and must be non-empty.
+        conversation_id: Optional opaque conversation correlation identifier.
+        conversation_context: Optional bounded recent user/assistant messages.
         top_k: Requested maximum evidence count for future retrieval integration.
         include_evidence: Whether evidence DTOs should be returned.
         include_debug: Reserved for future debug/admin behavior; ignored by the stub.
     """
 
     question: str = Field(..., min_length=1, max_length=MAX_QUESTION_LENGTH)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=200)
+    conversation_context: list[LegalQAContextMessage] = Field(
+        default_factory=list,
+        max_length=MAX_LEGAL_QA_CONTEXT_MESSAGES,
+    )
     top_k: int = Field(default=10, ge=1, le=20)
     include_evidence: bool = True
     include_debug: bool = False
@@ -148,6 +176,17 @@ class LegalQARequest(BaseModel):
         if not question:
             raise ValueError("question must not be empty")
         return question
+
+    @field_validator("conversation_id")
+    @classmethod
+    def strip_conversation_id(cls, value: str | None) -> str | None:
+        """Strip an optional conversation identifier."""
+        if value is None:
+            return None
+        conversation_id = value.strip()
+        if not conversation_id:
+            raise ValueError("conversation_id must not be empty")
+        return conversation_id
 
 
 class CitationDTO(BaseModel):

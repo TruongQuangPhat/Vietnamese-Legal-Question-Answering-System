@@ -118,7 +118,12 @@ class RealLegalQAWorkflow:
         self._runner = runner
 
     def run(self, request: LegalQAWorkflowRequest) -> LegalQAWorkflowResult:
-        """Run the evaluated RAG workflow and map it to the API workflow result."""
+        """Run the evaluated RAG workflow using only the current question.
+
+        Prepared conversation context remains auxiliary at this boundary. It is
+        not sent as evidence, used as a citation source, or used to rewrite the
+        retrieval query in this foundation.
+        """
         started_at = time.perf_counter()
         rag_result = _run_async(
             self._runner(

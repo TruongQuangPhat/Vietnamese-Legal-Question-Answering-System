@@ -1,7 +1,15 @@
 export type LegalQADecision = "answered" | "fallback" | "error";
 
+export interface LegalQAContextMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at?: string;
+}
+
 export interface LegalQARequest {
   question: string;
+  conversation_id?: string;
+  conversation_context?: LegalQAContextMessage[];
   top_k?: number;
   include_evidence?: boolean;
   include_debug?: boolean;

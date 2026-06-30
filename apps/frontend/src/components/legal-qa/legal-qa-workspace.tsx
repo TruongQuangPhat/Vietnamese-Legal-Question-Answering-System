@@ -10,6 +10,7 @@ import {
   type BackendConversationRole,
 } from "@/lib/conversation-client";
 import { ApiRequestError, askLegalQuestion } from "@/lib/legal-qa-client";
+import type { LegalQAContextMessage } from "@/types/legal-qa";
 import { AskForm } from "./ask-form";
 import { ChatEmptyState } from "./chat-empty-state";
 import {
@@ -25,6 +26,8 @@ const MAX_QUESTION_LENGTH = 4000;
 const DEFAULT_TOP_K = 10;
 const DEFAULT_CONVERSATION_TITLE = "Cuộc trò chuyện mới";
 const TITLE_MAX_LENGTH = 56;
+const MAX_ASK_CONTEXT_MESSAGES = 6;
+const MAX_ASK_CONTEXT_MESSAGE_LENGTH = 2000;
 
 export function LegalQAWorkspace() {
   const [question, setQuestion] = useState("");
@@ -87,6 +90,7 @@ export function LegalQAWorkspace() {
     const conversationId = activeConversationId ?? createMessageId();
     const conversationTitle =
       activeConversation?.title ?? createConversationTitle(trimmedQuestion);
+    const conversationContext = prepareRecentConversationContext(activeMessages);
     const timestamp = new Date().toISOString();
 
     setActiveConversationId(conversationId);
@@ -109,6 +113,9 @@ export function LegalQAWorkspace() {
     try {
       const answer = await askLegalQuestion({
         question: trimmedQuestion,
+        conversation_id: activeConversation?.backendConversationId,
+        conversation_context:
+          conversationContext.length > 0 ? conversationContext : undefined,
         top_k: topK,
         include_evidence: includeEvidence,
         include_debug: false,
@@ -535,6 +542,28 @@ function createUserMessage(content: string): ChatMessage {
     content,
     createdAt: new Date().toISOString(),
   };
+}
+
+function prepareRecentConversationContext(
+  messages: ChatMessage[],
+): LegalQAContextMessage[] {
+  try {
+    return messages
+      .filter(
+        (message) =>
+          message.role === "user" ||
+          (message.role === "assistant" && message.status === "complete"),
+      )
+      .slice(-MAX_ASK_CONTEXT_MESSAGES)
+      .map((message) => ({
+        role: message.role,
+        content: message.content.slice(0, MAX_ASK_CONTEXT_MESSAGE_LENGTH),
+        created_at: message.createdAt,
+      }));
+  } catch {
+    console.warn("Unable to prepare recent conversation context.");
+    return [];
+  }
 }
 
 function createAssistantLoadingMessage(): ChatMessage {

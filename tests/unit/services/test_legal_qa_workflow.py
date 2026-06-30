@@ -16,6 +16,7 @@ from src.services.legal_qa_api_service import (
     LegalQAService,
     LegalQAWorkflowRequest,
 )
+from src.services.legal_qa_context import LegalQAContextPreparer
 from src.services.legal_qa_workflow import (
     LegalQARuntimeSettings,
     LegalQAServiceMode,
@@ -70,6 +71,14 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
             request_id="request-1",
             question="Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?",
             top_k=10,
+            context=LegalQAContextPreparer().prepare(
+                LegalQARequest(
+                    question=("Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?"),
+                    conversation_context=[
+                        {"role": "user", "content": "Ngữ cảnh không phải bằng chứng"}
+                    ],
+                )
+            ),
         )
     )
 
@@ -84,6 +93,9 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     assert response.evidence[0].text == "Người lao động có quyền đơn phương chấm dứt."
     assert response.metadata.retrieval_strategy == "coverage_aware_quota"
     assert response.metadata.model == "google/gemini-2.5-flash"
+    assert retriever.calls[0]["query"] == (
+        "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?"
+    )
 
 
 def test_real_workflow_adapter_maps_fallback_result() -> None:

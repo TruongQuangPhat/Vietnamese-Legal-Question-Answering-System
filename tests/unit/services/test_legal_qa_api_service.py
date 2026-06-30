@@ -40,6 +40,52 @@ def test_service_maps_answered_workflow_result_to_response() -> None:
     assert workflow.requests[0].top_k == 10
 
 
+def test_service_passes_prepared_context_without_rewriting_question() -> None:
+    workflow = StaticLegalQAWorkflow(_answered_result())
+    service = LegalQAService(workflow=workflow)
+
+    response = service.answer(
+        LegalQARequest(
+            question="Vậy hợp đồng xác định thời hạn thì sao?",
+            conversation_id="conversation-1",
+            conversation_context=[
+                {"role": "user", "content": "  Câu hỏi trước  "},
+                {"role": "assistant", "content": "  Câu trả lời trước  "},
+            ],
+        )
+    )
+
+    workflow_request = workflow.requests[0]
+    assert response.decision == "answered"
+    assert workflow_request.question == "Vậy hợp đồng xác định thời hạn thì sao?"
+    assert workflow_request.context is not None
+    assert workflow_request.context.conversation_id == "conversation-1"
+    assert workflow_request.context.message_count == 2
+    assert [message.content for message in workflow_request.context.messages] == [
+        "Câu hỏi trước",
+        "Câu trả lời trước",
+    ]
+
+
+def test_fake_response_is_stable_with_conversation_context() -> None:
+    service = LegalQAService()
+
+    without_context = service.answer(LegalQARequest(question="Câu hỏi hợp lệ?"))
+    with_context = service.answer(
+        LegalQARequest(
+            question="Câu hỏi hợp lệ?",
+            conversation_context=[
+                {"role": "user", "content": "Câu hỏi trước"},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+        )
+    )
+
+    assert with_context.model_copy(update={"request_id": without_context.request_id}) == (
+        without_context
+    )
+
+
 def test_service_maps_fallback_workflow_result_to_response() -> None:
     workflow = StaticLegalQAWorkflow(
         LegalQAWorkflowResult(

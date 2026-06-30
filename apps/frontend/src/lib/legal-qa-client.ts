@@ -37,6 +37,8 @@ export async function askLegalQuestion(
       },
       body: JSON.stringify({
         question: request.question,
+        conversation_id: request.conversation_id,
+        conversation_context: request.conversation_context,
         top_k: request.top_k,
         include_evidence: request.include_evidence,
         include_debug: request.include_debug,

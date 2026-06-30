@@ -15,6 +15,10 @@ from src.api.schemas import (
     LegalQAResponse,
     ResponseMetadataDTO,
 )
+from src.services.legal_qa_context import (
+    LegalQAContextPreparer,
+    PreparedLegalQAContext,
+)
 
 
 class LegalQAWorkflowDecision(StrEnum):
@@ -38,6 +42,7 @@ class LegalQAWorkflowRequest:
     request_id: str
     question: str
     top_k: int
+    context: PreparedLegalQAContext | None = None
     include_debug: bool = False
 
 
@@ -174,8 +179,13 @@ class LegalQAService:
     and does not call external services.
     """
 
-    def __init__(self, workflow: LegalQAWorkflow | None = None) -> None:
+    def __init__(
+        self,
+        workflow: LegalQAWorkflow | None = None,
+        context_preparer: LegalQAContextPreparer | None = None,
+    ) -> None:
         self._workflow = workflow or FakeLegalQAWorkflow()
+        self._context_preparer = context_preparer or LegalQAContextPreparer()
 
     @staticmethod
     def create_request_id() -> str:
@@ -197,10 +207,12 @@ class LegalQAService:
             warnings, and safe workflow metadata.
         """
         request_id = self.create_request_id()
+        prepared_context = self._context_preparer.prepare(request)
         workflow_request = LegalQAWorkflowRequest(
             request_id=request_id,
-            question=request.question,
+            question=prepared_context.effective_question,
             top_k=request.top_k,
+            context=prepared_context,
             include_debug=request.include_debug,
         )
         result = self._workflow.run(workflow_request)

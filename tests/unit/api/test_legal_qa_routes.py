@@ -11,6 +11,8 @@ import pytest
 from src.api.app import create_app
 from src.api.dependencies import get_legal_qa_service
 from src.api.schemas import (
+    MAX_LEGAL_QA_CONTEXT_MESSAGE_LENGTH,
+    MAX_LEGAL_QA_CONTEXT_MESSAGES,
     MAX_QUESTION_LENGTH,
     LegalQADecision,
     LegalQARequest,
@@ -87,6 +89,96 @@ async def test_ask_route_hides_evidence_when_requested() -> None:
     assert response.status_code == 200
     assert body["citations"]
     assert body["evidence"] == []
+
+
+@pytest.mark.asyncio
+async def test_ask_route_accepts_valid_conversation_context(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
+    private_context = "Nội dung riêng tư CONTEXT-MARKER-7842"
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Vậy hợp đồng xác định thời hạn thì sao?",
+                "conversation_id": "conversation-1",
+                "conversation_context": [
+                    {
+                        "role": "user",
+                        "content": private_context,
+                        "created_at": "2025-01-01T00:00:00Z",
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "Câu trả lời trước có căn cứ.",
+                    },
+                ],
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "answered"
+    assert private_context not in response.text
+    assert private_context not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_ask_route_rejects_invalid_context_role() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Câu hỏi hợp lệ?",
+                "conversation_context": [{"role": "system", "content": "Không được chấp nhận."}],
+            },
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_ask_route_rejects_too_long_context_message() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Câu hỏi hợp lệ?",
+                "conversation_context": [
+                    {
+                        "role": "user",
+                        "content": "x" * (MAX_LEGAL_QA_CONTEXT_MESSAGE_LENGTH + 1),
+                    }
+                ],
+            },
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_ask_route_rejects_too_many_context_messages() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Câu hỏi hợp lệ?",
+                "conversation_context": [
+                    {"role": "user", "content": f"Tin nhắn {index}"}
+                    for index in range(MAX_LEGAL_QA_CONTEXT_MESSAGES + 1)
+                ],
+            },
+        )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
