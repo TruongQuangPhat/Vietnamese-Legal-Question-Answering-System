@@ -244,7 +244,7 @@ function ConversationDeleteConfirmation({
 }: ConversationDeleteConfirmationProps) {
   return (
     <div
-      className="min-w-52 flex-1 rounded-md bg-surface p-2 text-ink shadow-sm"
+      className="min-w-52 flex-1 rounded-md bg-surface p-2 text-ink"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -263,7 +263,7 @@ function ConversationDeleteConfirmation({
           Hủy
         </button>
         <button
-          className="rounded-md bg-[#a93434] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#8d2c2c] focus:outline-none focus:ring-2 focus:ring-[#a93434]/30"
+          className="rounded-md px-2.5 py-1 text-xs font-semibold text-[#9f3a38] transition hover:bg-[#fff0f0] focus:outline-none focus:ring-2 focus:ring-[#a93434]/25"
           onClick={onConfirm}
           type="button"
         >

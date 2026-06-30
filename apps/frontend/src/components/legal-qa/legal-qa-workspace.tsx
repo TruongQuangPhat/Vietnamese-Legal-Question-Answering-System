@@ -28,6 +28,7 @@ const DEFAULT_CONVERSATION_TITLE = "Cuộc trò chuyện mới";
 const TITLE_MAX_LENGTH = 56;
 const MAX_ASK_CONTEXT_MESSAGES = 6;
 const MAX_ASK_CONTEXT_MESSAGE_LENGTH = 2000;
+const CHAT_CONTENT_CONTAINER = "mx-auto w-full max-w-[760px]";
 
 export function LegalQAWorkspace() {
   const [question, setQuestion] = useState("");
@@ -37,7 +38,7 @@ export function LegalQAWorkspace() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
-  const latestMessageRef = useRef<HTMLDivElement | null>(null);
+  const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const backendConversationIdsRef = useRef(new Map<string, string>());
   const backendCreationPromisesRef = useRef(
     new Map<string, Promise<string | null>>(),
@@ -61,9 +62,9 @@ export function LegalQAWorkspace() {
   }, []);
 
   useEffect(() => {
-    latestMessageRef.current?.scrollIntoView({
+    messageScrollRef.current?.scrollTo({
       behavior: "smooth",
-      block: "end",
+      top: messageScrollRef.current.scrollHeight,
     });
   }, [activeConversationId, conversations]);
 
@@ -393,7 +394,7 @@ export function LegalQAWorkspace() {
   );
 
   return (
-    <div className="flex min-h-[calc(100vh-1.5rem)] flex-1 overflow-hidden rounded-md border border-border bg-surface shadow-panel md:min-h-[calc(100vh-2.5rem)]">
+    <div className="flex h-full min-h-0 flex-1 overflow-hidden rounded-md border border-border bg-surface shadow-panel">
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <ChatSidebar
           activeConversationId={activeConversationId}
@@ -404,18 +405,23 @@ export function LegalQAWorkspace() {
           onSelectConversation={selectConversation}
         />
 
-        <section className="flex min-h-0 flex-1 flex-col bg-[#fbfcfe]">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
-            {hasConversation ? (
-              <ChatMessageList messages={activeMessages} />
-            ) : (
-              <ChatEmptyState onSelectPrompt={selectSuggestedPrompt} />
-            )}
-            <div ref={latestMessageRef} />
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#fbfcfe]">
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 pb-8 [scrollbar-gutter:stable] md:px-6"
+            data-message-scroll
+            ref={messageScrollRef}
+          >
+            <div className={CHAT_CONTENT_CONTAINER}>
+              {hasConversation ? (
+                <ChatMessageList messages={activeMessages} />
+              ) : (
+                <ChatEmptyState onSelectPrompt={selectSuggestedPrompt} />
+              )}
+            </div>
           </div>
 
-          <div className="border-t border-border bg-surface px-4 py-4 md:px-6">
-            <div className="mx-auto w-full max-w-3xl">
+          <div className="shrink-0 overflow-y-auto border-t border-border bg-surface px-4 py-2.5 [scrollbar-gutter:stable] md:px-6">
+            <div className={CHAT_CONTENT_CONTAINER}>
               <AskForm
                 includeEvidence={includeEvidence}
                 isLoading={isLoading}

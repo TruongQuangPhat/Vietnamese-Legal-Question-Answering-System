@@ -28,7 +28,7 @@ export function AskForm({
 
   return (
     <form
-      className="rounded-md border border-border bg-surface p-3 shadow-sm"
+      className="rounded-md border border-border bg-surface p-2 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
@@ -40,7 +40,7 @@ export function AskForm({
         </label>
         <textarea
           id="question"
-          className="min-h-24 w-full resize-none border-0 p-0 text-sm leading-6 text-ink placeholder:text-[#8b95a5] focus:ring-0"
+          className="h-12 max-h-36 w-full resize-none overflow-y-auto border-0 p-0 text-sm leading-6 text-ink placeholder:text-[#8b95a5] focus:ring-0"
           disabled={isLoading}
           maxLength={MAX_QUESTION_LENGTH + 200}
           onChange={(event) => onQuestionChange(event.target.value)}
@@ -66,8 +66,8 @@ export function AskForm({
         ) : null}
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="mt-1.5 flex flex-col gap-1.5 border-t border-border pt-1.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={`text-xs ${isOverLimit ? "text-[#a93434]" : "text-muted"}`}
           >
@@ -81,7 +81,7 @@ export function AskForm({
             Bằng chứng
             <input
               id="top-k"
-              className="h-8 w-16 rounded-md border-border text-sm focus:border-primary focus:ring-primary"
+              className="h-7 w-14 rounded-md border-border px-2 py-1 text-sm focus:border-primary focus:ring-primary"
               disabled={isLoading}
               max={20}
               min={1}
@@ -104,7 +104,7 @@ export function AskForm({
         </div>
 
         <button
-          className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#0c625b] disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-primary px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0c625b] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isLoading}
           type="submit"
         >

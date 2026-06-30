@@ -1,3 +1,13 @@
+"use client";
+
+import {
+  forwardRef,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import type { LegalQACitation, LegalQAEvidence } from "@/types/legal-qa";
 
 type InlineCitationsProps = {
@@ -62,21 +72,162 @@ export function InlineCitations({
 }
 
 function CitationMarker({ marker }: { marker: CitationMarkerData }) {
+  const markerRef = useRef<HTMLSpanElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState<PopoverPosition | null>(null);
+
+  function cancelClose() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+
+  function openPopover() {
+    cancelClose();
+    setIsOpen(true);
+  }
+
+  function scheduleClose() {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => {
+      const activeElement = document.activeElement;
+      if (
+        (activeElement && markerRef.current?.contains(activeElement)) ||
+        (activeElement && popoverRef.current?.contains(activeElement))
+      ) {
+        return;
+      }
+      setIsOpen(false);
+    }, 150);
+  }
+
+  useEffect(
+    () => () => {
+      cancelClose();
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function updatePosition() {
+      const markerElement = markerRef.current;
+      const popoverElement = popoverRef.current;
+      if (!markerElement || !popoverElement) {
+        return;
+      }
+
+      const markerRect = markerElement.getBoundingClientRect();
+      const scrollContainer = markerElement.closest("[data-message-scroll]");
+      const containerRect = scrollContainer?.getBoundingClientRect();
+      const topBoundary = Math.max(8, (containerRect?.top ?? 0) + 8);
+      const bottomBoundary = Math.min(
+        window.innerHeight - 8,
+        (containerRect?.bottom ?? window.innerHeight) - 8,
+      );
+      const gap = 6;
+      const spaceAbove = markerRect.top - topBoundary - gap;
+      const spaceBelow = bottomBoundary - markerRect.bottom - gap;
+      const openBelow = spaceBelow >= Math.min(240, spaceAbove);
+      const availableHeight = Math.max(
+        96,
+        openBelow ? spaceBelow : spaceAbove,
+      );
+      const popoverHeight = Math.min(
+        popoverElement.scrollHeight,
+        availableHeight,
+      );
+      const top = openBelow
+        ? markerRect.bottom + gap
+        : markerRect.top - popoverHeight - gap;
+      const width = Math.min(384, window.innerWidth - 16);
+      const left = Math.min(
+        Math.max(8, markerRect.left),
+        window.innerWidth - width - 8,
+      );
+
+      setPosition({ left, maxHeight: availableHeight, top, width });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen]);
+
   return (
-    <span className="group relative inline-flex overflow-visible align-baseline">
+    <span
+      className="relative inline-flex overflow-visible align-baseline"
+      onBlur={scheduleClose}
+      onFocus={openPopover}
+      onMouseEnter={openPopover}
+      onMouseLeave={scheduleClose}
+      ref={markerRef}
+    >
       <button
+        aria-expanded={isOpen}
         aria-label={`Xem căn cứ ${marker.label}`}
+        aria-haspopup="dialog"
         className="inline-flex rounded-md border border-[#9bd4c9] bg-[#e8f3f1] px-1.5 py-0.5 text-xs font-semibold leading-5 text-primary transition hover:border-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
         type="button"
       >
         [{marker.label}]
       </button>
-      <EvidencePopover marker={marker} />
+      {isOpen
+        ? createPortal(
+            <EvidencePopover
+              marker={marker}
+              onBlur={scheduleClose}
+              onFocus={openPopover}
+              onMouseEnter={openPopover}
+              onMouseLeave={scheduleClose}
+              position={position}
+              ref={popoverRef}
+            />,
+            document.body,
+          )
+        : null}
     </span>
   );
 }
 
-function EvidencePopover({ marker }: { marker: CitationMarkerData }) {
+type PopoverPosition = {
+  left: number;
+  maxHeight: number;
+  top: number;
+  width: number;
+};
+
+type EvidencePopoverProps = {
+  marker: CitationMarkerData;
+  onBlur: () => void;
+  onFocus: () => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  position: PopoverPosition | null;
+};
+
+const EvidencePopover = forwardRef<HTMLDivElement, EvidencePopoverProps>(
+  function EvidencePopover(
+    {
+      marker,
+      onBlur,
+      onFocus,
+      onMouseEnter,
+      onMouseLeave,
+      position,
+    },
+    ref,
+  ) {
   const { citation, evidence } = marker;
   const citationLabel = citation?.citation || evidence?.citation || marker.label;
   const lawName = citation?.law_name || evidence?.law_name || "Không có tên văn bản";
@@ -86,8 +237,28 @@ function EvidencePopover({ marker }: { marker: CitationMarkerData }) {
   const sourceUrl = evidence?.source_url || citation?.source_url;
 
   return (
-    <span className="invisible absolute left-0 top-full z-40 w-[min(82vw,24rem)] pt-1 text-left text-xs leading-5 text-ink opacity-0 transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-      <span className="block max-h-[min(70vh,30rem)] overflow-y-auto rounded-md border border-border bg-surface p-4 shadow-panel">
+    <div
+      aria-label={`Căn cứ ${marker.label}`}
+      className={`fixed z-[100] overflow-y-auto rounded-md border border-border bg-surface p-4 text-left text-xs leading-5 text-ink shadow-panel transition-opacity ${
+        position ? "opacity-100" : "pointer-events-none opacity-0"
+      }`}
+      onBlur={onBlur}
+      onFocus={onFocus}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      ref={ref}
+      role="dialog"
+      style={
+        position
+          ? {
+              left: position.left,
+              maxHeight: position.maxHeight,
+              top: position.top,
+              width: position.width,
+            }
+          : { left: 0, top: 0, width: 384 }
+      }
+    >
         <span className="block text-sm font-semibold text-ink">
           {citationLabel}
         </span>
@@ -125,10 +296,10 @@ function EvidencePopover({ marker }: { marker: CitationMarkerData }) {
             Mở nguồn văn bản
           </a>
         ) : null}
-      </span>
-    </span>
+    </div>
   );
-}
+  },
+);
 
 function buildCitationMarkers(
   citations: LegalQACitation[],
