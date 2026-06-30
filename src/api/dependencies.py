@@ -5,6 +5,10 @@ from __future__ import annotations
 from functools import lru_cache
 
 from src.api.settings import get_settings
+from src.services.conversation_service import (
+    ConversationService,
+    InMemoryConversationRepository,
+)
 from src.services.legal_qa_api_service import LegalQAService
 from src.services.legal_qa_workflow import build_legal_qa_service
 
@@ -25,6 +29,26 @@ async def get_legal_qa_service() -> LegalQAService:
     return _get_cached_legal_qa_service()
 
 
+@lru_cache(maxsize=1)
+def _get_cached_conversation_service() -> ConversationService:
+    return ConversationService(InMemoryConversationRepository())
+
+
+async def get_conversation_service() -> ConversationService:
+    """Return the process-local conversation service.
+
+    Returns:
+        Cached service backed by an in-memory development repository. Data is
+        discarded on process restart and is not shared across workers.
+    """
+    return _get_cached_conversation_service()
+
+
 def clear_legal_qa_service_cache() -> None:
     """Clear the cached Legal QA service for tests and runtime reconfiguration."""
     _get_cached_legal_qa_service.cache_clear()
+
+
+def clear_conversation_service_cache() -> None:
+    """Clear process-local conversation state for tests."""
+    _get_cached_conversation_service.cache_clear()

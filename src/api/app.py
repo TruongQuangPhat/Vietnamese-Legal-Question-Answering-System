@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.routes.conversations import router as conversations_router
 from src.api.routes.health import router as health_router
 from src.api.routes.legal_qa import router as legal_qa_router
 from src.api.settings import AppSettings, get_settings
@@ -24,6 +25,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     app = FastAPI(title="VnLaw-QA API", version="0.1.0")
     app.include_router(health_router)
     app.include_router(legal_qa_router, prefix="/api/v1")
+    app.include_router(conversations_router, prefix="/api/v1")
     configure_cors(app, runtime_settings)
     return app
 
@@ -33,7 +35,7 @@ def configure_cors(app: FastAPI, settings: AppSettings) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         allow_credentials=False,
     )

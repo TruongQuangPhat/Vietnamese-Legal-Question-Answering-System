@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 MAX_QUESTION_LENGTH = 4000
+MAX_CONVERSATION_TITLE_LENGTH = 120
+MAX_MESSAGE_CONTENT_LENGTH = 20_000
+DEFAULT_CONVERSATION_TITLE = "Cuộc trò chuyện mới"
 
 
 class LegalQADecision(StrEnum):
@@ -15,6 +18,101 @@ class LegalQADecision(StrEnum):
     ANSWERED = "answered"
     FALLBACK = "fallback"
     ERROR = "error"
+
+
+class ConversationMessageRole(StrEnum):
+    """Roles supported by stored conversation messages."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class ConversationMessage(BaseModel):
+    """Public representation of one stored conversation message."""
+
+    id: str = Field(min_length=1)
+    role: ConversationMessageRole
+    content: str = Field(min_length=1, max_length=MAX_MESSAGE_CONTENT_LENGTH)
+    created_at: AwareDatetime
+
+
+class Conversation(BaseModel):
+    """Internal typed conversation record used by the conversation service."""
+
+    id: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=MAX_CONVERSATION_TITLE_LENGTH)
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    messages: list[ConversationMessage] = Field(default_factory=list)
+
+
+class ConversationSummary(BaseModel):
+    """Compact conversation representation returned by list and create routes."""
+
+    id: str
+    title: str
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    message_count: int = Field(ge=0)
+
+
+class ConversationCreateRequest(BaseModel):
+    """Request body for creating a conversation.
+
+    A missing or blank title is normalized to the product's default title by
+    the service.
+    """
+
+    title: str | None = Field(default=None, max_length=MAX_CONVERSATION_TITLE_LENGTH)
+
+    @field_validator("title")
+    @classmethod
+    def strip_optional_title(cls, value: str | None) -> str | None:
+        """Strip a supplied title and convert blank input to no title."""
+        if value is None:
+            return None
+        return value.strip() or None
+
+
+class ConversationUpdateRequest(BaseModel):
+    """Request body for renaming an existing conversation."""
+
+    title: str = Field(min_length=1, max_length=MAX_CONVERSATION_TITLE_LENGTH)
+
+    @field_validator("title")
+    @classmethod
+    def strip_title(cls, value: str) -> str:
+        """Strip and reject a blank replacement title."""
+        title = value.strip()
+        if not title:
+            raise ValueError("title must not be empty")
+        return title
+
+
+class ConversationMessageCreateRequest(BaseModel):
+    """Request body for adding a user or assistant message."""
+
+    role: ConversationMessageRole
+    content: str = Field(min_length=1, max_length=MAX_MESSAGE_CONTENT_LENGTH)
+
+    @field_validator("content")
+    @classmethod
+    def strip_content(cls, value: str) -> str:
+        """Strip and reject blank message content."""
+        content = value.strip()
+        if not content:
+            raise ValueError("content must not be empty")
+        return content
+
+
+class ConversationDetail(BaseModel):
+    """Full conversation representation including ordered messages."""
+
+    id: str
+    title: str
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    messages: list[ConversationMessage]
 
 
 class LegalQARequest(BaseModel):
