@@ -21,18 +21,37 @@ export function ChatSidebar({
   onSelectConversation,
 }: ChatSidebarProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editingConversationId, setEditingConversationId] = useState<
+    string | null
+  >(null);
+  const [renameTitle, setRenameTitle] = useState("");
 
-  function renameConversation(conversation: Conversation) {
-    const nextTitle = window.prompt("Đổi tên cuộc trò chuyện", conversation.title);
+  function startRenaming(conversation: Conversation) {
     setOpenMenuId(null);
-    if (!nextTitle || !nextTitle.trim()) {
+    setEditingConversationId(conversation.id);
+    setRenameTitle(conversation.title);
+  }
+
+  function saveRename(conversation: Conversation) {
+    const nextTitle = renameTitle.trim();
+    setEditingConversationId(null);
+    setRenameTitle("");
+    if (!nextTitle || nextTitle === conversation.title) {
       return;
     }
     onRenameConversation(conversation.id, nextTitle);
   }
 
+  function cancelRename() {
+    setEditingConversationId(null);
+    setRenameTitle("");
+  }
+
   function deleteConversation(conversation: Conversation) {
     setOpenMenuId(null);
+    if (editingConversationId === conversation.id) {
+      cancelRename();
+    }
     if (window.confirm("Xóa cuộc trò chuyện này khỏi trình duyệt?")) {
       onDeleteConversation(conversation.id);
     }
@@ -71,37 +90,48 @@ export function ChatSidebar({
                 }`}
                 key={conversation.id}
               >
-                <button
-                  className="min-w-0 flex-1 text-left"
-                  onClick={() => onSelectConversation(conversation.id)}
-                  type="button"
-                >
-                  <span className="block truncate font-medium">
-                    {conversation.title}
-                  </span>
-                  <span className="mt-1 block text-xs text-muted">
-                    {formatUpdatedAt(conversation.updatedAt)}
-                  </span>
-                </button>
-                <button
-                  aria-expanded={openMenuId === conversation.id}
-                  aria-label={`Mở menu ${conversation.title}`}
-                  className="rounded-md px-2 py-1 text-xs font-semibold text-muted"
-                  onClick={() =>
-                    setOpenMenuId((currentId) =>
-                      currentId === conversation.id ? null : conversation.id,
-                    )
-                  }
-                  type="button"
-                >
-                  ...
-                </button>
-                {openMenuId === conversation.id ? (
-                  <ConversationMenu
-                    onDelete={() => deleteConversation(conversation)}
-                    onRename={() => renameConversation(conversation)}
+                {editingConversationId === conversation.id ? (
+                  <ConversationTitleEditor
+                    onCancel={cancelRename}
+                    onChange={setRenameTitle}
+                    onSave={() => saveRename(conversation)}
+                    title={renameTitle}
                   />
-                ) : null}
+                ) : (
+                  <>
+                    <button
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => onSelectConversation(conversation.id)}
+                      type="button"
+                    >
+                      <span className="block truncate font-medium">
+                        {conversation.title}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted">
+                        {formatUpdatedAt(conversation.updatedAt)}
+                      </span>
+                    </button>
+                    <button
+                      aria-expanded={openMenuId === conversation.id}
+                      aria-label={`Mở menu ${conversation.title}`}
+                      className="rounded-md px-2 py-1 text-xs font-semibold text-muted"
+                      onClick={() =>
+                        setOpenMenuId((currentId) =>
+                          currentId === conversation.id ? null : conversation.id,
+                        )
+                      }
+                      type="button"
+                    >
+                      ...
+                    </button>
+                    {openMenuId === conversation.id ? (
+                      <ConversationMenu
+                        onDelete={() => deleteConversation(conversation)}
+                        onRename={() => startRenaming(conversation)}
+                      />
+                    ) : null}
+                  </>
+                )}
               </div>
             );
           })}
@@ -125,55 +155,117 @@ export function ChatSidebar({
                   }`}
                   key={conversation.id}
                 >
-                  <div className="flex items-start gap-2">
-                    <button
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => onSelectConversation(conversation.id)}
-                      type="button"
-                    >
-                      <span className="block truncate font-medium">
-                        {conversation.title}
-                      </span>
-                      <span className="mt-1 block text-xs text-muted">
-                        Cập nhật {formatUpdatedAt(conversation.updatedAt)}
-                      </span>
-                    </button>
-                    <button
-                      aria-expanded={openMenuId === conversation.id}
-                      aria-label={`Mở menu ${conversation.title}`}
-                      className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition hover:bg-[#fff0f0] hover:text-[#a93434] focus:outline-none focus:ring-2 focus:ring-[#a93434]/30"
-                      onClick={() =>
-                        setOpenMenuId((currentId) =>
-                          currentId === conversation.id ? null : conversation.id,
-                        )
-                      }
-                      type="button"
-                    >
-                      ...
-                    </button>
-                  </div>
-                  {openMenuId === conversation.id ? (
-                    <ConversationMenu
-                      onDelete={() => deleteConversation(conversation)}
-                      onRename={() => renameConversation(conversation)}
+                  {editingConversationId === conversation.id ? (
+                    <ConversationTitleEditor
+                      onCancel={cancelRename}
+                      onChange={setRenameTitle}
+                      onSave={() => saveRename(conversation)}
+                      title={renameTitle}
                     />
-                  ) : null}
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-2">
+                        <button
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => onSelectConversation(conversation.id)}
+                          type="button"
+                        >
+                          <span className="block truncate font-medium">
+                            {conversation.title}
+                          </span>
+                          <span className="mt-1 block text-xs text-muted">
+                            Cập nhật {formatUpdatedAt(conversation.updatedAt)}
+                          </span>
+                        </button>
+                        <button
+                          aria-expanded={openMenuId === conversation.id}
+                          aria-label={`Mở menu ${conversation.title}`}
+                          className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition hover:bg-[#fff0f0] hover:text-[#a93434] focus:outline-none focus:ring-2 focus:ring-[#a93434]/30"
+                          onClick={() =>
+                            setOpenMenuId((currentId) =>
+                              currentId === conversation.id
+                                ? null
+                                : conversation.id,
+                            )
+                          }
+                          type="button"
+                        >
+                          ...
+                        </button>
+                      </div>
+                      {openMenuId === conversation.id ? (
+                        <ConversationMenu
+                          onDelete={() => deleteConversation(conversation)}
+                          onRename={() => startRenaming(conversation)}
+                        />
+                      ) : null}
+                    </>
+                  )}
                 </div>
               );
             })}
           </nav>
-        ) : (
-          <div className="rounded-md border border-dashed border-border bg-surface p-3 text-sm leading-6 text-muted">
-            <p className="font-medium text-ink">Chưa có cuộc trò chuyện</p>
-            <p className="mt-1">Các cuộc trò chuyện sẽ được lưu trên trình duyệt này.</p>
-          </div>
-        )}
+        ) : null}
         <p className="mt-auto pt-4 text-xs leading-5 text-muted">
           Công cụ hỗ trợ nghiên cứu pháp luật, không thay thế tư vấn pháp lý
           chuyên nghiệp.
         </p>
       </div>
     </aside>
+  );
+}
+
+type ConversationTitleEditorProps = {
+  onCancel: () => void;
+  onChange: (title: string) => void;
+  onSave: () => void;
+  title: string;
+};
+
+function ConversationTitleEditor({
+  onCancel,
+  onChange,
+  onSave,
+  title,
+}: ConversationTitleEditorProps) {
+  return (
+    <form
+      className="min-w-52 flex-1"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave();
+      }}
+    >
+      <input
+        aria-label="Tên cuộc trò chuyện"
+        autoFocus
+        className="w-full rounded-md border-border bg-surface px-2 py-1 text-sm text-ink focus:border-primary focus:ring-primary"
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={(event) => event.currentTarget.select()}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onCancel();
+          }
+        }}
+        value={title}
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#164f49] focus:outline-none focus:ring-2 focus:ring-primary/30"
+          type="submit"
+        >
+          Lưu
+        </button>
+        <button
+          className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/30"
+          onClick={onCancel}
+          type="button"
+        >
+          Hủy
+        </button>
+      </div>
+    </form>
   );
 }
 
