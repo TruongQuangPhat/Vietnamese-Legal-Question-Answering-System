@@ -121,6 +121,10 @@ async def test_ask_route_accepts_valid_conversation_context(
 
     assert response.status_code == 200
     assert response.json()["decision"] == "answered"
+    assert response.json()["metadata"]["conversation_context_used"] is True
+    assert response.json()["metadata"]["conversation_context_message_count"] == 2
+    assert response.json()["metadata"]["follow_up_detected"] is True
+    assert response.json()["metadata"]["retrieval_question_prepared"] is True
     assert private_context not in response.text
     assert private_context not in caplog.text
 
@@ -252,6 +256,10 @@ async def test_ask_route_returns_safe_error_when_service_fails() -> None:
         "model": None,
         "reranking_used": False,
         "latency_ms": body["metadata"]["latency_ms"],
+        "conversation_context_used": False,
+        "conversation_context_message_count": 0,
+        "follow_up_detected": False,
+        "retrieval_question_prepared": False,
     }
     assert "secret traceback details" not in response.text
 

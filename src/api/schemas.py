@@ -221,6 +221,10 @@ class ResponseMetadataDTO(BaseModel):
     model: str | None
     reranking_used: bool
     latency_ms: int = Field(ge=0)
+    conversation_context_used: bool = False
+    conversation_context_message_count: int = Field(default=0, ge=0)
+    follow_up_detected: bool = False
+    retrieval_question_prepared: bool = False
 
 
 class LegalQAResponse(BaseModel):

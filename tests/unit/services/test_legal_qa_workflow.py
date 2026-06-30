@@ -69,13 +69,18 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     response = workflow.run(
         LegalQAWorkflowRequest(
             request_id="request-1",
-            question="Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?",
+            question="Vậy hợp đồng xác định thời hạn thì sao?",
             top_k=10,
             context=LegalQAContextPreparer().prepare(
                 LegalQARequest(
-                    question=("Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?"),
+                    question="Vậy hợp đồng xác định thời hạn thì sao?",
                     conversation_context=[
-                        {"role": "user", "content": "Ngữ cảnh không phải bằng chứng"}
+                        {
+                            "role": "user",
+                            "content": (
+                                "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?"
+                            ),
+                        }
                     ],
                 )
             ),
@@ -94,7 +99,8 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     assert response.metadata.retrieval_strategy == "coverage_aware_quota"
     assert response.metadata.model == "google/gemini-2.5-flash"
     assert retriever.calls[0]["query"] == (
-        "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào?"
+        "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào? "
+        "Vậy hợp đồng xác định thời hạn thì sao?"
     )
 
 

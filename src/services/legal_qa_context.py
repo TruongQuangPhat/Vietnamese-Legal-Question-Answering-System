@@ -6,10 +6,25 @@ from dataclasses import dataclass
 
 from src.api.schemas import (
     MAX_LEGAL_QA_CONTEXT_MESSAGES,
+    MAX_QUESTION_LENGTH,
     LegalQAContextMessage,
     LegalQAContextRole,
     LegalQARequest,
 )
+
+FOLLOW_UP_MARKERS = (
+    "vậy",
+    "vậy thì",
+    "trường hợp đó",
+    "như vậy",
+    "còn",
+    "thì sao",
+    "như trên",
+    "đối với trường hợp này",
+    "hợp đồng này",
+    "người đó",
+)
+MAX_STANDALONE_QUESTION_WORDS = 8
 
 
 @dataclass(frozen=True)
@@ -24,15 +39,23 @@ class PreparedLegalQAContextMessage:
 class PreparedLegalQAContext:
     """Prepared follow-up context passed through the Legal QA service boundary.
 
-    `effective_question` remains the current user question. `compact_text` is
-    reserved for future safe query processing and must not be treated as legal
-    evidence or passed to citation validation as evidence.
+    `original_question` remains the user-facing question. `retrieval_question`
+    may include one recent user topic anchor, but neither the anchor nor
+    `compact_text` is legal evidence or citable material.
     """
 
-    effective_question: str
+    original_question: str
+    retrieval_question: str
     conversation_id: str | None
     messages: tuple[PreparedLegalQAContextMessage, ...]
     compact_text: str
+    context_used: bool
+    follow_up_detected: bool
+
+    @property
+    def effective_question(self) -> str:
+        """Return the original question used for answer generation."""
+        return self.original_question
 
     @property
     def message_count(self) -> int:
@@ -49,7 +72,7 @@ class LegalQAContextPreparer:
         self._max_messages = max_messages
 
     def prepare(self, request: LegalQARequest) -> PreparedLegalQAContext:
-        """Prepare bounded context without rewriting the legal question.
+        """Prepare a bounded retrieval question without changing answer intent.
 
         Args:
             request: Validated Legal QA API request.
@@ -68,13 +91,55 @@ class LegalQAContextPreparer:
             if (content := _normalize_content(message))
         )
         compact_text = "\n".join(f"{message.role.value}: {message.content}" for message in messages)
+        follow_up_detected = _is_follow_up_question(request.question)
+        retrieval_question, context_used = _prepare_retrieval_question(
+            question=request.question,
+            messages=messages,
+            follow_up_detected=follow_up_detected,
+        )
         return PreparedLegalQAContext(
-            effective_question=request.question,
+            original_question=request.question,
+            retrieval_question=retrieval_question,
             conversation_id=request.conversation_id,
             messages=messages,
             compact_text=compact_text,
+            context_used=context_used,
+            follow_up_detected=follow_up_detected,
         )
 
 
 def _normalize_content(message: LegalQAContextMessage) -> str:
     return message.content.strip()
+
+
+def _is_follow_up_question(question: str) -> bool:
+    normalized_question = " ".join(question.casefold().split())
+    has_contextual_marker = any(marker in normalized_question for marker in FOLLOW_UP_MARKERS)
+    is_short = len(normalized_question.split()) <= MAX_STANDALONE_QUESTION_WORDS
+    return has_contextual_marker or is_short
+
+
+def _prepare_retrieval_question(
+    *,
+    question: str,
+    messages: tuple[PreparedLegalQAContextMessage, ...],
+    follow_up_detected: bool,
+) -> tuple[str, bool]:
+    if not follow_up_detected:
+        return question, False
+
+    prior_user_message = next(
+        (message.content for message in reversed(messages) if message.role == "user"),
+        None,
+    )
+    if not prior_user_message:
+        return question, False
+
+    available_anchor_length = MAX_QUESTION_LENGTH - len(question) - 1
+    if available_anchor_length <= 0:
+        return question, False
+
+    topic_anchor = prior_user_message[:available_anchor_length].rstrip()
+    if not topic_anchor:
+        return question, False
+    return f"{topic_anchor} {question}", True

@@ -13,6 +13,7 @@ from pathlib import Path
 from src.retrieval.coverage_aware import CoverageAwareFusionConfig
 from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, RagGenerationConfig
 from src.retrieval.llm_client import LLMClientProtocol
+from src.retrieval.models import RetrievalResult
 from src.retrieval.rag_pipeline import RagRetrieverProtocol, run_naive_rag
 from src.retrieval.selection import AnswerabilityDecision, EvidenceSelectionConfig
 from src.services.legal_qa_api_service import (
@@ -118,17 +119,24 @@ class RealLegalQAWorkflow:
         self._runner = runner
 
     def run(self, request: LegalQAWorkflowRequest) -> LegalQAWorkflowResult:
-        """Run the evaluated RAG workflow using only the current question.
+        """Run RAG with an enriched retrieval query and original answer question.
 
-        Prepared conversation context remains auxiliary at this boundary. It is
-        not sent as evidence, used as a citation source, or used to rewrite the
-        retrieval query in this foundation.
+        Conversation context may override only the query received by the
+        retriever. The RAG runner and generation prompt still receive the
+        original current question, and only retrieved legal chunks can become
+        selected evidence or citations.
         """
         started_at = time.perf_counter()
+        retrieval_question = (
+            request.context.retrieval_question if request.context is not None else request.question
+        )
         rag_result = _run_async(
             self._runner(
                 query=request.question,
-                retriever=self._retriever,
+                retriever=_RetrievalQuestionOverride(
+                    retriever=self._retriever,
+                    retrieval_question=retrieval_question,
+                ),
                 llm_client=self._llm_client,
                 collection_name=self._collection_name,
                 top_k=self._final_top_k,
@@ -142,6 +150,32 @@ class RealLegalQAWorkflow:
             rag_result,
             fallback_model=self._generation_config.model,
             latency_ms=latency_ms,
+        )
+
+
+class _RetrievalQuestionOverride:
+    """Use a prepared query only at the retriever boundary."""
+
+    def __init__(
+        self,
+        *,
+        retriever: RagRetrieverProtocol,
+        retrieval_question: str,
+    ) -> None:
+        self._retriever = retriever
+        self._retrieval_question = retrieval_question
+
+    async def retrieve(
+        self,
+        *,
+        query: str,
+        top_k: int | None = None,
+        collection_name: str | None = None,
+    ) -> RetrievalResult:
+        return await self._retriever.retrieve(
+            query=self._retrieval_question,
+            top_k=top_k,
+            collection_name=collection_name,
         )
 
 

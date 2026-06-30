@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Protocol
 from uuid import uuid4
@@ -81,6 +81,10 @@ class LegalQAWorkflowMetadata:
     model: str | None = None
     reranking_used: bool = False
     latency_ms: int = 0
+    conversation_context_used: bool = False
+    conversation_context_message_count: int = 0
+    follow_up_detected: bool = False
+    retrieval_question_prepared: bool = False
 
 
 @dataclass(frozen=True)
@@ -216,6 +220,18 @@ class LegalQAService:
             include_debug=request.include_debug,
         )
         result = self._workflow.run(workflow_request)
+        result = replace(
+            result,
+            metadata=replace(
+                result.metadata,
+                conversation_context_used=prepared_context.context_used,
+                conversation_context_message_count=prepared_context.message_count,
+                follow_up_detected=prepared_context.follow_up_detected,
+                retrieval_question_prepared=(
+                    prepared_context.retrieval_question != prepared_context.original_question
+                ),
+            ),
+        )
         return map_workflow_result_to_response(
             request_id=request_id,
             result=result,
@@ -297,4 +313,8 @@ def _map_metadata(metadata: LegalQAWorkflowMetadata) -> ResponseMetadataDTO:
         model=metadata.model,
         reranking_used=metadata.reranking_used,
         latency_ms=metadata.latency_ms,
+        conversation_context_used=metadata.conversation_context_used,
+        conversation_context_message_count=(metadata.conversation_context_message_count),
+        follow_up_detected=metadata.follow_up_detected,
+        retrieval_question_prepared=metadata.retrieval_question_prepared,
     )

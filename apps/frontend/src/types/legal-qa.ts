@@ -41,6 +41,10 @@ export interface LegalQAResponseMetadata {
   model: string | null;
   reranking_used: boolean;
   latency_ms: number;
+  conversation_context_used: boolean;
+  conversation_context_message_count: number;
+  follow_up_detected: boolean;
+  retrieval_question_prepared: boolean;
 }
 
 export interface LegalQAResponse {

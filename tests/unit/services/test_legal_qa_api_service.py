@@ -61,13 +61,22 @@ def test_service_passes_prepared_context_without_rewriting_question() -> None:
     assert workflow_request.context is not None
     assert workflow_request.context.conversation_id == "conversation-1"
     assert workflow_request.context.message_count == 2
+    assert workflow_request.context.context_used is True
+    assert workflow_request.context.follow_up_detected is True
+    assert workflow_request.context.retrieval_question == (
+        "Câu hỏi trước Vậy hợp đồng xác định thời hạn thì sao?"
+    )
     assert [message.content for message in workflow_request.context.messages] == [
         "Câu hỏi trước",
         "Câu trả lời trước",
     ]
+    assert response.metadata.conversation_context_used is True
+    assert response.metadata.conversation_context_message_count == 2
+    assert response.metadata.follow_up_detected is True
+    assert response.metadata.retrieval_question_prepared is True
 
 
-def test_fake_response_is_stable_with_conversation_context() -> None:
+def test_fake_answer_and_evidence_are_stable_with_conversation_context() -> None:
     service = LegalQAService()
 
     without_context = service.answer(LegalQARequest(question="Câu hỏi hợp lệ?"))
@@ -81,9 +90,12 @@ def test_fake_response_is_stable_with_conversation_context() -> None:
         )
     )
 
-    assert with_context.model_copy(update={"request_id": without_context.request_id}) == (
-        without_context
-    )
+    assert with_context.answer == without_context.answer
+    assert with_context.citations == without_context.citations
+    assert with_context.evidence == without_context.evidence
+    assert with_context.metadata.conversation_context_message_count == 2
+    assert with_context.metadata.conversation_context_used is True
+    assert with_context.metadata.retrieval_question_prepared is True
 
 
 def test_service_maps_fallback_workflow_result_to_response() -> None:
