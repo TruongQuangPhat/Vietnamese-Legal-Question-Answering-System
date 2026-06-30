@@ -1,22 +1,5 @@
-import type { LegalQAResponse } from "@/types/legal-qa";
 import { AnswerPanel } from "./answer-panel";
-
-export type ChatMessage =
-  | {
-      id: string;
-      role: "user";
-      content: string;
-      createdAt: string;
-    }
-  | {
-      id: string;
-      role: "assistant";
-      content: string;
-      createdAt: string;
-      status: "loading" | "complete" | "error";
-      response?: LegalQAResponse;
-      errorMessage?: string;
-    };
+import type { ChatMessage } from "./chat-types";
 
 type ChatMessageListProps = {
   messages: ChatMessage[];
