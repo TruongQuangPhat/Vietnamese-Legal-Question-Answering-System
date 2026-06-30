@@ -1,6 +1,5 @@
 import type { LegalQAResponse } from "@/types/legal-qa";
-import { CitationList } from "./citation-list";
-import { EvidenceList } from "./evidence-list";
+import { InlineCitations } from "./inline-citations";
 import { StatusBadge } from "./status-badge";
 
 type AnswerPanelProps = {
@@ -63,9 +62,11 @@ export function AnswerPanel({
           <StatusBadge decision={response.decision} />
         </div>
         {isDemoMode ? <DemoModeNotice /> : null}
-        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-ink">
-          {response.answer}
-        </p>
+        <InlineCitations
+          answer={response.answer}
+          citations={response.citations}
+          evidence={response.evidence}
+        />
       </div>
 
       {response.warnings.length > 0 ? (
@@ -78,23 +79,6 @@ export function AnswerPanel({
           </ul>
         </div>
       ) : null}
-
-      <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
-        <h3 className="text-base font-semibold">Trích dẫn</h3>
-        <div className="mt-3">
-          <CitationList citations={response.citations} />
-        </div>
-      </div>
-
-      <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
-        <h3 className="text-base font-semibold">Bằng chứng</h3>
-        <div className="mt-3">
-          <EvidenceList
-            citations={response.citations}
-            evidence={response.evidence}
-          />
-        </div>
-      </div>
 
       <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
         <h3 className="text-base font-semibold">Thông tin phản hồi</h3>
