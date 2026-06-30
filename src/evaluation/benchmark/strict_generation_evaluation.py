@@ -9,14 +9,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 from pydantic import ValidationError
 
 from src.evaluation.benchmark.enums import ExpectedDecision, TargetRole
 from src.evaluation.benchmark.fingerprinting import sha256_file
 from src.evaluation.benchmark.fusion_ablation import (
-    CoverageAwareFusionConfig,
     config_from_payload,
 )
 from src.evaluation.benchmark.generation_baseline import (
@@ -34,9 +33,12 @@ from src.evaluation.benchmark.loader import (
 )
 from src.evaluation.benchmark.schemas import BenchmarkQuery, EvidenceGroup, EvidenceJudgment
 from src.indexing.official_artifacts import write_json_atomic
+from src.retrieval.coverage_aware import (
+    CoverageAwareFusionConfig,
+    CoverageAwareRetrievalError,
+)
 from src.retrieval.dense_retriever import DenseRetrieverError
 from src.retrieval.evaluation import ExpectedTarget
-from src.retrieval.fusion import reciprocal_rank_fusion
 from src.retrieval.generation import RagAnswerResult, RagGenerationConfig
 from src.retrieval.generation_evaluation import find_secret_leak_labels
 from src.retrieval.llm_client import LLMClientError, LLMClientProtocol
@@ -48,14 +50,6 @@ from src.retrieval.sparse_retriever import SparseRetrieverError
 RETRIEVAL_STRATEGY = "coverage_aware_quota"
 WORKFLOW_NAME = "strict_generation_evaluation"
 BASE_GENERATION_BASELINE = "generation_baseline"
-
-
-class CandidateRetrieverProtocol(Protocol):
-    """Minimal candidate retrieval interface required by hybrid fusion."""
-
-    async def retrieve(self, query: str, *, top_k: int) -> RetrievalResult:
-        """Retrieve ranked candidates for one query."""
-        ...
 
 
 @dataclass(frozen=True)
@@ -74,85 +68,6 @@ class StrictGenerationPaths:
 
 class StrictGenerationEvaluationError(RuntimeError):
     """Raised when strict generation evaluation cannot run safely."""
-
-
-class CoverageAwareQuotaRetriever:
-    """Fuse read-only dense and sparse candidates with a fixed quota policy."""
-
-    def __init__(
-        self,
-        *,
-        dense_retriever: CandidateRetrieverProtocol,
-        sparse_retriever: CandidateRetrieverProtocol,
-        config: CoverageAwareFusionConfig,
-        collection_name: str,
-        vector_name: str,
-    ) -> None:
-        """Initialize the fixed retrieval strategy.
-
-        Args:
-            dense_retriever: Read-only dense candidate retriever.
-            sparse_retriever: Local BM25 candidate retriever.
-            config: Frozen coverage-aware quota configuration.
-            collection_name: Existing Qdrant collection name.
-            vector_name: Existing dense vector name.
-
-        Raises:
-            StrictGenerationEvaluationError: If the configuration is not the
-                approved coverage-aware quota strategy.
-        """
-        if config.mode != "quota" or config.config_id != "selected_coverage_aware_quota":
-            raise StrictGenerationEvaluationError(
-                "retrieval config must be selected_coverage_aware_quota"
-            )
-        self._dense_retriever = dense_retriever
-        self._sparse_retriever = sparse_retriever
-        self._config = config
-        self._collection_name = collection_name
-        self._vector_name = vector_name
-
-    async def retrieve(
-        self,
-        *,
-        query: str,
-        top_k: int | None = None,
-        collection_name: str | None = None,
-    ) -> RetrievalResult:
-        """Retrieve, fuse, and return the fixed final candidate set."""
-        requested_top_k = top_k or self._config.final_top_k
-        if requested_top_k != self._config.final_top_k:
-            raise StrictGenerationEvaluationError(
-                f"top_k must remain fixed at {self._config.final_top_k}"
-            )
-        if collection_name is not None and collection_name != self._collection_name:
-            raise StrictGenerationEvaluationError("collection override does not match config")
-
-        started = time.perf_counter()
-        dense_result = await self._dense_retriever.retrieve(
-            query, top_k=self._config.dense_candidate_k
-        )
-        sparse_result = await self._sparse_retriever.retrieve(
-            query, top_k=self._config.sparse_candidate_k
-        )
-        fused = reciprocal_rank_fusion(
-            dense_results=dense_result.results,
-            sparse_results=sparse_result.results,
-            final_top_k=self._config.final_top_k,
-            rrf_k=self._config.rrf_k,
-            dense_weight=self._config.dense_weight,
-            sparse_weight=self._config.sparse_weight,
-            quota_config=self._config.quota_config(),
-        )
-        return RetrievalResult(
-            query=query,
-            collection_name=self._collection_name,
-            vector_name=self._vector_name,
-            top_k=self._config.final_top_k,
-            elapsed_ms=(time.perf_counter() - started) * 1000,
-            query_vector_dimension=dense_result.query_vector_dimension,
-            results=fused,
-            issues=[*dense_result.issues, *sparse_result.issues],
-        )
 
 
 class FrozenResultRetriever:
@@ -263,6 +178,7 @@ async def evaluate_strict_generation_query(
         )
     except (
         DenseRetrieverError,
+        CoverageAwareRetrievalError,
         SparseRetrieverError,
         StrictGenerationEvaluationError,
         ValueError,

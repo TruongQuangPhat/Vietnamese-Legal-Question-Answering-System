@@ -315,7 +315,7 @@ volumes:
 
 **Development**:
 - Docker Compose local stack.
-- Hot-reload with `uv run uvicorn src.api.main:app --reload`.
+- Hot-reload with `uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000`.
 - `.env.dev` configuration.
 - Debug logging.
 
@@ -433,10 +433,10 @@ class QAResponse(BaseModel):
 
 ```bash
 # Development with hot reload
-uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 
 # Production (multiple workers)
-uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
+uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ### Docker Commands

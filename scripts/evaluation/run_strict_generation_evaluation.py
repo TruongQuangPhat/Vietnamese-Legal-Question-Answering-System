@@ -16,7 +16,6 @@ from pydantic import ValidationError
 from src.evaluation.benchmark.exceptions import BenchmarkLoadError
 from src.evaluation.benchmark.loader import BenchmarkFileSet, load_benchmark_manifest
 from src.evaluation.benchmark.strict_generation_evaluation import (
-    CoverageAwareQuotaRetriever,
     StrictGenerationEvaluationError,
     StrictGenerationPaths,
     aggregate_strict_generation_metrics,
@@ -26,6 +25,10 @@ from src.evaluation.benchmark.strict_generation_evaluation import (
 )
 from src.indexing.embedding_model import BgeM3EmbeddingModel, EmbeddingModelError
 from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
+from src.retrieval.coverage_aware import (
+    CoverageAwareQuotaRetriever,
+    CoverageAwareRetrievalError,
+)
 from src.retrieval.dense_retriever import DenseRetriever, DenseRetrieverError
 from src.retrieval.generation import RagGenerationConfig
 from src.retrieval.llm_client import OpenRouterLLMClient
@@ -202,6 +205,7 @@ async def run_command(args: argparse.Namespace) -> int:
         ValidationError,
         BenchmarkLoadError,
         StrictGenerationEvaluationError,
+        CoverageAwareRetrievalError,
         EmbeddingModelError,
         QdrantCollectionError,
         DenseRetrieverError,

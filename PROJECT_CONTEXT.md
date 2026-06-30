@@ -49,6 +49,9 @@ scripts/
   retrieval/    # retrieval, Naive RAG, review, and quality-gate entrypoints
   evaluation/   # benchmark, retrieval comparison, strict generation, diagnostics
 
+apps/
+  frontend/     # Next.js Legal QA product UI
+
 src/
   ingestion/    # registry, crawl, audit, cleaning, storage
   processing/   # hierarchy parsing, chunking, JSONL validation
@@ -57,17 +60,59 @@ src/
   generation/   # generation-specific helpers where implemented
   services/     # existing orchestration services
   evaluation/   # benchmark schemas, metrics, workflows, diagnostics, artifact contracts
-  api/          # not part of the adopted evaluated pipeline
+  api/          # FastAPI Legal QA product API
   monitoring/   # separately scoped
   security/     # separately scoped
+
+docker/
+  backend/Dockerfile
+  frontend/Dockerfile
+
+docker-compose.yml  # backend + frontend fake-mode local stack
 ```
 
 Scripts are thin wrappers. Reusable logic belongs under `src/`.
 
 BM25 sparse retrieval is local/manual in the current final pipeline. It is not a Qdrant sparse named-vector index.
 
+There is intentionally no `apps/backend`. The backend remains under `src/api`
+and service orchestration remains under `src/services`.
 
-## 3. Legal QA Safety Invariants
+## 3. Configuration Convention
+
+`configs/` stores committed, non-secret YAML configuration. These files are
+safe to commit, reviewable in Git, and define reproducible pipeline/runtime
+settings such as retrieval thresholds, indexing settings, evaluation benchmark
+configuration, processing validation rules, corpus registry metadata, and
+provider/model defaults without secrets.
+
+`.env` stores local runtime overrides, machine-specific values, and secrets. It
+is not committed. `.env.example` documents variable names only. Use `.env` for
+provider keys and tokens, local endpoints, service mode, and config selectors
+such as `LEGAL_QA_RETRIEVAL_CONFIG`, `LEGAL_QA_LLM_CONFIG`, and
+`LEGAL_QA_QDRANT_URL`.
+
+Do not put provider API keys or tokens in `configs/*.yml`. Do not put large
+reviewable config blocks in `.env`; `.env` should select or override runtime
+values, not replace committed config files.
+
+Current committed config inventory:
+
+| Path | Purpose |
+| --- | --- |
+| `configs/evaluation/legal_qa_benchmark.yml` | Benchmark case configuration. |
+| `configs/indexing/embedding_indexing.yml` | Embedding and Qdrant indexing settings. |
+| `configs/laws/corpus_registry.yml` | Trusted legal corpus registry metadata. |
+| `configs/llm/openrouter.yml` | Non-secret LLM provider/model defaults. |
+| `configs/processing/processed_jsonl_validation.yml` | Processed JSONL validation rules. |
+| `configs/retrieval/quality_gate.yml` | Retrieval quality gate settings. |
+| `configs/retrieval/retrieval.yml` | Retrieval runtime defaults. |
+
+Empty placeholder config directories are currently intentional:
+`configs/generation/`, `configs/ingestion/`, and `configs/sources/`.
+
+
+## 4. Legal QA Safety Invariants
 
 - No trusted source means no confident answer.
 - No traceable citation means the answer is invalid.
@@ -90,7 +135,7 @@ Default trusted source:
 https://thuvienphapluat.vn
 ```
 
-## 4. Corpus and Index State
+## 5. Corpus and Index State
 
 - Legal documents: 52.
 - Processed chunk file: `data/processed/legal_chunks.jsonl`.
@@ -115,7 +160,7 @@ Query embedding embeds only the query. The 40,389 corpus chunks are already
 indexed; do not re-embed or re-index unless a task explicitly scopes an
 official indexing rerun.
 
-## 5. Benchmark State
+## 6. Benchmark State
 
 Frozen benchmark:
 
@@ -132,7 +177,7 @@ The held-out test split is reporting-only and must not drive tuning. It
 excludes high-risk sanction/criminal QA, and no qualified human legal review
 has been completed for final generated claims.
 
-## 6. Final Adopted Retrieval
+## 7. Final Adopted Retrieval
 
 Adopted strategy:
 
@@ -181,7 +226,7 @@ selected_config = None
 
 Reranking was evaluated but is not part of the final adopted pipeline.
 
-## 7. Final Adopted Strict Generation Workflow
+## 8. Final Adopted Strict Generation Workflow
 
 Workflow:
 
@@ -250,7 +295,7 @@ strict_generation_evaluation_residual_answer_allowed_improvement
 It was tried but not adopted because development improved while held-out
 regressed and `generation_error_count` became `1`.
 
-## 8. Testing State
+## 9. Testing State
 
 The repository now has workflow-level integration coverage under:
 
@@ -266,7 +311,51 @@ benchmark workflows.
 
 Unit tests cover service, processing, retrieval, and evaluation modules.
 
-## 9. Protected Paths and Runtime Safety
+## 10. Product MVP State
+
+The Legal QA product MVP is complete for fake-mode local demo usage:
+
+- FastAPI backend API under `src/api`;
+- `GET /health`, `GET /version`, and `POST /api/v1/legal-qa/ask`;
+- fake/real Legal QA service mode boundary;
+- runtime settings, CORS, request safety, and safe logging;
+- Next.js frontend under `apps/frontend`;
+- Vietnamese ask UI with answer, citation, evidence, and metadata rendering;
+- Makefile local development commands;
+- backend and frontend Dockerfiles;
+- `docker-compose.yml` fake-mode backend + frontend stack.
+
+Routine local/demo workflow uses fake mode:
+
+```text
+make backend-dev
+make frontend-dev
+make stack-up
+make stack-down
+```
+
+Backend fake-mode development must use:
+
+```bash
+LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+Do not replace it with `uv run uvicorn`.
+
+Frontend browser-facing API URL remains:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+Do not change it to a Docker service hostname for browser-facing local fake
+mode.
+
+Fake mode does not require Qdrant, OpenRouter, embedding models, rerankers, or
+legal corpus data. Real mode is manual-only and should not be used in routine
+validation.
+
+## 11. Protected Paths and Runtime Safety
 
 Do not mutate these paths unless the user explicitly scopes an official rerun:
 
@@ -292,7 +381,7 @@ Unless explicitly requested:
 
 When real retrieval/evaluation is explicitly scoped, keep Qdrant read-only unless the task explicitly scopes indexing, payload mutation, collection recreation, or upsert behavior.
 
-## 10. Durable Documentation
+## 12. Durable Documentation
 
 - `README.md` — professional project overview, setup, commands, and final
   results.
@@ -307,14 +396,14 @@ When real retrieval/evaluation is explicitly scoped, keep Qdrant read-only unles
 Historical roadmap/journal docs are not authoritative when they conflict with
 this file.
 
-## 11. Future or Separately Scoped Work
+## 13. Future or Separately Scoped Work
 
 The following are not part of the current adopted evaluated pipeline unless a future task explicitly scopes, implements, and evaluates them:
 
 * GraphRAG / Neo4j graph traversal;
 * multi-agent retrieval or orchestration;
-* API/backend deployment;
-* UI;
+* production API/backend deployment;
+* production frontend deployment;
 * time-aware legal filtering;
 * cross-encoder reranking as an adopted pipeline component;
 * fine-tuning;

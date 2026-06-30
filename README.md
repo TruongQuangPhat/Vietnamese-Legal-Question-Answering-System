@@ -59,7 +59,14 @@ Main source modules:
 | `src/services/`   | Existing orchestration services where a service boundary is already used.                                                                                                                                                 |
 | `scripts/`        | Thin CLI wrappers for corpus, indexing, retrieval, and evaluation workflows.                                                                                                                                              |
 
-API deployment, GraphRAG, fine-tuning, production MLOps, and time-aware filtering are not part of the adopted evaluated pipeline.
+Production API deployment, GraphRAG, fine-tuning, production MLOps, and
+time-aware filtering are not part of the adopted evaluated pipeline.
+
+The local Legal QA product MVP includes a FastAPI backend under `src/api`, a
+Next.js frontend under `apps/frontend`, backend/frontend Dockerfiles, and a
+fake-mode `docker-compose.yml` stack. Fake mode is the default local demo path
+and does not require Qdrant, OpenRouter, embedding models, rerankers, or legal
+corpus data. Real mode remains manual-only.
 
 
 ## Current Results
@@ -170,8 +177,159 @@ uv sync
 
 Optional provider secrets belong in environment variables or an uncommitted
 `.env`. Do not store API keys in configs, docs, reports, or source code.
+Committed YAML config under `configs/` is for non-secret, reviewable pipeline
+and runtime defaults; `.env` only selects or overrides local runtime values.
+
+For backend runtime configuration and local smoke checks, see
+`docs/backend-runtime.md`.
+
+For frontend local development, see `apps/frontend/README.md`.
+
+## Local Product Development
+
+Run the fake-mode MVP with two terminals.
+
+Backend:
+
+```bash
+make backend-dev
+```
+
+Frontend:
+
+```bash
+make frontend-dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Fake mode returns stub Legal QA responses for local UI and API contract checks.
+It does not require Qdrant, OpenRouter, embedding models, rerankers, or
+benchmark/evaluation workflows. Real mode requires separate manual setup and
+should not be used in routine validation.
 
 ## Common Commands
+
+Run focused product checks:
+
+```bash
+make test-api
+make frontend-lint
+make frontend-build
+```
+
+Build and run the backend container in fake mode:
+
+```bash
+make backend-image
+make backend-container
+```
+
+Equivalent direct commands:
+
+```bash
+docker build -f docker/backend/Dockerfile -t vnlaw-qa-backend:local .
+docker run --rm -p 8000:8000 -e LEGAL_QA_SERVICE_MODE=fake vnlaw-qa-backend:local
+```
+
+Smoke check the running container:
+
+```bash
+curl -s http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+The backend image is for fake-mode local packaging checks. It does not require
+Qdrant, OpenRouter, embedding models, rerankers, or legal corpus data. Real
+mode requires additional runtime setup and is not part of routine validation.
+
+Build and run the frontend container:
+
+```bash
+make frontend-image
+make frontend-container
+```
+
+Equivalent direct commands:
+
+```bash
+docker build -f docker/frontend/Dockerfile \
+  -t vnlaw-qa-frontend:local \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
+  .
+
+docker run --rm -p 3000:3000 vnlaw-qa-frontend:local
+```
+
+Local container smoke:
+
+1. Run the backend on `http://localhost:8000` with `make backend-dev` or
+   `make backend-container`.
+2. Run the frontend container on `http://localhost:3000`.
+3. Open `http://localhost:3000`.
+4. Submit a Vietnamese legal question.
+5. Confirm the fake backend response renders.
+
+`NEXT_PUBLIC_API_BASE_URL` is browser-facing and must not contain secret values.
+For this local packaging flow it remains `http://localhost:8000`; Docker Compose
+service-network wiring is intentionally not configured yet.
+
+Run the fake-mode Docker Compose stack defined in `docker-compose.yml`:
+
+```bash
+make stack-up
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Smoke checks:
+
+```bash
+curl -s http://localhost:8000/health
+curl -I http://localhost:3000
+```
+
+Expected backend response:
+
+```json
+{"status":"ok"}
+```
+
+Stop the stack:
+
+```bash
+make stack-down
+```
+
+Equivalent direct command:
+
+```bash
+docker compose -f docker-compose.yml down
+```
+
+The Compose stack runs fake mode only. It does not require Qdrant, OpenRouter,
+embedding models, rerankers, or legal corpus data. `NEXT_PUBLIC_API_BASE_URL`
+is browser-facing and defaults to `http://localhost:8000`; do not put secrets
+in `NEXT_PUBLIC_*` variables. Real-mode Compose will be documented separately.
 
 Run safe validation:
 
