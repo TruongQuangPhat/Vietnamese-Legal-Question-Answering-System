@@ -17,7 +17,9 @@ export function AnswerPanel({
   if (isLoading) {
     return (
       <section className="rounded-md border border-border bg-surface p-5 shadow-sm">
-        <p className="text-sm font-medium text-ink">Đang tải câu trả lời...</p>
+        <p className="text-sm font-medium text-ink">
+          Đang tra cứu căn cứ pháp lý...
+        </p>
         <p className="mt-2 text-sm text-muted">
           Yêu cầu đang được gửi tới Legal QA API.
         </p>

@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiRequestError, askLegalQuestion } from "@/lib/legal-qa-client";
-import type { LegalQAResponse } from "@/types/legal-qa";
-import { AnswerPanel } from "./answer-panel";
 import { AskForm } from "./ask-form";
 import { ChatEmptyState } from "./chat-empty-state";
+import { ChatMessageList, type ChatMessage } from "./chat-message-list";
 import { ChatSidebar } from "./chat-sidebar";
 
 const MAX_QUESTION_LENGTH = 4000;
@@ -20,10 +19,17 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
   const [topK, setTopK] = useState(DEFAULT_TOP_K);
   const [includeEvidence, setIncludeEvidence] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const [response, setResponse] = useState<LegalQAResponse | null>(null);
-  const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const latestMessageRef = useRef<HTMLDivElement | null>(null);
+  const chatVersionRef = useRef(0);
+
+  useEffect(() => {
+    latestMessageRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [messages]);
 
   async function submitQuestion() {
     const trimmedQuestion = question.trim();
@@ -34,10 +40,17 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
     }
 
     setValidationError(null);
-    setRequestError(null);
-    setSubmittedQuestion(trimmedQuestion);
-    setResponse(null);
+    setQuestion("");
     setIsLoading(true);
+
+    const userMessage = createUserMessage(trimmedQuestion);
+    const assistantMessage = createAssistantLoadingMessage();
+    const chatVersion = chatVersionRef.current;
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      userMessage,
+      assistantMessage,
+    ]);
 
     try {
       const answer = await askLegalQuestion({
@@ -46,25 +59,44 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
         include_evidence: includeEvidence,
         include_debug: false,
       });
-      setResponse(answer);
+      if (chatVersion !== chatVersionRef.current) {
+        return;
+      }
+      setMessages((currentMessages) =>
+        updateAssistantMessage(currentMessages, assistantMessage.id, {
+          content: answer.answer,
+          status: "complete",
+          response: answer,
+        }),
+      );
     } catch (error) {
-      setRequestError(toUserFacingError(error));
+      if (chatVersion !== chatVersionRef.current) {
+        return;
+      }
+      const errorMessage = toUserFacingError(error);
+      setMessages((currentMessages) =>
+        updateAssistantMessage(currentMessages, assistantMessage.id, {
+          content: errorMessage,
+          status: "error",
+          errorMessage,
+        }),
+      );
     } finally {
-      setIsLoading(false);
+      if (chatVersion === chatVersionRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 
   function startNewChat() {
+    chatVersionRef.current += 1;
     setQuestion("");
     setValidationError(null);
-    setRequestError(null);
-    setResponse(null);
-    setSubmittedQuestion(null);
+    setMessages([]);
+    setIsLoading(false);
   }
 
-  const hasConversation = Boolean(
-    submittedQuestion || response || requestError || isLoading,
-  );
+  const hasConversation = messages.length > 0;
 
   return (
     <div className="flex min-h-[calc(100vh-1.5rem)] flex-1 overflow-hidden rounded-md border border-border bg-surface shadow-panel md:min-h-[calc(100vh-2.5rem)]">
@@ -85,28 +117,11 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
             {hasConversation ? (
-              <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-                {submittedQuestion ? (
-                  <div className="flex justify-end">
-                    <div className="max-w-[min(88%,680px)] rounded-md bg-primary px-4 py-3 text-sm leading-6 text-white shadow-sm">
-                      {submittedQuestion}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="flex justify-start">
-                  <div className="w-full max-w-[min(100%,760px)]">
-                    <AnswerPanel
-                      errorMessage={requestError}
-                      isLoading={isLoading}
-                      response={response}
-                    />
-                  </div>
-                </div>
-              </div>
+              <ChatMessageList messages={messages} />
             ) : (
               <ChatEmptyState />
             )}
+            <div ref={latestMessageRef} />
           </div>
 
           <div className="border-t border-border bg-surface px-4 py-4 md:px-6">
@@ -135,6 +150,48 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
   );
 }
 
+function createUserMessage(content: string): ChatMessage {
+  return {
+    id: createMessageId(),
+    role: "user",
+    content,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function createAssistantLoadingMessage(): ChatMessage {
+  return {
+    id: createMessageId(),
+    role: "assistant",
+    content: "Đang tra cứu căn cứ pháp lý...",
+    createdAt: new Date().toISOString(),
+    status: "loading",
+  };
+}
+
+function updateAssistantMessage(
+  messages: ChatMessage[],
+  messageId: string,
+  updates: Partial<Extract<ChatMessage, { role: "assistant" }>>,
+): ChatMessage[] {
+  return messages.map((message) => {
+    if (message.id !== messageId || message.role !== "assistant") {
+      return message;
+    }
+    return {
+      ...message,
+      ...updates,
+    };
+  });
+}
+
+function createMessageId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function validateQuestion(
   trimmedQuestion: string,
   questionLength: number,
@@ -155,14 +212,14 @@ function validateQuestion(
 function toUserFacingError(error: unknown): string {
   if (error instanceof ApiRequestError) {
     if (error.code === "network_error") {
-      return "Không thể kết nối backend. Kiểm tra API server và NEXT_PUBLIC_API_BASE_URL.";
+      return "Không thể nhận câu trả lời lúc này. Vui lòng thử lại.";
     }
     if (error.code === "http_error") {
-      return "Backend trả về lỗi. Vui lòng thử lại.";
+      return "Không thể nhận câu trả lời lúc này. Vui lòng thử lại.";
     }
     if (error.code === "invalid_json") {
-      return "Phản hồi backend không hợp lệ.";
+      return "Không thể nhận câu trả lời lúc này. Vui lòng thử lại.";
     }
   }
-  return "Đã xảy ra lỗi không xác định.";
+  return "Không thể nhận câu trả lời lúc này. Vui lòng thử lại.";
 }
