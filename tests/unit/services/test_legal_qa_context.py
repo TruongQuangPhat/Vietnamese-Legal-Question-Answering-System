@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from src.api.schemas import LegalQARequest
 from src.services.legal_qa_context import LegalQAContextPreparer
 
@@ -85,6 +87,62 @@ def test_follow_up_question_uses_most_recent_user_topic_anchor() -> None:
     assert prepared.follow_up_detected is True
     assert prepared.context_used is True
     assert prepared.retrieval_question == f"{prior_question} {current_question}"
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Vậy hợp đồng xác định thời hạn thì sao?",
+        "Còn hợp đồng không xác định thời hạn?",
+        "Trường hợp đó có cần báo trước không?",
+        "Như trên thì người lao động có được trợ cấp không?",
+        "Nếu vậy thì công ty có phải bồi thường không?",
+    ],
+)
+def test_explicit_follow_up_markers_use_prior_user_anchor(question: str) -> None:
+    prepared = LegalQAContextPreparer().prepare(
+        LegalQARequest(
+            question=question,
+            conversation_context=[
+                {
+                    "role": "user",
+                    "content": "Người lao động đơn phương chấm dứt hợp đồng khi nào?",
+                }
+            ],
+        )
+    )
+
+    assert prepared.follow_up_detected is True
+    assert prepared.context_used is True
+    assert prepared.retrieval_question.endswith(question)
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Điều kiện kết hôn là gì?",
+        "Bảo hiểm y tế trẻ em?",
+        "Nghỉ phép năm bao nhiêu ngày?",
+        "Hợp đồng lao động là gì?",
+        "Tội trộm cắp tài sản xử lý thế nào?",
+    ],
+)
+def test_short_independent_questions_do_not_use_prior_context(question: str) -> None:
+    prepared = LegalQAContextPreparer().prepare(
+        LegalQARequest(
+            question=question,
+            conversation_context=[
+                {
+                    "role": "user",
+                    "content": "Người lao động đơn phương chấm dứt hợp đồng khi nào?",
+                }
+            ],
+        )
+    )
+
+    assert prepared.follow_up_detected is False
+    assert prepared.context_used is False
+    assert prepared.retrieval_question == question
 
 
 def test_assistant_only_context_is_not_used_as_topic_anchor() -> None:

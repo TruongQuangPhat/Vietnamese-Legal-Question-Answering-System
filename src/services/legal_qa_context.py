@@ -15,16 +15,21 @@ from src.api.schemas import (
 FOLLOW_UP_MARKERS = (
     "vậy",
     "vậy thì",
+    "nếu vậy",
     "trường hợp đó",
+    "trường hợp này",
     "như vậy",
     "còn",
+    "còn nếu",
     "thì sao",
     "như trên",
     "đối với trường hợp này",
     "hợp đồng này",
     "người đó",
+    "bên đó",
+    "việc đó",
+    "quy định đó",
 )
-MAX_STANDALONE_QUESTION_WORDS = 8
 
 
 @dataclass(frozen=True)
@@ -114,9 +119,7 @@ def _normalize_content(message: LegalQAContextMessage) -> str:
 
 def _is_follow_up_question(question: str) -> bool:
     normalized_question = " ".join(question.casefold().split())
-    has_contextual_marker = any(marker in normalized_question for marker in FOLLOW_UP_MARKERS)
-    is_short = len(normalized_question.split()) <= MAX_STANDALONE_QUESTION_WORDS
-    return has_contextual_marker or is_short
+    return any(marker in normalized_question for marker in FOLLOW_UP_MARKERS)
 
 
 def _prepare_retrieval_question(

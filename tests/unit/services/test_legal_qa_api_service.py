@@ -78,11 +78,12 @@ def test_service_passes_prepared_context_without_rewriting_question() -> None:
 
 def test_fake_answer_and_evidence_are_stable_with_conversation_context() -> None:
     service = LegalQAService()
+    question = "Vậy trường hợp này thì sao?"
 
-    without_context = service.answer(LegalQARequest(question="Câu hỏi hợp lệ?"))
+    without_context = service.answer(LegalQARequest(question=question))
     with_context = service.answer(
         LegalQARequest(
-            question="Câu hỏi hợp lệ?",
+            question=question,
             conversation_context=[
                 {"role": "user", "content": "Câu hỏi trước"},
                 {"role": "assistant", "content": "Câu trả lời trước"},
