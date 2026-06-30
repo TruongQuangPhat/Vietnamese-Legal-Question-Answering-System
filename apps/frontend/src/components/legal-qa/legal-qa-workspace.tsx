@@ -5,6 +5,8 @@ import { ApiRequestError, askLegalQuestion } from "@/lib/legal-qa-client";
 import type { LegalQAResponse } from "@/types/legal-qa";
 import { AnswerPanel } from "./answer-panel";
 import { AskForm } from "./ask-form";
+import { ChatEmptyState } from "./chat-empty-state";
+import { ChatSidebar } from "./chat-sidebar";
 
 const MAX_QUESTION_LENGTH = 4000;
 const DEFAULT_TOP_K = 10;
@@ -20,6 +22,7 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [response, setResponse] = useState<LegalQAResponse | null>(null);
+  const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   async function submitQuestion() {
@@ -32,6 +35,8 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
 
     setValidationError(null);
     setRequestError(null);
+    setSubmittedQuestion(trimmedQuestion);
+    setResponse(null);
     setIsLoading(true);
 
     try {
@@ -49,45 +54,83 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
     }
   }
 
+  function startNewChat() {
+    setQuestion("");
+    setValidationError(null);
+    setRequestError(null);
+    setResponse(null);
+    setSubmittedQuestion(null);
+  }
+
+  const hasConversation = Boolean(
+    submittedQuestion || response || requestError || isLoading,
+  );
+
   return (
-    <div className="grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
-      <section className="h-fit rounded-md border border-border bg-surface p-5 shadow-panel">
-        <div className="border-b border-border pb-4">
-          <h2 className="text-lg font-semibold">Khu vực đặt câu hỏi</h2>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            Nhập câu hỏi pháp lý bằng tiếng Việt. Backend có thể trả lời kèm
-            trích dẫn hoặc fallback an toàn khi bằng chứng chưa đủ.
-          </p>
-          <p className="mt-2 text-xs text-muted">
-            API: <span className="font-medium text-ink">{apiBaseUrl}</span>
-          </p>
-        </div>
+    <div className="flex min-h-[calc(100vh-1.5rem)] flex-1 overflow-hidden rounded-md border border-border bg-surface shadow-panel md:min-h-[calc(100vh-2.5rem)]">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <ChatSidebar onNewChat={startNewChat} />
 
-        <div className="mt-5">
-          <AskForm
-            includeEvidence={includeEvidence}
-            isLoading={isLoading}
-            onIncludeEvidenceChange={setIncludeEvidence}
-            onQuestionChange={(value) => {
-              setQuestion(value);
-              if (validationError) {
-                setValidationError(null);
-              }
-            }}
-            onSubmit={submitQuestion}
-            onTopKChange={setTopK}
-            question={question}
-            topK={topK}
-            validationError={validationError}
-          />
-        </div>
-      </section>
+        <section className="flex min-h-0 flex-1 flex-col bg-[#fbfcfe]">
+          <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-semibold text-ink">
+                Cuộc trò chuyện hiện tại
+              </h2>
+              <p className="mt-1 truncate text-xs text-muted">
+                API: <span className="font-medium text-ink">{apiBaseUrl}</span>
+              </p>
+            </div>
+          </div>
 
-      <AnswerPanel
-        errorMessage={requestError}
-        isLoading={isLoading}
-        response={response}
-      />
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
+            {hasConversation ? (
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+                {submittedQuestion ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[min(88%,680px)] rounded-md bg-primary px-4 py-3 text-sm leading-6 text-white shadow-sm">
+                      {submittedQuestion}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="flex justify-start">
+                  <div className="w-full max-w-[min(100%,760px)]">
+                    <AnswerPanel
+                      errorMessage={requestError}
+                      isLoading={isLoading}
+                      response={response}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ChatEmptyState />
+            )}
+          </div>
+
+          <div className="border-t border-border bg-surface px-4 py-4 md:px-6">
+            <div className="mx-auto w-full max-w-3xl">
+              <AskForm
+                includeEvidence={includeEvidence}
+                isLoading={isLoading}
+                onIncludeEvidenceChange={setIncludeEvidence}
+                onQuestionChange={(value) => {
+                  setQuestion(value);
+                  if (validationError) {
+                    setValidationError(null);
+                  }
+                }}
+                onSubmit={submitQuestion}
+                onTopKChange={setTopK}
+                question={question}
+                topK={topK}
+                validationError={validationError}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

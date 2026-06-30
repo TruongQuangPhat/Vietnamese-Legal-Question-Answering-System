@@ -28,30 +28,23 @@ export function AskForm({
 
   return (
     <form
-      className="space-y-5"
+      className="rounded-md border border-border bg-surface p-3 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
       <div>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <label className="text-sm font-medium text-ink" htmlFor="question">
-            Câu hỏi pháp lý
-          </label>
-          <span
-            className={`text-xs ${isOverLimit ? "text-[#a93434]" : "text-muted"}`}
-          >
-            {characterCount}/{MAX_QUESTION_LENGTH}
-          </span>
-        </div>
+        <label className="sr-only" htmlFor="question">
+          Câu hỏi pháp lý
+        </label>
         <textarea
           id="question"
-          className="min-h-44 w-full resize-y rounded-md border-border text-sm leading-6 text-ink placeholder:text-[#8b95a5] focus:border-primary focus:ring-primary"
+          className="min-h-24 w-full resize-none border-0 p-0 text-sm leading-6 text-ink placeholder:text-[#8b95a5] focus:ring-0"
           disabled={isLoading}
           maxLength={MAX_QUESTION_LENGTH + 200}
           onChange={(event) => onQuestionChange(event.target.value)}
-          placeholder="Người lao động được quyền đơn phương chấm dứt hợp đồng lao động khi nào?"
+          placeholder="Nhập câu hỏi pháp lý..."
           value={question}
         />
         {validationError ? (
@@ -59,45 +52,51 @@ export function AskForm({
         ) : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
-        <div>
+      <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={`text-xs ${isOverLimit ? "text-[#a93434]" : "text-muted"}`}
+          >
+            {characterCount}/{MAX_QUESTION_LENGTH}
+          </span>
+
           <label
-            className="mb-2 block text-sm font-medium text-ink"
+            className="flex items-center gap-2 text-xs font-medium text-muted"
             htmlFor="top-k"
           >
-            Số bằng chứng tối đa
+            Bằng chứng
+            <input
+              id="top-k"
+              className="h-8 w-16 rounded-md border-border text-sm focus:border-primary focus:ring-primary"
+              disabled={isLoading}
+              max={20}
+              min={1}
+              onChange={(event) => onTopKChange(Number(event.target.value))}
+              type="number"
+              value={topK}
+            />
           </label>
-          <input
-            id="top-k"
-            className="w-full rounded-md border-border text-sm focus:border-primary focus:ring-primary"
-            disabled={isLoading}
-            max={20}
-            min={1}
-            onChange={(event) => onTopKChange(Number(event.target.value))}
-            type="number"
-            value={topK}
-          />
+
+          <label className="flex items-center gap-2 text-xs font-medium text-muted">
+            <input
+              checked={includeEvidence}
+              className="rounded border-border text-primary focus:ring-primary"
+              disabled={isLoading}
+              onChange={(event) => onIncludeEvidenceChange(event.target.checked)}
+              type="checkbox"
+            />
+            Hiển thị bằng chứng
+          </label>
         </div>
 
-        <label className="flex items-center gap-3 self-end rounded-md border border-border bg-[#f8fafc] px-4 py-3 text-sm text-ink">
-          <input
-            checked={includeEvidence}
-            className="rounded border-border text-primary focus:ring-primary"
-            disabled={isLoading}
-            onChange={(event) => onIncludeEvidenceChange(event.target.checked)}
-            type="checkbox"
-          />
-          Hiển thị bằng chứng được chọn
-        </label>
+        <button
+          className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#0c625b] disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isLoading}
+          type="submit"
+        >
+          {isLoading ? "Đang gửi..." : "Gửi"}
+        </button>
       </div>
-
-      <button
-        className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0c625b] disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isLoading}
-        type="submit"
-      >
-        {isLoading ? "Đang gửi..." : "Gửi câu hỏi"}
-      </button>
     </form>
   );
 }

@@ -16,7 +16,7 @@ export function AnswerPanel({
 }: AnswerPanelProps) {
   if (isLoading) {
     return (
-      <section className="rounded-md border border-border bg-surface p-5 shadow-panel">
+      <section className="rounded-md border border-border bg-surface p-5 shadow-sm">
         <p className="text-sm font-medium text-ink">Đang tải câu trả lời...</p>
         <p className="mt-2 text-sm text-muted">
           Yêu cầu đang được gửi tới Legal QA API.
@@ -36,7 +36,7 @@ export function AnswerPanel({
 
   if (!response) {
     return (
-      <section className="rounded-md border border-border bg-surface p-5 shadow-panel">
+      <section className="rounded-md border border-border bg-surface p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Câu trả lời</h2>
         <p className="mt-2 text-sm leading-6 text-muted">
           Gửi một câu hỏi pháp lý để xem câu trả lời, trích dẫn, bằng chứng,
@@ -50,10 +50,10 @@ export function AnswerPanel({
 
   return (
     <section className="space-y-5">
-      <div className="rounded-md border border-border bg-surface p-5 shadow-panel">
+      <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Câu trả lời</h2>
+            <h2 className="text-lg font-semibold">Trợ lý pháp lý</h2>
             <p className="mt-1 text-xs text-muted">
               request_id: {response.request_id}
             </p>
@@ -77,14 +77,14 @@ export function AnswerPanel({
         </div>
       ) : null}
 
-      <div className="rounded-md border border-border bg-surface p-5 shadow-panel">
+      <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
         <h3 className="text-base font-semibold">Trích dẫn</h3>
         <div className="mt-3">
           <CitationList citations={response.citations} />
         </div>
       </div>
 
-      <div className="rounded-md border border-border bg-surface p-5 shadow-panel">
+      <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
         <h3 className="text-base font-semibold">Bằng chứng</h3>
         <div className="mt-3">
           <EvidenceList
@@ -94,7 +94,7 @@ export function AnswerPanel({
         </div>
       </div>
 
-      <div className="rounded-md border border-border bg-surface p-5 shadow-panel">
+      <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
         <h3 className="text-base font-semibold">Thông tin phản hồi</h3>
         <dl className="mt-3 grid gap-3 text-sm md:grid-cols-4">
           <div>
