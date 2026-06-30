@@ -121,10 +121,31 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
     setActiveConversationId(null);
   }
 
+  function deleteConversation(conversationId: string) {
+    setConversations((currentConversations) => {
+      const remainingConversations = currentConversations.filter(
+        (conversation) => conversation.id !== conversationId,
+      );
+
+      if (conversationId === activeConversationId) {
+        setQuestion("");
+        setValidationError(null);
+        setActiveConversationId(remainingConversations[0]?.id ?? null);
+      }
+
+      return remainingConversations;
+    });
+  }
+
   function selectConversation(conversationId: string) {
     setQuestion("");
     setValidationError(null);
     setActiveConversationId(conversationId);
+  }
+
+  function selectSuggestedPrompt(prompt: string) {
+    setQuestion(prompt);
+    setValidationError(null);
   }
 
   const activeConversation = activeConversationId
@@ -142,6 +163,7 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
         <ChatSidebar
           activeConversationId={activeConversationId}
           conversations={conversations}
+          onDeleteConversation={deleteConversation}
           onNewChat={startNewChat}
           onSelectConversation={selectConversation}
         />
@@ -162,7 +184,7 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
             {hasConversation ? (
               <ChatMessageList messages={activeMessages} />
             ) : (
-              <ChatEmptyState />
+              <ChatEmptyState onSelectPrompt={selectSuggestedPrompt} />
             )}
             <div ref={latestMessageRef} />
           </div>

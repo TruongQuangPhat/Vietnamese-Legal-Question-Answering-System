@@ -4,12 +4,14 @@ type ChatSidebarProps = {
   activeConversationId: string | null;
   conversations: Conversation[];
   onNewChat: () => void;
+  onDeleteConversation: (conversationId: string) => void;
   onSelectConversation: (conversationId: string) => void;
 };
 
 export function ChatSidebar({
   activeConversationId,
   conversations,
+  onDeleteConversation,
   onNewChat,
   onSelectConversation,
 }: ChatSidebarProps) {
@@ -33,22 +35,21 @@ export function ChatSidebar({
         </button>
       </div>
 
-      <div className="mt-4 hidden min-h-0 flex-1 flex-col md:flex">
-        <h2 className="mb-2 text-sm font-semibold text-ink">
-          Lịch sử trò chuyện
-        </h2>
-        {conversations.length > 0 ? (
-          <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {conversations.map((conversation) => {
-              const isActive = conversation.id === activeConversationId;
-              return (
+      {conversations.length > 0 ? (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 md:hidden">
+          {conversations.map((conversation) => {
+            const isActive = conversation.id === activeConversationId;
+            return (
+              <div
+                className={`flex max-w-64 shrink-0 items-start gap-2 rounded-md border px-3 py-2 text-left text-sm transition ${
+                  isActive
+                    ? "border-primary bg-surface text-primary"
+                    : "border-transparent bg-[#f8fafc] text-ink"
+                }`}
+                key={conversation.id}
+              >
                 <button
-                  className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
-                    isActive
-                      ? "border-primary bg-surface text-primary"
-                      : "border-transparent text-ink hover:border-border hover:bg-surface"
-                  }`}
-                  key={conversation.id}
+                  className="min-w-0 flex-1 text-left"
                   onClick={() => onSelectConversation(conversation.id)}
                   type="button"
                 >
@@ -59,6 +60,74 @@ export function ChatSidebar({
                     {formatUpdatedAt(conversation.updatedAt)}
                   </span>
                 </button>
+                <button
+                  aria-label={`Xóa ${conversation.title}`}
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-muted"
+                  onClick={() => {
+                    if (
+                      window.confirm("Xóa cuộc trò chuyện này khỏi trình duyệt?")
+                    ) {
+                      onDeleteConversation(conversation.id);
+                    }
+                  }}
+                  type="button"
+                >
+                  Xóa
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="mt-4 hidden min-h-0 flex-1 flex-col md:flex">
+        <h2 className="mb-2 text-sm font-semibold text-ink">
+          Lịch sử trò chuyện
+        </h2>
+        {conversations.length > 0 ? (
+          <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+            {conversations.map((conversation) => {
+              const isActive = conversation.id === activeConversationId;
+              return (
+                <div
+                  className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
+                    isActive
+                      ? "border-primary bg-surface text-primary"
+                      : "border-transparent text-ink hover:border-border hover:bg-surface"
+                  }`}
+                  key={conversation.id}
+                >
+                  <div className="flex items-start gap-2">
+                    <button
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => onSelectConversation(conversation.id)}
+                      type="button"
+                    >
+                      <span className="block truncate font-medium">
+                        {conversation.title}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted">
+                        Cập nhật {formatUpdatedAt(conversation.updatedAt)}
+                      </span>
+                    </button>
+                    <button
+                      aria-label={`Xóa ${conversation.title}`}
+                      className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition hover:bg-[#fff0f0] hover:text-[#a93434] focus:outline-none focus:ring-2 focus:ring-[#a93434]/30"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Xóa cuộc trò chuyện này khỏi trình duyệt?",
+                          )
+                        ) {
+                          onDeleteConversation(conversation.id);
+                        }
+                      }}
+                      type="button"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </nav>

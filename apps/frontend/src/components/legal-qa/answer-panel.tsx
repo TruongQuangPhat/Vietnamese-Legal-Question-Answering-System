@@ -1,4 +1,7 @@
+"use client";
+
 import type { LegalQAResponse } from "@/types/legal-qa";
+import { useState } from "react";
 import { InlineCitations } from "./inline-citations";
 import { StatusBadge } from "./status-badge";
 
@@ -13,6 +16,10 @@ export function AnswerPanel({
   errorMessage,
   isLoading,
 }: AnswerPanelProps) {
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
+
   if (isLoading) {
     return (
       <section className="rounded-md border border-border bg-surface p-5 shadow-sm">
@@ -49,6 +56,21 @@ export function AnswerPanel({
 
   const isDemoMode = response.metadata.model === "stub";
 
+  async function copyAnswer() {
+    if (!response) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(response.answer);
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus("idle"), 1600);
+    } catch {
+      setCopyStatus("failed");
+      window.setTimeout(() => setCopyStatus("idle"), 2000);
+    }
+  }
+
   return (
     <section className="space-y-5">
       <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
@@ -59,7 +81,20 @@ export function AnswerPanel({
               request_id: {response.request_id}
             </p>
           </div>
-          <StatusBadge decision={response.decision} />
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge decision={response.decision} />
+            <button
+              className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-muted transition hover:border-primary hover:text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              onClick={copyAnswer}
+              type="button"
+            >
+              {copyStatus === "copied"
+                ? "Đã sao chép"
+                : copyStatus === "failed"
+                  ? "Không sao chép được"
+                  : "Sao chép"}
+            </button>
+          </div>
         </div>
         {isDemoMode ? <DemoModeNotice /> : null}
         <InlineCitations

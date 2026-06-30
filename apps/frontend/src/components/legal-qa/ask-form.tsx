@@ -44,6 +44,20 @@ export function AskForm({
           disabled={isLoading}
           maxLength={MAX_QUESTION_LENGTH + 200}
           onChange={(event) => onQuestionChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (
+              event.key !== "Enter" ||
+              event.shiftKey ||
+              event.nativeEvent.isComposing
+            ) {
+              return;
+            }
+            if (isLoading || !question.trim()) {
+              return;
+            }
+            event.preventDefault();
+            onSubmit();
+          }}
           placeholder="Nhập câu hỏi pháp lý..."
           value={question}
         />
