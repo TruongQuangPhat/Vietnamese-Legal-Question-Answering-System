@@ -18,11 +18,7 @@ const DEFAULT_TOP_K = 10;
 const DEFAULT_CONVERSATION_TITLE = "Cuộc trò chuyện mới";
 const TITLE_MAX_LENGTH = 56;
 
-type LegalQAWorkspaceProps = {
-  apiBaseUrl: string;
-};
-
-export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
+export function LegalQAWorkspace() {
   const [question, setQuestion] = useState("");
   const [topK, setTopK] = useState(DEFAULT_TOP_K);
   const [includeEvidence, setIncludeEvidence] = useState(true);
@@ -137,6 +133,28 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
     });
   }
 
+  function renameConversation(conversationId: string, title: string) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      return;
+    }
+
+    setConversations((currentConversations) =>
+      sortConversations(
+        currentConversations.map((conversation) => {
+          if (conversation.id !== conversationId) {
+            return conversation;
+          }
+          return {
+            ...conversation,
+            title: createConversationTitle(trimmedTitle),
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      ),
+    );
+  }
+
   function selectConversation(conversationId: string) {
     setQuestion("");
     setValidationError(null);
@@ -165,21 +183,11 @@ export function LegalQAWorkspace({ apiBaseUrl }: LegalQAWorkspaceProps) {
           conversations={conversations}
           onDeleteConversation={deleteConversation}
           onNewChat={startNewChat}
+          onRenameConversation={renameConversation}
           onSelectConversation={selectConversation}
         />
 
         <section className="flex min-h-0 flex-1 flex-col bg-[#fbfcfe]">
-          <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold text-ink">
-                Cuộc trò chuyện hiện tại
-              </h2>
-              <p className="mt-1 truncate text-xs text-muted">
-                API: <span className="font-medium text-ink">{apiBaseUrl}</span>
-              </p>
-            </div>
-          </div>
-
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
             {hasConversation ? (
               <ChatMessageList messages={activeMessages} />

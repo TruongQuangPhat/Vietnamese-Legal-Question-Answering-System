@@ -77,9 +77,6 @@ export function AnswerPanel({
         <div className="flex flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Trợ lý pháp lý</h2>
-            <p className="mt-1 text-xs text-muted">
-              request_id: {response.request_id}
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge decision={response.decision} />
@@ -115,31 +112,6 @@ export function AnswerPanel({
         </div>
       ) : null}
 
-      <div className="rounded-md border border-border bg-surface p-5 shadow-sm">
-        <h3 className="text-base font-semibold">Thông tin phản hồi</h3>
-        <dl className="mt-3 grid gap-3 text-sm md:grid-cols-4">
-          <div>
-            <dt className="font-medium text-muted">latency_ms</dt>
-            <dd className="mt-1 text-ink">{response.metadata.latency_ms} ms</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-muted">retrieval_strategy</dt>
-            <dd className="mt-1 text-ink">
-              {response.metadata.retrieval_strategy}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium text-muted">model</dt>
-            <dd className="mt-1 text-ink">{response.metadata.model ?? "none"}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-muted">reranking_used</dt>
-            <dd className="mt-1 text-ink">
-              {response.metadata.reranking_used ? "true" : "false"}
-            </dd>
-          </div>
-        </dl>
-      </div>
     </section>
   );
 }

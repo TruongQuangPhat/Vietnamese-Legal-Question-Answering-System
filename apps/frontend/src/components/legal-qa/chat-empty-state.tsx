@@ -22,9 +22,6 @@ export function ChatEmptyState({ onSelectPrompt }: ChatEmptyStateProps) {
         Nhập câu hỏi pháp lý để nhận câu trả lời kèm trích dẫn và bằng chứng từ
         nguồn pháp luật đáng tin cậy.
       </p>
-      <div className="mt-6 rounded-md border border-dashed border-border bg-surface px-4 py-3 text-sm text-muted">
-        Chưa có cuộc trò chuyện
-      </div>
       <div className="mt-6 grid w-full gap-2 text-left sm:grid-cols-2">
         {SUGGESTED_PROMPTS.map((prompt) => (
           <button
