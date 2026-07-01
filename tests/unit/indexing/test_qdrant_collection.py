@@ -141,6 +141,35 @@ def test_missing_qdrant_dependency_has_clear_install_message(
         build_qdrant_client(url="http://localhost:6333", timeout_seconds=60)
 
 
+@pytest.mark.parametrize("api_key", [None, "qdrant-test-key"])
+def test_qdrant_client_passes_optional_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+    api_key: str | None,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakeAsyncQdrantClient:
+        def __init__(self, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "src.indexing.qdrant_collection.importlib.import_module",
+        lambda name: SimpleNamespace(AsyncQdrantClient=FakeAsyncQdrantClient),
+    )
+
+    build_qdrant_client(
+        url="http://localhost:6333",
+        timeout_seconds=60,
+        api_key=api_key,
+    )
+
+    assert captured == {
+        "url": "http://localhost:6333",
+        "timeout": 60,
+        "api_key": api_key,
+    }
+
+
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [

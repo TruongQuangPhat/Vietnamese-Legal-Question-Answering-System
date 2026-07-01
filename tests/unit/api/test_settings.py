@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from src.api.dependencies import clear_legal_qa_service_cache, get_legal_qa_service
 from src.api.schemas import LegalQARequest
-from src.api.settings import AppSettings, get_settings
+from src.api.settings import AppSettings, RuntimeConfigurationError, get_settings
 from src.services.legal_qa_workflow import (
     DEFAULT_LLM_CONFIG_PATH,
     DEFAULT_RETRIEVAL_CONFIG_PATH,
@@ -19,6 +21,7 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.log_level == "INFO"
     assert settings.cors_allowed_origins == ["http://localhost:3000"]
     assert settings.legal_qa_service_mode == LegalQAServiceMode.FAKE
+    assert settings.runtime_configuration_issues() == ()
 
 
 def test_settings_default_config_paths_exist() -> None:
@@ -50,6 +53,8 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
             "LEGAL_QA_LLM_CONFIG": "configs/llm/custom.yml",
             "LEGAL_QA_COLLECTION_NAME": "custom_collection",
             "LEGAL_QA_QDRANT_URL": "http://localhost:6333",
+            "QDRANT_API_KEY": "qdrant-test-secret",
+            "OPENROUTER_API_KEY": "openrouter-test-secret",
             "LEGAL_QA_DEVICE": "cpu",
             "LEGAL_QA_MODEL": "google/gemini-2.5-flash",
         }
@@ -63,8 +68,97 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
     assert runtime_settings.llm_config_path == Path("configs/llm/custom.yml")
     assert runtime_settings.collection_name == "custom_collection"
     assert runtime_settings.qdrant_url == "http://localhost:6333"
+    assert runtime_settings.qdrant_api_key == "qdrant-test-secret"
     assert runtime_settings.device == "cpu"
     assert runtime_settings.model == "google/gemini-2.5-flash"
+
+
+def test_settings_load_dotenv_with_process_environment_precedence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dotenv_path = tmp_path / ".env"
+    dotenv_path.write_text(
+        "LEGAL_QA_SERVICE_MODE=real\n"
+        "QDRANT_URL=http://dotenv-qdrant:6333\n"
+        "QDRANT_COLLECTION=dotenv_collection\n"
+        "OPENROUTER_API_KEY=dotenv-secret\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LEGAL_QA_SERVICE_MODE", "fake")
+
+    settings = AppSettings.from_env(dotenv_path=dotenv_path)
+
+    assert settings.legal_qa_service_mode == LegalQAServiceMode.FAKE
+    assert settings.legal_qa_qdrant_url == "http://dotenv-qdrant:6333"
+    assert settings.legal_qa_collection_name == "dotenv_collection"
+    assert settings.openrouter_api_key is not None
+    assert str(settings.openrouter_api_key) == "**********"
+
+
+def test_fake_mode_does_not_require_real_runtime_configuration(tmp_path: Path) -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "fake",
+            "LEGAL_QA_RETRIEVAL_CONFIG": str(tmp_path / "missing-retrieval.yml"),
+            "LEGAL_QA_CHUNKS_PATH": str(tmp_path / "missing-chunks.jsonl"),
+            "LEGAL_QA_LLM_CONFIG": str(tmp_path / "missing-llm.yml"),
+        }
+    )
+
+    settings.validate_runtime_configuration()
+    assert settings.runtime_configuration_issues() == ()
+
+
+def test_real_mode_reports_safe_missing_configuration_codes(tmp_path: Path) -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "real",
+            "LEGAL_QA_RETRIEVAL_CONFIG": str(tmp_path / "missing-retrieval.yml"),
+            "LEGAL_QA_CHUNKS_PATH": str(tmp_path / "missing-chunks.jsonl"),
+            "LEGAL_QA_LLM_CONFIG": str(tmp_path / "missing-llm.yml"),
+        }
+    )
+
+    with pytest.raises(RuntimeConfigurationError) as exc_info:
+        settings.validate_runtime_configuration()
+
+    message = str(exc_info.value)
+    assert "missing_qdrant_url" in message
+    assert "missing_qdrant_collection" in message
+    assert "missing_openrouter_api_key" in message
+    assert "missing_retrieval_config" in message
+    assert "missing_llm_config" in message
+    assert "missing_legal_chunks" in message
+    assert "secret" not in message
+
+
+def test_real_mode_accepts_required_configuration_without_external_calls(
+    tmp_path: Path,
+) -> None:
+    retrieval_config = tmp_path / "retrieval.yml"
+    chunks = tmp_path / "chunks.jsonl"
+    llm_config = tmp_path / "llm.yml"
+    for path in (retrieval_config, chunks, llm_config):
+        path.touch()
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "real",
+            "QDRANT_URL": "http://qdrant:6333",
+            "QDRANT_COLLECTION": "legal_chunks",
+            "QDRANT_API_KEY": "qdrant-secret-value",
+            "OPENROUTER_API_KEY": "openrouter-secret-value",
+            "LEGAL_QA_RETRIEVAL_CONFIG": str(retrieval_config),
+            "LEGAL_QA_CHUNKS_PATH": str(chunks),
+            "LEGAL_QA_LLM_CONFIG": str(llm_config),
+        }
+    )
+
+    settings.validate_runtime_configuration()
+
+    assert settings.runtime_configuration_issues() == ()
+    assert "qdrant-secret-value" not in repr(settings)
+    assert "openrouter-secret-value" not in repr(settings)
 
 
 async def test_dependency_provider_uses_settings_default_fake_mode(monkeypatch) -> None:
@@ -77,3 +171,34 @@ async def test_dependency_provider_uses_settings_default_fake_mode(monkeypatch) 
     response = service.answer(LegalQARequest(question="Câu hỏi hợp lệ?"))
     assert response.decision == "answered"
     assert response.metadata.model == "stub"
+
+
+async def test_dependency_provider_rejects_real_mode_before_workflow_construction(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "real",
+            "OPENROUTER_API_KEY": "must-not-appear",
+            "LEGAL_QA_RETRIEVAL_CONFIG": str(tmp_path / "missing-retrieval.yml"),
+            "LEGAL_QA_CHUNKS_PATH": str(tmp_path / "missing-chunks.jsonl"),
+            "LEGAL_QA_LLM_CONFIG": str(tmp_path / "missing-llm.yml"),
+        }
+    )
+    builder_called = False
+
+    def fail_if_called(*args, **kwargs):
+        nonlocal builder_called
+        builder_called = True
+        raise AssertionError("workflow builder must not run")
+
+    monkeypatch.setattr("src.api.dependencies.get_settings", lambda: settings)
+    monkeypatch.setattr("src.api.dependencies.build_legal_qa_service", fail_if_called)
+    clear_legal_qa_service_cache()
+
+    with pytest.raises(RuntimeConfigurationError) as exc_info:
+        await get_legal_qa_service()
+
+    assert builder_called is False
+    assert "must-not-appear" not in str(exc_info.value)

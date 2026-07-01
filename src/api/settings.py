@@ -7,7 +7,8 @@ from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from dotenv import dotenv_values
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.services.legal_qa_workflow import (
@@ -19,6 +20,11 @@ from src.services.legal_qa_workflow import (
 )
 
 DEFAULT_CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+DEFAULT_DOTENV_PATH = Path(".env")
+
+
+class RuntimeConfigurationError(RuntimeError):
+    """Raised when the selected API runtime mode is not configured safely."""
 
 
 class AppSettings(BaseSettings):
@@ -41,20 +47,31 @@ class AppSettings(BaseSettings):
     legal_qa_llm_config: Path = DEFAULT_LLM_CONFIG_PATH
     legal_qa_collection_name: str | None = None
     legal_qa_qdrant_url: str | None = None
+    qdrant_api_key: SecretStr | None = Field(default=None, repr=False)
+    openrouter_api_key: SecretStr | None = Field(default=None, repr=False)
     legal_qa_device: str | None = None
     legal_qa_model: str | None = None
 
     @classmethod
-    def from_env(cls, environ: Mapping[str, str] | None = None) -> AppSettings:
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+        *,
+        dotenv_path: Path = DEFAULT_DOTENV_PATH,
+    ) -> AppSettings:
         """Build API settings from environment variables.
 
         Args:
-            environ: Optional environment mapping for tests.
+            environ: Optional complete environment mapping for deterministic
+                tests. When omitted, values from ``.env`` are loaded first and
+                process environment values override them.
+            dotenv_path: Project dotenv path used only when ``environ`` is
+                omitted.
 
         Returns:
             API settings with fake Legal QA mode unless explicitly configured.
         """
-        env = os.environ if environ is None else environ
+        env = _runtime_environment(environ=environ, dotenv_path=dotenv_path)
         return cls(
             app_env=_non_blank(env.get("APP_ENV")) or "local",
             log_level=(_non_blank(env.get("LOG_LEVEL")) or "INFO").upper(),
@@ -68,11 +85,67 @@ class AppSettings(BaseSettings):
             ),
             legal_qa_chunks_path=Path(env.get("LEGAL_QA_CHUNKS_PATH", str(DEFAULT_CHUNKS_PATH))),
             legal_qa_llm_config=Path(env.get("LEGAL_QA_LLM_CONFIG", str(DEFAULT_LLM_CONFIG_PATH))),
-            legal_qa_collection_name=_non_blank(env.get("LEGAL_QA_COLLECTION_NAME")),
-            legal_qa_qdrant_url=_non_blank(env.get("LEGAL_QA_QDRANT_URL")),
+            legal_qa_collection_name=_first_non_blank(
+                env,
+                "LEGAL_QA_COLLECTION_NAME",
+                "QDRANT_COLLECTION",
+            ),
+            legal_qa_qdrant_url=_first_non_blank(
+                env,
+                "LEGAL_QA_QDRANT_URL",
+                "QDRANT_URL",
+            ),
+            qdrant_api_key=_secret_from_env(
+                env,
+                "LEGAL_QA_QDRANT_API_KEY",
+                "QDRANT_API_KEY",
+            ),
+            openrouter_api_key=_secret_from_env(env, "OPENROUTER_API_KEY"),
             legal_qa_device=_non_blank(env.get("LEGAL_QA_DEVICE")),
-            legal_qa_model=_non_blank(env.get("LEGAL_QA_MODEL")),
+            legal_qa_model=_first_non_blank(
+                env,
+                "LEGAL_QA_MODEL",
+                "OPENROUTER_MODEL",
+            ),
         )
+
+    def runtime_configuration_issues(self) -> tuple[str, ...]:
+        """Return safe issue codes for the selected runtime mode.
+
+        The check performs local value and file-existence validation only. It
+        does not construct clients, load an embedding model, contact Qdrant, or
+        call an LLM provider.
+        """
+        if self.legal_qa_service_mode == LegalQAServiceMode.FAKE:
+            return ()
+
+        issues: list[str] = []
+        if self.legal_qa_qdrant_url is None:
+            issues.append("missing_qdrant_url")
+        if self.legal_qa_collection_name is None:
+            issues.append("missing_qdrant_collection")
+        if self.openrouter_api_key is None:
+            issues.append("missing_openrouter_api_key")
+        if not self.legal_qa_retrieval_config.is_file():
+            issues.append("missing_retrieval_config")
+        if not self.legal_qa_llm_config.is_file():
+            issues.append("missing_llm_config")
+        if not self.legal_qa_chunks_path.is_file():
+            issues.append("missing_legal_chunks")
+        return tuple(issues)
+
+    def validate_runtime_configuration(self) -> None:
+        """Reject an invalid real-mode configuration before client construction.
+
+        Raises:
+            RuntimeConfigurationError: If real mode lacks required settings or
+                local artifacts. The message contains safe issue codes only.
+        """
+        issues = self.runtime_configuration_issues()
+        if issues:
+            raise RuntimeConfigurationError(
+                "Invalid Legal QA runtime configuration: " + ", ".join(issues)
+            )
 
     def to_legal_qa_runtime_settings(self) -> LegalQARuntimeSettings:
         """Convert API settings to the Legal QA service runtime contract."""
@@ -83,6 +156,9 @@ class AppSettings(BaseSettings):
             llm_config_path=self.legal_qa_llm_config,
             collection_name=self.legal_qa_collection_name,
             qdrant_url=self.legal_qa_qdrant_url,
+            qdrant_api_key=(
+                self.qdrant_api_key.get_secret_value() if self.qdrant_api_key is not None else None
+            ),
             device=self.legal_qa_device,
             model=self.legal_qa_model,
         )
@@ -118,3 +194,29 @@ def _non_blank(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _runtime_environment(
+    *,
+    environ: Mapping[str, str] | None,
+    dotenv_path: Path,
+) -> Mapping[str, str]:
+    if environ is not None:
+        return environ
+    dotenv_environment = {
+        key: value for key, value in dotenv_values(dotenv_path).items() if value is not None
+    }
+    return {**dotenv_environment, **os.environ}
+
+
+def _first_non_blank(environment: Mapping[str, str], *names: str) -> str | None:
+    for name in names:
+        value = _non_blank(environment.get(name))
+        if value is not None:
+            return value
+    return None
+
+
+def _secret_from_env(environment: Mapping[str, str], *names: str) -> SecretStr | None:
+    value = _first_non_blank(environment, *names)
+    return SecretStr(value) if value is not None else None

@@ -22,6 +22,22 @@ class LegalQADecision(StrEnum):
     ERROR = "error"
 
 
+class ReadinessCheckDTO(BaseModel):
+    """Sanitized result for one backend readiness check."""
+
+    name: str
+    ready: bool
+    detail: str
+
+
+class ReadinessResponse(BaseModel):
+    """Backend readiness response with no credentials or sensitive context."""
+
+    ready: bool
+    service_mode: str
+    checks: list[ReadinessCheckDTO]
+
+
 class LegalQAContextRole(StrEnum):
     """Client roles accepted in recent Legal QA conversation context."""
 

@@ -19,6 +19,7 @@ OpenRouter, embedding inference, or evaluation workflows.
 
 - FastAPI application under `src/api` with:
   - `GET /health`;
+  - `GET /api/v1/readiness`;
   - `GET /version`;
   - `POST /api/v1/legal-qa/ask`;
   - the lightweight `/api/v1/conversations` contract.
@@ -41,11 +42,11 @@ connectivity, or real multi-turn quality.
 
 | Area | Current state | Deployment consequence |
 | --- | --- | --- |
-| Service mode | Fake is safe by default; real wiring exists | Real startup and one request still need controlled validation |
-| Qdrant | URL, collection, timeout, and vector contract exist | No API-key/TLS-specific setting is wired; service must remain private or client support must be added |
+| Service mode | Fake is safe by default; real config is validated before workflow construction | Real startup and one request still need controlled validation |
+| Qdrant | URL, collection, optional API key, timeout, and vector contract exist | TLS/custom CA policy and deployed connectivity remain to be validated |
 | Embedding and sparse retrieval | Real mode constructs BGE-M3 and loads the complete chunks JSONL | Model dependencies/cache and processed chunks are absent from the backend image |
 | LLM provider | OpenRouter URL/model config and `OPENROUTER_API_KEY` lookup exist | Provider credential, egress, timeout/error behavior, and real response remain unverified |
-| Health | `/health` returns a constant `{"status":"ok"}` | It is liveness only; there is no dependency-aware readiness endpoint |
+| Health | `/health` is liveness; `/api/v1/readiness` validates config and optionally reads Qdrant collection metadata | Readiness deliberately does not validate LLM availability or load the embedding model |
 | Version | Static API name/version is exposed | It has no build or revision identity |
 | CORS | Comma-separated explicit origins are supported; local origin is default | Deployed frontend origins must be supplied explicitly |
 | Frontend API URL | One public base URL is used by both clients | It is embedded during `next build`; localhost fallback is unsafe for an omitted production setting |
@@ -74,6 +75,10 @@ LEGAL_QA_QDRANT_URL=http://localhost:6333
 LEGAL_QA_DEVICE=cpu
 LEGAL_QA_MODEL=google/gemini-2.5-flash
 
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+QDRANT_API_KEY=
+
 OPENROUTER_API_KEY=
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 OPENROUTER_MODEL=google/gemini-2.5-flash
@@ -83,7 +88,8 @@ Real mode requires, at minimum:
 
 - `LEGAL_QA_SERVICE_MODE=real`;
 - a reachable Qdrant URL and existing compatible collection, selected through
-  `LEGAL_QA_QDRANT_URL` and `LEGAL_QA_COLLECTION_NAME` or retrieval config;
+  `LEGAL_QA_QDRANT_URL`/`LEGAL_QA_COLLECTION_NAME` or the compatible
+  `QDRANT_URL`/`QDRANT_COLLECTION` names;
 - readable retrieval config, LLM config, and complete processed chunks JSONL;
 - installed Qdrant and embedding optional dependencies;
 - available BGE-M3 model files and sufficient CPU/RAM or a supported device;
@@ -93,12 +99,14 @@ Real mode requires, at minimum:
 `OPENROUTER_MODEL` is the provider-level fallback. `LEGAL_QA_DEVICE` selects
 the query embedding device, not the LLM.
 
-Important current behavior: `AppSettings.from_env()` reads the process
-environment directly. It does not load `.env` before deciding
-`LEGAL_QA_SERVICE_MODE`. The real workflow loads the project `.env` only after
-real mode has already been selected. Therefore, export/inject backend settings
-through the process or container environment; do not assume an un-sourced
-`.env` alone selects real mode. This should be hardened before deployment.
+`AppSettings.from_env()` loads the project `.env` and then overlays process
+environment values, so an exported/container value has precedence. Tests can
+pass an explicit environment mapping and bypass local `.env` state.
+
+Before the real workflow is constructed, validation requires the Qdrant URL,
+collection, OpenRouter key, retrieval config, LLM config, and processed chunks
+file. Failures contain safe issue codes only. Validation does not connect to
+Qdrant, call OpenRouter, or load an embedding model.
 
 ### Frontend environment
 
@@ -153,23 +161,26 @@ recreate collections, upsert points, re-index, or re-embed the corpus.
 - The Qdrant collection must already exist and match this contract.
 - The API request path performs retrieval only; it should have no index-write
   authority.
-- `build_qdrant_client()` currently accepts URL and timeout only. It does not
-  pass a Qdrant API key. A secured remote Qdrant deployment therefore needs a
-  narrowly scoped client/settings change or a private trusted network; do not
-  expose an unauthenticated Qdrant port publicly.
-- Readiness currently does not verify collection existence, schema, point
-  count, or connectivity.
+- `QDRANT_API_KEY` is optional. `LEGAL_QA_QDRANT_API_KEY` is accepted as a
+  backend-specific override. When configured, the value is passed to the
+  Qdrant client and is never returned by readiness or included in settings
+  representations. Local unauthenticated Qdrant remains supported.
+- Real-mode readiness reads collection metadata with a short timeout. It
+  verifies connectivity and collection availability only; it does not fully
+  validate vector schema, point count, payload integrity, or corpus version.
 
 ## OpenRouter assumptions and gaps
 
 - The implemented real provider is OpenRouter through its OpenAI-compatible
   chat-completions API.
-- `OPENROUTER_API_KEY` is read only when a generation request is made.
+- `OPENROUTER_API_KEY` presence is validated before workflow construction; the
+  credential value is used only when the generation client sends a request.
 - Provider base URL and model are non-secret configuration.
 - The request timeout is currently fixed at 30 seconds in API real-workflow
   construction.
-- There is no deployment-level startup validation for a missing key and no
-  readiness probe for provider configuration.
+- Real-mode configuration validation requires the key to be present before
+  workflow construction. Readiness checks presence only and never sends a
+  provider request.
 - Provider failures are sanitized by the API, but retry, circuit-breaker,
   concurrency, and cost controls are not deployment-hardened.
 
@@ -182,18 +193,19 @@ Other key names in `.env.example`, such as `OPENAI_API_KEY` and
 as proof that real Legal QA can serve requests. `GET /version` returns static
 application metadata.
 
-There is no separate readiness endpoint. A deployment-ready implementation
-should distinguish:
+`GET /api/v1/readiness` distinguishes runtime readiness:
 
 - liveness: the API process can answer without external calls;
-- readiness: required config/artifacts are present, real-mode dependencies can
-  be initialized, and Qdrant is reachable with the expected collection
-  contract;
-- provider validation: avoid billable generation calls in routine readiness
-  probes; validate credential presence/configuration without logging values.
+- fake readiness: configuration is valid without Qdrant, provider credentials,
+  chunks, or models;
+- real readiness: required settings and local artifact paths are present, then
+  the configured Qdrant collection metadata is readable.
 
-Readiness must be bounded by short timeouts, return sanitized reasons, remain
-read-only, and never trigger model downloads, indexing, or LLM generation.
+The endpoint returns 200 when ready and 503 otherwise. Failure details are
+stable operational codes such as `missing_openrouter_api_key` or the sanitized
+Qdrant status `unavailable`. It does not return credentials, exception text,
+or internal paths. It never calls the LLM, runs retrieval/generation, loads an
+embedding model, downloads model files, or mutates Qdrant.
 
 ## CORS and frontend origin notes
 
@@ -280,44 +292,34 @@ write evaluation artifacts.
 
 ## Known real-mode blockers
 
-1. Define and validate production runtime configuration, including consistent
-   `.env`/process-environment semantics and fail-fast real-mode checks.
-2. Add a read-only, dependency-aware readiness contract separate from
-   liveness.
-3. Package/install real-mode dependency groups and provide the chunks/model
+1. Package/install real-mode dependency groups and provide the chunks/model
    artifacts without embedding protected data into source control.
-4. Support secured Qdrant credentials/TLS requirements and verify the existing
-   collection contract without mutation.
-5. Make frontend production API URL configuration fail safely instead of
+2. Define deployed Qdrant TLS/custom CA policy and extend readiness if full
+   schema/corpus-version verification is required.
+3. Make frontend production API URL configuration fail safely instead of
    silently targeting localhost.
-6. Provide a real-mode container/deployment configuration; current Compose is
+4. Provide a real-mode container/deployment configuration; current Compose is
    fake-only.
-7. Complete API security decisions and resource/concurrency controls.
-8. Resolve process-local conversation behavior before multi-worker or
+5. Complete API security decisions and resource/concurrency controls.
+6. Resolve process-local conversation behavior before multi-worker or
    multi-replica use, or explicitly exclude server-side history from the
    initial deployment.
-9. Run a controlled real-mode smoke only after the above environment is
+7. Run a controlled real-mode smoke only after the above environment is
    reviewed and explicitly approved.
 
 ## Recommended implementation order
 
-1. Harden backend runtime settings and startup validation. Keep fake mode the
-   default, define required real-mode inputs, add secure Qdrant connection
-   settings, and make configuration failures explicit without contacting
-   providers.
-2. Add separate liveness and read-only readiness behavior with targeted tests.
-3. Harden frontend production API URL handling and document its build-time
-   contract.
-4. Build a real-mode backend image/deployment foundation with optional
+1. Build a real-mode backend image/deployment foundation with optional
    dependencies and read-only artifact mounts; retain the current fake-mode
    Compose workflow.
-5. Add the minimum approved public-API security controls.
-6. Perform deployment/security review, then execute one controlled low-risk
+2. Harden frontend production API URL handling and document its build-time
+   contract.
+3. Add the minimum approved public-API security controls.
+4. Perform deployment/security review, then execute one controlled low-risk
    real-mode smoke with citation and fallback checks.
 
-The next implementation task should combine backend runtime configuration
-hardening with the readiness contract, because container work cannot be
-validated safely until required inputs and health semantics are explicit.
+The next implementation task should build the Docker/Compose real-mode
+foundation because runtime inputs and readiness semantics are now explicit.
 
 ## Safe validation commands
 

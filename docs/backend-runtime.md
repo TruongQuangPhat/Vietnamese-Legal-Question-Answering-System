@@ -17,11 +17,10 @@ Runtime settings are read from environment variables by `src/api/settings.py`.
 `.env.example` contains both existing project-level variables and backend API
 runtime variables. It must contain placeholders only.
 
-`AppSettings.from_env()` currently reads the process environment directly; it
-does not load `.env` before selecting `LEGAL_QA_SERVICE_MODE`. The real
-workflow loads the project `.env` only after real mode has already been
-selected. Export or inject backend settings through the process/container
-environment rather than assuming an un-sourced `.env` selects real mode.
+`AppSettings.from_env()` loads the project `.env` first and overlays process
+environment values. Exported or container-injected values therefore take
+precedence. Explicit environment mappings used by tests bypass local `.env`
+state.
 
 Committed YAML config under `configs/` stores non-secret runtime defaults such
 as retrieval settings and provider/model defaults. Local `.env` values select
@@ -44,11 +43,21 @@ LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
 LEGAL_QA_QDRANT_URL=http://localhost:6333
 LEGAL_QA_DEVICE=cpu
 LEGAL_QA_MODEL=google/gemini-2.5-flash
+
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+QDRANT_API_KEY=
+
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=google/gemini-2.5-flash
 ```
 
-`QDRANT_URL` remains the general project-level Qdrant URL used by older scripts
-and workflows. `LEGAL_QA_QDRANT_URL` is the backend Legal QA runtime override
-used by API settings.
+`LEGAL_QA_QDRANT_URL` and `LEGAL_QA_COLLECTION_NAME` are backend-specific
+overrides. `QDRANT_URL` and `QDRANT_COLLECTION` are compatible generic names.
+`QDRANT_API_KEY` is optional; `LEGAL_QA_QDRANT_API_KEY` is accepted as a
+backend-specific override. Local unauthenticated Qdrant continues to work when
+the key is absent. Secret values are hidden in settings representations and
+must not be logged.
 
 `LEGAL_QA_DEVICE` selects the local embedding device in manual real mode.
 `OPENROUTER_MODEL` is the provider-level default model. `LEGAL_QA_MODEL` is an
@@ -81,13 +90,19 @@ LEGAL_QA_SERVICE_MODE=real
 
 Before using real mode manually, confirm:
 
-- Qdrant is running and reachable.
-- The expected collection exists.
+- `QDRANT_URL` (or `LEGAL_QA_QDRANT_URL`) is set.
+- `QDRANT_COLLECTION` (or `LEGAL_QA_COLLECTION_NAME`) is set.
+- Qdrant is running and the expected collection exists.
+- `QDRANT_API_KEY` is set only when the Qdrant service requires it.
 - `data/processed/legal_chunks.jsonl` exists locally.
 - `LEGAL_QA_RETRIEVAL_CONFIG` points to a valid retrieval config.
 - `LEGAL_QA_LLM_CONFIG` points to a valid LLM config.
 - `OPENROUTER_API_KEY` is set in an uncommitted environment file or shell.
 - No secrets are printed, logged, or pasted into docs.
+
+Before workflow/client construction, real mode validates the required values
+and local files. Invalid configuration fails with safe issue codes and does
+not construct Qdrant, embedding, or LLM clients.
 
 Do not use real mode in routine unit tests or default validation commands.
 The committed backend image and Compose stack are fake-mode packaging
@@ -128,12 +143,26 @@ LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:create_app --fac
 ## API Endpoints
 
 - `GET /health`
+- `GET /api/v1/readiness`
 - `GET /version`
 - `POST /api/v1/legal-qa/ask`
+- `GET /api/v1/conversations`
+- `POST /api/v1/conversations`
+- `GET /api/v1/conversations/{conversation_id}`
+- `PATCH /api/v1/conversations/{conversation_id}`
+- `DELETE /api/v1/conversations/{conversation_id}`
+- `POST /api/v1/conversations/{conversation_id}/messages`
 
 `GET /health` is liveness only. It returns a constant response and does not
-establish Qdrant, model, corpus artifact, or provider readiness. There is
-currently no dependency-aware readiness endpoint.
+establish Qdrant, model, corpus artifact, or provider readiness.
+
+`GET /api/v1/readiness` returns 200 when ready and 503 otherwise. Fake mode is
+ready without external dependencies. Real mode checks required configuration
+and local artifact presence, then performs one read-only Qdrant
+`get_collection` metadata request with a short timeout. It does not call
+OpenRouter, load/download the embedding model, run retrieval/generation, or
+mutate Qdrant. Responses contain only safe status codes and never secret
+values or raw exception text.
 
 Legal QA request fields:
 
@@ -168,6 +197,7 @@ curl -s -X POST http://localhost:8000/api/v1/legal-qa/ask \
 Expected fake-mode behavior:
 
 - The health route returns `{"status":"ok"}`.
+- The readiness route returns `ready=true` without external calls.
 - The version route returns deterministic API metadata.
 - The ask route returns the stable Legal QA response contract with stub data.
 - No Qdrant, OpenRouter, embedding model, reranker, or evaluation workflow is
@@ -300,6 +330,16 @@ manual smoke checklist.
   intentional operation.
 - The API supports legal research only and does not provide professional legal
   advice.
+- The system is not production-ready until deployment/security review and a
+  controlled real-mode smoke are complete.
+
+### Conversation storage boundary
+
+Conversation API storage is process-local and in memory. It is not durable,
+not shared across workers or replicas, and disappears on process restart.
+There is no durable server-side chat history unless database-backed storage is
+implemented. Frontend localStorage remains the rich UI source of truth and
+backend synchronization remains best-effort.
 
 ## Troubleshooting
 

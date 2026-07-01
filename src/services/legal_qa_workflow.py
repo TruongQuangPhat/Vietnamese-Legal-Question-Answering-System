@@ -6,7 +6,7 @@ import asyncio
 import os
 import time
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
@@ -57,6 +57,7 @@ class LegalQARuntimeSettings:
     llm_config_path: Path = DEFAULT_LLM_CONFIG_PATH
     collection_name: str | None = None
     qdrant_url: str | None = None
+    qdrant_api_key: str | None = field(default=None, repr=False)
     device: str | None = None
     model: str | None = None
 
@@ -81,10 +82,15 @@ class LegalQARuntimeSettings:
             ),
             chunks_path=Path(env.get("LEGAL_QA_CHUNKS_PATH", str(DEFAULT_CHUNKS_PATH))),
             llm_config_path=Path(env.get("LEGAL_QA_LLM_CONFIG", str(DEFAULT_LLM_CONFIG_PATH))),
-            collection_name=_non_blank(env.get("LEGAL_QA_COLLECTION_NAME")),
-            qdrant_url=_non_blank(env.get("LEGAL_QA_QDRANT_URL")),
+            collection_name=_non_blank(
+                env.get("LEGAL_QA_COLLECTION_NAME") or env.get("QDRANT_COLLECTION")
+            ),
+            qdrant_url=_non_blank(env.get("LEGAL_QA_QDRANT_URL") or env.get("QDRANT_URL")),
+            qdrant_api_key=_non_blank(
+                env.get("LEGAL_QA_QDRANT_API_KEY") or env.get("QDRANT_API_KEY")
+            ),
             device=_non_blank(env.get("LEGAL_QA_DEVICE")),
-            model=_non_blank(env.get("LEGAL_QA_MODEL")),
+            model=_non_blank(env.get("LEGAL_QA_MODEL") or env.get("OPENROUTER_MODEL")),
         )
 
 
@@ -229,6 +235,7 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
     qdrant_client = build_qdrant_client(
         url=qdrant_url,
         timeout_seconds=retrieval_config.qdrant.timeout_seconds,
+        api_key=settings.qdrant_api_key,
     )
     embedding_model = BgeM3EmbeddingModel(
         model_name=retrieval_config.embedding.model_name,

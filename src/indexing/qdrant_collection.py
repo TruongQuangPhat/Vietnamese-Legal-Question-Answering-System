@@ -48,12 +48,18 @@ class QdrantCollectionClient(Protocol):
         ...
 
 
-def build_qdrant_client(*, url: str, timeout_seconds: float) -> QdrantCollectionClient:
+def build_qdrant_client(
+    *,
+    url: str,
+    timeout_seconds: float,
+    api_key: str | None = None,
+) -> QdrantCollectionClient:
     """Build an async Qdrant client without connecting to the server.
 
     Args:
         url: Qdrant HTTP endpoint.
         timeout_seconds: Positive request timeout.
+        api_key: Optional credential for an authenticated Qdrant service.
 
     Returns:
         An ``AsyncQdrantClient`` compatible with the setup protocol.
@@ -74,7 +80,11 @@ def build_qdrant_client(*, url: str, timeout_seconds: float) -> QdrantCollection
             "qdrant-client is required for collection setup; "
             "install it with `uv sync --extra qdrant`"
         ) from exc
-    return module.AsyncQdrantClient(url=url, timeout=timeout_seconds)
+    return module.AsyncQdrantClient(
+        url=url,
+        timeout=timeout_seconds,
+        api_key=api_key,
+    )
 
 
 def build_payload_index_specs() -> list[PayloadIndexSpec]:
