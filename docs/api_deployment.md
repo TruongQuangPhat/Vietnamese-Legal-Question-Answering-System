@@ -698,7 +698,7 @@ Render service settings:
 Service type: Web Service
 Runtime: Python
 Root directory: repository root
-Build command: python -m pip install --no-cache-dir uv && uv sync --frozen --no-dev --extra qdrant --extra embedding
+Build command: python -m pip install --no-cache-dir uv && uv sync --frozen --no-dev --extra qdrant --extra embedding && python scripts/deployment/fetch_processed_chunks.py
 Start command: uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
 Health check path: /health
 ```
@@ -724,7 +724,9 @@ LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
 LEGAL_QA_QDRANT_URL=https://your-qdrant-cloud-endpoint
 LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
 LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
-LEGAL_QA_CHUNKS_PATH=/path/to/read-only/legal_chunks.jsonl
+LEGAL_QA_CHUNKS_URL=https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
+LEGAL_QA_CHUNKS_SHA256=95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
+LEGAL_QA_CHUNKS_PATH=data/processed/legal_chunks.jsonl
 LEGAL_QA_DEVICE=cpu
 LEGAL_QA_MODEL=google/gemini-2.5-flash
 
@@ -732,29 +734,61 @@ OPENROUTER_API_KEY=
 OPENROUTER_MODEL=google/gemini-2.5-flash
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 
-CORS_ALLOWED_ORIGINS='["https://your-vercel-app.vercel.app"]'
+CORS_ALLOWED_ORIGINS=["https://your-vercel-app.vercel.app"]
 HF_TOKEN=
 ```
 
+For local browser testing, use
+`CORS_ALLOWED_ORIGINS=["http://localhost:3000"]`. In a shell or `.env`, quote
+the complete JSON value when needed to prevent shell interpretation; in the
+Render dashboard, enter the JSON array itself.
+
 Store `QDRANT_API_KEY` and `OPENROUTER_API_KEY` as secret environment values,
 never in Git or Render command fields. `HF_TOKEN` is optional for the public
-BGE-M3 model and must also be secret if used. The duplicated generic and
-backend-specific Qdrant variables make the selected values explicit; the
-backend-specific values take precedence.
+chunks artifact and public BGE-M3 model. If either becomes private or gated,
+inject the token as a secret. The duplicated generic and backend-specific
+Qdrant variables make the selected values explicit; the backend-specific
+values take precedence.
 
 `LOG_FORMAT=json` is retained as the intended deployment convention, but the
 current FastAPI bootstrap does not yet wire `LOG_FORMAT` into a production
 logging initializer. Treat structured logging as a remaining hardening item,
 not as a verified behavior.
 
-### Blocking artifact and resource checks
+### Processed chunks build artifact
 
-Real mode cannot be declared Render-ready until an approved, integrity-checked,
-read-only distribution mechanism provides
-`data/processed/legal_chunks.jsonl` (40,389 rows) at
-`LEGAL_QA_CHUNKS_PATH`. The file is intentionally untracked and must not be
-committed or casually copied into an image. This task does not add an artifact
-download or persistent-disk bootstrap mechanism.
+The public Hugging Face Dataset artifact is the checksum-pinned build input:
+
+```text
+dataset: phattruong1802/vnlaw-qa
+artifact: legal_chunks/v1/legal_chunks.jsonl
+size: 180,915,261 bytes
+SHA256: 95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
+target: data/processed/legal_chunks.jsonl
+```
+
+The complete Render build command is:
+
+```bash
+python -m pip install --no-cache-dir uv && \
+  uv sync --frozen --no-dev --extra qdrant --extra embedding && \
+  python scripts/deployment/fetch_processed_chunks.py
+```
+
+The standard-library-only fetcher downloads to a temporary file in the target
+directory, verifies SHA256, and atomically installs the target only after
+verification. It reuses an existing matching file. A mismatched existing file
+fails safely; set `LEGAL_QA_CHUNKS_OVERWRITE=1` only for an intentional
+replacement. Failed downloads and checksum mismatches remove the temporary
+file.
+
+Output includes only the source hostname and filename, never the full URL or
+query string. An Authorization header is sent only when `HF_TOKEN` is nonblank,
+and the token is never printed. The current public artifact needs no token.
+
+`data/processed/legal_chunks.jsonl` remains ignored by Git and excluded from
+the Docker context. It is a verified build artifact, not source code. Do not
+commit it, remove its ignore rule, or regenerate it during deployment.
 
 The first real request constructs BGE-M3 and local BM25 lazily. Readiness does
 not download or load the model, so a 200 readiness response does not prove that
@@ -855,8 +889,8 @@ write evaluation artifacts.
 
 ## Known real-mode blockers
 
-1. Provide the chunks artifact through an approved read-only distribution
-   mechanism without committing protected data; verify its checksum before use.
+1. Confirm Render can download the 180,915,261-byte public chunks artifact
+   during build and retains it in the deployed build filesystem.
 2. Confirm that the selected Render plan can install and run BGE-M3 on CPU,
    retain an appropriate Hugging Face cache, and tolerate first-request model
    initialization.
@@ -873,9 +907,7 @@ write evaluation artifacts.
 
 ## Recommended implementation order
 
-1. Define and verify the read-only processed-chunks artifact delivery mechanism
-   for Render, then confirm BGE-M3 resource/cache requirements on the selected
-   plan.
+1. Confirm BGE-M3 resource/cache requirements on the selected Render plan.
 2. Create the Render service manually with the documented native build/start
    commands and secret environment values.
 3. Harden frontend production API URL handling and document its build-time

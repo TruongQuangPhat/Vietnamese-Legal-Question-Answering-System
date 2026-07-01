@@ -136,7 +136,8 @@ For the planned native Render Web Service, install runtime dependencies with:
 
 ```bash
 python -m pip install --no-cache-dir uv && \
-  uv sync --frozen --no-dev --extra qdrant --extra embedding
+  uv sync --frozen --no-dev --extra qdrant --extra embedding && \
+  python scripts/deployment/fetch_processed_chunks.py
 ```
 
 Start one worker with Render's assigned port:
@@ -145,9 +146,24 @@ Start one worker with Render's assigned port:
 uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
 ```
 
-Do not deploy until `LEGAL_QA_CHUNKS_PATH` points to an approved read-only copy
-of the complete processed chunks JSONL. The file is ignored by Git, and local
-BM25 loads it in real mode even when dense retrieval uses Qdrant Cloud.
+The build artifact fetcher requires:
+
+```env
+LEGAL_QA_CHUNKS_URL=https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
+LEGAL_QA_CHUNKS_SHA256=95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
+LEGAL_QA_CHUNKS_PATH=data/processed/legal_chunks.jsonl
+```
+
+The public artifact does not require `HF_TOKEN`. If access later becomes
+private or gated, inject `HF_TOKEN` as a secret. The fetcher verifies SHA256
+before atomic installation, skips an already matching file, and refuses to
+replace a mismatched file unless `LEGAL_QA_CHUNKS_OVERWRITE=1` is explicitly
+set.
+
+The resulting file remains ignored by Git. Local BM25 loads it in real mode
+even when dense retrieval uses Qdrant Cloud. Fetching this immutable,
+checksum-pinned build artifact is deployment preparation; startup still must
+not process the corpus, index data, restore snapshots, or call external LLMs.
 
 ## Run the Backend
 
