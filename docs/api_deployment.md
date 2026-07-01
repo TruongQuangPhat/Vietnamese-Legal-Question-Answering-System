@@ -1,556 +1,373 @@
-# API & Deployment
+# API Deployment Readiness
 
-## Overview
+## Purpose and current status
 
-The API & Deployment phase exposes the VnLaw-QA system through a RESTful FastAPI service and packages it for production deployment using Docker and container orchestration. This phase is the final integration step that combines all previous components into a cohesive, secure, and observable service.
+VnLaw-QA is a Vietnamese legal research assistant, not legal advice. The
+current product is a fake-mode Legal QA chat MVP with a real-workflow adapter;
+it is not production-ready.
 
-This phase is implemented only after the core retrieval/generation pipeline and evaluation gates are stable.
+The repository has useful deployment foundations, but real mode is not yet
+deployable from the committed containers or Compose stack. Do not describe the
+system as production-ready until deployment and security review, dependency
+and artifact packaging, readiness checks, and a controlled real-mode smoke
+have been completed.
 
-## Quick Start
+This document records the repository state as audited without calling Qdrant,
+OpenRouter, embedding inference, or evaluation workflows.
 
-**Intended deployment** (design phase, not yet implemented):
+## What already exists
+
+- FastAPI application under `src/api` with:
+  - `GET /health`;
+  - `GET /version`;
+  - `POST /api/v1/legal-qa/ask`;
+  - the lightweight `/api/v1/conversations` contract.
+- Typed API schemas, dependency injection, sanitized ask failures, safe request
+  metadata, and deterministic fake mode.
+- Explicit `LEGAL_QA_SERVICE_MODE=fake|real`; fake is the default.
+- A real-mode adapter for coverage-aware dense plus local BM25 retrieval,
+  evidence selection, strict generation, citation validation, and fallback.
+- Configurable CORS origins.
+- Next.js frontend clients using `NEXT_PUBLIC_API_BASE_URL`.
+- Backend and frontend Dockerfiles and a fake-mode `docker-compose.yml`.
+- Unit tests around API settings, routes, services, conversation context, and
+  fake dependencies.
+
+Fake mode is only for UI/API contract smoke. Its deterministic stub answer and
+evidence do not establish legal correctness, retrieval quality, provider
+connectivity, or real multi-turn quality.
+
+## Readiness summary
+
+| Area | Current state | Deployment consequence |
+| --- | --- | --- |
+| Service mode | Fake is safe by default; real wiring exists | Real startup and one request still need controlled validation |
+| Qdrant | URL, collection, timeout, and vector contract exist | No API-key/TLS-specific setting is wired; service must remain private or client support must be added |
+| Embedding and sparse retrieval | Real mode constructs BGE-M3 and loads the complete chunks JSONL | Model dependencies/cache and processed chunks are absent from the backend image |
+| LLM provider | OpenRouter URL/model config and `OPENROUTER_API_KEY` lookup exist | Provider credential, egress, timeout/error behavior, and real response remain unverified |
+| Health | `/health` returns a constant `{"status":"ok"}` | It is liveness only; there is no dependency-aware readiness endpoint |
+| Version | Static API name/version is exposed | It has no build or revision identity |
+| CORS | Comma-separated explicit origins are supported; local origin is default | Deployed frontend origins must be supplied explicitly |
+| Frontend API URL | One public base URL is used by both clients | It is embedded during `next build`; localhost fallback is unsafe for an omitted production setting |
+| Containers | Fake-mode images and Compose stack build the MVP | Committed stack does not package or configure real mode |
+| Conversation storage | Process-local in-memory repository | Not durable, not shared across workers, and not user-specific |
+| API security | Input bounds and sanitized errors exist | Authentication, authorization, rate limiting, trusted proxy policy, and abuse controls are not implemented |
+| Observability | Safe completion/failure metadata is logged | Production logging configuration, metrics, tracing, and alerting are not established |
+
+## Runtime configuration
+
+### Backend process environment
+
+Current API settings:
+
+```env
+APP_ENV=local
+LOG_LEVEL=INFO
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+
+LEGAL_QA_SERVICE_MODE=fake
+LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
+LEGAL_QA_CHUNKS_PATH=data/processed/legal_chunks.jsonl
+LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
+LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
+LEGAL_QA_QDRANT_URL=http://localhost:6333
+LEGAL_QA_DEVICE=cpu
+LEGAL_QA_MODEL=google/gemini-2.5-flash
+
+OPENROUTER_API_KEY=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=google/gemini-2.5-flash
+```
+
+Real mode requires, at minimum:
+
+- `LEGAL_QA_SERVICE_MODE=real`;
+- a reachable Qdrant URL and existing compatible collection, selected through
+  `LEGAL_QA_QDRANT_URL` and `LEGAL_QA_COLLECTION_NAME` or retrieval config;
+- readable retrieval config, LLM config, and complete processed chunks JSONL;
+- installed Qdrant and embedding optional dependencies;
+- available BGE-M3 model files and sufficient CPU/RAM or a supported device;
+- `OPENROUTER_API_KEY` and outbound HTTPS access to the selected provider.
+
+`LEGAL_QA_MODEL` overrides the API runtime generation model.
+`OPENROUTER_MODEL` is the provider-level fallback. `LEGAL_QA_DEVICE` selects
+the query embedding device, not the LLM.
+
+Important current behavior: `AppSettings.from_env()` reads the process
+environment directly. It does not load `.env` before deciding
+`LEGAL_QA_SERVICE_MODE`. The real workflow loads the project `.env` only after
+real mode has already been selected. Therefore, export/inject backend settings
+through the process or container environment; do not assume an un-sourced
+`.env` alone selects real mode. This should be hardened before deployment.
+
+### Frontend environment
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://api.example.invalid
+```
+
+This value is public and must never contain a secret. It is read by browser
+code and embedded during the Next.js image build. Build each frontend image
+with the final browser-reachable HTTPS API origin. Setting a different runtime
+container environment value does not reliably replace the already compiled
+client value.
+
+The current code falls back to `http://localhost:8000` when the setting is
+missing or blank. That is convenient locally but should become a production
+configuration error or be replaced by a deliberate same-origin proxy design.
+
+## Fake mode and real mode
+
+### Fake mode
+
+```env
+LEGAL_QA_SERVICE_MODE=fake
+```
+
+Use fake mode for local UI/API contract smoke, request validation, CORS checks,
+and deterministic tests. It must not call Qdrant, OpenRouter, embedding
+models, rerankers, corpus pipelines, or evaluation workflows.
+
+### Real mode
+
+```env
+LEGAL_QA_SERVICE_MODE=real
+```
+
+Real mode constructs:
+
+1. a Qdrant async client and BGE-M3 query embedder;
+2. dense retrieval from the existing named vector `dense`;
+3. local BM25 from `data/processed/legal_chunks.jsonl`;
+4. coverage-aware fusion and evidence selection;
+5. an OpenRouter generation client with citation and fallback guards.
+
+Real mode must use the existing collection read-only. Deployment must not
+recreate collections, upsert points, re-index, or re-embed the corpus.
+
+## Qdrant assumptions and gaps
+
+- Expected collection: `vnlaw_chunks_bgem3_v1_full`.
+- Expected points: 40,389.
+- Dense vector: `dense`, dimension 1024, cosine distance.
+- The Qdrant collection must already exist and match this contract.
+- The API request path performs retrieval only; it should have no index-write
+  authority.
+- `build_qdrant_client()` currently accepts URL and timeout only. It does not
+  pass a Qdrant API key. A secured remote Qdrant deployment therefore needs a
+  narrowly scoped client/settings change or a private trusted network; do not
+  expose an unauthenticated Qdrant port publicly.
+- Readiness currently does not verify collection existence, schema, point
+  count, or connectivity.
+
+## OpenRouter assumptions and gaps
+
+- The implemented real provider is OpenRouter through its OpenAI-compatible
+  chat-completions API.
+- `OPENROUTER_API_KEY` is read only when a generation request is made.
+- Provider base URL and model are non-secret configuration.
+- The request timeout is currently fixed at 30 seconds in API real-workflow
+  construction.
+- There is no deployment-level startup validation for a missing key and no
+  readiness probe for provider configuration.
+- Provider failures are sanitized by the API, but retry, circuit-breaker,
+  concurrency, and cost controls are not deployment-hardened.
+
+Other key names in `.env.example`, such as `OPENAI_API_KEY` and
+`ANTHROPIC_API_KEY`, are not used by the current API real workflow.
+
+## Health, readiness, and version status
+
+`GET /health` is a deterministic process liveness endpoint. It must not be used
+as proof that real Legal QA can serve requests. `GET /version` returns static
+application metadata.
+
+There is no separate readiness endpoint. A deployment-ready implementation
+should distinguish:
+
+- liveness: the API process can answer without external calls;
+- readiness: required config/artifacts are present, real-mode dependencies can
+  be initialized, and Qdrant is reachable with the expected collection
+  contract;
+- provider validation: avoid billable generation calls in routine readiness
+  probes; validate credential presence/configuration without logging values.
+
+Readiness must be bounded by short timeouts, return sanitized reasons, remain
+read-only, and never trigger model downloads, indexing, or LLM generation.
+
+## CORS and frontend origin notes
+
+`CORS_ALLOWED_ORIGINS` is parsed as a comma-separated list. The default permits
+only `http://localhost:3000`. Set exact HTTPS frontend origins for each
+deployment. Do not use wildcard origins in production.
+
+The frontend calls the API directly from the browser, so the configured API
+URL must be browser-reachable; Docker service names are not valid public
+browser destinations. HTTPS frontend deployments should use an HTTPS API to
+avoid mixed-content failures.
+
+## Container and Compose gaps
+
+The existing files are intentionally fake-mode foundations:
+
+- `docker/backend/Dockerfile` installs default dependencies only. It does not
+  install the `qdrant` and `embedding` optional dependency groups.
+- The backend image copies `src` and `configs`, but not the processed chunks
+  file and not a model cache.
+- `docker-compose.yml` fixes `LEGAL_QA_SERVICE_MODE=fake`, defines no Qdrant
+  service or external Qdrant connection, injects no real-mode configuration,
+  and builds the frontend against localhost.
+- The Compose health check reaches liveness only.
+- The containers do not define a non-root runtime user or production resource
+  limits.
+
+Do not add the legal corpus or model cache to the image casually. Prefer
+explicit, read-only artifact mounts or a controlled artifact distribution
+mechanism, with integrity/version checks and least-privilege access.
+
+## Conversation persistence limitation
+
+The conversation API repository is process-local and in memory. It disappears
+on restart and is not shared across workers or replicas. There is no durable
+server-side chat history unless a database-backed implementation is added.
+There is also no authenticated user ownership boundary.
+
+Frontend `localStorage` remains the rich UI source of truth and backend sync is
+best-effort. Backend messages do not preserve the full evidence payload needed
+for UI restoration. Multi-worker or autoscaled deployment would make current
+conversation endpoints inconsistent; deploy a single worker only for
+contract/demo use, or implement durable user-scoped persistence before relying
+on server-side history.
+
+Conversation context is retrieval-query assistance only. It is not legal
+evidence, must not be cited, and raw context or prepared retrieval queries must
+not be exposed in normal metadata or logs.
+
+## Security and secret notes
+
+- Keep provider credentials in a secret manager or injected process
+  environment. Never use `NEXT_PUBLIC_*`, committed YAML, images, logs, docs,
+  or reports for secrets.
+- Do not log raw legal questions, prompts, conversation context, retrieval
+  queries, full provider responses, chain-of-thought, authorization headers, or
+  API keys.
+- Qdrant should be private, authenticated where supported, and read-only from
+  the API workload.
+- Public deployment still needs authentication/authorization decisions, rate
+  limiting, request/body limits at the proxy, trusted proxy/header handling,
+  TLS termination, and dependency/resource limits.
+- Swagger/OpenAPI exposure and error/log retention require an explicit
+  deployment policy.
+- A valid citation ID is necessary but does not prove semantic legal
+  faithfulness or replace qualified legal review.
+
+## Protected data paths
+
+Deployment work must not mutate:
+
+```text
+data/raw/
+data/interim/
+data/reports/
+data/processed/legal_chunks.jsonl
+data/eval/
+artifacts/reports/evaluation/
+```
+
+Mount `data/processed/legal_chunks.jsonl` read-only when real mode needs it.
+Deployment startup and readiness must not crawl, clean, parse, embed, index, or
+write evaluation artifacts.
+
+## Known real-mode blockers
+
+1. Define and validate production runtime configuration, including consistent
+   `.env`/process-environment semantics and fail-fast real-mode checks.
+2. Add a read-only, dependency-aware readiness contract separate from
+   liveness.
+3. Package/install real-mode dependency groups and provide the chunks/model
+   artifacts without embedding protected data into source control.
+4. Support secured Qdrant credentials/TLS requirements and verify the existing
+   collection contract without mutation.
+5. Make frontend production API URL configuration fail safely instead of
+   silently targeting localhost.
+6. Provide a real-mode container/deployment configuration; current Compose is
+   fake-only.
+7. Complete API security decisions and resource/concurrency controls.
+8. Resolve process-local conversation behavior before multi-worker or
+   multi-replica use, or explicitly exclude server-side history from the
+   initial deployment.
+9. Run a controlled real-mode smoke only after the above environment is
+   reviewed and explicitly approved.
+
+## Recommended implementation order
+
+1. Harden backend runtime settings and startup validation. Keep fake mode the
+   default, define required real-mode inputs, add secure Qdrant connection
+   settings, and make configuration failures explicit without contacting
+   providers.
+2. Add separate liveness and read-only readiness behavior with targeted tests.
+3. Harden frontend production API URL handling and document its build-time
+   contract.
+4. Build a real-mode backend image/deployment foundation with optional
+   dependencies and read-only artifact mounts; retain the current fake-mode
+   Compose workflow.
+5. Add the minimum approved public-API security controls.
+6. Perform deployment/security review, then execute one controlled low-risk
+   real-mode smoke with citation and fallback checks.
+
+The next implementation task should combine backend runtime configuration
+hardening with the readiness contract, because container work cannot be
+validated safely until required inputs and health semantics are explicit.
+
+## Safe validation commands
+
+These checks do not call real services:
 
 ```bash
-# Build and run with Docker Compose (development)
-docker-compose up -d
+git diff --check
 
-# Check health
-curl http://localhost:8000/health
+grep -R "localhost\|127.0.0.1" -n \
+  src apps/frontend docs README.md PROJECT_CONTEXT.md 2>/dev/null || true
 
-# Run a query
-curl -X POST "http://localhost:8000/api/v1/qa" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Quyền sử dụng đất của hộ gia đình là gì?"}'
+grep -R \
+  "OPENROUTER_API_KEY\|OPENAI_API_KEY\|ANTHROPIC_API_KEY\|HF_TOKEN" \
+  -n src tests apps/frontend README.md PROJECT_CONTEXT.md AGENTS.md docs \
+  apps/frontend/README.md 2>/dev/null || true
+
+git diff --name-only -- \
+  data/raw data/interim data/reports \
+  data/processed/legal_chunks.jsonl data/eval
+git diff --name-only -- artifacts/reports/evaluation
+
+git status --short \
+  .env apps/frontend/.env.local apps/frontend/.next \
+  apps/frontend/node_modules .venv
 ```
 
-**Expected environment**:
-- FastAPI service on port 8000
-- Qdrant on port 6333
-- Neo4j on port 7687 (optional, for GraphRAG)
-- Redis (optional, for caching)
-- Docker Compose for local dev; Kubernetes for production.
-
-## Architecture
-
-```
-┌────────────────────────────────────────────┐
-│         Client Request (HTTPS)            │
-└────────────┬───────────────────────────────┘
-             │
-             ▼
-┌──────────────────────┐
-│  FastAPI              │
-│  Application         │
-│  (async routes)      │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Middleware          │
-│  (rate limit, auth,  │
-│   logging, CORS)     │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Use Case            │
-│  Handler             │
-│  (Naive/Advanced/    │
-│   GraphRAG)          │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Infrastructure      │
-│  Clients             │
-│  (Qdrant, Neo4j,    │
-│   Redis, LLM)       │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Structured          │
-│  Response            │
-└──────────────────────┘
-```
-
-## Components
-
-### 1. FastAPI Application
-
-**Goal**: Provide HTTP API for legal QA with async request handling.
-
-**Core endpoints**:
-- `GET /health` — health check (liveness/readiness)
-- `POST /api/v1/qa` — Naive/Advanced RAG QA
-- `POST /api/v1/graph_qa` — GraphRAG QA (when enabled)
-- `GET /metrics` — Prometheus metrics (optional)
-- `GET /docs` — Auto-generated OpenAPI/Swagger UI
-
-**Request handling**:
-- FastAPI routes are thin wrappers; business logic in use-case classes (e.g., `NaiveRAGUseCase`, `GraphRAGUseCase`).
-- Dependency injection for infrastructure clients (Qdrant, Neo4j, Redis, LLMClient).
-- Async all the way: no blocking I/O in main thread.
-- Request validation via Pydantic models.
-
-**Configuration**:
-- Environment variables via `pydantic-settings` (see Configuration section).
-- Logging configured at startup with `structlog`.
-
-**Example route handler**:
-
-```python
-@router.post("/qa", response_model=QAResponse)
-async def qa_endpoint(request: QARequest, use_case: NaiveRAGUseCase = Depends(get_naive_rag_use_case)):
-    try:
-        result = await use_case.execute(
-            query=request.query,
-            max_chunks=request.max_chunks,
-            confidence_threshold=request.confidence_threshold
-        )
-        return result
-    except Exception as e:
-        logger.error("qa_failed", query=request.query, error=str(e))
-        raise HTTPException(status_code=500, detail="Internal server error")
-```
-
-### 2. Configuration & Secrets
-
-**Goal**: Manage environment-specific settings securely.
-
-**Method**: `pydantic-settings` with `.env` files (never commit secrets).
-
-**Settings model**:
-
-```python
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    # API
-    api_host: str = "0.0.0.0"
-    api_port: int = 8000
-    api_workers: int = 4
-    cors_origins: list[str] = ["*"]  # restrict in prod
-
-    # Security
-    api_key_header: Optional[str] = None  # if set, require X-API-Key header
-    jwt_secret: Optional[str] = None
-
-    # Qdrant
-    qdrant_url: str = "http://qdrant:6333"
-    qdrant_api_key: Optional[str] = None
-    qdrant_collection: str = "vnlaw_qa_chunks"
-
-    # Neo4j
-    neo4j_uri: str = "bolt://neo4j:7687"
-    neo4j_user: str = "neo4j"
-    neo4j_password: Optional[str] = None
-
-    # Redis (caching)
-    redis_url: Optional[str] = None
-
-    # LLM
-    llm_provider_api_key: str  # required for generation providers
-    llm_provider_model: str
-    llm_provider_timeout: int = 30
-
-    # Feature flags
-    enable_graphrag: bool = False
-
-    class Config:
-        env_file = ".env"
-```
-
-**Environment files**:
-- `.env.dev` — local development with provider secrets only when generation is tested
-- `.env.staging` — staging deployment (real services, test data)
-- `.env.prod` — production deployment (restricted access, monitoring)
-
-**Secrets management**: For production, inject secrets via Docker secrets or Kubernetes secrets, not `.env` files.
-
-### 3. Docker Containerization
-
-**Goal**: Package service into portable, reproducible container.
-
-**Dockerfile** (production):
-
-```dockerfile
-FROM python:3.11-slim AS builder
-WORKDIR /app
-COPY pyproject.toml uv.lock ./
-RUN pip install uv && uv sync --frozen --no-dev
-
-FROM python:3.11-slim
-WORKDIR /app
-COPY --from=builder /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-COPY src/ ./src/
-COPY configs/ ./configs/
-COPY data/processed/ ./data/processed/  # read-only mount in prod; better: separate volume
-EXPOSE 8000
-CMD ["uv", "run", "python", "-m", "src.api.main"]
-```
-
-**Optimizations**:
-- Multi-stage build: builder installs deps, runtime image slim.
-- Use `uv sync --frozen` for reproducible installs.
-- Copy only necessary files; `data/processed/` likely mounted as volume in prod.
-
-**docker-compose.yml** (local dev):
-
-```yaml
-version: '3.8'
-services:
-  qdrant:
-    image: qdrant/qdrant:latest
-    ports:
-      - "6333:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
-
-  neo4j:
-    image: neo4j:5
-    environment:
-      - NEO4J_AUTH=neo4j/secret
-    ports:
-      - "7687:7687"
-    volumes:
-      - neo4j_data:/data
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  vnlaw-qa:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_PROVIDER_API_KEY=${LLM_PROVIDER_API_KEY}
-      - QDRANT_URL=http://qdrant:6333
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_PASSWORD=secret
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - qdrant
-      - neo4j
-      - redis
-    volumes:
-      - ./data/processed:/app/data/processed:ro  # read-only mount
-
-volumes:
-  qdrant_data:
-  neo4j_data:
-```
-
-### 4. Security & Access Control
-
-**Goal**: Protect API from abuse and unauthorized access.
-
-**Measures**:
-
-- **Rate limiting**: Per IP or per API key. Example: 100 requests/minute.
-  - Implementation: `slowapi` middleware with Redis backend for distributed limits.
-  
-- **API keys** (if internal deployment): Require `X-API-Key` header; validate against allowed keys in config or database.
-
-- **JWT authentication** (if user-facing): Issue tokens for authenticated users; validate on each request.
-  - Not needed for pure internal QA service; only if multi-tenant.
-
-- **CORS**: Restrict `Access-Control-Allow-Origin` to known frontends in production.
-
-- **HTTPS**: Terminate TLS at load balancer (e.g., Nginx, AWS ALB). FastAPI itself can run HTTP internally.
-
-- **Input validation**: Pydantic models prevent injection attacks; no raw query logging in prod.
-
-- **Secrets**: Never commit API keys; use environment variables or secret managers.
-
-### 5. Observability
-
-**Goal**: Monitor service health, performance, and errors in production.
-
-**Logging**:
-- `structlog` → JSON format → stdout.
-- Include `request_id`, `user_id` (if available), `query_id`, timestamps.
-- Sanitize: never log raw user legal questions in production (PII risk). Log only query hash or ID.
-- Centralize logs to ELK stack, Datadog, or CloudWatch.
-
-**Metrics** (Prometheus):
-- Request count, latency (p50/p95/p99), error rate.
-- Component latency: retrieval, generation.
-- Cache hit rate (if Redis caching enabled).
-- LLM token usage.
-
-**Health checks**:
-- `/health/live` — liveness: process running.
-- `/health/ready` — readiness: can connect to Qdrant, Neo4j, Redis, LLM API.
-- Both return 200 if healthy, 503 if degraded.
-
-**Alerting**:
-- Latency p95 > threshold.
-- Error rate > 1%.
-- Qdrant/Neo4j/Redis connection failures.
-- LLM API errors or rate limits.
-
-### 6. Caching Strategy (Optional)
-
-**Goal**: Reduce latency and LLM cost for frequent queries.
-
-**Approach**: Redis cache with query hash as key.
-
-**Cache key**: SHA256 of `query + max_chunks + effective_date filter (if any)`.
-
-**Cache value**: Full `QAResponse` (answer, citations, confidence, retrieved_chunks).
-
-**TTL**: 24 hours (legal content changes slowly but not static).
-
-**Cache policy**:
-- Check cache before retrieval; on hit, return immediately.
-- Invalidate cache when new laws indexed or embeddings updated (flush all or selective).
-
-**Implementation**: Redis client in FastAPI dependency; `@cached` decorator on use-case execute method.
-
-### 7. Deployment Stages
-
-**Development**:
-- Docker Compose local stack.
-- Hot-reload with `uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000`.
-- `.env.dev` configuration.
-- Debug logging.
-
-**Staging**:
-- Deploy to staging environment (mirrors prod).
-- Docker image pushed to registry.
-- Kubernetes or ECS/Fargate.
-- `.env.staging`.
-- Smoke tests and evaluation suite run on deploy.
-- Limited traffic, monitoring enabled.
-
-**Production**:
-- Immutable Docker image with version tag.
-- Kubernetes or cloud managed service (AWS ECS, GCP Cloud Run).
-- `.env.prod`.
-- Auto-scaling (HPA) based on request rate and latency.
-- Secrets from cloud secret manager.
-- HTTPS with valid TLS certificate.
-- Full observability (logs, metrics, alerts).
-- Blue-green or canary deployments with health checks.
-
-## Pipeline Execution Flow
-
-1. **Build phase**:
-   - Run tests, lint, type-check.
-   - Build Docker image; tag with git commit SHA.
-   - Push image to registry.
-
-2. **Deploy phase**:
-   - Update Kubernetes deployment/image tag.
-   - Wait for rollout; monitor pod health.
-   - Run smoke tests against new version.
-
-3. **Runtime phase** (per request):
-   - Load balancer → FastAPI pod.
-   - Middleware: rate limit, auth, request ID, logging.
-   - Route handler receives validated request.
-   - Use case executes retrieval/generation pipeline.
-   - Infrastructure clients (Qdrant, Neo4j, LLM) called async.
-   - Response model serialized → JSON.
-   - Structured logs written; metrics incremented.
-   - Return 200 with response body.
-
-4. **Error phase**:
-   - Exceptions caught at route level or middleware.
-   - Log error details (sanitized).
-   - Return appropriate HTTP status:
-     - 400: bad request (validation error)
-     - 429: rate limited
-     - 500: internal error
-     - 503: service unavailable (infrastructure down)
-
-## Data Models / Output Schema
-
-### API Request Models
-
-```python
-from pydantic import BaseModel, Field
-from typing import Optional
-
-class QARequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=500)
-    max_chunks: int = Field(default=10, ge=1, le=50)
-    confidence_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
-    effective_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD
-
-class GraphQARequest(QARequest):
-    traversal_depth: int = Field(default=2, ge=1, le=3)
-```
-
-### API Response Models
-
-```python
-from pydantic import BaseModel
-from datetime import datetime
-from typing import List, Optional
-
-class Citation(BaseModel):
-    chunk_id: str
-    citation: str
-    source_url: Optional[str] = None
-
-class RetrievedChunk(BaseModel):
-    chunk_id: str
-    score: float
-    payload: dict  # or define specific fields
-
-class QAResponse(BaseModel):
-    answer: str
-    citations: List[Citation]
-    confidence: float
-    retrieved_chunks: List[RetrievedChunk]  # include for debugging; may hide in prod
-    fallback: bool
-    processing_time_ms: float
-    query_id: str
-    timestamp: datetime
-```
-
-### Health Check Response
-
-```json
-{
-  "status": "healthy|degraded|unhealthy",
-  "checks": {
-    "qdrant": {"status": "ok", "latency_ms": 5},
-    "neo4j": {"status": "ok", "latency_ms": 10},
-    "redis": {"status": "skip", "message": "not configured"}
-  }
-}
-```
-
-## CLI Reference
-
-### FastAPI Dev Server
-
-```bash
-# Development with hot reload
-uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
-
-# Production (multiple workers)
-uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --workers 4
-```
-
-### Docker Commands
-
-```bash
-# Build image
-docker build -t vnlaw-qa:latest .
-
-# Run container (with env file)
-docker run -p 8000:8000 --env-file .env.dev vnlaw-qa:latest
-
-# Docker Compose (full stack)
-docker-compose up -d
-docker-compose logs -f vnlaw-qa
-docker-compose down
-```
-
-### Kubernetes Deployment (example)
-
-```bash
-# Apply deployment and service
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
-
-# Check rollout status
-kubectl rollout status deployment/vnlaw-qa
-
-# Port forward for testing
-kubectl port-forward svc/vnlaw-qa 8000:8000
-```
-
-## Testing
-
-**Unit tests**:
-- `test_request_validation()`: invalid `query` length or `confidence_threshold` range rejected.
-- `test_response_model()`: response conforms to schema; all required fields present.
-- `test_health_endpoint()`: returns 200 when dependencies up.
-- `test_rate_limit_middleware()`: exceeds limit returns 429.
-- `test_cors_headers()`: appropriate `Access-Control-Allow-Origin` set.
-
-**Integration tests**:
-- End-to-end API request → response; measure latency.
-- Cache behavior: identical query hits cache on second call.
-- Error paths: Qdrant down returns 503 with degraded status.
-- Authentication: missing/invalid API key returns 401.
-
-**Load testing**:
-- Use `locust` or `k6` to simulate concurrent users (e.g., 50 RPS).
-- Monitor latency p95, error rate, resource usage.
-- Identify bottlenecks (DB connection pool, LLM rate limits).
-
-## Error Handling
-
-- **ValidationError** (bad request): return 400 with error details.
-- **Infrastructure failure** (Qdrant/Neo4j/Redis/LLM unreachable): return 503 Service Unavailable; include degraded health check.
-- **Rate limit exceeded**: return 429 with `Retry-After` header.
-- **Authentication/authorization failure**: return 401 or 403.
-- **Unexpected exception**: log sanitized error (no PII); return 500 generic message.
-
-All errors logged with `request_id` for correlation. Responses do not expose internal stack traces in production.
-
-## Troubleshooting
-
-| Issue | Possible Cause | How to Check | Recommended Fix |
-|-------|----------------|--------------|-----------------|
-| 503 on all requests | Qdrant/Neo4j/LLM not running or credentials wrong | Check `/health/ready`; inspect logs for connection errors | Start dependencies; verify env vars; check network connectivity |
-| High latency p95 | LLM API slow OR retrieval not using filters | Profile request stages; check Qdrant query time | Enable caching; optimize retrieval filters; use faster LLM model; add timeouts |
-| 429 Too Many Requests | Rate limit too strict OR bot traffic | Check rate limit counters in logs | Increase rate limit; add allowlist for trusted IPs |
-| Container exits on start | Missing provider env vars OR port already in use | `docker logs` shows config error | Provide required env vars; free port 8000 |
-| CORS errors in browser | `cors_origins` not including frontend origin | Browser console shows CORS block | Add frontend URL to `cors_origins` |
-| Memory leak / OOM | Large response objects cached OR unbounded retrieved_chunks stored | Monitor container memory; profile heap | Limit `max_chunks`; cap cache size; avoid storing large texts in memory |
-| HTTPS termination failing | Load balancer not configured with TLS cert | Browser shows connection not secure | Configure ALB/NGINX with valid TLS certificate; redirect HTTP → HTTPS |
-| Pods crash looping | Unhandled exception on startup | `kubectl logs` shows stack trace | Fix configuration; add retry/backoff for infrastructure connections |
-
-## Best Practices
-
-- **Thin routes** — keep business logic in use-case classes, not in route handlers.
-- **Async all I/O** — Qdrant, Neo4j, Redis, LLM calls must use async clients.
-- **Sanitize logs** — never log raw user queries in prod; use query hash or ID.
-- **Graceful degradation** — if caching disabled, still serve; if Redis down, skip cache but continue.
-- **Timeouts everywhere** — set timeouts on all external calls; fail fast.
-- **Health checks** — separate liveness (process up) and readiness (dependencies reachable).
-- **Immutable images** — same image tag deployed to all environments; config via env vars only.
-- **Monitor SLOs** — track latency p95 < 2s, error rate < 0.1%.
-- **Canary deployments** — route small percentage of traffic to new version; monitor errors/latency before full rollout.
-- **Secure defaults** — CORS restricted, rate limiting enabled, authentication required in prod.
-
-## Changelog
-
-### Version 0.1 (2026-05-21)
-
-- Created initial API & deployment documentation.
-- Defined FastAPI routes, middleware, and configuration via `pydantic-settings`.
-- Specified Dockerfile multi-stage build and docker-compose stack.
-- Documented security (rate limiting, API keys, CORS, HTTPS) and observability (logging, metrics, health checks).
-- Provided caching strategy (Redis) and deployment stages (dev/staging/prod).
-- Added request/response Pydantic models and error handling policies.
-- Included troubleshooting table for common deployment and runtime issues.
-
-## Related Documentation
-
-| Document | Status | Description |
-|----------|--------|-------------|
-| `docs/project_phase_journal.md` | Existing | Project phase journal and pipeline notes |
-| `docs/project_setup.md` | Implemented | Environment setup and coding standards |
-| `docs/corpus_registry.md` | Implemented | Corpus registry schema and design |
-| `docs/raw_corpus_audit.md` | Designed | Raw artifact audit procedure |
-| `docs/cleaning_normalization.md` | Existing | HTML-to-text and Unicode normalization |
-| `docs/legal_parsing.md` | Existing | Legal hierarchy parsing algorithm |
-| `docs/parent_child_chunking.md` | Existing | Parent-child chunking design |
-| `docs/processed_jsonl.md` | Existing | JSONL export schema and validation |
-| `docs/embedding_indexing.md` | Implemented | BGE-M3 dense index and Qdrant validation |
-| `docs/naive_rag.md` | Implemented baseline | Baseline RAG implementation |
-| `docs/advanced_rag.md` | Implemented/evaluated | Coverage-aware hybrid retrieval and strict generation |
-| `docs/graphrag_agents.md` | Future extension | Legal graph schema, traversal, agent orchestration |
-| `docs/evaluation.md` | Implemented | Benchmark metrics, strict generation evaluation, diagnostics |
-| `docs/mlops_maintenance.md` | Future extension | Corpus updates, index refresh, monitoring, runbooks |
+For later code changes, run targeted API/service tests, Ruff, format checks,
+`uv lock --check`, frontend lint/build when applicable, and
+`docker compose config` plus image builds when Docker files change.
+
+## Controlled real-mode smoke checklist
+
+Do not execute this checklist without explicit approval and a reviewed
+environment.
+
+- [ ] Deployment/security review completed.
+- [ ] Exact Qdrant endpoint, authentication, TLS, collection, and read-only
+      access confirmed.
+- [ ] Collection/vector contract and expected corpus version confirmed without
+      writes.
+- [ ] Processed chunks mounted read-only and integrity checked.
+- [ ] Embedding dependency and model artifact/device availability confirmed.
+- [ ] OpenRouter key injected from a secret store; value is not printed.
+- [ ] CORS and final frontend API URL match the deployed HTTPS origins.
+- [ ] Liveness and readiness pass with bounded, non-billable checks.
+- [ ] Logs are sanitized and raw context/retrieval queries are absent.
+- [ ] One low-risk Vietnamese legal research question is approved.
+- [ ] Response contract, selected child evidence, citations, and fallback
+      behavior are inspected.
+- [ ] No Qdrant write, indexing, corpus mutation, or evaluation artifact write
+      occurs.
+- [ ] Provider usage is stopped/revoked after the smoke if credentials were
+      temporary.

@@ -17,6 +17,12 @@ Runtime settings are read from environment variables by `src/api/settings.py`.
 `.env.example` contains both existing project-level variables and backend API
 runtime variables. It must contain placeholders only.
 
+`AppSettings.from_env()` currently reads the process environment directly; it
+does not load `.env` before selecting `LEGAL_QA_SERVICE_MODE`. The real
+workflow loads the project `.env` only after real mode has already been
+selected. Export or inject backend settings through the process/container
+environment rather than assuming an un-sourced `.env` selects real mode.
+
 Committed YAML config under `configs/` stores non-secret runtime defaults such
 as retrieval settings and provider/model defaults. Local `.env` values select
 those config files, override local endpoints/service mode, and provide secrets
@@ -84,6 +90,11 @@ Before using real mode manually, confirm:
 - No secrets are printed, logged, or pasted into docs.
 
 Do not use real mode in routine unit tests or default validation commands.
+The committed backend image and Compose stack are fake-mode packaging
+foundations, not real-mode deployment artifacts: the image does not install
+the `qdrant` and `embedding` optional dependency groups or include the
+processed chunks/model artifacts. See `docs/api_deployment.md` for the complete
+readiness audit and blockers.
 
 ## Run the Backend
 
@@ -119,6 +130,10 @@ LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:create_app --fac
 - `GET /health`
 - `GET /version`
 - `POST /api/v1/legal-qa/ask`
+
+`GET /health` is liveness only. It returns a constant response and does not
+establish Qdrant, model, corpus artifact, or provider readiness. There is
+currently no dependency-aware readiness endpoint.
 
 Legal QA request fields:
 
