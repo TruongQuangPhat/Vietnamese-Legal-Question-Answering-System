@@ -169,6 +169,326 @@ recreate collections, upsert points, re-index, or re-embed the corpus.
   verifies connectivity and collection availability only; it does not fully
   validate vector schema, point count, payload integrity, or corpus version.
 
+## Qdrant Cloud migration audit
+
+This section is an audit and manual checklist. No migration, snapshot,
+embedding, indexing, upsert, retrieval, or Qdrant mutation was run while
+preparing it.
+
+### Current source and target facts
+
+The local source collection was reported as:
+
+```text
+URL: http://localhost:6333
+collection: vnlaw_chunks_bgem3_v1_full
+status: green
+optimizer_status: ok
+points_count: 40,389
+indexed_vectors_count: 40,012
+named vector: dense
+vector size: 1,024
+distance: Cosine
+segments_count: 4
+on_disk_payload: true
+update queue: empty
+```
+
+The input corpus is `data/processed/legal_chunks.jsonl` with 40,389 validated
+rows. One legal chunk maps to one deterministic Qdrant point. The difference
+between `points_count` and `indexed_vectors_count` does not by itself prove
+missing points; verify collection status, point count, sampled vectors, and
+optimizer state after migration.
+
+The Qdrant Cloud cluster is reachable but currently has no collections. The
+target collection must remain:
+
+```text
+vnlaw_chunks_bgem3_v1_full
+```
+
+Do not substitute the default
+`vnlaw_chunks_bgem3_v1` from
+`configs/indexing/embedding_indexing.yml`.
+
+### Existing repository workflows
+
+| Purpose | Existing entrypoint | Actual behavior |
+| --- | --- | --- |
+| Create/validate collection schema and payload indexes | `scripts/indexing/setup_qdrant_collection.py` | Calls `ensure_collection`; creates the named dense-vector schema and missing payload indexes, but never upserts points |
+| Embed and upsert chunks | `scripts/indexing/index_qdrant_chunks.py` | Loads BGE-M3 for a real run and calls `IndexingService`, which batches `upsert(..., wait=True)` with deterministic UUIDv5 point IDs |
+| Validate an existing index | `scripts/indexing/validate_qdrant_index.py` | Reads collection schema/count, samples points/vectors, and checks payload filters; retrieval sanity can be disabled to avoid loading BGE-M3 |
+
+All three entrypoints call the shared
+`src.indexing.qdrant_collection.build_qdrant_client`. The builder supports an
+optional API key, but these three CLI entrypoints currently pass only URL and
+timeout. They also do not read `QDRANT_URL`, `QDRANT_COLLECTION`, or
+`QDRANT_API_KEY`; URL and collection must be supplied with CLI flags.
+
+Therefore, the maintained indexing path does **not** currently support
+authenticated Qdrant Cloud. The backend runtime and readiness paths do support
+`QDRANT_API_KEY`, but that does not make the indexing CLIs authenticated.
+Do not embed a key in a URL or command argument as a workaround. A separate
+small code change and mock-only tests are required before using these CLIs
+against Qdrant Cloud.
+
+No repository script implements Qdrant collection snapshot creation, download,
+upload, recovery, or the Qdrant Migration Tool.
+
+### Environment variables
+
+Local unauthenticated Qdrant:
+
+```env
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+QDRANT_API_KEY=
+```
+
+Qdrant Cloud:
+
+```env
+QDRANT_URL=https://your-cluster.example.cloud.qdrant.io
+QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+QDRANT_API_KEY=
+```
+
+Inject the Cloud key from a private shell, Render secret environment setting,
+or another secret manager. Never commit it, print it, paste it into docs, put
+it in a URL, or use a `NEXT_PUBLIC_*` variable.
+
+The backend also accepts `LEGAL_QA_QDRANT_URL`,
+`LEGAL_QA_COLLECTION_NAME`, and `LEGAL_QA_QDRANT_API_KEY` as higher-priority
+aliases. The indexing CLIs do not currently consume either naming family.
+
+### Safe connectivity and metadata verification
+
+The following commands are read-only but were **not run** during this audit.
+They use environment placeholders only.
+
+List Cloud collections:
+
+```bash
+curl --fail --silent --show-error \
+  -H "api-key: $QDRANT_API_KEY" \
+  "$QDRANT_URL/collections"
+```
+
+Inspect the target Cloud collection:
+
+```bash
+curl --fail --silent --show-error \
+  -H "api-key: $QDRANT_API_KEY" \
+  "$QDRANT_URL/collections/vnlaw_chunks_bgem3_v1_full"
+```
+
+Inspect the local source:
+
+```bash
+curl --fail --silent --show-error \
+  http://localhost:6333/collections/vnlaw_chunks_bgem3_v1_full
+```
+
+After migration, inspect the Cloud response and require:
+
+- collection name `vnlaw_chunks_bgem3_v1_full`;
+- status acceptable and eventually `green`;
+- named vector `dense`;
+- vector size `1024`;
+- distance `Cosine`;
+- `points_count == 40389`;
+- no unexpected sparse vector;
+- these payload indexes in `payload_schema`:
+  - `law_id` (`keyword`);
+  - `chunk_kind` (`keyword`);
+  - `level` (`keyword`);
+  - `metadata.is_empty_or_repealed` (`bool`);
+  - `metadata.is_source_unit_repealed` (`bool`);
+  - `source_domain` (`keyword`);
+  - `article_number` (`keyword`).
+
+Point count and schema are necessary but not sufficient. A later approved
+validation should sample payloads and vectors and compare deterministic
+`chunk_id`/point IDs. `indexed_vectors_count` may lag `points_count` while
+optimization runs, so record it and optimizer status rather than treating
+temporary inequality as automatic data loss.
+
+The maintained validator is appropriate after API-key wiring. This is a
+read-only schema/payload/vector check with retrieval sanity disabled:
+
+```bash
+# NOT RUN; currently blocked for Qdrant Cloud because the CLI does not pass
+# QDRANT_API_KEY to the shared client builder.
+uv run --extra qdrant python scripts/indexing/validate_qdrant_index.py \
+  --config configs/indexing/embedding_indexing.yml \
+  --url "$QDRANT_URL" \
+  --collection-name "$QDRANT_COLLECTION" \
+  --dense-vector-name dense \
+  --dense-dimension 1024 \
+  --expected-distance Cosine \
+  --expected-min-points 40389 \
+  --sample-limit 10 \
+  --skip-retrieval-sanity \
+  --output /tmp/vnlaw_qdrant_cloud_validation.json
+```
+
+### Preferred option: manual snapshot transfer
+
+Qdrant documents collection snapshots as a way to move a self-hosted
+collection to Qdrant Cloud without recomputing embeddings or rebuilding the
+index. A collection snapshot includes its configuration, points, payloads, and
+pre-built index. Qdrant Cloud Free clusters support manual snapshots and
+restores through the API.
+
+This is the preferred path if all of the following are confirmed first:
+
+- source and target Qdrant versions satisfy snapshot compatibility; Qdrant
+  requires the same minor version, with the target patch version at least the
+  source patch version;
+- the snapshot and its temporary restore footprint fit Cloud disk and memory
+  limits with headroom;
+- the target collection is absent;
+- the local collection is quiescent and healthy;
+- the rotated Cloud API key is available only through a secret environment
+  variable.
+
+Manual high-level checklist (**NOT RUN**):
+
+1. Record local and Cloud Qdrant versions, source collection metadata, payload
+   indexes, and counts.
+2. Stop all writes to the local source collection.
+3. Request a local collection snapshot with
+   `POST /collections/vnlaw_chunks_bgem3_v1_full/snapshots`.
+4. Download the generated snapshot to a protected temporary location and
+   record its byte size and checksum. Do not commit it.
+5. Confirm the Cloud target collection is absent and the cluster has enough
+   free disk/RAM for upload, extraction, and optimization.
+6. Upload the snapshot to the Cloud collection snapshot endpoint with
+   `priority=snapshot`. Qdrant creates the absent collection during recovery.
+7. Wait for recovery/optimization to finish; do not start Render traffic.
+8. Run the read-only metadata, count, payload-index, and sampled-point checks.
+9. Remove temporary snapshot files after verification according to the
+   approved retention policy.
+
+Reference mutation commands, provided only for a separately approved manual
+operation:
+
+```bash
+# NOT RUN: create a local collection snapshot.
+curl --fail --silent --show-error -X POST \
+  http://localhost:6333/collections/vnlaw_chunks_bgem3_v1_full/snapshots
+
+# NOT RUN: upload and recover an already downloaded snapshot into Cloud.
+curl --fail --silent --show-error -X POST \
+  -H "api-key: $QDRANT_API_KEY" \
+  -H "Content-Type: multipart/form-data" \
+  -F "snapshot=@/private/path/to/collection.snapshot" \
+  "$QDRANT_URL/collections/vnlaw_chunks_bgem3_v1_full/snapshots/upload?priority=snapshot"
+```
+
+Cloud restore from an external URL is not supported because outbound traffic
+from Qdrant Cloud is blocked; use uploaded snapshot data. Startup snapshot
+restore is also unavailable in Qdrant Cloud.
+
+Official references:
+
+- [Qdrant snapshots and restore](https://qdrant.tech/documentation/operations/snapshots/)
+- [Qdrant migration and recovery options](https://qdrant.tech/documentation/migration-recovery-options/)
+- [Qdrant Cloud free-cluster resources](https://qdrant.tech/documentation/cloud/create-cluster/)
+
+### Fallback option: rebuild and upsert
+
+Rebuild is slower and more operationally risky because it loads BGE-M3,
+recomputes all 40,389 embeddings, transfers every payload, and builds the
+Cloud index. Use it only if snapshot compatibility/capacity fails or an
+explicit rebuild is preferred.
+
+The manual order would be:
+
+1. Add `QDRANT_API_KEY` support to all three indexing CLI client-construction
+   calls and cover present/absent-key behavior with mocks.
+2. Verify processed-corpus validation and immutable input hashes.
+3. Create the empty Cloud collection with `dense`, size 1024, Cosine, no
+   sparse vector, and the seven payload indexes.
+4. Run a small explicitly bounded pilot and validate it.
+5. Run the full resumable indexing command with a private checkpoint and
+   report outside protected data paths.
+6. Reconcile counts, inspect failed chunk IDs, and retry only failed batches.
+7. Run read-only schema, sampled payload/vector, filter, and count validation.
+8. Enable backend traffic only after all checks pass.
+
+Likely maintained commands (**NOT RUN and not Cloud-ready until API-key wiring
+is implemented**):
+
+```bash
+# NOT RUN: creates/validates schema and payload indexes; mutates Qdrant.
+uv run --extra qdrant python scripts/indexing/setup_qdrant_collection.py \
+  --config configs/indexing/embedding_indexing.yml \
+  --url "$QDRANT_URL" \
+  --collection-name "$QDRANT_COLLECTION" \
+  --dense-vector-name dense \
+  --dense-dimension 1024 \
+  --distance Cosine
+
+# NOT RUN: loads BGE-M3, embeds the full corpus, and upserts Qdrant.
+uv run --extra qdrant --extra embedding \
+  python scripts/indexing/index_qdrant_chunks.py \
+  --input data/processed/legal_chunks.jsonl \
+  --config configs/indexing/embedding_indexing.yml \
+  --url "$QDRANT_URL" \
+  --collection-name "$QDRANT_COLLECTION" \
+  --processed-validation-report /private/path/processed_validation_report.json \
+  --allow-full-corpus \
+  --run-type official_full_indexing \
+  --checkpoint /private/path/qdrant_cloud_indexing_checkpoint.json \
+  --max-retries 3 \
+  --reconcile-counts \
+  --output /tmp/vnlaw_qdrant_cloud_indexing_report.json
+```
+
+Never use `--recreate` against the local source or Cloud target without a
+separately reviewed destructive operation.
+
+### Qdrant Cloud Free Tier risks
+
+As of the documentation checked for this audit, a free cluster provides one
+node, 1 GB RAM, 0.5 vCPU, and 4 GB disk. It is intended for prototyping, has no
+dedicated resources, and supports only manual snapshot/restore. Inactive free
+clusters may be suspended after one week and deleted after four weeks if not
+reactivated.
+
+The raw float32 dense vectors alone are approximately 158 MiB
+(`40389 * 1024 * 4` bytes), but this is not a capacity estimate. Payload text
+and repeated `parent_text`, HNSW/index structures, segment metadata, WAL,
+snapshot upload/extraction, optimizer work, and operational headroom can
+dominate storage and RAM. The reported local `on_disk_payload=true` does not
+guarantee the Cloud collection fits or performs acceptably.
+
+Before mutation, record local collection/snapshot size and compare it with
+actual Cloud free disk/RAM metrics. Do not proceed if restore/indexing would
+approach limits. A streaming migration or rebuild can require substantial
+temporary resources; Qdrant's migration guidance warns that the Migration Tool
+may require roughly twice the source collection's RAM and disk during
+migration. Upgrade the cluster rather than weakening payload traceability,
+dropping citation metadata, or reducing safety fields to force a fit.
+
+### Render startup boundary
+
+Render startup must only start the FastAPI service. It must never:
+
+- create, recreate, restore, or delete a Qdrant collection;
+- create/download/upload snapshots;
+- run `setup_qdrant_collection.py`, `index_qdrant_chunks.py`, or the Qdrant
+  Migration Tool;
+- load BGE-M3 to rebuild vectors;
+- upsert or update payloads;
+- crawl, process, validate, or rewrite corpus artifacts;
+- run retrieval/generation evaluations.
+
+Migration is a separately approved, one-time operator action. Render real-mode
+readiness may perform its existing bounded `get_collection` metadata read, but
+startup must not turn readiness into migration or indexing.
+
 ## OpenRouter assumptions and gaps
 
 - The implemented real provider is OpenRouter through its OpenAI-compatible

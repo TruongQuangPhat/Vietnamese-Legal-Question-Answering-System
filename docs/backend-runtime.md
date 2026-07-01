@@ -59,6 +59,13 @@ backend-specific override. Local unauthenticated Qdrant continues to work when
 the key is absent. Secret values are hidden in settings representations and
 must not be logged.
 
+These variables configure the backend runtime and readiness paths. The
+maintained setup/index/validation CLIs currently require `--url` and
+`--collection-name` flags and do not pass either Qdrant API-key variable to the
+shared client builder. They are not authenticated-Qdrant-Cloud ready until a
+separately tested CLI wiring change is made. See `docs/api_deployment.md` for
+the migration audit.
+
 `LEGAL_QA_DEVICE` selects the local embedding device in manual real mode.
 `OPENROUTER_MODEL` is the provider-level default model. `LEGAL_QA_MODEL` is an
 optional Legal QA runtime LLM model override and takes precedence for the API
