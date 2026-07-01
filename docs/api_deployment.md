@@ -257,6 +257,11 @@ or another secret manager. Never commit it, print it, paste it into docs, put
 it in a URL, or use a `NEXT_PUBLIC_*` variable.
 `QDRANT_API_KEY` is required for authenticated Qdrant Cloud and optional for
 local unauthenticated Qdrant.
+Run manual commands from a private shell with tracing disabled; never use
+`set -x`, echo the key, or paste the literal key into a command. Header examples
+reference the environment variable, but the expanded header may still be
+briefly visible to local process inspection, so restrict host/session access
+and rotate temporary credentials after the operation.
 
 The backend also accepts `LEGAL_QA_QDRANT_URL`,
 `LEGAL_QA_COLLECTION_NAME`, and `LEGAL_QA_QDRANT_API_KEY` as higher-priority
@@ -268,9 +273,22 @@ authentication and do not consume the backend-specific key alias.
 The following commands are read-only but were **not run** during this audit.
 They use environment placeholders only.
 
+Check the local and Cloud Qdrant versions:
+
+```bash
+# NOT RUN by Codex: read-only local version check.
+curl --fail --silent --show-error http://localhost:6333/
+
+# NOT RUN by Codex: read-only Cloud version check.
+curl --fail --silent --show-error \
+  -H "api-key: $QDRANT_API_KEY" \
+  "$QDRANT_URL/"
+```
+
 List Cloud collections:
 
 ```bash
+# NOT RUN by Codex: read-only Cloud collection listing.
 curl --fail --silent --show-error \
   -H "api-key: $QDRANT_API_KEY" \
   "$QDRANT_URL/collections"
@@ -279,6 +297,7 @@ curl --fail --silent --show-error \
 Inspect the target Cloud collection:
 
 ```bash
+# NOT RUN by Codex: read-only; a 404 is expected before restore.
 curl --fail --silent --show-error \
   -H "api-key: $QDRANT_API_KEY" \
   "$QDRANT_URL/collections/vnlaw_chunks_bgem3_v1_full"
@@ -287,9 +306,15 @@ curl --fail --silent --show-error \
 Inspect the local source:
 
 ```bash
+# NOT RUN by Codex: read-only local collection metadata.
 curl --fail --silent --show-error \
   http://localhost:6333/collections/vnlaw_chunks_bgem3_v1_full
 ```
+
+Before creating anything, record both version strings and the complete local
+collection response. Do not infer snapshot compatibility from the client
+library version or Docker image tag alone; compare the server versions returned
+by these endpoints.
 
 After migration, inspect the Cloud response and require:
 
@@ -342,55 +367,128 @@ index. A collection snapshot includes its configuration, points, payloads, and
 pre-built index. Qdrant Cloud Free clusters support manual snapshots and
 restores through the API.
 
+Snapshot/restore is preferred for this collection because the local source is
+already healthy and fully populated, the Cloud target is empty, and the
+snapshot preserves the existing point IDs, vectors, payloads, collection
+configuration, and pre-built index. It avoids recomputing 40,389 BGE-M3
+embeddings. This preference is conditional, not approval to run it.
+
 This is the preferred path if all of the following are confirmed first:
 
-- source and target Qdrant versions satisfy snapshot compatibility; Qdrant
-  requires the same minor version, with the target patch version at least the
-  source patch version;
-- the snapshot and its temporary restore footprint fit Cloud disk and memory
-  limits with headroom;
+- source and target Qdrant server versions satisfy snapshot compatibility;
+- the downloaded snapshot size and estimated restored collection fit Cloud
+  disk and memory limits with substantial headroom;
 - the target collection is absent;
 - the local collection is quiescent and healthy;
 - the rotated Cloud API key is available only through a secret environment
   variable.
+
+Qdrant's snapshot reference specifies the same minor version, with the target
+patch version no older than the source. Its newer migration guidance says a
+target may be at most one minor version higher. Use the same minor version as
+the conservative gate. If Cloud is one minor newer, stop and confirm support
+for the exact source/target versions before upload; never attempt a snapshot
+from a newer source into an older target.
 
 Manual high-level checklist (**NOT RUN**):
 
 1. Record local and Cloud Qdrant versions, source collection metadata, payload
    indexes, and counts.
 2. Stop all writes to the local source collection.
-3. Request a local collection snapshot with
+3. Confirm the local snapshot storage has enough free disk for snapshot and
+   temporary files.
+4. Request a local collection snapshot with
    `POST /collections/vnlaw_chunks_bgem3_v1_full/snapshots`.
-4. Download the generated snapshot to a protected temporary location and
+5. List snapshots and record the returned name and reported byte size.
+6. Download the generated snapshot to a private temporary location and
    record its byte size and checksum. Do not commit it.
-5. Confirm the Cloud target collection is absent and the cluster has enough
-   free disk/RAM for upload, extraction, and optimization.
-6. Upload the snapshot to the Cloud collection snapshot endpoint with
+7. Confirm the downloaded byte size matches the API metadata and preserve the
+   checksum for transfer verification.
+8. Confirm the Cloud target collection is absent and the cluster has enough
+   free disk/RAM for upload, extraction, and optimization. Qdrant estimates
+   approximately twice the collection disk size is needed during restore
+   because the uploaded snapshot and restored collection coexist.
+9. Upload the snapshot to the Cloud collection snapshot endpoint with
    `priority=snapshot`. Qdrant creates the absent collection during recovery.
-7. Wait for recovery/optimization to finish; do not start Render traffic.
-8. Run the read-only metadata, count, payload-index, and sampled-point checks.
-9. Remove temporary snapshot files after verification according to the
+10. Wait for recovery/optimization to finish; do not start Render traffic.
+11. Run the read-only metadata, count, payload-index, and sampled-point checks.
+12. Remove temporary snapshot files after verification according to the
    approved retention policy.
 
-Reference mutation commands, provided only for a separately approved manual
-operation:
+Manual local commands are shown below for a separately approved operation.
+Codex did **not** run any of them:
 
 ```bash
 # NOT RUN: create a local collection snapshot.
 curl --fail --silent --show-error -X POST \
   http://localhost:6333/collections/vnlaw_chunks_bgem3_v1_full/snapshots
 
+# NOT RUN: list local snapshots and read the returned name/size metadata.
+curl --fail --silent --show-error \
+  http://localhost:6333/collections/vnlaw_chunks_bgem3_v1_full/snapshots
+
+# NOT RUN: download the named local snapshot to a private temporary path.
+SNAPSHOT_NAME="<snapshot-name-returned-by-qdrant>"
+SNAPSHOT_PATH="/tmp/$SNAPSHOT_NAME"
+curl --fail --silent --show-error \
+  "http://localhost:6333/collections/vnlaw_chunks_bgem3_v1_full/snapshots/$SNAPSHOT_NAME" \
+  --output "$SNAPSHOT_PATH"
+
+# NOT RUN: measure and checksum the downloaded snapshot without modifying it.
+stat --format='%n %s bytes' "$SNAPSHOT_PATH"
+du --human-readable "$SNAPSHOT_PATH"
+sha256sum "$SNAPSHOT_PATH"
+```
+
+Snapshot creation is a local Qdrant write-like administrative operation and
+requires explicit approval. Listing, downloading, `stat`, `du`, and
+`sha256sum` are read-only, but only become useful after an approved snapshot
+exists. Store snapshots outside the repository and protected corpus/artifact
+paths.
+
+The Cloud restore command is a mutation and requires separate explicit
+approval. Codex did **not** run it:
+
+```bash
 # NOT RUN: upload and recover an already downloaded snapshot into Cloud.
 curl --fail --silent --show-error -X POST \
   -H "api-key: $QDRANT_API_KEY" \
   -H "Content-Type: multipart/form-data" \
-  -F "snapshot=@/private/path/to/collection.snapshot" \
+  -F "snapshot=@${SNAPSHOT_PATH}" \
   "$QDRANT_URL/collections/vnlaw_chunks_bgem3_v1_full/snapshots/upload?priority=snapshot"
 ```
+
+Use `priority=snapshot` for an absent target collection. Do not pre-create the
+target collection and do not use `replica` priority for this migration:
+Qdrant warns that the default replica priority can prefer the empty target
+state. Never use `no_sync` for this workflow.
 
 Cloud restore from an external URL is not supported because outbound traffic
 from Qdrant Cloud is blocked; use uploaded snapshot data. Startup snapshot
 restore is also unavailable in Qdrant Cloud.
+
+### Post-restore acceptance checklist
+
+Do not route Render traffic until all checks pass:
+
+1. Confirm the target collection exists and eventually reports `green`,
+   `optimizer_status=ok`, and an empty update queue.
+2. Confirm named vector `dense`, size 1024, distance `Cosine`, and no
+   unexpected sparse vector.
+3. Require `points_count == 40389`. Record `indexed_vectors_count`; allow it to
+   converge while optimization runs, but investigate persistent mismatch or
+   non-green status.
+4. Confirm all seven expected payload indexes and their types.
+5. Run the maintained validator with `--skip-retrieval-sanity`; inspect its
+   sampled payload/vector and filter results. This is a real Cloud read and
+   should be run only after migration approval.
+6. Compare selected deterministic point IDs, `chunk_id`, hashes, citations,
+   source URLs, hierarchy metadata, `text`, and `parent_text` with the local
+   source.
+7. Confirm readiness returns ready in the intended backend environment without
+   exposing credentials.
+8. Retain the snapshot checksum and migration record, then remove temporary
+   snapshot files according to the approved retention policy.
 
 Official references:
 
@@ -467,11 +565,40 @@ guarantee the Cloud collection fits or performs acceptably.
 
 Before mutation, record local collection/snapshot size and compare it with
 actual Cloud free disk/RAM metrics. Do not proceed if restore/indexing would
-approach limits. A streaming migration or rebuild can require substantial
-temporary resources; Qdrant's migration guidance warns that the Migration Tool
-may require roughly twice the source collection's RAM and disk during
-migration. Upgrade the cluster rather than weakening payload traceability,
-dropping citation metadata, or reducing safety fields to force a fit.
+approach limits. Qdrant's current migration guidance says snapshot restore
+needs approximately twice the collection disk size during the restore window
+because the snapshot and restored collection coexist. A snapshot near or above
+2 GB is therefore an immediate 4 GB Free Tier warning even before operational
+headroom; smaller snapshots can still fail because snapshot size is not equal
+to peak restored disk or RAM.
+
+Warning signs include insufficient disk errors, upload/restore rejection,
+cluster restart or suspension, prolonged yellow/red status, optimizer backlog,
+memory pressure, slow or failed indexing, and inability for
+`indexed_vectors_count` to stabilize. Upgrade the cluster rather than weakening
+payload traceability, dropping citation metadata, or reducing safety fields to
+force a fit.
+
+### Command approval boundary
+
+Safe pre-migration read-only commands, provided they use placeholders and do
+not print secret values:
+
+- local/Cloud root version checks;
+- local/Cloud collection listing and metadata reads;
+- local snapshot listing;
+- local filesystem `stat`, `du`, and `sha256sum` for an already approved
+  snapshot file;
+- `git diff`, secret-reference, ignored-file, and protected-path checks.
+
+Commands requiring explicit approval:
+
+- snapshot creation or deletion;
+- snapshot upload/recovery;
+- target collection create, recreate, or delete;
+- setup, indexing, upsert, payload update, or Qdrant Migration Tool;
+- real Cloud sampled validation or retrieval;
+- embedding model loading and full evaluation.
 
 ### Render startup boundary
 
@@ -653,7 +780,7 @@ grep -R "localhost\|127.0.0.1" -n \
   src apps/frontend docs README.md PROJECT_CONTEXT.md 2>/dev/null || true
 
 grep -R \
-  "OPENROUTER_API_KEY\|OPENAI_API_KEY\|ANTHROPIC_API_KEY\|HF_TOKEN" \
+  "OPENROUTER_API_KEY\|OPENAI_API_KEY\|ANTHROPIC_API_KEY\|HF_TOKEN\|QDRANT_API_KEY" \
   -n src tests apps/frontend README.md PROJECT_CONTEXT.md AGENTS.md docs \
   apps/frontend/README.md 2>/dev/null || true
 
