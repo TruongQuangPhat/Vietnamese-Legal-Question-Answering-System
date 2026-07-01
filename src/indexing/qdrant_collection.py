@@ -8,6 +8,7 @@ retrieval.
 from __future__ import annotations
 
 import importlib
+import os
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
@@ -46,6 +47,33 @@ class QdrantCollectionClient(Protocol):
     async def create_payload_index(self, **kwargs: Any) -> Any:
         """Create one payload field index."""
         ...
+
+
+def resolve_qdrant_api_key(
+    explicit_api_key: str | None,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> str | None:
+    """Resolve an optional Qdrant API key without exposing it.
+
+    Args:
+        explicit_api_key: CLI-provided key. When the option is present, it
+            takes precedence over the environment, including an explicit blank
+            value that disables authentication.
+        environ: Optional environment mapping for deterministic tests.
+
+    Returns:
+        Stripped explicit key, stripped ``QDRANT_API_KEY``, or ``None`` when
+        the selected value is missing or blank.
+    """
+    environment = os.environ if environ is None else environ
+    selected = (
+        explicit_api_key if explicit_api_key is not None else environment.get("QDRANT_API_KEY")
+    )
+    if selected is None:
+        return None
+    normalized = selected.strip()
+    return normalized or None
 
 
 def build_qdrant_client(

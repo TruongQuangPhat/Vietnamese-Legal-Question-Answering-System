@@ -221,16 +221,15 @@ Do not substitute the default
 
 All three entrypoints call the shared
 `src.indexing.qdrant_collection.build_qdrant_client`. The builder supports an
-optional API key, but these three CLI entrypoints currently pass only URL and
-timeout. They also do not read `QDRANT_URL`, `QDRANT_COLLECTION`, or
-`QDRANT_API_KEY`; URL and collection must be supplied with CLI flags.
+optional API key. Each CLI now resolves `QDRANT_API_KEY`, normalizes blank
+values to no key, and passes the result to the builder. An explicit
+`--qdrant-api-key` takes precedence, including an explicit blank value that
+disables authentication. Prefer the environment variable because CLI
+arguments may be retained in shell history or process listings.
 
-Therefore, the maintained indexing path does **not** currently support
-authenticated Qdrant Cloud. The backend runtime and readiness paths do support
-`QDRANT_API_KEY`, but that does not make the indexing CLIs authenticated.
-Do not embed a key in a URL or command argument as a workaround. A separate
-small code change and mock-only tests are required before using these CLIs
-against Qdrant Cloud.
+The CLIs still do not read `QDRANT_URL` or `QDRANT_COLLECTION`; URL and
+collection must be supplied with `--url` and `--collection-name`. Local
+unauthenticated Qdrant remains supported when no key is configured.
 
 No repository script implements Qdrant collection snapshot creation, download,
 upload, recovery, or the Qdrant Migration Tool.
@@ -256,10 +255,13 @@ QDRANT_API_KEY=
 Inject the Cloud key from a private shell, Render secret environment setting,
 or another secret manager. Never commit it, print it, paste it into docs, put
 it in a URL, or use a `NEXT_PUBLIC_*` variable.
+`QDRANT_API_KEY` is required for authenticated Qdrant Cloud and optional for
+local unauthenticated Qdrant.
 
 The backend also accepts `LEGAL_QA_QDRANT_URL`,
 `LEGAL_QA_COLLECTION_NAME`, and `LEGAL_QA_QDRANT_API_KEY` as higher-priority
-aliases. The indexing CLIs do not currently consume either naming family.
+aliases. The indexing CLIs intentionally consume only `QDRANT_API_KEY` for
+authentication and do not consume the backend-specific key alias.
 
 ### Safe connectivity and metadata verification
 
@@ -317,8 +319,8 @@ The maintained validator is appropriate after API-key wiring. This is a
 read-only schema/payload/vector check with retrieval sanity disabled:
 
 ```bash
-# NOT RUN; currently blocked for Qdrant Cloud because the CLI does not pass
-# QDRANT_API_KEY to the shared client builder.
+# NOT RUN: read-only Cloud validation; requires QDRANT_API_KEY in the
+# environment and explicit URL/collection flags.
 uv run --extra qdrant python scripts/indexing/validate_qdrant_index.py \
   --config configs/indexing/embedding_indexing.yml \
   --url "$QDRANT_URL" \
@@ -405,8 +407,8 @@ explicit rebuild is preferred.
 
 The manual order would be:
 
-1. Add `QDRANT_API_KEY` support to all three indexing CLI client-construction
-   calls and cover present/absent-key behavior with mocks.
+1. Inject `QDRANT_API_KEY` through a private environment and verify it is not
+   present in command history, logs, reports, or process arguments.
 2. Verify processed-corpus validation and immutable input hashes.
 3. Create the empty Cloud collection with `dense`, size 1024, Cosine, no
    sparse vector, and the seven payload indexes.
@@ -417,8 +419,7 @@ The manual order would be:
 7. Run read-only schema, sampled payload/vector, filter, and count validation.
 8. Enable backend traffic only after all checks pass.
 
-Likely maintained commands (**NOT RUN and not Cloud-ready until API-key wiring
-is implemented**):
+Maintained commands (**NOT RUN; Qdrant mutation requires separate approval**):
 
 ```bash
 # NOT RUN: creates/validates schema and payload indexes; mutates Qdrant.

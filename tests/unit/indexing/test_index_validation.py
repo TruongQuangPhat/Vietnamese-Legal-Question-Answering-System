@@ -671,3 +671,36 @@ async def test_cli_skip_retrieval_does_not_construct_embedding_model(
     assert output.is_file()
     assert client.query_calls == []
     assert client.mutation_calls == []
+
+
+@pytest.mark.asyncio
+async def test_validation_cli_passes_environment_api_key_without_exposing_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, Any] = {}
+    secret = "validation-env-secret"
+    monkeypatch.setenv("QDRANT_API_KEY", secret)
+
+    def capture_client(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        raise validate_qdrant_index.QdrantCollectionError("synthetic client failure")
+
+    monkeypatch.setattr(validate_qdrant_index, "build_qdrant_client", capture_client)
+
+    exit_code = await validate_qdrant_index.run_validation(
+        [
+            "--config",
+            "configs/indexing/embedding_indexing.yml",
+            "--skip-retrieval-sanity",
+            "--output",
+            str(tmp_path / "report.json"),
+        ]
+    )
+
+    assert exit_code == 1
+    assert captured["api_key"] == secret
+    output = capsys.readouterr()
+    assert secret not in output.out
+    assert secret not in output.err

@@ -28,7 +28,11 @@ from src.indexing.indexing_models import (
     RetrievalSanityQuery,
 )
 from src.indexing.official_artifacts import write_json_atomic
-from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
+from src.indexing.qdrant_collection import (
+    QdrantCollectionError,
+    build_qdrant_client,
+    resolve_qdrant_api_key,
+)
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -59,6 +63,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--collection-name", default=None, help="Existing collection to inspect.")
     parser.add_argument("--url", default=None, help="Override the configured Qdrant URL.")
+    parser.add_argument(
+        "--qdrant-api-key",
+        default=None,
+        help=(
+            "Override QDRANT_API_KEY. Prefer the environment variable to avoid "
+            "placing credentials in shell history."
+        ),
+    )
     parser.add_argument("--dense-vector-name", default=None, help="Named dense vector to validate.")
     parser.add_argument(
         "--dense-dimension",
@@ -162,6 +174,7 @@ async def run_validation(argv: list[str] | None = None) -> int:
         client = build_qdrant_client(
             url=args.url or config.qdrant.url,
             timeout_seconds=config.qdrant.timeout_seconds,
+            api_key=resolve_qdrant_api_key(args.qdrant_api_key),
         )
         embedding_model = None
         if not args.skip_retrieval_sanity:

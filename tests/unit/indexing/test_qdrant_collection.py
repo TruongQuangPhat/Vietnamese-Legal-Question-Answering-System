@@ -15,6 +15,7 @@ from src.indexing.qdrant_collection import (
     build_payload_index_specs,
     build_qdrant_client,
     ensure_collection,
+    resolve_qdrant_api_key,
 )
 
 
@@ -168,6 +169,30 @@ def test_qdrant_client_passes_optional_api_key(
         "timeout": 60,
         "api_key": api_key,
     }
+
+
+@pytest.mark.parametrize(
+    ("explicit_api_key", "environment", "expected"),
+    [
+        (None, {}, None),
+        (None, {"QDRANT_API_KEY": "  "}, None),
+        (None, {"QDRANT_API_KEY": " env-key "}, "env-key"),
+        (" cli-key ", {"QDRANT_API_KEY": "env-key"}, "cli-key"),
+        ("  ", {"QDRANT_API_KEY": "env-key"}, None),
+    ],
+)
+def test_resolve_qdrant_api_key_is_normalized_and_cli_takes_precedence(
+    explicit_api_key: str | None,
+    environment: dict[str, str],
+    expected: str | None,
+) -> None:
+    assert (
+        resolve_qdrant_api_key(
+            explicit_api_key,
+            environ=environment,
+        )
+        == expected
+    )
 
 
 @pytest.mark.parametrize(
@@ -408,6 +433,71 @@ async def test_dry_run_cli_does_not_build_client(
     output = capsys.readouterr().out
     assert '"dense_dimension": 1024' in output
     assert '"recreate": false' in output
+
+
+@pytest.mark.asyncio
+async def test_setup_cli_passes_environment_api_key_without_exposing_it(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, Any] = {}
+    secret = "setup-env-secret"
+    monkeypatch.setenv("QDRANT_API_KEY", secret)
+
+    def capture_client(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        raise QdrantCollectionError("synthetic client failure")
+
+    monkeypatch.setattr(setup_qdrant_collection, "build_qdrant_client", capture_client)
+
+    result = await setup_qdrant_collection.run_setup(
+        [
+            "--config",
+            "configs/indexing/embedding_indexing.yml",
+            "--dense-dimension",
+            "1024",
+        ]
+    )
+
+    assert result == 1
+    assert captured["api_key"] == secret
+    output = capsys.readouterr()
+    assert secret not in output.out
+    assert secret not in output.err
+
+
+@pytest.mark.asyncio
+async def test_setup_cli_explicit_api_key_overrides_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, Any] = {}
+    environment_secret = "setup-env-secret"
+    explicit_secret = "setup-cli-secret"
+    monkeypatch.setenv("QDRANT_API_KEY", environment_secret)
+
+    def capture_client(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        raise QdrantCollectionError("synthetic client failure")
+
+    monkeypatch.setattr(setup_qdrant_collection, "build_qdrant_client", capture_client)
+
+    result = await setup_qdrant_collection.run_setup(
+        [
+            "--config",
+            "configs/indexing/embedding_indexing.yml",
+            "--dense-dimension",
+            "1024",
+            "--qdrant-api-key",
+            explicit_secret,
+        ]
+    )
+
+    assert result == 1
+    assert captured["api_key"] == explicit_secret
+    output = capsys.readouterr()
+    assert environment_secret not in output.out + output.err
+    assert explicit_secret not in output.out + output.err
 
 
 def test_recreate_defaults_to_false() -> None:

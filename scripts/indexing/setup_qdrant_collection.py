@@ -25,6 +25,7 @@ from src.indexing.qdrant_collection import (
     build_collection_plan,
     build_qdrant_client,
     ensure_collection,
+    resolve_qdrant_api_key,
 )
 
 EXIT_SUCCESS = 0
@@ -45,6 +46,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="embedding/indexing configuration.",
     )
     parser.add_argument("--url", default=None, help="Override the configured Qdrant URL.")
+    parser.add_argument(
+        "--qdrant-api-key",
+        default=None,
+        help=(
+            "Override QDRANT_API_KEY. Prefer the environment variable to avoid "
+            "placing credentials in shell history."
+        ),
+    )
     parser.add_argument(
         "--collection-name",
         default=None,
@@ -132,6 +141,7 @@ async def run_setup(argv: list[str] | None = None) -> int:
         client = build_qdrant_client(
             url=args.url or config.qdrant.url,
             timeout_seconds=config.qdrant.timeout_seconds,
+            api_key=resolve_qdrant_api_key(args.qdrant_api_key),
         )
         result = await ensure_collection(client, **plan.model_dump())
         if not args.quiet:

@@ -58,13 +58,17 @@ overrides. `QDRANT_URL` and `QDRANT_COLLECTION` are compatible generic names.
 backend-specific override. Local unauthenticated Qdrant continues to work when
 the key is absent. Secret values are hidden in settings representations and
 must not be logged.
+`QDRANT_API_KEY` is required for authenticated Qdrant Cloud and optional for
+local unauthenticated Qdrant.
 
 These variables configure the backend runtime and readiness paths. The
-maintained setup/index/validation CLIs currently require `--url` and
-`--collection-name` flags and do not pass either Qdrant API-key variable to the
-shared client builder. They are not authenticated-Qdrant-Cloud ready until a
-separately tested CLI wiring change is made. See `docs/api_deployment.md` for
-the migration audit.
+maintained setup/index/validation CLIs also consume `QDRANT_API_KEY` and pass
+it to the shared client builder. An explicit `--qdrant-api-key` takes
+precedence, but the environment is preferred to avoid shell-history and
+process-list exposure. Blank values mean unauthenticated local access. The
+CLIs still require `--url` and `--collection-name`; they do not consume
+`QDRANT_URL`, `QDRANT_COLLECTION`, or the backend-specific key alias. See
+`docs/api_deployment.md` for the manual migration checklist.
 
 `LEGAL_QA_DEVICE` selects the local embedding device in manual real mode.
 `OPENROUTER_MODEL` is the provider-level default model. `LEGAL_QA_MODEL` is an

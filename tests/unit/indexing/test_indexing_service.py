@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from scripts.indexing import index_qdrant_chunks
 from scripts.indexing.index_qdrant_chunks import (
     load_processed_validation_report,
     validate_cli_arguments,
@@ -863,3 +864,39 @@ def test_cli_resume_requires_existing_checkpoint(tmp_path: Path) -> None:
             max_retries=0,
             retry_backoff_seconds=0,
         )
+
+
+@pytest.mark.asyncio
+async def test_indexing_cli_passes_environment_api_key_without_real_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, Any] = {}
+    secret = "indexing-env-secret"
+    monkeypatch.setenv("QDRANT_API_KEY", secret)
+    monkeypatch.setattr(
+        index_qdrant_chunks,
+        "BgeM3EmbeddingModel",
+        lambda **kwargs: object(),
+    )
+
+    def capture_client(**kwargs: Any) -> Any:
+        captured.update(kwargs)
+        raise index_qdrant_chunks.QdrantCollectionError("synthetic client failure")
+
+    monkeypatch.setattr(index_qdrant_chunks, "build_qdrant_client", capture_client)
+
+    exit_code = await index_qdrant_chunks.run_indexing(
+        [
+            "--config",
+            "configs/indexing/embedding_indexing.yml",
+            "--limit",
+            "1",
+        ]
+    )
+
+    assert exit_code == 1
+    assert captured["api_key"] == secret
+    output = capsys.readouterr()
+    assert secret not in output.out
+    assert secret not in output.err

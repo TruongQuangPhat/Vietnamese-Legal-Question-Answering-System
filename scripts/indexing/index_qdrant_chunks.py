@@ -37,7 +37,11 @@ from src.indexing.official_artifacts import (
     build_processed_corpus_validation_summary_from_path,
     write_json_atomic,
 )
-from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
+from src.indexing.qdrant_collection import (
+    QdrantCollectionError,
+    build_qdrant_client,
+    resolve_qdrant_api_key,
+)
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -75,6 +79,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--collection-name", default=None, help="Target existing collection.")
     parser.add_argument("--url", default=None, help="Override the configured Qdrant URL.")
+    parser.add_argument(
+        "--qdrant-api-key",
+        default=None,
+        help=(
+            "Override QDRANT_API_KEY. Prefer the environment variable to avoid "
+            "placing credentials in shell history."
+        ),
+    )
     parser.add_argument("--limit", type=int, default=None, help="Maximum matching chunks.")
     parser.add_argument("--law-id", default=None, help="Optional exact law_id filter.")
     parser.add_argument(
@@ -244,6 +256,7 @@ async def run_indexing(argv: list[str] | None = None) -> int:
             client = build_qdrant_client(
                 url=args.url or config.qdrant.url,
                 timeout_seconds=config.qdrant.timeout_seconds,
+                api_key=resolve_qdrant_api_key(args.qdrant_api_key),
             )
 
         service = IndexingService(
