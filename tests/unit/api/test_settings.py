@@ -44,6 +44,31 @@ def test_settings_parse_cors_allowed_origins() -> None:
     ]
 
 
+def test_settings_parse_cors_allowed_origins_json_array() -> None:
+    settings = AppSettings.from_env(
+        {"CORS_ALLOWED_ORIGINS": ('["https://vnlaw.example", "https://preview.vnlaw.example"]')}
+    )
+
+    assert settings.cors_allowed_origins == [
+        "https://vnlaw.example",
+        "https://preview.vnlaw.example",
+    ]
+
+
+@pytest.mark.parametrize(
+    "raw_value",
+    [
+        '["https://vnlaw.example"',
+        '{"origin":"https://vnlaw.example"}',
+        '["https://vnlaw.example", 1]',
+        "[]",
+    ],
+)
+def test_settings_reject_invalid_cors_json(raw_value: str) -> None:
+    with pytest.raises(ValueError, match="CORS_ALLOWED_ORIGINS"):
+        AppSettings.from_env({"CORS_ALLOWED_ORIGINS": raw_value})
+
+
 def test_settings_convert_to_legal_qa_runtime_settings() -> None:
     settings = AppSettings.from_env(
         {
@@ -161,7 +186,11 @@ def test_real_mode_accepts_required_configuration_without_external_calls(
     assert "openrouter-secret-value" not in repr(settings)
 
 
-async def test_dependency_provider_uses_settings_default_fake_mode(monkeypatch) -> None:
+async def test_dependency_provider_uses_settings_default_fake_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("LEGAL_QA_SERVICE_MODE", raising=False)
     get_settings.cache_clear()
     clear_legal_qa_service_cache()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -212,7 +213,12 @@ def test_real_workflow_adapter_falls_back_when_answer_lacks_traceable_citations(
     assert "missing_citation_source_url" in response.warnings
 
 
-async def test_dependency_provider_uses_fake_workflow_by_default() -> None:
+async def test_dependency_provider_uses_fake_workflow_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LEGAL_QA_SERVICE_MODE", raising=False)
     get_settings.cache_clear()
     clear_legal_qa_service_cache()
 

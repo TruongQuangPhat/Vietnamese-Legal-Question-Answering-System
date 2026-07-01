@@ -3,8 +3,10 @@
 ## Purpose and current status
 
 VnLaw-QA is a Vietnamese legal research assistant, not legal advice. The
-current product is a fake-mode Legal QA chat MVP with a real-workflow adapter;
-it is not production-ready.
+current product includes a fake-mode Legal QA chat MVP and a real-workflow
+adapter. The Qdrant collection has been restored to Qdrant Cloud and validated,
+but the Render backend has not been deployed and the system is not
+production-ready.
 
 The repository has useful deployment foundations, but real mode is not yet
 deployable from the committed containers or Compose stack. Do not describe the
@@ -44,11 +46,11 @@ connectivity, or real multi-turn quality.
 | --- | --- | --- |
 | Service mode | Fake is safe by default; real config is validated before workflow construction | Real startup and one request still need controlled validation |
 | Qdrant | URL, collection, optional API key, timeout, and vector contract exist | TLS/custom CA policy and deployed connectivity remain to be validated |
-| Embedding and sparse retrieval | Real mode constructs BGE-M3 and loads the complete chunks JSONL | Model dependencies/cache and processed chunks are absent from the backend image |
+| Embedding and sparse retrieval | Real mode constructs BGE-M3 and loads the complete chunks JSONL | Model cache and processed chunks are absent from committed deployment sources |
 | LLM provider | OpenRouter URL/model config and `OPENROUTER_API_KEY` lookup exist | Provider credential, egress, timeout/error behavior, and real response remain unverified |
 | Health | `/health` is liveness; `/api/v1/readiness` validates config and optionally reads Qdrant collection metadata | Readiness deliberately does not validate LLM availability or load the embedding model |
 | Version | Static API name/version is exposed | It has no build or revision identity |
-| CORS | Comma-separated explicit origins are supported; local origin is default | Deployed frontend origins must be supplied explicitly |
+| CORS | JSON-array origins are supported; legacy comma-separated values remain compatible | Deployed frontend origins must be supplied explicitly |
 | Frontend API URL | One public base URL is used by both clients | It is embedded during `next build`; localhost fallback is unsafe for an omitted production setting |
 | Containers | Fake-mode images and Compose stack build the MVP | Committed stack does not package or configure real mode |
 | Conversation storage | Process-local in-memory repository | Not durable, not shared across workers, and not user-specific |
@@ -64,7 +66,8 @@ Current API settings:
 ```env
 APP_ENV=local
 LOG_LEVEL=INFO
-CORS_ALLOWED_ORIGINS=http://localhost:3000
+LOG_FORMAT=json
+CORS_ALLOWED_ORIGINS='["http://localhost:3000"]'
 
 LEGAL_QA_SERVICE_MODE=fake
 LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
@@ -200,8 +203,9 @@ between `points_count` and `indexed_vectors_count` does not by itself prove
 missing points; verify collection status, point count, sampled vectors, and
 optimizer state after migration.
 
-The Qdrant Cloud cluster is reachable but currently has no collections. The
-target collection must remain:
+The snapshot migration has since completed. The Qdrant Cloud target collection
+is green with 40,389 points and 40,389 indexed vectors; the named vector is
+`dense`, size 1,024, with cosine distance. The collection name remains:
 
 ```text
 vnlaw_chunks_bgem3_v1_full
@@ -657,18 +661,129 @@ embedding model, downloads model files, or mutates Qdrant.
 
 ## CORS and frontend origin notes
 
-`CORS_ALLOWED_ORIGINS` is parsed as a comma-separated list. The default permits
-only `http://localhost:3000`. Set exact HTTPS frontend origins for each
-deployment. Do not use wildcard origins in production.
+`CORS_ALLOWED_ORIGINS` should be a JSON array string in deployed environments:
+
+```env
+CORS_ALLOWED_ORIGINS='["https://your-vercel-app.vercel.app"]'
+```
+
+Legacy comma-separated values remain supported for compatibility. The default
+permits only `http://localhost:3000`. Set exact HTTPS frontend origins for each
+deployment. Do not use wildcard origins in production. Invalid JSON arrays
+fail configuration loading instead of silently configuring the wrong origin.
 
 The frontend calls the API directly from the browser, so the configured API
 URL must be browser-reachable; Docker service names are not valid public
 browser destinations. HTTPS frontend deployments should use an HTTPS API to
 avoid mixed-content failures.
 
-## Container and Compose gaps
+## Render backend preparation
 
-The existing files are intentionally fake-mode foundations:
+### Chosen strategy
+
+Use a **native Render Python Web Service**, configured manually in the Render
+dashboard. Do not apply a Blueprint or deploy yet.
+
+This is the smallest auditable path because Render can install the locked
+`qdrant` and `embedding` dependency groups directly and can expand its `PORT`
+environment variable in the start command. The existing backend Dockerfile and
+Compose stack intentionally remain fake-mode local packaging. Converting that
+image would not solve the current real-mode artifact blocker:
+`SparseBM25Retriever` requires the complete processed chunks JSONL, which is
+ignored by Git and excluded from the Docker build context.
+
+Render service settings:
+
+```text
+Service type: Web Service
+Runtime: Python
+Root directory: repository root
+Build command: python -m pip install --no-cache-dir uv && uv sync --frozen --no-dev --extra qdrant --extra embedding
+Start command: uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
+Health check path: /health
+```
+
+`/health` is suitable for Render process health checks. Check
+`/api/v1/readiness` separately during deployment review because it can return
+503 when configuration, the local chunks artifact, or the read-only Qdrant
+metadata check is unavailable.
+
+Required Render environment configuration:
+
+```env
+LEGAL_QA_SERVICE_MODE=real
+APP_ENV=production
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+
+QDRANT_URL=https://your-qdrant-cloud-endpoint
+QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+QDRANT_API_KEY=
+
+LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
+LEGAL_QA_QDRANT_URL=https://your-qdrant-cloud-endpoint
+LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
+LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
+LEGAL_QA_CHUNKS_PATH=/path/to/read-only/legal_chunks.jsonl
+LEGAL_QA_DEVICE=cpu
+LEGAL_QA_MODEL=google/gemini-2.5-flash
+
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=google/gemini-2.5-flash
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+CORS_ALLOWED_ORIGINS='["https://your-vercel-app.vercel.app"]'
+HF_TOKEN=
+```
+
+Store `QDRANT_API_KEY` and `OPENROUTER_API_KEY` as secret environment values,
+never in Git or Render command fields. `HF_TOKEN` is optional for the public
+BGE-M3 model and must also be secret if used. The duplicated generic and
+backend-specific Qdrant variables make the selected values explicit; the
+backend-specific values take precedence.
+
+`LOG_FORMAT=json` is retained as the intended deployment convention, but the
+current FastAPI bootstrap does not yet wire `LOG_FORMAT` into a production
+logging initializer. Treat structured logging as a remaining hardening item,
+not as a verified behavior.
+
+### Blocking artifact and resource checks
+
+Real mode cannot be declared Render-ready until an approved, integrity-checked,
+read-only distribution mechanism provides
+`data/processed/legal_chunks.jsonl` (40,389 rows) at
+`LEGAL_QA_CHUNKS_PATH`. The file is intentionally untracked and must not be
+committed or casually copied into an image. This task does not add an artifact
+download or persistent-disk bootstrap mechanism.
+
+The first real request constructs BGE-M3 and local BM25 lazily. Readiness does
+not download or load the model, so a 200 readiness response does not prove that
+the Render plan has enough RAM, disk/cache space, startup latency, or request
+time for BGE-M3 on CPU. Review Render resource limits and Hugging Face cache
+behavior before deployment.
+
+Use one Uvicorn worker while conversation storage remains process-local.
+Multiple workers or replicas would produce inconsistent server-side
+conversation state. This limitation does not make chat history durable; the
+frontend still treats localStorage as its rich source of truth.
+
+### Startup boundary
+
+Render startup must do only this:
+
+```bash
+uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
+```
+
+It must not run indexing, collection setup, snapshot create/upload/restore,
+corpus generation, evaluation, model preloading, real retrieval smoke, or an
+OpenRouter request. Normal serving uses Qdrant Cloud and does not require a
+local Qdrant process.
+
+## Container and Compose status
+
+The existing files remain intentionally fake-mode foundations and are not the
+chosen Render deployment path:
 
 - `docker/backend/Dockerfile` installs default dependencies only. It does not
   install the `qdrant` and `embedding` optional dependency groups.
@@ -740,14 +855,15 @@ write evaluation artifacts.
 
 ## Known real-mode blockers
 
-1. Package/install real-mode dependency groups and provide the chunks/model
-   artifacts without embedding protected data into source control.
-2. Define deployed Qdrant TLS/custom CA policy and extend readiness if full
+1. Provide the chunks artifact through an approved read-only distribution
+   mechanism without committing protected data; verify its checksum before use.
+2. Confirm that the selected Render plan can install and run BGE-M3 on CPU,
+   retain an appropriate Hugging Face cache, and tolerate first-request model
+   initialization.
+3. Define deployed Qdrant TLS/custom CA policy and extend readiness if full
    schema/corpus-version verification is required.
-3. Make frontend production API URL configuration fail safely instead of
+4. Make frontend production API URL configuration fail safely instead of
    silently targeting localhost.
-4. Provide a real-mode container/deployment configuration; current Compose is
-   fake-only.
 5. Complete API security decisions and resource/concurrency controls.
 6. Resolve process-local conversation behavior before multi-worker or
    multi-replica use, or explicitly exclude server-side history from the
@@ -757,17 +873,16 @@ write evaluation artifacts.
 
 ## Recommended implementation order
 
-1. Build a real-mode backend image/deployment foundation with optional
-   dependencies and read-only artifact mounts; retain the current fake-mode
-   Compose workflow.
-2. Harden frontend production API URL handling and document its build-time
+1. Define and verify the read-only processed-chunks artifact delivery mechanism
+   for Render, then confirm BGE-M3 resource/cache requirements on the selected
+   plan.
+2. Create the Render service manually with the documented native build/start
+   commands and secret environment values.
+3. Harden frontend production API URL handling and document its build-time
    contract.
-3. Add the minimum approved public-API security controls.
-4. Perform deployment/security review, then execute one controlled low-risk
+4. Add the minimum approved public-API security controls.
+5. Perform deployment/security review, then execute one controlled low-risk
    real-mode smoke with citation and fallback checks.
-
-The next implementation task should build the Docker/Compose real-mode
-foundation because runtime inputs and readiness semantics are now explicit.
 
 ## Safe validation commands
 

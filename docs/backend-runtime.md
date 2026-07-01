@@ -33,7 +33,8 @@ Backend API settings:
 ```env
 APP_ENV=local
 LOG_LEVEL=INFO
-CORS_ALLOWED_ORIGINS=http://localhost:3000
+LOG_FORMAT=json
+CORS_ALLOWED_ORIGINS='["http://localhost:3000"]'
 
 LEGAL_QA_SERVICE_MODE=fake
 LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
@@ -79,6 +80,15 @@ Provider keys such as `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, and
 `ANTHROPIC_API_KEY` are not required for fake mode. When needed for manual real
 mode checks, set secrets outside version control.
 
+`CORS_ALLOWED_ORIGINS` should be a JSON array string on Render, for example
+`'["https://your-vercel-app.vercel.app"]'`. Legacy comma-separated values
+remain accepted for local compatibility. Invalid JSON arrays are rejected so a
+deployment cannot silently use malformed origins.
+
+`LOG_FORMAT=json` documents the intended production convention. The current
+FastAPI bootstrap does not yet apply this variable through a production
+logging initializer.
+
 ## Fake Mode
 
 Fake mode is the default:
@@ -121,6 +131,23 @@ foundations, not real-mode deployment artifacts: the image does not install
 the `qdrant` and `embedding` optional dependency groups or include the
 processed chunks/model artifacts. See `docs/api_deployment.md` for the complete
 readiness audit and blockers.
+
+For the planned native Render Web Service, install runtime dependencies with:
+
+```bash
+python -m pip install --no-cache-dir uv && \
+  uv sync --frozen --no-dev --extra qdrant --extra embedding
+```
+
+Start one worker with Render's assigned port:
+
+```bash
+uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
+```
+
+Do not deploy until `LEGAL_QA_CHUNKS_PATH` points to an approved read-only copy
+of the complete processed chunks JSONL. The file is ignored by Git, and local
+BM25 loads it in real mode even when dense retrieval uses Qdrant Cloud.
 
 ## Run the Backend
 

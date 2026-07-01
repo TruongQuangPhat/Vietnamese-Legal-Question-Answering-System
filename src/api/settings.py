@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping
 from functools import lru_cache
@@ -75,7 +76,7 @@ class AppSettings(BaseSettings):
         return cls(
             app_env=_non_blank(env.get("APP_ENV")) or "local",
             log_level=(_non_blank(env.get("LOG_LEVEL")) or "INFO").upper(),
-            cors_allowed_origins=_parse_csv(
+            cors_allowed_origins=_parse_cors_allowed_origins(
                 env.get("CORS_ALLOWED_ORIGINS"),
                 default=DEFAULT_CORS_ALLOWED_ORIGINS,
             ),
@@ -170,10 +171,22 @@ def get_settings() -> AppSettings:
     return AppSettings.from_env()
 
 
-def _parse_csv(raw_value: str | None, *, default: list[str]) -> list[str]:
+def _parse_cors_allowed_origins(raw_value: str | None, *, default: list[str]) -> list[str]:
+    """Parse CORS origins from a JSON array or legacy comma-separated value."""
     value = _non_blank(raw_value)
     if value is None:
         return list(default)
+    if value.startswith(("[", "{")):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError("CORS_ALLOWED_ORIGINS must be a valid JSON array") from exc
+        if not isinstance(decoded, list) or not all(isinstance(item, str) for item in decoded):
+            raise ValueError("CORS_ALLOWED_ORIGINS must be a JSON array of strings")
+        parsed = [item.strip() for item in decoded if item.strip()]
+        if not parsed:
+            raise ValueError("CORS_ALLOWED_ORIGINS must contain at least one origin")
+        return parsed
     parsed = [item.strip() for item in value.split(",") if item.strip()]
     return parsed or list(default)
 

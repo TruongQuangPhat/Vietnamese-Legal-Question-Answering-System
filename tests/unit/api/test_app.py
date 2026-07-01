@@ -11,7 +11,7 @@ from src.api.settings import AppSettings
 async def test_app_allows_cors_preflight_from_configured_origin() -> None:
     app = create_app(
         AppSettings.from_env(
-            {"CORS_ALLOWED_ORIGINS": "http://localhost:3000,http://localhost:5173"}
+            {"CORS_ALLOWED_ORIGINS": ('["http://localhost:3000", "http://localhost:5173"]')}
         )
     )
     transport = httpx.ASGITransport(app=app)

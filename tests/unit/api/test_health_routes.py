@@ -34,11 +34,15 @@ async def test_version_route_returns_metadata() -> None:
 @pytest.mark.asyncio
 async def test_fake_mode_readiness_needs_no_external_dependencies() -> None:
     app = create_app()
-    app.dependency_overrides[get_runtime_readiness_service] = lambda: RuntimeReadinessService(
-        service_mode=LegalQAServiceMode.FAKE,
-        configuration_issues=(),
-        qdrant_collection=None,
-    )
+
+    async def readiness_service() -> RuntimeReadinessService:
+        return RuntimeReadinessService(
+            service_mode=LegalQAServiceMode.FAKE,
+            configuration_issues=(),
+            qdrant_collection=None,
+        )
+
+    app.dependency_overrides[get_runtime_readiness_service] = readiness_service
     transport = httpx.ASGITransport(app=app)
 
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -55,11 +59,15 @@ async def test_fake_mode_readiness_needs_no_external_dependencies() -> None:
 @pytest.mark.asyncio
 async def test_real_mode_readiness_reports_safe_configuration_failure() -> None:
     app = create_app()
-    app.dependency_overrides[get_runtime_readiness_service] = lambda: RuntimeReadinessService(
-        service_mode=LegalQAServiceMode.REAL,
-        configuration_issues=("missing_openrouter_api_key",),
-        qdrant_collection=None,
-    )
+
+    async def readiness_service() -> RuntimeReadinessService:
+        return RuntimeReadinessService(
+            service_mode=LegalQAServiceMode.REAL,
+            configuration_issues=("missing_openrouter_api_key",),
+            qdrant_collection=None,
+        )
+
+    app.dependency_overrides[get_runtime_readiness_service] = readiness_service
     transport = httpx.ASGITransport(app=app)
 
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
