@@ -58,7 +58,13 @@ Current durable status:
 * reranking was evaluated but not adopted;
 * final adopted strict generation evaluation uses coverage-aware retrieval, strict legal generation, citation ID guard, and answerability fallback guard;
 * workflow-level integration tests exist for corpus, retrieval, and evaluation;
-* API deployment, GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part of the adopted evaluated pipeline.
+* Render backend and Vercel frontend infrastructure are deployed; read
+  `docs/api_deployment.md` for URLs, runbook, and the Render Free memory
+  limitation;
+* deployed backend mode remains `real`; liveness/readiness pass, while real
+  `/ask` is blocked by the 512 MB Render Free limit;
+* GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part
+  of the adopted evaluated pipeline.
 
 Read `PROJECT_CONTEXT.md` for the complete current state.
 
@@ -101,7 +107,8 @@ Do not follow stale statements such as:
 * retrieval has not started;
 * Advanced RAG is only future work;
 * reranking is part of the final adopted pipeline;
-* API deployment or time-aware filtering is implemented;
+* production API/frontend infrastructure has not been deployed;
+* time-aware filtering is implemented;
 * the broad benchmark has not been frozen.
 
 ## 8. Update Policy

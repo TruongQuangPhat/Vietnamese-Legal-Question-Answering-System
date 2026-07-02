@@ -13,6 +13,10 @@ The deployed backend remains in real mode. Do not describe the system as
 production-ready until the runtime memory blocker, deployment/security review,
 and a controlled real-mode QA smoke have been completed.
 
+The API and deployment infrastructure work is closed with this memory
+limitation documented. Follow-up quality work must not loosen fallback,
+evidence-selection, or citation gates merely to make deployment smoke pass.
+
 This document records the repository state as audited without calling Qdrant,
 OpenRouter, embedding inference, or evaluation workflows.
 

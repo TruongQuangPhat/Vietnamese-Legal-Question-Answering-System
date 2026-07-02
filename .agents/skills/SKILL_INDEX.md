@@ -115,7 +115,11 @@ coverage-aware hybrid retrieval
 
 Reranking was evaluated as a controlled ablation but was not adopted.
 
-GraphRAG, multi-agent retrieval, API/backend, UI, production deployment, time-aware filtering, fine-tuning, monitoring, and MLOps infrastructure remain future or separately scoped unless the user explicitly requests them.
+API/backend and UI infrastructure are deployed separately from the adopted
+evaluated pipeline; see `PROJECT_CONTEXT.md` and `docs/api_deployment.md` for
+current status and limitations. GraphRAG, multi-agent retrieval, time-aware
+filtering, fine-tuning, monitoring, and MLOps infrastructure remain future or
+separately scoped unless the user explicitly requests them.
 
 If a task crosses the current workflow boundary:
 
