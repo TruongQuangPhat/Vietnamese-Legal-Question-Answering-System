@@ -352,8 +352,61 @@ Do not change it to a Docker service hostname for browser-facing local fake
 mode.
 
 Fake mode does not require Qdrant, OpenRouter, embedding models, rerankers, or
-legal corpus data. Real mode is manual-only and should not be used in routine
-validation.
+legal corpus data. It remains the routine local validation path.
+
+### Production deployment handoff
+
+The API and deployment infrastructure work is complete with known runtime
+limitations:
+
+```text
+backend: https://vnlaw-qa-backend.onrender.com
+frontend: https://vnlaw-qa.vercel.app
+backend mode: LEGAL_QA_SERVICE_MODE=real
+Qdrant: Qdrant Cloud / vnlaw_chunks_bgem3_v1_full
+```
+
+Render `GET /health` and `GET /api/v1/readiness` pass. Readiness reports
+`ready=true`, `service_mode=real`, valid configuration, and Qdrant
+`collection_available`. These checks establish infrastructure readiness only;
+they do not load BGE-M3 or prove request-time QA capacity.
+
+Render fetches the processed chunks artifact from:
+
+```text
+https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
+```
+
+The build verifies SHA256:
+
+```text
+95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
+```
+
+The deployed app does not require local Docker or local Qdrant. Those remain
+tools for separately approved local indexing, migration, snapshot/restore, or
+retrieval debugging.
+
+Render Free has 512 MB RAM. Real `POST /api/v1/legal-qa/ask` is known to
+terminate out of memory when BGE-M3, Torch, and Transformers load. This is a
+runtime resource limit, not an infrastructure deployment failure. Keep
+production in real mode and do not repeatedly call `/ask` on Render Free.
+
+Final offline deployment validation passed:
+
+```text
+Python compile: pass
+safe backend unit tests: 159 passed
+Ruff check / format check: pass
+uv lock --check: pass
+git diff --check: pass
+frontend lint / production build: pass
+protected-path and secret checks: clean
+```
+
+Fallback and evidence gates were not loosened to make deployment smoke pass.
+Any safe fallback/evidence calibration is intentionally deferred and must
+preserve citation integrity and insufficient-evidence behavior.
 
 ## 11. Protected Paths and Runtime Safety
 
@@ -392,6 +445,8 @@ When real retrieval/evaluation is explicitly scoped, keep Qdrant read-only unles
 - `docs/naive_rag.md` — baseline dense RAG reference.
 - `docs/parent_child_chunking.md` and `docs/processed_jsonl.md` — chunk and
   processed JSONL contracts.
+- `docs/api_deployment.md` — production URLs, Render/Vercel runbook,
+  infrastructure smoke status, resource limitation, and deployment follow-up.
 
 Historical roadmap/journal docs are not authoritative when they conflict with
 this file.
@@ -402,12 +457,19 @@ The following are not part of the current adopted evaluated pipeline unless a fu
 
 * GraphRAG / Neo4j graph traversal;
 * multi-agent retrieval or orchestration;
-* production API/backend deployment;
-* production frontend deployment;
 * time-aware legal filtering;
 * cross-encoder reranking as an adopted pipeline component;
 * fine-tuning;
 * production monitoring or MLOps infrastructure;
 * new trusted legal-source architecture.
+
+Deployment follow-up:
+
+* calibrate safe fallback/evidence gates without weakening legal safety;
+* improve retrieval and selected-evidence quality;
+* optimize real QA memory use or redesign embedding serving;
+* add authentication and rate limiting before a serious public demo;
+* add durable, user-scoped conversation storage if server-side history becomes
+  a product requirement.
 
 Reranking was evaluated as an ablation and was not adopted. Held-out results are reporting-only and must not be used for tuning.

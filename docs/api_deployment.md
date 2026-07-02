@@ -5,17 +5,153 @@
 VnLaw-QA is a Vietnamese legal research assistant, not legal advice. The
 current product includes a fake-mode Legal QA chat MVP and a real-workflow
 adapter. The Qdrant collection has been restored to Qdrant Cloud and validated,
-but the Render backend has not been deployed and the system is not
+and the backend and frontend are deployed. Infrastructure readiness passes,
+but real QA requests exceed the Render Free memory limit; the system is not
 production-ready.
 
-The repository has useful deployment foundations, but real mode is not yet
-deployable from the committed containers or Compose stack. Do not describe the
-system as production-ready until deployment and security review, dependency
-and artifact packaging, readiness checks, and a controlled real-mode smoke
-have been completed.
+The deployed backend remains in real mode. Do not describe the system as
+production-ready until the runtime memory blocker, deployment/security review,
+and a controlled real-mode QA smoke have been completed.
+
+The API and deployment infrastructure work is closed with this memory
+limitation documented. Follow-up quality work must not loosen fallback,
+evidence-selection, or citation gates merely to make deployment smoke pass.
 
 This document records the repository state as audited without calling Qdrant,
 OpenRouter, embedding inference, or evaluation workflows.
+
+## Production deployment runbook
+
+### Current services
+
+```text
+Backend (Render): https://vnlaw-qa-backend.onrender.com
+Frontend (Vercel): https://vnlaw-qa.vercel.app
+Backend mode: LEGAL_QA_SERVICE_MODE=real
+Qdrant collection: vnlaw_chunks_bgem3_v1_full
+```
+
+Keep the backend in real mode. Do not switch production to fake mode to conceal
+the Render Free memory limitation.
+
+### Render backend
+
+Create a native Python Web Service from the repository root.
+
+Build command:
+
+```bash
+python -m pip install --no-cache-dir uv && \
+  uv sync --frozen --no-dev --extra qdrant --extra embedding && \
+  python scripts/deployment/fetch_processed_chunks.py
+```
+
+Start command:
+
+```bash
+uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
+```
+
+Render supplies `PORT`. Configure `/health` as the service health-check path.
+Use one Uvicorn worker while conversation storage remains process-local.
+
+Required Render environment values:
+
+```env
+LEGAL_QA_SERVICE_MODE=real
+APP_ENV=production
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+
+QDRANT_URL=<Qdrant Cloud endpoint>
+QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+QDRANT_API_KEY=<Render secret>
+
+LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
+LEGAL_QA_QDRANT_URL=<same Qdrant Cloud endpoint>
+LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
+LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
+LEGAL_QA_DEVICE=cpu
+LEGAL_QA_MODEL=google/gemini-2.5-flash
+
+LEGAL_QA_CHUNKS_URL=https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
+LEGAL_QA_CHUNKS_SHA256=95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
+LEGAL_QA_CHUNKS_PATH=data/processed/legal_chunks.jsonl
+
+OPENROUTER_API_KEY=<Render secret>
+OPENROUTER_MODEL=google/gemini-2.5-flash
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
+HF_TOKEN=
+```
+
+`HF_TOKEN` is not required for the current public chunks artifact. If the
+dataset becomes private, store the token as a Render secret. Never put Qdrant,
+OpenRouter, or Hugging Face credentials in Git, build commands, frontend
+variables, or logs.
+
+### Vercel frontend
+
+Configure the Vercel project with:
+
+```text
+Framework preset: Next.js
+Root Directory: apps/frontend
+Production URL: https://vnlaw-qa.vercel.app
+```
+
+Set this production environment variable before building:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+```
+
+`NEXT_PUBLIC_API_BASE_URL` is browser-visible and must contain only the public
+backend origin. Redeploy the frontend after changing it because Next.js embeds
+the value during build. The matching backend CORS value is:
+
+```env
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
+```
+
+### Qdrant Cloud and chunks artifact
+
+Normal deployed serving uses Qdrant Cloud directly and expects collection
+`vnlaw_chunks_bgem3_v1_full`. The collection has 40,389 indexed points with
+named vector `dense`, dimension 1024, and cosine distance.
+
+Render fetches `legal_chunks/v1/legal_chunks.jsonl` from the public
+`phattruong1802/vnlaw-qa` Hugging Face Dataset during build. The fetch script
+must verify this pinned SHA256 before installing the file:
+
+```text
+95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
+```
+
+The deployed app does not require local Docker or a local Qdrant instance.
+Local Docker/Qdrant is only for separately approved local indexing, snapshot
+or restore operations, and local retrieval debugging.
+
+### Infrastructure smoke
+
+These read-only commands verify deployed infrastructure without invoking real
+QA generation:
+
+```bash
+curl -fsS https://vnlaw-qa-backend.onrender.com/health
+curl -fsS https://vnlaw-qa-backend.onrender.com/api/v1/readiness
+```
+
+Expected status:
+
+- `/health` returns `{"status":"ok"}`;
+- `/api/v1/readiness` returns `ready=true`, `service_mode=real`, valid
+  configuration, and Qdrant `collection_available`.
+
+Do not treat readiness as proof that BGE-M3 can fit in memory. Do not call
+`POST /api/v1/legal-qa/ask` on Render Free: BGE-M3, Torch, and Transformers
+exceed the 512 MB memory limit and real QA serving is not reliable there.
 
 ## What already exists
 
@@ -814,6 +950,38 @@ corpus generation, evaluation, model preloading, real retrieval smoke, or an
 OpenRouter request. Normal serving uses Qdrant Cloud and does not require a
 local Qdrant process.
 
+### Stage 5 post-deploy smoke and runtime decision
+
+Current production endpoints:
+
+```text
+Backend: https://vnlaw-qa-backend.onrender.com
+Frontend: https://vnlaw-qa.vercel.app
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
+```
+
+Infrastructure smoke passes on Render:
+
+- `GET /health` responds successfully.
+- `GET /api/v1/readiness` responds with `ready=true`,
+  `service_mode=real`, valid configuration, and
+  `collection_available` for Qdrant.
+
+These checks establish process, configuration, and read-only Qdrant
+availability only. They do not load BGE-M3 or prove that a Legal QA request can
+complete.
+
+Real `POST /api/v1/legal-qa/ask` serving is blocked on Render Free. Loading
+BGE-M3 with Torch and Transformers exceeds the 512 MB instance memory limit
+and causes an out-of-memory termination. Do not repeat `/ask` smoke requests on
+this instance.
+
+Runtime decision: keep `LEGAL_QA_SERVICE_MODE=real` and document the resource
+limitation. Do not switch production to fake mode to make the smoke appear to
+pass. A controlled real QA smoke remains pending until the backend runs with
+sufficient memory or the embedding runtime architecture is changed and
+reviewed.
+
 ## Container and Compose status
 
 The existing files remain intentionally fake-mode foundations and are not the
@@ -889,11 +1057,11 @@ write evaluation artifacts.
 
 ## Known real-mode blockers
 
-1. Confirm Render can download the 180,915,261-byte public chunks artifact
-   during build and retains it in the deployed build filesystem.
-2. Confirm that the selected Render plan can install and run BGE-M3 on CPU,
-   retain an appropriate Hugging Face cache, and tolerate first-request model
-   initialization.
+1. Move the real backend to a runtime with enough memory for BGE-M3, Torch,
+   Transformers, local BM25, and request-time overhead, or separately review an
+   architecture that removes the local embedding memory requirement.
+2. Repeat one controlled real QA smoke only after the memory blocker is
+   resolved.
 3. Define deployed Qdrant TLS/custom CA policy and extend readiness if full
    schema/corpus-version verification is required.
 4. Make frontend production API URL configuration fail safely instead of
@@ -902,18 +1070,15 @@ write evaluation artifacts.
 6. Resolve process-local conversation behavior before multi-worker or
    multi-replica use, or explicitly exclude server-side history from the
    initial deployment.
-7. Run a controlled real-mode smoke only after the above environment is
-   reviewed and explicitly approved.
+7. Complete the controlled real-mode smoke; infrastructure-only smoke has
+   passed, but `/ask` remains blocked by memory.
 
 ## Recommended implementation order
 
-1. Confirm BGE-M3 resource/cache requirements on the selected Render plan.
-2. Create the Render service manually with the documented native build/start
-   commands and secret environment values.
-3. Harden frontend production API URL handling and document its build-time
-   contract.
-4. Add the minimum approved public-API security controls.
-5. Perform deployment/security review, then execute one controlled low-risk
+1. Select a runtime with sufficient memory or review a lower-memory embedding
+   runtime design without weakening retrieval/citation safety.
+2. Add the minimum approved public-API security controls.
+3. Perform deployment/security review, then execute one controlled low-risk
    real-mode smoke with citation and fallback checks.
 
 ## Safe validation commands
