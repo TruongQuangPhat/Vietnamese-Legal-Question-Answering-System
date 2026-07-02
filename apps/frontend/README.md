@@ -35,6 +35,41 @@ environment managed by `uv`.
 
 The Legal QA form calls the backend configured by `NEXT_PUBLIC_API_BASE_URL`.
 
+## Vercel Production
+
+Current production frontend:
+
+```text
+https://vnlaw-qa.vercel.app
+```
+
+Configure the Vercel project with the Next.js framework preset and:
+
+```text
+Root Directory: apps/frontend
+```
+
+Set the production build environment:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+```
+
+The backend must allow the deployed frontend origin:
+
+```env
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
+```
+
+`NEXT_PUBLIC_API_BASE_URL` is public and embedded during `next build`; changing
+it requires a new Vercel deployment. Do not place provider or database secrets
+in any `NEXT_PUBLIC_*` variable.
+
+The Render backend remains in real mode. Its liveness and readiness endpoints
+pass, but Render Free cannot reliably serve real `/api/v1/legal-qa/ask`
+requests because BGE-M3, Torch, and Transformers exceed the 512 MB memory
+limit. Do not switch the backend to fake mode to mask this limitation.
+
 ## Container
 
 Build the frontend image from the repository root:
