@@ -97,6 +97,11 @@ def test_follow_up_question_uses_most_recent_user_topic_anchor() -> None:
         "Trường hợp đó có cần báo trước không?",
         "Như trên thì người lao động có được trợ cấp không?",
         "Nếu vậy thì công ty có phải bồi thường không?",
+        "Vậy trường hợp này thì sao?",
+        "Còn nếu chưa đủ tuổi?",
+        "Thế có bị phạt không?",
+        "Cái đó áp dụng cho ai?",
+        "Như trên thì có được không?",
     ],
 )
 def test_explicit_follow_up_markers_use_prior_user_anchor(question: str) -> None:
@@ -123,6 +128,10 @@ def test_explicit_follow_up_markers_use_prior_user_anchor(question: str) -> None
         "Điều kiện kết hôn là gì?",
         "Bảo hiểm y tế trẻ em?",
         "Nghỉ phép năm bao nhiêu ngày?",
+        "Trẻ em dưới 6 tuổi có được cấp thẻ bảo hiểm y tế không?",
+        "Thời hiệu khởi kiện là gì?",
+        "Ly hôn thuận tình cần gì?",
+        "Thế chấp tài sản là gì?",
         "Hợp đồng lao động là gì?",
         "Tội trộm cắp tài sản xử lý thế nào?",
     ],
@@ -136,6 +145,74 @@ def test_short_independent_questions_do_not_use_prior_context(question: str) -> 
                     "role": "user",
                     "content": "Người lao động đơn phương chấm dứt hợp đồng khi nào?",
                 }
+            ],
+        )
+    )
+
+    assert prepared.follow_up_detected is False
+    assert prepared.context_used is False
+    assert prepared.retrieval_question == question
+
+
+def test_short_standalone_question_does_not_inherit_unrelated_marriage_context() -> None:
+    question = "Nghỉ phép năm bao nhiêu ngày?"
+    prepared = LegalQAContextPreparer().prepare(
+        LegalQARequest(
+            question=question,
+            conversation_context=[
+                {"role": "user", "content": "Điều kiện kết hôn là gì?"},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+        )
+    )
+
+    assert prepared.follow_up_detected is False
+    assert prepared.context_used is False
+    assert prepared.retrieval_question == question
+
+
+def test_short_standalone_question_does_not_inherit_health_insurance_context() -> None:
+    question = "Điều kiện kết hôn là gì?"
+    prepared = LegalQAContextPreparer().prepare(
+        LegalQARequest(
+            question=question,
+            conversation_context=[
+                {"role": "user", "content": "Bảo hiểm y tế trẻ em?"},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+        )
+    )
+
+    assert prepared.follow_up_detected is False
+    assert prepared.context_used is False
+    assert prepared.retrieval_question == question
+
+
+def test_true_follow_up_can_use_annual_leave_context() -> None:
+    prior_question = "Nghỉ phép năm bao nhiêu ngày?"
+    current_question = "Vậy có được nghỉ thêm không?"
+    prepared = LegalQAContextPreparer().prepare(
+        LegalQARequest(
+            question=current_question,
+            conversation_context=[
+                {"role": "user", "content": prior_question},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+        )
+    )
+
+    assert prepared.follow_up_detected is True
+    assert prepared.context_used is True
+    assert prepared.retrieval_question == f"{prior_question} {current_question}"
+
+
+def test_ambiguous_question_without_context_reference_stays_standalone() -> None:
+    question = "Có cần giấy tờ gì?"
+    prepared = LegalQAContextPreparer().prepare(
+        LegalQARequest(
+            question=question,
+            conversation_context=[
+                {"role": "user", "content": "Điều kiện kết hôn là gì?"},
             ],
         )
     )

@@ -321,6 +321,11 @@ fake-mode API dependencies by default. Real-service tests must be explicitly
 opted in with `LEGAL_QA_ALLOW_REAL_TESTS=1` and must remain separate from the
 default unit/integration suite.
 
+Conversation context preparation uses deterministic follow-up intent signals.
+Short legal-topic questions remain standalone unless they contain clear
+context-dependent references such as "vậy", "như trên", "cái đó", or
+"trường hợp này".
+
 Unit tests cover service, processing, retrieval, and evaluation modules.
 
 ## 10. Product MVP State

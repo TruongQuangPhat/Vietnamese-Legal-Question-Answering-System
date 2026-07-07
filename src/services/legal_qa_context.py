@@ -12,23 +12,57 @@ from src.api.schemas import (
     LegalQARequest,
 )
 
-FOLLOW_UP_MARKERS = (
-    "vậy",
-    "vậy thì",
-    "nếu vậy",
-    "trường hợp đó",
-    "trường hợp này",
-    "như vậy",
-    "còn",
-    "còn nếu",
-    "thì sao",
-    "như trên",
-    "đối với trường hợp này",
-    "hợp đồng này",
-    "người đó",
-    "bên đó",
+CONTEXT_REFERENCE_PHRASES = (
+    "cái đó",
+    "điều đó",
     "việc đó",
     "quy định đó",
+    "trường hợp đó",
+    "trường hợp này",
+    "đối với trường hợp này",
+    "người đó",
+    "bên đó",
+    "hợp đồng này",
+    "như trên",
+    "như vậy",
+    "nếu vậy",
+)
+FOLLOW_UP_PREFIXES = (
+    "vậy",
+    "còn",
+    "còn nếu",
+    "thế có",
+    "thế còn",
+    "thế thì",
+    "như trên",
+)
+FOLLOW_UP_SUFFIXES = (
+    "thì sao",
+    "được không",
+    "áp dụng cho ai",
+)
+STANDALONE_LEGAL_TOPIC_TERMS = (
+    "bảo hiểm xã hội",
+    "bảo hiểm y tế",
+    "bị phạt",
+    "bồi thường",
+    "cấp thẻ",
+    "đất đai",
+    "điều kiện",
+    "hợp đồng",
+    "khởi kiện",
+    "kết hôn",
+    "ly hôn",
+    "nghỉ hằng năm",
+    "nghỉ phép",
+    "nghĩa vụ",
+    "người lao động",
+    "quyền",
+    "thời hiệu",
+    "thuế",
+    "trẻ em",
+    "trợ cấp",
+    "xử phạt",
 )
 
 
@@ -119,7 +153,31 @@ def _normalize_content(message: LegalQAContextMessage) -> str:
 
 def _is_follow_up_question(question: str) -> bool:
     normalized_question = " ".join(question.casefold().split())
-    return any(marker in normalized_question for marker in FOLLOW_UP_MARKERS)
+    if _has_context_reference(normalized_question):
+        return True
+    if _has_follow_up_prefix(normalized_question):
+        return True
+    if _has_standalone_legal_topic(normalized_question):
+        return False
+    return _has_follow_up_suffix(normalized_question)
+
+
+def _has_context_reference(question: str) -> bool:
+    return any(phrase in question for phrase in CONTEXT_REFERENCE_PHRASES)
+
+
+def _has_follow_up_prefix(question: str) -> bool:
+    return any(
+        question == prefix or question.startswith(f"{prefix} ") for prefix in FOLLOW_UP_PREFIXES
+    )
+
+
+def _has_standalone_legal_topic(question: str) -> bool:
+    return any(term in question for term in STANDALONE_LEGAL_TOPIC_TERMS)
+
+
+def _has_follow_up_suffix(question: str) -> bool:
+    return any(question.endswith(suffix) for suffix in FOLLOW_UP_SUFFIXES)
 
 
 def _prepare_retrieval_question(
