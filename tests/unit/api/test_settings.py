@@ -161,6 +161,19 @@ def test_settings_parse_postgres_conversation_store_configuration() -> None:
     assert "password" not in repr(settings)
 
 
+def test_settings_memory_conversation_store_allows_blank_database_url() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_CONVERSATION_STORE": "memory",
+            "LEGAL_QA_DATABASE_URL": "   ",
+        }
+    )
+
+    assert settings.legal_qa_conversation_store == ConversationStoreMode.MEMORY
+    assert settings.legal_qa_database_url is None
+    assert settings.conversation_configuration_issues() == ()
+
+
 def test_settings_postgres_conversation_store_requires_database_url() -> None:
     settings = AppSettings.from_env({"LEGAL_QA_CONVERSATION_STORE": "postgres"})
 
@@ -168,6 +181,18 @@ def test_settings_postgres_conversation_store_requires_database_url() -> None:
     assert settings.runtime_configuration_issues() == ("missing_database_url",)
     with pytest.raises(RuntimeConfigurationError, match="missing_database_url"):
         settings.validate_conversation_configuration()
+
+
+def test_settings_postgres_conversation_store_rejects_blank_database_url() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_CONVERSATION_STORE": "postgres",
+            "LEGAL_QA_DATABASE_URL": "   ",
+        }
+    )
+
+    assert settings.legal_qa_database_url is None
+    assert settings.conversation_configuration_issues() == ("missing_database_url",)
 
 
 def test_settings_reject_invalid_conversation_store() -> None:

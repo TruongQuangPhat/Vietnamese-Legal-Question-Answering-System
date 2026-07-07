@@ -263,13 +263,15 @@ gateway, WAF, or Redis-backed limiter.
 
 `LEGAL_QA_CONVERSATION_STORE=memory` uses the default process-local
 conversation repository for tests and simple local usage. It is not durable and
-is not shared across workers. `LEGAL_QA_CONVERSATION_STORE=postgres` selects the
-PostgreSQL repository and requires `LEGAL_QA_DATABASE_URL` from a secret
-environment variable plus the optional `postgres` dependency extra. Apply
+is not shared across workers. `LEGAL_QA_DATABASE_URL` is not required in memory
+mode. `LEGAL_QA_CONVERSATION_STORE=postgres` selects the PostgreSQL repository
+and requires `LEGAL_QA_DATABASE_URL` from a secret environment variable plus the
+optional `postgres` dependency extra. Apply
 `scripts/database/postgres_conversation_store.sql` to the target database before
 serving traffic in PostgreSQL mode. Managed PostgreSQL is the intended durable
 store for future Render, AWS, or Azure deployments. Default tests do not require
-local Docker or PostgreSQL.
+local Docker or PostgreSQL. Real PostgreSQL integration tests, if added, must be
+guarded by an explicit opt-in such as `LEGAL_QA_ALLOW_DB_TESTS=1`.
 
 For a PostgreSQL-backed deployment, install the optional extra in the backend
 build, for example by adding `--extra postgres` to the existing `uv sync`

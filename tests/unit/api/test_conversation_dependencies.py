@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import builtins
+
 import pytest
 
 from src.api.dependencies import clear_conversation_service_cache, get_conversation_service
@@ -31,6 +33,32 @@ async def test_conversation_dependency_uses_memory_store_by_default(
 
     assert conversation.title == "Memory"
     assert postgres_constructed is False
+
+
+async def test_conversation_dependency_memory_store_does_not_import_psycopg(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_CONVERSATION_STORE": "memory",
+            "LEGAL_QA_DATABASE_URL": "postgresql://user:secret@db.example/vnlaw",
+        }
+    )
+    original_import = builtins.__import__
+
+    def fail_if_psycopg_is_imported(name, *args, **kwargs):
+        if name == "psycopg":
+            raise AssertionError("memory store must not import psycopg")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("src.api.dependencies.get_settings", lambda: settings)
+    monkeypatch.setattr(builtins, "__import__", fail_if_psycopg_is_imported)
+    clear_conversation_service_cache()
+
+    service = await get_conversation_service()
+    conversation = service.create(ConversationCreateRequest(title="Memory"))
+
+    assert conversation.title == "Memory"
 
 
 async def test_conversation_dependency_selects_postgres_store_without_connecting(
