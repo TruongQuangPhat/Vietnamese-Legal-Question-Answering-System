@@ -340,6 +340,7 @@ The Legal QA product MVP is complete for fake-mode local demo usage:
 - runtime settings, CORS, request safety, and safe logging;
 - optional in-process rate limiting for `POST /api/v1/legal-qa/ask`;
 - configurable conversation storage with memory default and PostgreSQL support;
+- optional anonymous session ownership for conversation APIs;
 - Next.js frontend under `apps/frontend`;
 - Vietnamese ask UI with answer, citation, evidence, and metadata rendering;
 - Makefile local development commands;
@@ -380,8 +381,19 @@ local use. PostgreSQL-backed durable conversation storage is available through
 `LEGAL_QA_CONVERSATION_STORE=postgres` and `LEGAL_QA_DATABASE_URL` after
 applying `scripts/database/postgres_conversation_store.sql`. Managed
 PostgreSQL is the intended durable store for future Render, AWS, or Azure
-deployments. Auth/user ownership remains future work; nullable ownership fields
-exist only inside the PostgreSQL schema.
+deployments. Full login/user accounts remain future work; nullable ownership
+fields support session ownership without requiring account records.
+
+Conversation APIs can enforce minimal anonymous session ownership with
+`LEGAL_QA_AUTH_ENABLED=true`, `LEGAL_QA_SESSION_SECRET`, and
+`LEGAL_QA_SESSION_HEADER` (default `X-Legal-QA-Session`). When enabled,
+conversation list/read/update/delete/message operations are scoped to the
+session-derived owner id and cross-owner access returns not found. The frontend
+sends a stable anonymous session token for conversation API calls while keeping
+its localStorage conversation cache. Auth-enabled deployments must set a strong
+non-placeholder session secret; clearing localStorage or switching
+browsers/devices creates a different anonymous session. Full login/OAuth
+remains future work.
 
 ### Production deployment handoff
 

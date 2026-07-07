@@ -41,11 +41,12 @@ class PostgresConversationRepository:
         with self._connect_factory() as connection:
             connection.execute(
                 """
-                INSERT INTO conversations (id, title, created_at, updated_at)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO conversations (id, owner_id, title, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (
                     conversation.id,
+                    conversation.owner_id,
                     conversation.title,
                     conversation.created_at,
                     conversation.updated_at,
@@ -53,16 +54,27 @@ class PostgresConversationRepository:
             )
         return conversation.model_copy(deep=True)
 
-    def list(self) -> list[Conversation]:
+    def list(self, *, owner_id: str | None = None) -> list[Conversation]:
         """Return all conversations with ordered messages."""
         with self._connect_factory() as connection:
-            rows = connection.execute(
-                """
-                SELECT id, title, created_at, updated_at
-                FROM conversations
-                ORDER BY updated_at DESC, created_at DESC, id DESC
-                """
-            ).fetchall()
+            if owner_id is None:
+                rows = connection.execute(
+                    """
+                    SELECT id, owner_id, title, created_at, updated_at
+                    FROM conversations
+                    ORDER BY updated_at DESC, created_at DESC, id DESC
+                    """
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT id, owner_id, title, created_at, updated_at
+                    FROM conversations
+                    WHERE owner_id = %s
+                    ORDER BY updated_at DESC, created_at DESC, id DESC
+                    """,
+                    (owner_id,),
+                ).fetchall()
             return [
                 _conversation_from_row(
                     row,
@@ -71,20 +83,21 @@ class PostgresConversationRepository:
                 for row in rows
             ]
 
-    def get(self, conversation_id: str) -> Conversation:
+    def get(self, conversation_id: str, *, owner_id: str | None = None) -> Conversation:
         """Return one conversation.
 
         Raises:
             ConversationNotFoundError: If the identifier is unknown.
         """
         with self._connect_factory() as connection:
-            return _fetch_conversation(connection, conversation_id)
+            return _fetch_conversation(connection, conversation_id, owner_id=owner_id)
 
     def update_title(
         self,
         conversation_id: str,
         title: str,
         updated_at: datetime,
+        owner_id: str | None = None,
     ) -> Conversation:
         """Update a conversation title and timestamp.
 
@@ -92,15 +105,26 @@ class PostgresConversationRepository:
             ConversationNotFoundError: If the identifier is unknown.
         """
         with self._connect_factory() as connection:
-            row = connection.execute(
-                """
-                UPDATE conversations
-                SET title = %s, updated_at = %s
-                WHERE id = %s
-                RETURNING id, title, created_at, updated_at
-                """,
-                (title, updated_at, conversation_id),
-            ).fetchone()
+            if owner_id is None:
+                row = connection.execute(
+                    """
+                    UPDATE conversations
+                    SET title = %s, updated_at = %s
+                    WHERE id = %s
+                    RETURNING id, owner_id, title, created_at, updated_at
+                    """,
+                    (title, updated_at, conversation_id),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    UPDATE conversations
+                    SET title = %s, updated_at = %s
+                    WHERE id = %s AND owner_id = %s
+                    RETURNING id, owner_id, title, created_at, updated_at
+                    """,
+                    (title, updated_at, conversation_id, owner_id),
+                ).fetchone()
             if row is None:
                 raise ConversationNotFoundError(conversation_id)
             return _conversation_from_row(
@@ -108,17 +132,23 @@ class PostgresConversationRepository:
                 messages=_fetch_messages(connection, conversation_id=conversation_id),
             )
 
-    def delete(self, conversation_id: str) -> None:
+    def delete(self, conversation_id: str, *, owner_id: str | None = None) -> None:
         """Delete a conversation and its messages.
 
         Raises:
             ConversationNotFoundError: If the identifier is unknown.
         """
         with self._connect_factory() as connection:
-            row = connection.execute(
-                "DELETE FROM conversations WHERE id = %s RETURNING id",
-                (conversation_id,),
-            ).fetchone()
+            if owner_id is None:
+                row = connection.execute(
+                    "DELETE FROM conversations WHERE id = %s RETURNING id",
+                    (conversation_id,),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "DELETE FROM conversations WHERE id = %s AND owner_id = %s RETURNING id",
+                    (conversation_id, owner_id),
+                ).fetchone()
             if row is None:
                 raise ConversationNotFoundError(conversation_id)
 
@@ -127,6 +157,7 @@ class PostgresConversationRepository:
         conversation_id: str,
         message: ConversationMessage,
         updated_at: datetime,
+        owner_id: str | None = None,
     ) -> ConversationMessage:
         """Append a message and update the parent conversation timestamp.
 
@@ -134,26 +165,38 @@ class PostgresConversationRepository:
             ConversationNotFoundError: If the identifier is unknown.
         """
         with self._connect_factory() as connection:
-            row = connection.execute(
-                """
-                UPDATE conversations
-                SET updated_at = %s
-                WHERE id = %s
-                RETURNING id
-                """,
-                (updated_at, conversation_id),
-            ).fetchone()
+            if owner_id is None:
+                row = connection.execute(
+                    """
+                    UPDATE conversations
+                    SET updated_at = %s
+                    WHERE id = %s
+                    RETURNING id
+                    """,
+                    (updated_at, conversation_id),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    UPDATE conversations
+                    SET updated_at = %s
+                    WHERE id = %s AND owner_id = %s
+                    RETURNING id
+                    """,
+                    (updated_at, conversation_id, owner_id),
+                ).fetchone()
             if row is None:
                 raise ConversationNotFoundError(conversation_id)
             connection.execute(
                 """
                 INSERT INTO conversation_messages
-                    (id, conversation_id, role, content, created_at)
-                VALUES (%s, %s, %s, %s, %s)
+                    (id, conversation_id, owner_id, role, content, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     message.id,
                     conversation_id,
+                    owner_id,
                     message.role.value,
                     message.content,
                     message.created_at,
@@ -171,15 +214,30 @@ class PostgresConversationRepository:
         return psycopg.connect(self._database_url)
 
 
-def _fetch_conversation(connection: Any, conversation_id: str) -> Conversation:
-    row = connection.execute(
-        """
-        SELECT id, title, created_at, updated_at
-        FROM conversations
-        WHERE id = %s
-        """,
-        (conversation_id,),
-    ).fetchone()
+def _fetch_conversation(
+    connection: Any,
+    conversation_id: str,
+    *,
+    owner_id: str | None,
+) -> Conversation:
+    if owner_id is None:
+        row = connection.execute(
+            """
+            SELECT id, owner_id, title, created_at, updated_at
+            FROM conversations
+            WHERE id = %s
+            """,
+            (conversation_id,),
+        ).fetchone()
+    else:
+        row = connection.execute(
+            """
+            SELECT id, owner_id, title, created_at, updated_at
+            FROM conversations
+            WHERE id = %s AND owner_id = %s
+            """,
+            (conversation_id, owner_id),
+        ).fetchone()
     if row is None:
         raise ConversationNotFoundError(conversation_id)
     return _conversation_from_row(
@@ -216,8 +274,9 @@ def _conversation_from_row(
 ) -> Conversation:
     return Conversation(
         id=row[0],
-        title=row[1],
-        created_at=row[2],
-        updated_at=row[3],
+        owner_id=row[1],
+        title=row[2],
+        created_at=row[3],
+        updated_at=row[4],
         messages=messages,
     )
