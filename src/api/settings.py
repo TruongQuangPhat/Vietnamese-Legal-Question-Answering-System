@@ -22,6 +22,8 @@ from src.services.legal_qa_workflow import (
 
 DEFAULT_CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
 DEFAULT_DOTENV_PATH = Path(".env")
+DEFAULT_RATE_LIMIT_REQUESTS = 10
+DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
 
 
 class RuntimeConfigurationError(RuntimeError):
@@ -52,6 +54,9 @@ class AppSettings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(default=None, repr=False)
     legal_qa_device: str | None = None
     legal_qa_model: str | None = None
+    legal_qa_rate_limit_enabled: bool = False
+    legal_qa_rate_limit_requests: int = Field(DEFAULT_RATE_LIMIT_REQUESTS, gt=0)
+    legal_qa_rate_limit_window_seconds: int = Field(DEFAULT_RATE_LIMIT_WINDOW_SECONDS, gt=0)
 
     @classmethod
     def from_env(
@@ -107,6 +112,20 @@ class AppSettings(BaseSettings):
                 env,
                 "LEGAL_QA_MODEL",
                 "OPENROUTER_MODEL",
+            ),
+            legal_qa_rate_limit_enabled=_parse_bool(
+                env.get("LEGAL_QA_RATE_LIMIT_ENABLED"),
+                default=False,
+            ),
+            legal_qa_rate_limit_requests=_parse_positive_int(
+                env.get("LEGAL_QA_RATE_LIMIT_REQUESTS"),
+                default=DEFAULT_RATE_LIMIT_REQUESTS,
+                name="LEGAL_QA_RATE_LIMIT_REQUESTS",
+            ),
+            legal_qa_rate_limit_window_seconds=_parse_positive_int(
+                env.get("LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS"),
+                default=DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+                name="LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS",
             ),
         )
 
@@ -200,6 +219,31 @@ def _service_mode(raw_value: str | None) -> LegalQAServiceMode:
     except ValueError as exc:
         allowed = ", ".join(item.value for item in LegalQAServiceMode)
         raise ValueError(f"LEGAL_QA_SERVICE_MODE must be one of: {allowed}") from exc
+
+
+def _parse_bool(raw_value: str | None, *, default: bool) -> bool:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    normalized = value.casefold()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError("boolean environment values must be true/false")
+
+
+def _parse_positive_int(raw_value: str | None, *, default: int, name: str) -> int:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if parsed <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return parsed
 
 
 def _non_blank(value: str | None) -> str | None:

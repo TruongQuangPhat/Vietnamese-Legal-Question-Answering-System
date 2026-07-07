@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from src.api.app import create_app
-from src.api.dependencies import get_legal_qa_service
+from src.api.dependencies import get_legal_qa_service, get_runtime_readiness_service
 from src.api.schemas import (
     MAX_LEGAL_QA_CONTEXT_MESSAGE_LENGTH,
     MAX_LEGAL_QA_CONTEXT_MESSAGES,
@@ -19,7 +19,10 @@ from src.api.schemas import (
     LegalQAResponse,
     ResponseMetadataDTO,
 )
+from src.api.settings import AppSettings
 from src.services.legal_qa_api_service import LegalQAService, LegalQAWorkflowRequest
+from src.services.legal_qa_workflow import LegalQAServiceMode
+from src.services.runtime_readiness import RuntimeReadinessService
 
 
 @pytest.fixture(autouse=True)
@@ -371,6 +374,135 @@ async def test_ask_route_offloads_service_answer_from_event_loop() -> None:
     assert response.json()["decision"] == "answered"
     assert answer_thread_ids
     assert answer_thread_ids[0] != event_loop_thread_id
+
+
+@pytest.mark.asyncio
+async def test_ask_route_allows_requests_within_rate_limit() -> None:
+    app = create_app(_rate_limit_settings(requests=2, window_seconds=60))
+    service = CountingLegalQAService()
+    app.dependency_overrides[get_legal_qa_service] = lambda: service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        first = await client.post("/api/v1/legal-qa/ask", json={"question": "Câu hỏi hợp lệ?"})
+        second = await client.post("/api/v1/legal-qa/ask", json={"question": "Câu hỏi hợp lệ?"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert service.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_ask_route_returns_429_when_rate_limit_exceeded() -> None:
+    app = create_app(_rate_limit_settings(requests=1, window_seconds=60))
+    service = CountingLegalQAService()
+    service_dependency_calls = 0
+
+    def get_counting_service() -> CountingLegalQAService:
+        nonlocal service_dependency_calls
+        service_dependency_calls += 1
+        return service
+
+    app.dependency_overrides[get_legal_qa_service] = get_counting_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        allowed = await client.post("/api/v1/legal-qa/ask", json={"question": "Câu hỏi hợp lệ?"})
+        blocked = await client.post("/api/v1/legal-qa/ask", json={"question": "Câu hỏi hợp lệ?"})
+
+    assert allowed.status_code == 200
+    assert blocked.status_code == 429
+    assert blocked.headers["retry-after"] == "60"
+    assert blocked.json() == {
+        "detail": {
+            "error": "rate_limit_exceeded",
+            "message": "Too many Legal QA requests. Please retry later.",
+        }
+    }
+    assert service.call_count == 1
+    assert service_dependency_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_ask_route_rate_limit_can_be_disabled() -> None:
+    app = create_app(_rate_limit_settings(enabled=False, requests=1, window_seconds=60))
+    service = CountingLegalQAService()
+    app.dependency_overrides[get_legal_qa_service] = lambda: service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        first = await client.post("/api/v1/legal-qa/ask", json={"question": "Câu hỏi hợp lệ?"})
+        second = await client.post("/api/v1/legal-qa/ask", json={"question": "Câu hỏi hợp lệ?"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert service.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_health_and_readiness_are_not_rate_limited() -> None:
+    app = create_app(_rate_limit_settings(requests=1, window_seconds=60))
+    service = CountingLegalQAService()
+    app.dependency_overrides[get_legal_qa_service] = lambda: service
+    app.dependency_overrides[get_runtime_readiness_service] = lambda: RuntimeReadinessService(
+        service_mode=LegalQAServiceMode.FAKE,
+        configuration_issues=(),
+        qdrant_collection=None,
+    )
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        blocked_seed = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Câu hỏi hợp lệ?"},
+        )
+        blocked = await client.post("/api/v1/legal-qa/ask", json={"question": "Câu hỏi hợp lệ?"})
+        health = await client.get("/health")
+        readiness = await client.get("/api/v1/readiness")
+
+    assert blocked_seed.status_code == 200
+    assert blocked.status_code == 429
+    assert health.status_code == 200
+    assert readiness.status_code == 200
+    assert service.call_count == 1
+
+
+class CountingLegalQAService:
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    def answer(self, request: LegalQARequest) -> LegalQAResponse:
+        self.call_count += 1
+        return LegalQAResponse(
+            request_id=f"request-{self.call_count}",
+            decision=LegalQADecision.ANSWERED,
+            answer="Câu trả lời thử nghiệm.",
+            citations=[],
+            evidence=[],
+            warnings=[],
+            metadata=ResponseMetadataDTO(
+                retrieval_strategy="coverage_aware_quota",
+                model="stub",
+                reranking_used=False,
+                latency_ms=1,
+            ),
+        )
+
+
+def _rate_limit_settings(
+    *,
+    enabled: bool = True,
+    requests: int,
+    window_seconds: int,
+) -> AppSettings:
+    return AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "fake",
+            "LEGAL_QA_RATE_LIMIT_ENABLED": str(enabled).lower(),
+            "LEGAL_QA_RATE_LIMIT_REQUESTS": str(requests),
+            "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS": str(window_seconds),
+        }
+    )
 
 
 def _single_log_record(caplog: pytest.LogCaptureFixture, message: str) -> logging.LogRecord:

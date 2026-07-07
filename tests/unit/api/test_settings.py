@@ -33,6 +33,9 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.log_level == "INFO"
     assert settings.cors_allowed_origins == ["http://localhost:3000"]
     assert settings.legal_qa_service_mode == LegalQAServiceMode.FAKE
+    assert settings.legal_qa_rate_limit_enabled is False
+    assert settings.legal_qa_rate_limit_requests == 10
+    assert settings.legal_qa_rate_limit_window_seconds == 60
     assert settings.runtime_configuration_issues() == ()
 
 
@@ -74,6 +77,35 @@ def test_settings_parse_cors_allowed_origins_json_array() -> None:
         "https://vnlaw.example",
         "https://preview.vnlaw.example",
     ]
+
+
+def test_settings_parse_rate_limit_configuration() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_RATE_LIMIT_ENABLED": "true",
+            "LEGAL_QA_RATE_LIMIT_REQUESTS": "2",
+            "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS": "30",
+        }
+    )
+
+    assert settings.legal_qa_rate_limit_enabled is True
+    assert settings.legal_qa_rate_limit_requests == 2
+    assert settings.legal_qa_rate_limit_window_seconds == 30
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("LEGAL_QA_RATE_LIMIT_ENABLED", "maybe"),
+        ("LEGAL_QA_RATE_LIMIT_REQUESTS", "0"),
+        ("LEGAL_QA_RATE_LIMIT_REQUESTS", "not-an-int"),
+        ("LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS", "-1"),
+        ("LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS", "not-an-int"),
+    ],
+)
+def test_settings_reject_invalid_rate_limit_configuration(name: str, value: str) -> None:
+    with pytest.raises(ValueError):
+        AppSettings.from_env({name: value})
 
 
 @pytest.mark.parametrize(

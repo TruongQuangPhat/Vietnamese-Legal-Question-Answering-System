@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.rate_limit import build_rate_limiter
 from src.api.routes.conversations import router as conversations_router
 from src.api.routes.health import router as health_router
 from src.api.routes.legal_qa import router as legal_qa_router
@@ -23,6 +24,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     """
     runtime_settings = settings or get_settings()
     app = FastAPI(title="VnLaw-QA API", version="0.1.0")
+    app.state.ask_rate_limiter = build_rate_limiter(runtime_settings)
     app.include_router(health_router)
     app.include_router(legal_qa_router, prefix="/api/v1")
     app.include_router(conversations_router, prefix="/api/v1")
