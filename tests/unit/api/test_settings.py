@@ -34,6 +34,7 @@ REAL_SERVICE_TEST_ENV_VARS = (
     "LEGAL_QA_SESSION_SECRET",
     "LEGAL_QA_SESSION_HEADER",
 )
+VALID_SESSION_SECRET = "unit-test-session-secret-with-enough-entropy"
 
 
 def test_settings_default_to_local_fake_mode() -> None:
@@ -223,21 +224,47 @@ def test_settings_auth_enabled_requires_session_secret() -> None:
         settings.validate_auth_configuration()
 
 
+def test_settings_auth_enabled_rejects_blank_session_secret() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_AUTH_ENABLED": "true",
+            "LEGAL_QA_SESSION_SECRET": "   ",
+        }
+    )
+
+    assert settings.legal_qa_session_secret is None
+    assert settings.auth_configuration_issues() == ("missing_session_secret",)
+
+
+@pytest.mark.parametrize("secret", ["secret", "test-secret", "change-me", "short"])
+def test_settings_auth_enabled_rejects_weak_session_secret(secret: str) -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_AUTH_ENABLED": "true",
+            "LEGAL_QA_SESSION_SECRET": secret,
+        }
+    )
+
+    assert settings.auth_configuration_issues() == ("weak_session_secret",)
+    with pytest.raises(RuntimeConfigurationError, match="weak_session_secret"):
+        settings.validate_auth_configuration()
+
+
 def test_settings_parse_session_ownership_configuration() -> None:
     settings = AppSettings.from_env(
         {
             "LEGAL_QA_AUTH_ENABLED": "true",
-            "LEGAL_QA_SESSION_SECRET": "test-secret",
+            "LEGAL_QA_SESSION_SECRET": VALID_SESSION_SECRET,
             "LEGAL_QA_SESSION_HEADER": "X-Test-Session",
         }
     )
 
     assert settings.legal_qa_auth_enabled is True
     assert settings.legal_qa_session_secret is not None
-    assert settings.legal_qa_session_secret.get_secret_value() == "test-secret"
+    assert settings.legal_qa_session_secret.get_secret_value() == VALID_SESSION_SECRET
     assert settings.legal_qa_session_header == "X-Test-Session"
     assert settings.auth_configuration_issues() == ()
-    assert "test-secret" not in repr(settings)
+    assert VALID_SESSION_SECRET not in repr(settings)
 
 
 def test_settings_reject_invalid_session_header() -> None:

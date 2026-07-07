@@ -25,6 +25,20 @@ DEFAULT_CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
 DEFAULT_DOTENV_PATH = Path(".env")
 DEFAULT_RATE_LIMIT_REQUESTS = 10
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
+MIN_SESSION_SECRET_LENGTH = 16
+WEAK_SESSION_SECRET_PLACEHOLDERS = {
+    "changeme",
+    "change-me",
+    "change_me",
+    "replace-me",
+    "replace_me",
+    "secret",
+    "session-secret",
+    "test-secret",
+    "your-secret",
+    "your-session-secret",
+    "legal-qa-session-secret",
+}
 
 
 class ConversationStoreMode(StrEnum):
@@ -156,8 +170,13 @@ class AppSettings(BaseSettings):
 
     def auth_configuration_issues(self) -> tuple[str, ...]:
         """Return safe issue codes for session ownership configuration."""
-        if self.legal_qa_auth_enabled and self.legal_qa_session_secret is None:
+        if not self.legal_qa_auth_enabled:
+            return ()
+        if self.legal_qa_session_secret is None:
             return ("missing_session_secret",)
+        secret = self.legal_qa_session_secret.get_secret_value()
+        if _is_weak_session_secret(secret):
+            return ("weak_session_secret",)
         return ()
 
     def validate_auth_configuration(self) -> None:
@@ -365,3 +384,8 @@ def _first_non_blank(environment: Mapping[str, str], *names: str) -> str | None:
 def _secret_from_env(environment: Mapping[str, str], *names: str) -> SecretStr | None:
     value = _first_non_blank(environment, *names)
     return SecretStr(value) if value is not None else None
+
+
+def _is_weak_session_secret(secret: str) -> bool:
+    normalized = secret.strip().casefold()
+    return len(secret) < MIN_SESSION_SECRET_LENGTH or normalized in WEAK_SESSION_SECRET_PLACEHOLDERS

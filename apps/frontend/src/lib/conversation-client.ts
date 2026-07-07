@@ -3,6 +3,7 @@ import { getApiBaseUrl, normalizeApiBaseUrl } from "./api-config";
 const CONVERSATIONS_PATH = "/api/v1/conversations";
 const SESSION_HEADER = "X-Legal-QA-Session";
 const SESSION_STORAGE_KEY = "legal-qa-chat-session";
+let serverSessionToken: string | null = null;
 
 export type BackendConversationRole = "user" | "assistant";
 
@@ -185,23 +186,26 @@ function conversationPath(conversationId: string): string {
 
 function getConversationSessionToken(): string {
   if (typeof window === "undefined") {
-    return "server-render";
+    serverSessionToken ??= createSessionToken(globalThis.crypto);
+    return serverSessionToken;
   }
   const existingToken = window.localStorage.getItem(SESSION_STORAGE_KEY);
   if (existingToken) {
     return existingToken;
   }
-  const token = createSessionToken();
+  const token = createSessionToken(window.crypto);
   window.localStorage.setItem(SESSION_STORAGE_KEY, token);
   return token;
 }
 
-function createSessionToken(): string {
-  const cryptoApi = window.crypto;
+function createSessionToken(cryptoApi: Crypto | undefined): string {
   if (cryptoApi?.randomUUID) {
     return cryptoApi.randomUUID();
   }
   const values = new Uint8Array(16);
-  cryptoApi.getRandomValues(values);
-  return Array.from(values, (value) => value.toString(16).padStart(2, "0")).join("");
+  if (cryptoApi?.getRandomValues) {
+    cryptoApi.getRandomValues(values);
+    return Array.from(values, (value) => value.toString(16).padStart(2, "0")).join("");
+  }
+  return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

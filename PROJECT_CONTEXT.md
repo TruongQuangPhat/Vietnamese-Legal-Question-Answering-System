@@ -390,7 +390,10 @@ Conversation APIs can enforce minimal anonymous session ownership with
 conversation list/read/update/delete/message operations are scoped to the
 session-derived owner id and cross-owner access returns not found. The frontend
 sends a stable anonymous session token for conversation API calls while keeping
-its localStorage conversation cache. Full login/OAuth remains future work.
+its localStorage conversation cache. Auth-enabled deployments must set a strong
+non-placeholder session secret; clearing localStorage or switching
+browsers/devices creates a different anonymous session. Full login/OAuth
+remains future work.
 
 ### Production deployment handoff
 

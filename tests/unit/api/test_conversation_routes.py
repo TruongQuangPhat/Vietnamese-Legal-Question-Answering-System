@@ -16,6 +16,8 @@ from src.services.conversation_service import (
     InMemoryConversationRepository,
 )
 
+VALID_SESSION_SECRET = "unit-test-session-secret-with-enough-entropy"
+
 
 @pytest.fixture
 def conversation_app() -> FastAPI:
@@ -326,7 +328,7 @@ def _auth_conversation_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     settings = AppSettings.from_env(
         {
             "LEGAL_QA_AUTH_ENABLED": "true",
-            "LEGAL_QA_SESSION_SECRET": "unit-test-secret",
+            "LEGAL_QA_SESSION_SECRET": VALID_SESSION_SECRET,
         }
     )
     monkeypatch.setattr("src.api.session_identity.get_settings", lambda: settings)

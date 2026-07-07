@@ -291,10 +291,14 @@ ownership for conversation routes. In that mode, clients must send the
 configured `LEGAL_QA_SESSION_HEADER` value, defaulting to
 `X-Legal-QA-Session`; the backend derives an opaque `owner_id` using
 `LEGAL_QA_SESSION_SECRET` and stores only that owner id. Set
-`LEGAL_QA_SESSION_SECRET` from a secret manager before enabling auth. Cross-owner
-conversation reads, updates, deletes, and message appends return 404. This is a
-session ownership layer, not full login/OAuth. Production should serve it only
-over HTTPS and should use managed secret storage.
+`LEGAL_QA_SESSION_SECRET` from a secret manager before enabling auth; blank,
+placeholder, or trivially short values are rejected and there is no default
+fallback secret in auth-enabled mode. Cross-owner conversation reads, updates,
+deletes, and message appends return 404. This is anonymous session ownership,
+not full login/OAuth. The frontend stores one anonymous session token in
+localStorage and sends it only on conversation API calls; clearing localStorage
+or switching browsers/devices creates a different anonymous session. Production
+should serve it only over HTTPS and should use managed secret storage.
 
 `AppSettings.from_env()` loads the project `.env` and then overlays process
 environment values, so an exported/container value has precedence. Tests can
@@ -865,6 +869,9 @@ Legacy comma-separated values remain supported for compatibility. The default
 permits only `http://localhost:3000`. Set exact HTTPS frontend origins for each
 deployment. Do not use wildcard origins in production. Invalid JSON arrays
 fail configuration loading instead of silently configuring the wrong origin.
+The backend accepts browser preflight requests for configured origins with
+request headers including `X-Legal-QA-Session` or a custom
+`LEGAL_QA_SESSION_HEADER` value.
 
 The frontend calls the API directly from the browser, so the configured API
 URL must be browser-reachable; Docker service names are not valid public

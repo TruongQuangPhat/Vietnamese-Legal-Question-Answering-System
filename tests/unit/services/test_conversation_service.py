@@ -95,6 +95,25 @@ def test_memory_conversation_repository_filters_by_owner() -> None:
         repository.delete("conversation-a", owner_id="owner-b")
 
 
+def test_memory_conversation_repository_hides_null_owner_records_from_owner_scope() -> None:
+    repository = InMemoryConversationRepository()
+    timestamp = datetime(2025, 1, 1, tzinfo=UTC)
+    repository.create(
+        Conversation(
+            id="legacy-conversation",
+            owner_id=None,
+            title="Legacy",
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+    )
+
+    assert [conversation.id for conversation in repository.list()] == ["legacy-conversation"]
+    assert repository.list(owner_id="owner-a") == []
+    with pytest.raises(ConversationNotFoundError):
+        repository.get("legacy-conversation", owner_id="owner-a")
+
+
 def test_postgres_conversation_repository_constructor_is_lazy() -> None:
     connect_called = False
 
@@ -174,6 +193,30 @@ def test_postgres_conversation_repository_lifecycle_with_fake_connection() -> No
     assert detail.messages[0].content == "Xin chào"
     with pytest.raises(ConversationNotFoundError):
         repository.get("conversation-1")
+
+
+def test_postgres_conversation_repository_hides_null_owner_records_from_owner_scope() -> None:
+    state = _FakePostgresState()
+    repository = PostgresConversationRepository(
+        "postgresql://unused",
+        connect_factory=lambda: _FakePostgresConnection(state),
+    )
+    timestamp = datetime(2025, 1, 1, tzinfo=UTC)
+
+    repository.create(
+        Conversation(
+            id="legacy-conversation",
+            owner_id=None,
+            title="Legacy",
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+    )
+
+    assert [conversation.id for conversation in repository.list()] == ["legacy-conversation"]
+    assert repository.list(owner_id="owner-a") == []
+    with pytest.raises(ConversationNotFoundError):
+        repository.get("legacy-conversation", owner_id="owner-a")
 
 
 def test_postgres_conversation_repository_reports_missing_optional_extra(
