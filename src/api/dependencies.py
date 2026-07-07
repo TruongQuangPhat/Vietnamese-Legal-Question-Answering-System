@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from src.api.settings import get_settings
+from src.api.settings import AppSettings, ConversationStoreMode, get_settings
 from src.services.conversation_service import (
+    ConversationRepository,
     ConversationService,
     InMemoryConversationRepository,
 )
 from src.services.legal_qa_api_service import LegalQAService
 from src.services.legal_qa_workflow import build_legal_qa_service
+from src.services.postgres_conversation_repository import PostgresConversationRepository
 from src.services.runtime_readiness import (
     QdrantCollectionReadinessProbe,
     RuntimeReadinessService,
@@ -62,17 +64,30 @@ async def get_runtime_readiness_service() -> RuntimeReadinessService:
 
 @lru_cache(maxsize=1)
 def _get_cached_conversation_service() -> ConversationService:
-    return ConversationService(InMemoryConversationRepository())
+    settings = get_settings()
+    settings.validate_conversation_configuration()
+    return ConversationService(_build_conversation_repository(settings))
 
 
 async def get_conversation_service() -> ConversationService:
-    """Return the process-local conversation service.
+    """Return the configured conversation service.
 
     Returns:
-        Cached service backed by an in-memory development repository. Data is
-        discarded on process restart and is not shared across workers.
+        Cached service backed by the selected conversation repository. Memory
+        mode is the default; PostgreSQL mode is selected explicitly through
+        runtime settings.
     """
     return _get_cached_conversation_service()
+
+
+def _build_conversation_repository(settings: AppSettings) -> ConversationRepository:
+    if settings.legal_qa_conversation_store == ConversationStoreMode.MEMORY:
+        return InMemoryConversationRepository()
+    database_url = settings.legal_qa_database_url
+    if database_url is None:
+        settings.validate_conversation_configuration()
+        raise AssertionError("unreachable missing database URL after validation")
+    return PostgresConversationRepository(database_url.get_secret_value())
 
 
 def clear_legal_qa_service_cache() -> None:

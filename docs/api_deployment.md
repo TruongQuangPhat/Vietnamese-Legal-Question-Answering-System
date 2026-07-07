@@ -76,6 +76,8 @@ LEGAL_QA_MODEL=google/gemini-2.5-flash
 LEGAL_QA_RATE_LIMIT_ENABLED=true
 LEGAL_QA_RATE_LIMIT_REQUESTS=10
 LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
+LEGAL_QA_CONVERSATION_STORE=memory
+LEGAL_QA_DATABASE_URL=
 
 LEGAL_QA_CHUNKS_URL=https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
 LEGAL_QA_CHUNKS_SHA256=95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
@@ -195,7 +197,7 @@ connectivity, or real multi-turn quality.
 | CORS | JSON-array origins are supported; legacy comma-separated values remain compatible | Deployed frontend origins must be supplied explicitly |
 | Frontend API URL | One public base URL is used by both clients | It is embedded during `next build`; localhost fallback is unsafe for an omitted production setting |
 | Containers | Fake-mode images and Compose stack build the MVP | Committed stack does not package or configure real mode |
-| Conversation storage | Process-local in-memory repository | Not durable, not shared across workers, and not user-specific |
+| Conversation storage | Memory store is the default; PostgreSQL store is available when explicitly configured | Auth/user ownership remains future work; PostgreSQL schema must be applied before durable use |
 | API security | Input bounds, sanitized errors, and optional in-process `/api/v1/legal-qa/ask` rate limiting exist | Authentication, authorization, trusted proxy policy, and distributed abuse controls are not implemented |
 | Observability | Safe completion/failure metadata is logged | Production logging configuration, metrics, tracing, and alerting are not established |
 
@@ -222,6 +224,8 @@ LEGAL_QA_MODEL=google/gemini-2.5-flash
 LEGAL_QA_RATE_LIMIT_ENABLED=false
 LEGAL_QA_RATE_LIMIT_REQUESTS=10
 LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
+LEGAL_QA_CONVERSATION_STORE=memory
+LEGAL_QA_DATABASE_URL=
 
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
@@ -256,6 +260,24 @@ workflow. `/health` and `/api/v1/readiness` are not rate limited. This is
 appropriate for the current single-process Render deployment; a future
 multi-instance deployment should use shared infrastructure such as an API
 gateway, WAF, or Redis-backed limiter.
+
+`LEGAL_QA_CONVERSATION_STORE=memory` uses the default process-local
+conversation repository for tests and simple local usage. It is not durable and
+is not shared across workers. `LEGAL_QA_DATABASE_URL` is not required in memory
+mode. `LEGAL_QA_CONVERSATION_STORE=postgres` selects the PostgreSQL repository
+and requires `LEGAL_QA_DATABASE_URL` from a secret environment variable plus the
+optional `postgres` dependency extra. Apply
+`scripts/database/postgres_conversation_store.sql` to the target database before
+serving traffic in PostgreSQL mode. Managed PostgreSQL is the intended durable
+store for future Render, AWS, or Azure deployments. Default tests do not require
+local Docker or PostgreSQL. Real PostgreSQL integration tests, if added, must be
+guarded by an explicit opt-in such as `LEGAL_QA_ALLOW_DB_TESTS=1`.
+
+For a PostgreSQL-backed deployment, install the optional extra in the backend
+build, for example by adding `--extra postgres` to the existing `uv sync`
+command. Apply the schema with an operator-controlled command such as
+`psql "$LEGAL_QA_DATABASE_URL" -f scripts/database/postgres_conversation_store.sql`.
+Do not commit database URLs, dumps, or generated local database files.
 
 `AppSettings.from_env()` loads the project `.env` and then overlays process
 environment values, so an exported/container value has precedence. Tests can
@@ -887,6 +909,8 @@ LEGAL_QA_MODEL=google/gemini-2.5-flash
 LEGAL_QA_RATE_LIMIT_ENABLED=true
 LEGAL_QA_RATE_LIMIT_REQUESTS=10
 LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
+LEGAL_QA_CONVERSATION_STORE=memory
+LEGAL_QA_DATABASE_URL=
 
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=google/gemini-2.5-flash

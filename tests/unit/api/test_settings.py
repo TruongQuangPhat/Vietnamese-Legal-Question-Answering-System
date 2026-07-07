@@ -7,7 +7,12 @@ import pytest
 
 from src.api.dependencies import clear_legal_qa_service_cache, get_legal_qa_service
 from src.api.schemas import LegalQARequest
-from src.api.settings import AppSettings, RuntimeConfigurationError, get_settings
+from src.api.settings import (
+    AppSettings,
+    ConversationStoreMode,
+    RuntimeConfigurationError,
+    get_settings,
+)
 from src.services.legal_qa_workflow import (
     DEFAULT_LLM_CONFIG_PATH,
     DEFAULT_RETRIEVAL_CONFIG_PATH,
@@ -23,6 +28,8 @@ REAL_SERVICE_TEST_ENV_VARS = (
     "QDRANT_API_KEY",
     "OPENROUTER_API_KEY",
     "OPENROUTER_MODEL",
+    "LEGAL_QA_CONVERSATION_STORE",
+    "LEGAL_QA_DATABASE_URL",
 )
 
 
@@ -36,6 +43,8 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.legal_qa_rate_limit_enabled is False
     assert settings.legal_qa_rate_limit_requests == 10
     assert settings.legal_qa_rate_limit_window_seconds == 60
+    assert settings.legal_qa_conversation_store == ConversationStoreMode.MEMORY
+    assert settings.legal_qa_database_url is None
     assert settings.runtime_configuration_issues() == ()
 
 
@@ -133,6 +142,62 @@ def test_settings_reject_invalid_rate_limit_configuration(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         AppSettings.from_env({name: value})
+
+
+def test_settings_parse_postgres_conversation_store_configuration() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_CONVERSATION_STORE": "postgres",
+            "LEGAL_QA_DATABASE_URL": "postgresql://user:password@db.example/vnlaw",
+        }
+    )
+
+    assert settings.legal_qa_conversation_store == ConversationStoreMode.POSTGRES
+    assert settings.legal_qa_database_url is not None
+    assert settings.legal_qa_database_url.get_secret_value() == (
+        "postgresql://user:password@db.example/vnlaw"
+    )
+    assert settings.conversation_configuration_issues() == ()
+    assert "password" not in repr(settings)
+
+
+def test_settings_memory_conversation_store_allows_blank_database_url() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_CONVERSATION_STORE": "memory",
+            "LEGAL_QA_DATABASE_URL": "   ",
+        }
+    )
+
+    assert settings.legal_qa_conversation_store == ConversationStoreMode.MEMORY
+    assert settings.legal_qa_database_url is None
+    assert settings.conversation_configuration_issues() == ()
+
+
+def test_settings_postgres_conversation_store_requires_database_url() -> None:
+    settings = AppSettings.from_env({"LEGAL_QA_CONVERSATION_STORE": "postgres"})
+
+    assert settings.conversation_configuration_issues() == ("missing_database_url",)
+    assert settings.runtime_configuration_issues() == ("missing_database_url",)
+    with pytest.raises(RuntimeConfigurationError, match="missing_database_url"):
+        settings.validate_conversation_configuration()
+
+
+def test_settings_postgres_conversation_store_rejects_blank_database_url() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_CONVERSATION_STORE": "postgres",
+            "LEGAL_QA_DATABASE_URL": "   ",
+        }
+    )
+
+    assert settings.legal_qa_database_url is None
+    assert settings.conversation_configuration_issues() == ("missing_database_url",)
+
+
+def test_settings_reject_invalid_conversation_store() -> None:
+    with pytest.raises(ValueError, match="LEGAL_QA_CONVERSATION_STORE"):
+        AppSettings.from_env({"LEGAL_QA_CONVERSATION_STORE": "sqlite"})
 
 
 @pytest.mark.parametrize(

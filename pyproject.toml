@@ -38,6 +38,9 @@ embedding = [
 qdrant = [
     "qdrant-client>=1.18.0",
 ]
+postgres = [
+    "psycopg[binary]>=3.2.0",
+]
 
 
 [build-system]
