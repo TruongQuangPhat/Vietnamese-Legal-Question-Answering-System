@@ -78,6 +78,9 @@ LEGAL_QA_RATE_LIMIT_REQUESTS=10
 LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
 LEGAL_QA_CONVERSATION_STORE=memory
 LEGAL_QA_DATABASE_URL=
+LEGAL_QA_AUTH_ENABLED=false
+LEGAL_QA_SESSION_SECRET=
+LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session
 
 LEGAL_QA_CHUNKS_URL=https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
 LEGAL_QA_CHUNKS_SHA256=95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
@@ -226,6 +229,9 @@ LEGAL_QA_RATE_LIMIT_REQUESTS=10
 LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
 LEGAL_QA_CONVERSATION_STORE=memory
 LEGAL_QA_DATABASE_URL=
+LEGAL_QA_AUTH_ENABLED=false
+LEGAL_QA_SESSION_SECRET=
+LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session
 
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
@@ -278,6 +284,17 @@ build, for example by adding `--extra postgres` to the existing `uv sync`
 command. Apply the schema with an operator-controlled command such as
 `psql "$LEGAL_QA_DATABASE_URL" -f scripts/database/postgres_conversation_store.sql`.
 Do not commit database URLs, dumps, or generated local database files.
+
+`LEGAL_QA_AUTH_ENABLED=false` preserves the legacy unauthenticated conversation
+API behavior. `LEGAL_QA_AUTH_ENABLED=true` enables minimal anonymous session
+ownership for conversation routes. In that mode, clients must send the
+configured `LEGAL_QA_SESSION_HEADER` value, defaulting to
+`X-Legal-QA-Session`; the backend derives an opaque `owner_id` using
+`LEGAL_QA_SESSION_SECRET` and stores only that owner id. Set
+`LEGAL_QA_SESSION_SECRET` from a secret manager before enabling auth. Cross-owner
+conversation reads, updates, deletes, and message appends return 404. This is a
+session ownership layer, not full login/OAuth. Production should serve it only
+over HTTPS and should use managed secret storage.
 
 `AppSettings.from_env()` loads the project `.env` and then overlays process
 environment values, so an exported/container value has precedence. Tests can
@@ -911,6 +928,9 @@ LEGAL_QA_RATE_LIMIT_REQUESTS=10
 LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
 LEGAL_QA_CONVERSATION_STORE=memory
 LEGAL_QA_DATABASE_URL=
+LEGAL_QA_AUTH_ENABLED=false
+LEGAL_QA_SESSION_SECRET=
+LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session
 
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=google/gemini-2.5-flash

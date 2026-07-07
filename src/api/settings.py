@@ -67,6 +67,9 @@ class AppSettings(BaseSettings):
     legal_qa_rate_limit_window_seconds: int = Field(DEFAULT_RATE_LIMIT_WINDOW_SECONDS, gt=0)
     legal_qa_conversation_store: ConversationStoreMode = ConversationStoreMode.MEMORY
     legal_qa_database_url: SecretStr | None = Field(default=None, repr=False)
+    legal_qa_auth_enabled: bool = False
+    legal_qa_session_secret: SecretStr | None = Field(default=None, repr=False)
+    legal_qa_session_header: str = "X-Legal-QA-Session"
 
     @classmethod
     def from_env(
@@ -142,16 +145,43 @@ class AppSettings(BaseSettings):
                 env.get("LEGAL_QA_CONVERSATION_STORE")
             ),
             legal_qa_database_url=_secret_from_env(env, "LEGAL_QA_DATABASE_URL"),
+            legal_qa_auth_enabled=_parse_bool(
+                env.get("LEGAL_QA_AUTH_ENABLED"),
+                default=False,
+                name="LEGAL_QA_AUTH_ENABLED",
+            ),
+            legal_qa_session_secret=_secret_from_env(env, "LEGAL_QA_SESSION_SECRET"),
+            legal_qa_session_header=_session_header(env.get("LEGAL_QA_SESSION_HEADER")),
         )
+
+    def auth_configuration_issues(self) -> tuple[str, ...]:
+        """Return safe issue codes for session ownership configuration."""
+        if self.legal_qa_auth_enabled and self.legal_qa_session_secret is None:
+            return ("missing_session_secret",)
+        return ()
+
+    def validate_auth_configuration(self) -> None:
+        """Reject invalid session ownership configuration.
+
+        Raises:
+            RuntimeConfigurationError: If auth is enabled without required
+                secret material. The message contains safe issue codes only.
+        """
+        issues = self.auth_configuration_issues()
+        if issues:
+            raise RuntimeConfigurationError(
+                "Invalid session ownership configuration: " + ", ".join(issues)
+            )
 
     def conversation_configuration_issues(self) -> tuple[str, ...]:
         """Return safe issue codes for conversation storage configuration."""
+        issues = list(self.auth_configuration_issues())
         if (
             self.legal_qa_conversation_store == ConversationStoreMode.POSTGRES
             and self.legal_qa_database_url is None
         ):
-            return ("missing_database_url",)
-        return ()
+            issues.append("missing_database_url")
+        return tuple(issues)
 
     def validate_conversation_configuration(self) -> None:
         """Reject invalid conversation storage configuration.
@@ -268,6 +298,15 @@ def _conversation_store_mode(raw_value: str | None) -> ConversationStoreMode:
     except ValueError as exc:
         allowed = ", ".join(item.value for item in ConversationStoreMode)
         raise ValueError(f"LEGAL_QA_CONVERSATION_STORE must be one of: {allowed}") from exc
+
+
+def _session_header(raw_value: str | None) -> str:
+    value = _non_blank(raw_value)
+    if value is None:
+        return "X-Legal-QA-Session"
+    if any(character.isspace() for character in value):
+        raise ValueError("LEGAL_QA_SESSION_HEADER must not contain whitespace")
+    return value
 
 
 def _parse_bool(raw_value: str | None, *, default: bool, name: str) -> bool:

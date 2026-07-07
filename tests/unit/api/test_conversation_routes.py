@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from src.api.app import create_app
 from src.api.dependencies import get_conversation_service
+from src.api.settings import AppSettings
 from src.services.conversation_service import (
     ConversationService,
     InMemoryConversationRepository,
@@ -220,11 +221,122 @@ async def test_invalid_message_role_is_rejected(conversation_app: FastAPI) -> No
     assert response.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_auth_enabled_scopes_conversations_by_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _auth_conversation_app(monkeypatch)
+
+    async with _client(app) as client:
+        owner_a_create = await client.post(
+            "/api/v1/conversations",
+            json={"title": "Owner A"},
+            headers={"X-Legal-QA-Session": "owner-a"},
+        )
+        owner_a_id = owner_a_create.json()["id"]
+        owner_a_list = await client.get(
+            "/api/v1/conversations",
+            headers={"X-Legal-QA-Session": "owner-a"},
+        )
+        owner_b_list = await client.get(
+            "/api/v1/conversations",
+            headers={"X-Legal-QA-Session": "owner-b"},
+        )
+
+    assert owner_a_create.status_code == 201
+    assert [item["id"] for item in owner_a_list.json()] == [owner_a_id]
+    assert owner_b_list.status_code == 200
+    assert owner_b_list.json() == []
+
+
+@pytest.mark.asyncio
+async def test_auth_enabled_blocks_cross_owner_conversation_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _auth_conversation_app(monkeypatch)
+
+    async with _client(app) as client:
+        owner_a_create = await client.post(
+            "/api/v1/conversations",
+            json={"title": "Owner A"},
+            headers={"X-Legal-QA-Session": "owner-a"},
+        )
+        conversation_id = owner_a_create.json()["id"]
+        read_response = await client.get(
+            f"/api/v1/conversations/{conversation_id}",
+            headers={"X-Legal-QA-Session": "owner-b"},
+        )
+        patch_response = await client.patch(
+            f"/api/v1/conversations/{conversation_id}",
+            json={"title": "Owner B rename"},
+            headers={"X-Legal-QA-Session": "owner-b"},
+        )
+        message_response = await client.post(
+            f"/api/v1/conversations/{conversation_id}/messages",
+            json={"role": "user", "content": "Cross-owner message"},
+            headers={"X-Legal-QA-Session": "owner-b"},
+        )
+        delete_response = await client.delete(
+            f"/api/v1/conversations/{conversation_id}",
+            headers={"X-Legal-QA-Session": "owner-b"},
+        )
+        owner_a_read = await client.get(
+            f"/api/v1/conversations/{conversation_id}",
+            headers={"X-Legal-QA-Session": "owner-a"},
+        )
+
+    assert {
+        read_response.status_code,
+        patch_response.status_code,
+        message_response.status_code,
+        delete_response.status_code,
+    } == {404}
+    assert owner_a_read.status_code == 200
+    assert owner_a_read.json()["title"] == "Owner A"
+
+
+@pytest.mark.asyncio
+async def test_auth_enabled_rejects_missing_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _auth_conversation_app(monkeypatch)
+
+    async with _client(app) as client:
+        response = await client.get("/api/v1/conversations")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Missing session token."
+
+
 def _client(app: FastAPI) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app),
         base_url="http://testserver",
     )
+
+
+def _auth_conversation_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
+    timestamps = _timestamps()
+    identifiers = (f"id-{value}" for value in count(1))
+    service = ConversationService(
+        InMemoryConversationRepository(),
+        clock=lambda: next(timestamps),
+        id_factory=lambda: next(identifiers),
+    )
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_AUTH_ENABLED": "true",
+            "LEGAL_QA_SESSION_SECRET": "unit-test-secret",
+        }
+    )
+    monkeypatch.setattr("src.api.session_identity.get_settings", lambda: settings)
+    app = create_app()
+
+    async def get_test_conversation_service() -> ConversationService:
+        return service
+
+    app.dependency_overrides[get_conversation_service] = get_test_conversation_service
+    return app
 
 
 async def _create(client: httpx.AsyncClient, title: str) -> dict[str, object]:

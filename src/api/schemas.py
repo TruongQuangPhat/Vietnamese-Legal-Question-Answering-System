@@ -78,6 +78,7 @@ class Conversation(BaseModel):
     """Internal typed conversation record used by the conversation service."""
 
     id: str = Field(min_length=1)
+    owner_id: str | None = None
     title: str = Field(min_length=1, max_length=MAX_CONVERSATION_TITLE_LENGTH)
     created_at: AwareDatetime
     updated_at: AwareDatetime

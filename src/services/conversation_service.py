@@ -34,11 +34,11 @@ class ConversationRepository(Protocol):
         """Store and return a new conversation."""
         ...
 
-    def list(self) -> list[Conversation]:
+    def list(self, *, owner_id: str | None = None) -> list[Conversation]:
         """Return all stored conversations."""
         ...
 
-    def get(self, conversation_id: str) -> Conversation:
+    def get(self, conversation_id: str, *, owner_id: str | None = None) -> Conversation:
         """Return a conversation or raise `ConversationNotFoundError`."""
         ...
 
@@ -47,11 +47,12 @@ class ConversationRepository(Protocol):
         conversation_id: str,
         title: str,
         updated_at: datetime,
+        owner_id: str | None = None,
     ) -> Conversation:
         """Update a conversation title and timestamp atomically."""
         ...
 
-    def delete(self, conversation_id: str) -> None:
+    def delete(self, conversation_id: str, *, owner_id: str | None = None) -> None:
         """Delete a conversation or raise `ConversationNotFoundError`."""
         ...
 
@@ -60,6 +61,7 @@ class ConversationRepository(Protocol):
         conversation_id: str,
         message: ConversationMessage,
         updated_at: datetime,
+        owner_id: str | None = None,
     ) -> ConversationMessage:
         """Append and return a message while updating the conversation timestamp."""
         ...
@@ -82,27 +84,32 @@ class InMemoryConversationRepository:
             self._conversations[conversation.id] = conversation.model_copy(deep=True)
             return conversation.model_copy(deep=True)
 
-    def list(self) -> list[Conversation]:
+    def list(self, *, owner_id: str | None = None) -> list[Conversation]:
         """Return defensive copies of all conversations."""
         with self._lock:
             return [
-                conversation.model_copy(deep=True) for conversation in self._conversations.values()
+                conversation.model_copy(deep=True)
+                for conversation in self._conversations.values()
+                if _owner_matches(conversation, owner_id)
             ]
 
-    def get(self, conversation_id: str) -> Conversation:
+    def get(self, conversation_id: str, *, owner_id: str | None = None) -> Conversation:
         """Return a defensive copy of a conversation.
 
         Raises:
             ConversationNotFoundError: If the identifier is unknown.
         """
         with self._lock:
-            return self._require(conversation_id).model_copy(deep=True)
+            conversation = self._require(conversation_id)
+            _require_owner(conversation, owner_id)
+            return conversation.model_copy(deep=True)
 
     def update_title(
         self,
         conversation_id: str,
         title: str,
         updated_at: datetime,
+        owner_id: str | None = None,
     ) -> Conversation:
         """Update title and timestamp atomically.
 
@@ -111,6 +118,7 @@ class InMemoryConversationRepository:
         """
         with self._lock:
             conversation = self._require(conversation_id)
+            _require_owner(conversation, owner_id)
             updated = conversation.model_copy(
                 update={"title": title, "updated_at": updated_at},
                 deep=True,
@@ -118,14 +126,15 @@ class InMemoryConversationRepository:
             self._conversations[conversation_id] = updated
             return updated.model_copy(deep=True)
 
-    def delete(self, conversation_id: str) -> None:
+    def delete(self, conversation_id: str, *, owner_id: str | None = None) -> None:
         """Delete a conversation.
 
         Raises:
             ConversationNotFoundError: If the identifier is unknown.
         """
         with self._lock:
-            self._require(conversation_id)
+            conversation = self._require(conversation_id)
+            _require_owner(conversation, owner_id)
             del self._conversations[conversation_id]
 
     def add_message(
@@ -133,6 +142,7 @@ class InMemoryConversationRepository:
         conversation_id: str,
         message: ConversationMessage,
         updated_at: datetime,
+        owner_id: str | None = None,
     ) -> ConversationMessage:
         """Append a message and update the parent timestamp atomically.
 
@@ -141,6 +151,7 @@ class InMemoryConversationRepository:
         """
         with self._lock:
             conversation = self._require(conversation_id)
+            _require_owner(conversation, owner_id)
             stored_message = message.model_copy(deep=True)
             updated = conversation.model_copy(
                 update={
@@ -173,11 +184,17 @@ class ConversationService:
         self._clock = clock or _utc_now
         self._id_factory = id_factory or _new_id
 
-    def create(self, request: ConversationCreateRequest) -> ConversationSummary:
+    def create(
+        self,
+        request: ConversationCreateRequest,
+        *,
+        owner_id: str | None = None,
+    ) -> ConversationSummary:
         """Create a conversation and return its summary."""
         timestamp = self._timestamp()
         conversation = Conversation(
             id=self._id_factory(),
+            owner_id=owner_id,
             title=request.title or DEFAULT_CONVERSATION_TITLE,
             created_at=timestamp,
             updated_at=timestamp,
@@ -185,27 +202,29 @@ class ConversationService:
         )
         return _to_summary(self._repository.create(conversation))
 
-    def list(self) -> list[ConversationSummary]:
+    def list(self, *, owner_id: str | None = None) -> list[ConversationSummary]:
         """Return summaries sorted by most recent update first."""
         conversations = sorted(
-            self._repository.list(),
+            self._repository.list(owner_id=owner_id),
             key=lambda conversation: conversation.updated_at,
             reverse=True,
         )
         return [_to_summary(conversation) for conversation in conversations]
 
-    def get(self, conversation_id: str) -> ConversationDetail:
+    def get(self, conversation_id: str, *, owner_id: str | None = None) -> ConversationDetail:
         """Return full conversation detail.
 
         Raises:
             ConversationNotFoundError: If the identifier is unknown.
         """
-        return _to_detail(self._repository.get(conversation_id))
+        return _to_detail(self._repository.get(conversation_id, owner_id=owner_id))
 
     def rename(
         self,
         conversation_id: str,
         request: ConversationUpdateRequest,
+        *,
+        owner_id: str | None = None,
     ) -> ConversationSummary:
         """Rename a conversation and return its updated summary.
 
@@ -216,21 +235,24 @@ class ConversationService:
             conversation_id,
             request.title,
             self._timestamp(),
+            owner_id=owner_id,
         )
         return _to_summary(conversation)
 
-    def delete(self, conversation_id: str) -> None:
+    def delete(self, conversation_id: str, *, owner_id: str | None = None) -> None:
         """Delete a conversation.
 
         Raises:
             ConversationNotFoundError: If the identifier is unknown.
         """
-        self._repository.delete(conversation_id)
+        self._repository.delete(conversation_id, owner_id=owner_id)
 
     def add_message(
         self,
         conversation_id: str,
         request: ConversationMessageCreateRequest,
+        *,
+        owner_id: str | None = None,
     ) -> ConversationMessage:
         """Store a message without invoking retrieval or generation.
 
@@ -244,7 +266,12 @@ class ConversationService:
             content=request.content,
             created_at=timestamp,
         )
-        return self._repository.add_message(conversation_id, message, timestamp)
+        return self._repository.add_message(
+            conversation_id,
+            message,
+            timestamp,
+            owner_id=owner_id,
+        )
 
     def _timestamp(self) -> datetime:
         timestamp = self._clock()
@@ -271,6 +298,15 @@ def _to_detail(conversation: Conversation) -> ConversationDetail:
         updated_at=conversation.updated_at,
         messages=conversation.messages,
     )
+
+
+def _owner_matches(conversation: Conversation, owner_id: str | None) -> bool:
+    return owner_id is None or conversation.owner_id == owner_id
+
+
+def _require_owner(conversation: Conversation, owner_id: str | None) -> None:
+    if not _owner_matches(conversation, owner_id):
+        raise ConversationNotFoundError(conversation.id)
 
 
 def _utc_now() -> datetime:

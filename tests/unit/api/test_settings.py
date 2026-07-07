@@ -30,6 +30,9 @@ REAL_SERVICE_TEST_ENV_VARS = (
     "OPENROUTER_MODEL",
     "LEGAL_QA_CONVERSATION_STORE",
     "LEGAL_QA_DATABASE_URL",
+    "LEGAL_QA_AUTH_ENABLED",
+    "LEGAL_QA_SESSION_SECRET",
+    "LEGAL_QA_SESSION_HEADER",
 )
 
 
@@ -45,6 +48,9 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.legal_qa_rate_limit_window_seconds == 60
     assert settings.legal_qa_conversation_store == ConversationStoreMode.MEMORY
     assert settings.legal_qa_database_url is None
+    assert settings.legal_qa_auth_enabled is False
+    assert settings.legal_qa_session_secret is None
+    assert settings.legal_qa_session_header == "X-Legal-QA-Session"
     assert settings.runtime_configuration_issues() == ()
 
 
@@ -198,6 +204,45 @@ def test_settings_postgres_conversation_store_rejects_blank_database_url() -> No
 def test_settings_reject_invalid_conversation_store() -> None:
     with pytest.raises(ValueError, match="LEGAL_QA_CONVERSATION_STORE"):
         AppSettings.from_env({"LEGAL_QA_CONVERSATION_STORE": "sqlite"})
+
+
+def test_settings_auth_disabled_does_not_require_session_secret() -> None:
+    settings = AppSettings.from_env({"LEGAL_QA_AUTH_ENABLED": "false"})
+
+    assert settings.legal_qa_auth_enabled is False
+    assert settings.auth_configuration_issues() == ()
+    assert settings.conversation_configuration_issues() == ()
+
+
+def test_settings_auth_enabled_requires_session_secret() -> None:
+    settings = AppSettings.from_env({"LEGAL_QA_AUTH_ENABLED": "true"})
+
+    assert settings.auth_configuration_issues() == ("missing_session_secret",)
+    assert settings.conversation_configuration_issues() == ("missing_session_secret",)
+    with pytest.raises(RuntimeConfigurationError, match="missing_session_secret"):
+        settings.validate_auth_configuration()
+
+
+def test_settings_parse_session_ownership_configuration() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_AUTH_ENABLED": "true",
+            "LEGAL_QA_SESSION_SECRET": "test-secret",
+            "LEGAL_QA_SESSION_HEADER": "X-Test-Session",
+        }
+    )
+
+    assert settings.legal_qa_auth_enabled is True
+    assert settings.legal_qa_session_secret is not None
+    assert settings.legal_qa_session_secret.get_secret_value() == "test-secret"
+    assert settings.legal_qa_session_header == "X-Test-Session"
+    assert settings.auth_configuration_issues() == ()
+    assert "test-secret" not in repr(settings)
+
+
+def test_settings_reject_invalid_session_header() -> None:
+    with pytest.raises(ValueError, match="LEGAL_QA_SESSION_HEADER"):
+        AppSettings.from_env({"LEGAL_QA_SESSION_HEADER": "X Bad Header"})
 
 
 @pytest.mark.parametrize(
