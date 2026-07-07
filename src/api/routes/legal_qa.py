@@ -9,6 +9,7 @@ import anyio
 from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_legal_qa_service
+from src.api.rate_limit import enforce_ask_rate_limit
 from src.api.schemas import LegalQADecision, LegalQARequest, LegalQAResponse, ResponseMetadataDTO
 from src.services.legal_qa_api_service import LegalQAService
 
@@ -21,6 +22,7 @@ SAFE_ERROR_ANSWER = "Không thể xử lý yêu cầu lúc này. Vui lòng thử
 @router.post("/ask", response_model=LegalQAResponse)
 async def ask_legal_question(
     request: LegalQARequest,
+    _: None = Depends(enforce_ask_rate_limit),
     service: LegalQAService = Depends(get_legal_qa_service),
 ) -> LegalQAResponse:
     """Answer a legal question through the API service boundary.

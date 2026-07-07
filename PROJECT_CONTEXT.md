@@ -338,6 +338,7 @@ The Legal QA product MVP is complete for fake-mode local demo usage:
   `fallback`;
 - fake/real Legal QA service mode boundary;
 - runtime settings, CORS, request safety, and safe logging;
+- optional in-process rate limiting for `POST /api/v1/legal-qa/ask`;
 - Next.js frontend under `apps/frontend`;
 - Vietnamese ask UI with answer, citation, evidence, and metadata rendering;
 - Makefile local development commands;
@@ -410,6 +411,14 @@ Render Free has 512 MB RAM. Real `POST /api/v1/legal-qa/ask` is known to
 terminate out of memory when BGE-M3, Torch, and Transformers load. This is a
 runtime resource limit, not an infrastructure deployment failure. Keep
 production in real mode and do not repeatedly call `/ask` on Render Free.
+
+`POST /api/v1/legal-qa/ask` supports optional in-process fixed-window rate
+limiting via `LEGAL_QA_RATE_LIMIT_ENABLED`,
+`LEGAL_QA_RATE_LIMIT_REQUESTS`, and
+`LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS`. Health and readiness are not rate
+limited. This is a single-process abuse control; a future multi-instance
+deployment should use shared infrastructure such as an API gateway, WAF, or
+Redis-backed limiter.
 
 Final offline deployment validation passed:
 

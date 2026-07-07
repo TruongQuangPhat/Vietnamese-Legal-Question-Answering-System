@@ -73,6 +73,9 @@ LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
 LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
 LEGAL_QA_DEVICE=cpu
 LEGAL_QA_MODEL=google/gemini-2.5-flash
+LEGAL_QA_RATE_LIMIT_ENABLED=true
+LEGAL_QA_RATE_LIMIT_REQUESTS=10
+LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
 
 LEGAL_QA_CHUNKS_URL=https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
 LEGAL_QA_CHUNKS_SHA256=95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
@@ -193,7 +196,7 @@ connectivity, or real multi-turn quality.
 | Frontend API URL | One public base URL is used by both clients | It is embedded during `next build`; localhost fallback is unsafe for an omitted production setting |
 | Containers | Fake-mode images and Compose stack build the MVP | Committed stack does not package or configure real mode |
 | Conversation storage | Process-local in-memory repository | Not durable, not shared across workers, and not user-specific |
-| API security | Input bounds and sanitized errors exist | Authentication, authorization, rate limiting, trusted proxy policy, and abuse controls are not implemented |
+| API security | Input bounds, sanitized errors, and optional in-process `/api/v1/legal-qa/ask` rate limiting exist | Authentication, authorization, trusted proxy policy, and distributed abuse controls are not implemented |
 | Observability | Safe completion/failure metadata is logged | Production logging configuration, metrics, tracing, and alerting are not established |
 
 ## Runtime configuration
@@ -216,6 +219,9 @@ LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
 LEGAL_QA_QDRANT_URL=http://localhost:6333
 LEGAL_QA_DEVICE=cpu
 LEGAL_QA_MODEL=google/gemini-2.5-flash
+LEGAL_QA_RATE_LIMIT_ENABLED=false
+LEGAL_QA_RATE_LIMIT_REQUESTS=10
+LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
 
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
@@ -240,6 +246,16 @@ Real mode requires, at minimum:
 `LEGAL_QA_MODEL` overrides the API runtime generation model.
 `OPENROUTER_MODEL` is the provider-level fallback. `LEGAL_QA_DEVICE` selects
 the query embedding device, not the LLM.
+
+`LEGAL_QA_RATE_LIMIT_ENABLED=true` enables a lightweight in-process fixed-window
+limiter on `POST /api/v1/legal-qa/ask`. `LEGAL_QA_RATE_LIMIT_REQUESTS` sets the
+number of allowed requests per client key, and
+`LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS` sets the window size. Exceeded requests
+return HTTP 429 with a `Retry-After` header and do not call the Legal QA
+workflow. `/health` and `/api/v1/readiness` are not rate limited. This is
+appropriate for the current single-process Render deployment; a future
+multi-instance deployment should use shared infrastructure such as an API
+gateway, WAF, or Redis-backed limiter.
 
 `AppSettings.from_env()` loads the project `.env` and then overlays process
 environment values, so an exported/container value has precedence. Tests can
@@ -868,6 +884,9 @@ LEGAL_QA_CHUNKS_SHA256=95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541
 LEGAL_QA_CHUNKS_PATH=data/processed/legal_chunks.jsonl
 LEGAL_QA_DEVICE=cpu
 LEGAL_QA_MODEL=google/gemini-2.5-flash
+LEGAL_QA_RATE_LIMIT_ENABLED=true
+LEGAL_QA_RATE_LIMIT_REQUESTS=10
+LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
 
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=google/gemini-2.5-flash
@@ -1033,9 +1052,9 @@ not be exposed in normal metadata or logs.
   API keys.
 - Qdrant should be private, authenticated where supported, and read-only from
   the API workload.
-- Public deployment still needs authentication/authorization decisions, rate
-  limiting, request/body limits at the proxy, trusted proxy/header handling,
-  TLS termination, and dependency/resource limits.
+- Public deployment still needs authentication/authorization decisions,
+  distributed abuse controls, request/body limits at the proxy, trusted
+  proxy/header handling, TLS termination, and dependency/resource limits.
 - Swagger/OpenAPI exposure and error/log retention require an explicit
   deployment policy.
 - A valid citation ID is necessary but does not prove semantic legal
