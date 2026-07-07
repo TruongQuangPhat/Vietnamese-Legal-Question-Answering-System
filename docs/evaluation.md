@@ -671,6 +671,12 @@ Exit codes:
 - `1`: validation completed but found benchmark errors.
 - `2`: command could not run because inputs, config, or file I/O failed.
 
+Evaluation runners that use Qdrant accept an explicit `--url` and
+`--collection-name`. They also resolve optional `QDRANT_API_KEY` from the
+private environment for authenticated Qdrant Cloud. Leave `QDRANT_API_KEY`
+unset or blank for unauthenticated local Qdrant. Never pass the key as a CLI
+argument, print it, or write it to reports.
+
 ## Metrics Contract
 
 Core retrieval and strict generation metrics are implemented for the frozen

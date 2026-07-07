@@ -23,8 +23,9 @@ from src.evaluation.benchmark.strict_generation_evaluation import (
     run_strict_generation_cases,
     verify_coverage_retrieval_manifest,
 )
+from src.evaluation.qdrant import build_evaluation_qdrant_client
 from src.indexing.embedding_model import BgeM3EmbeddingModel, EmbeddingModelError
-from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
+from src.indexing.qdrant_collection import QdrantCollectionError
 from src.retrieval.coverage_aware import (
     CoverageAwareQuotaRetriever,
     CoverageAwareRetrievalError,
@@ -132,7 +133,7 @@ async def run_command(args: argparse.Namespace) -> int:
         url = args.url or retrieval_config.qdrant.url
         device = args.device or retrieval_config.embedding.device
 
-        client = build_qdrant_client(
+        client = build_evaluation_qdrant_client(
             url=url,
             timeout_seconds=retrieval_config.qdrant.timeout_seconds,
         )

@@ -39,8 +39,9 @@ from src.evaluation.benchmark.reranking_ablation import (
     run_final_reranked_report,
 )
 from src.evaluation.benchmark.retrieval_baseline import aggregate_case_metrics, build_breakdowns
+from src.evaluation.qdrant import build_evaluation_qdrant_client
 from src.indexing.embedding_model import BgeM3EmbeddingModel, EmbeddingModelError
-from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
+from src.indexing.qdrant_collection import QdrantCollectionError
 from src.retrieval.dense_retriever import DenseRetriever, DenseRetrieverError
 from src.retrieval.reranker import (
     NativeTransformersReranker,
@@ -122,7 +123,7 @@ async def run_command(argv: list[str] | None = None) -> int:
         retrieval_config = load_retrieval_config(args.config)
         collection_name = args.collection_name or retrieval_config.qdrant.collection_name
         url = args.url or retrieval_config.qdrant.url
-        client = build_qdrant_client(
+        client = build_evaluation_qdrant_client(
             url=url,
             timeout_seconds=retrieval_config.qdrant.timeout_seconds,
         )

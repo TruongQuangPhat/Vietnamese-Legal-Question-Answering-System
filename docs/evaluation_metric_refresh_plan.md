@@ -111,19 +111,14 @@ The real strict generation refresh requires:
   evaluation. Render Free is not suitable.
 - A read-only Qdrant collection containing `vnlaw_chunks_bgem3_v1_full` with
   40,389 points and dense vector name `dense`.
+- `QDRANT_API_KEY` in the local private environment when using authenticated
+  Qdrant Cloud. Leave it unset or blank for unauthenticated local Qdrant.
 - `OPENROUTER_API_KEY` in the local private environment for real generation.
 
-Current runner caveat: `scripts/evaluation/run_strict_generation_evaluation.py`
-and `scripts/evaluation/run_coverage_aware_hybrid_retrieval.py` accept `--url`
-and `--collection-name`, but the inspected code does not pass `QDRANT_API_KEY`
-into `build_qdrant_client()`. Therefore authenticated Qdrant Cloud should not
-be assumed to work for this refresh until that path is tested or patched. The
-safe current options are:
-
-1. run against an unauthenticated local Qdrant instance restored with the
-   existing collection; or
-2. first add a small evaluation-CLI credential fix so read-only Qdrant Cloud can
-   use `QDRANT_API_KEY`.
+Evaluation runners that construct Qdrant clients now resolve `QDRANT_API_KEY`
+from the environment and pass it to the shared Qdrant client factory. The value
+must never be echoed, checked into Git, included in command-line arguments, or
+written to reports.
 
 Do not use the deployed Render `/api/v1/legal-qa/ask` endpoint for benchmark
 evaluation.
@@ -140,6 +135,8 @@ Before a real run:
 - Existing official report directories are not selected as output directories.
 - The output directory does not exist before the run.
 - The selected Qdrant endpoint is read-only for evaluation purposes.
+- When using Qdrant Cloud, `QDRANT_API_KEY` is set in a private shell and shell
+  tracing such as `set -x` is disabled.
 - Qdrant point count and vector schema match the manifest.
 - `OPENROUTER_API_KEY` is present in the private shell.
 - Real LLM spend and latency are expected and approved.
@@ -185,8 +182,8 @@ env UV_CACHE_DIR=/tmp/vnlaw-uv-cache \
 ```
 
 Use `--url http://localhost:6333` only when a compatible local read-only Qdrant
-instance is available. For Qdrant Cloud, first ensure evaluation CLIs pass
-`QDRANT_API_KEY` or run a separately approved credential-support patch.
+instance is available. For Qdrant Cloud, use the Cloud endpoint in `--url` and
+provide `QDRANT_API_KEY` through the private environment, not as a CLI argument.
 
 If retrieval must be refreshed as well, use a separate unique output directory
 and comparison directory before the strict generation run:
@@ -254,8 +251,9 @@ been reviewed.
 - Held-out cases are reporting-only and must not drive tuning.
 - No qualified human legal review of final generated claims is complete.
 - LLM output may vary despite temperature `0.0`.
-- The current evaluation runner may need Qdrant credential support before
-  authenticated Qdrant Cloud can be used directly.
+- Authenticated Qdrant Cloud access depends on `QDRANT_API_KEY` being available
+  in the private environment; the value must not appear in logs, docs, or
+  artifacts.
 - API rate limiting, durable conversations, and session ownership are not
   benchmarked by this single-turn offline strict generation flow.
 - Do not claim refreshed official metrics until the real benchmark command has

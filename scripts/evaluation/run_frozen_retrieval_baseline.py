@@ -27,9 +27,10 @@ from src.evaluation.benchmark.retrieval_baseline import (
     build_breakdowns,
     evaluate_case_retrieval,
 )
+from src.evaluation.qdrant import build_evaluation_qdrant_client
 from src.indexing.embedding_model import BgeM3EmbeddingModel, EmbeddingModelError
 from src.indexing.official_artifacts import write_json_atomic
-from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
+from src.indexing.qdrant_collection import QdrantCollectionError
 from src.retrieval.dense_retriever import DenseRetriever, DenseRetrieverError
 from src.retrieval.workflows.common import DEFAULT_CONFIG, load_retrieval_config
 from src.services.retrieval_service import RetrievalService
@@ -108,7 +109,7 @@ async def run_baseline(argv: list[str] | None = None) -> int:
         url = args.url or retrieval_config.qdrant.url
         device = args.device or retrieval_config.embedding.device
 
-        client = build_qdrant_client(
+        client = build_evaluation_qdrant_client(
             url=url,
             timeout_seconds=retrieval_config.qdrant.timeout_seconds,
         )
