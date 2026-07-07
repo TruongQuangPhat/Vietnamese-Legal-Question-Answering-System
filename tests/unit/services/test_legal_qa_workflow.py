@@ -111,6 +111,49 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     )
 
 
+def test_real_workflow_adapter_keeps_short_standalone_query_for_retrieval() -> None:
+    retriever = StaticRetriever(_retrieval_result([_retrieved_chunk()]))
+    llm_client = MockLLMClient(
+        [
+            LLMResponse(
+                text="Câu trả lời có căn cứ [E1].",
+                model="google/gemini-2.5-flash",
+                provider="openrouter",
+                latency_ms=12.0,
+                finish_reason="stop",
+            )
+        ]
+    )
+    workflow = RealLegalQAWorkflow(
+        retriever=retriever,
+        llm_client=llm_client,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+    )
+    context = LegalQAContextPreparer().prepare(
+        LegalQARequest(
+            question="Điều kiện kết hôn là gì?",
+            conversation_context=[
+                {"role": "user", "content": "Bảo hiểm y tế trẻ em?"},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+        )
+    )
+
+    response = workflow.run(
+        LegalQAWorkflowRequest(
+            request_id="request-1",
+            question="Điều kiện kết hôn là gì?",
+            top_k=10,
+            context=context,
+        )
+    )
+
+    assert response.decision == "answered"
+    assert context.follow_up_detected is False
+    assert context.context_used is False
+    assert retriever.calls[0]["query"] == "Điều kiện kết hôn là gì?"
+
+
 def test_real_workflow_adapter_maps_answered_with_caution_result() -> None:
     async def caution_runner(**_: Any) -> RagAnswerResult:
         return RagAnswerResult(

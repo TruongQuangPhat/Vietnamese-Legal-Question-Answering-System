@@ -97,6 +97,56 @@ def test_service_passes_prepared_context_without_rewriting_question() -> None:
     assert response.metadata.retrieval_question_prepared is True
 
 
+def test_service_keeps_short_independent_question_standalone_with_prior_context() -> None:
+    workflow = StaticLegalQAWorkflow(_answered_result())
+    service = LegalQAService(workflow=workflow)
+
+    response = service.answer(
+        LegalQARequest(
+            question="Nghỉ phép năm bao nhiêu ngày?",
+            conversation_context=[
+                {"role": "user", "content": "Điều kiện kết hôn là gì?"},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+        )
+    )
+
+    workflow_request = workflow.requests[0]
+    assert response.decision == "answered"
+    assert workflow_request.context is not None
+    assert workflow_request.context.follow_up_detected is False
+    assert workflow_request.context.context_used is False
+    assert workflow_request.context.retrieval_question == "Nghỉ phép năm bao nhiêu ngày?"
+    assert response.metadata.follow_up_detected is False
+    assert response.metadata.retrieval_question_prepared is False
+
+
+def test_service_uses_context_for_true_follow_up_question() -> None:
+    workflow = StaticLegalQAWorkflow(_answered_result())
+    service = LegalQAService(workflow=workflow)
+    prior_question = "Nghỉ phép năm bao nhiêu ngày?"
+    current_question = "Vậy có được nghỉ thêm không?"
+
+    response = service.answer(
+        LegalQARequest(
+            question=current_question,
+            conversation_context=[
+                {"role": "user", "content": prior_question},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+        )
+    )
+
+    workflow_request = workflow.requests[0]
+    assert response.decision == "answered"
+    assert workflow_request.context is not None
+    assert workflow_request.context.follow_up_detected is True
+    assert workflow_request.context.context_used is True
+    assert workflow_request.context.retrieval_question == f"{prior_question} {current_question}"
+    assert response.metadata.follow_up_detected is True
+    assert response.metadata.retrieval_question_prepared is True
+
+
 def test_fake_answer_and_evidence_are_stable_with_conversation_context() -> None:
     service = LegalQAService()
     question = "Vậy trường hợp này thì sao?"
