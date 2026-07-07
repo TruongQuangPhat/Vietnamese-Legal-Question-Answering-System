@@ -40,6 +40,27 @@ def test_service_maps_answered_workflow_result_to_response() -> None:
     assert workflow.requests[0].top_k == 10
 
 
+def test_service_maps_answered_with_caution_workflow_result_to_response() -> None:
+    workflow = StaticLegalQAWorkflow(
+        LegalQAWorkflowResult(
+            decision=LegalQAWorkflowDecision.ANSWERED_WITH_CAUTION,
+            answer="Câu trả lời thận trọng dựa trên bằng chứng [E1].",
+            citations=[_workflow_citation()],
+            evidence=[_workflow_evidence()],
+            warnings=["all_selected_evidence_caution"],
+            metadata=LegalQAWorkflowMetadata(model="fake-workflow", latency_ms=7),
+        )
+    )
+    service = LegalQAService(workflow=workflow)
+
+    response = service.answer(LegalQARequest(question="Nghỉ phép năm bao nhiêu ngày?"))
+
+    assert response.decision == "answered_with_caution"
+    assert response.citations[0].evidence_id == "E1"
+    assert response.evidence[0].score == 0.91
+    assert response.warnings == ["all_selected_evidence_caution"]
+
+
 def test_service_passes_prepared_context_without_rewriting_question() -> None:
     workflow = StaticLegalQAWorkflow(_answered_result())
     service = LegalQAService(workflow=workflow)

@@ -79,7 +79,11 @@ async def run_naive_rag(
         expected_targets=expected_targets,
     )
 
-    if selection_result.decision != AnswerabilityDecision.ANSWER_ALLOWED:
+    generation_allowed = {
+        AnswerabilityDecision.ANSWER_ALLOWED,
+        AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED,
+    }
+    if selection_result.decision not in generation_allowed:
         return build_fallback_result(
             query=query,
             decision=selection_result.decision,
@@ -136,11 +140,11 @@ async def run_naive_rag(
 
     return RagAnswerResult(
         query=query,
-        decision=AnswerabilityDecision.ANSWER_ALLOWED,
+        decision=selection_result.decision,
         answer=llm_response.text,
         citations=citation_check.valid_citations,
         used_evidence=used_evidence_from_prompt(prompt.evidence),
-        fallback_reasons=[],
+        fallback_reasons=[reason.code.value for reason in selection_result.fallback_reasons],
         selection_warnings=[warning.code.value for warning in selection_result.warnings],
         citation_issues=citation_check.issues,
         retrieval_metadata=retrieval_metadata,

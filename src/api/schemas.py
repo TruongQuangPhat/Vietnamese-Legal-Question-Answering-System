@@ -18,6 +18,7 @@ class LegalQADecision(StrEnum):
     """Legal QA decision values returned by the API."""
 
     ANSWERED = "answered"
+    ANSWERED_WITH_CAUTION = "answered_with_caution"
     FALLBACK = "fallback"
     ERROR = "error"
 

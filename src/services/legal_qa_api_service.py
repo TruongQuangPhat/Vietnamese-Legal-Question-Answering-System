@@ -25,6 +25,7 @@ class LegalQAWorkflowDecision(StrEnum):
     """Internal decision values returned by a legal QA workflow."""
 
     ANSWERED = "answered"
+    ANSWERED_WITH_CAUTION = "answered_with_caution"
     FALLBACK = "fallback"
 
 
@@ -270,9 +271,14 @@ def map_workflow_result_to_response(
             metadata=_map_metadata(result.metadata),
         )
 
+    decision = (
+        LegalQADecision.ANSWERED_WITH_CAUTION
+        if result.decision == LegalQAWorkflowDecision.ANSWERED_WITH_CAUTION
+        else LegalQADecision.ANSWERED
+    )
     return LegalQAResponse(
         request_id=request_id,
-        decision=LegalQADecision.ANSWERED,
+        decision=decision,
         answer=result.answer,
         citations=[
             CitationDTO(

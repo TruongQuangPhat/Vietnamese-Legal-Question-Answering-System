@@ -1,4 +1,8 @@
-export type LegalQADecision = "answered" | "fallback" | "error";
+export type LegalQADecision =
+  | "answered"
+  | "answered_with_caution"
+  | "fallback"
+  | "error";
 
 export interface LegalQAContextMessage {
   role: "user" | "assistant";

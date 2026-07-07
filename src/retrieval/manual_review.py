@@ -226,11 +226,7 @@ def _render_case(
         f"- Priority flags: {', '.join(priority_flags) or 'none'}",
         f"- Fallback reasons: {', '.join(case.fallback_reasons) or 'none'}",
         "- Preliminary reviewer verdict: `"
-        + (
-            "not_applicable_for_fallback"
-            if case.decision != AnswerabilityDecision.ANSWER_ALLOWED
-            else "unchecked"
-        )
+        + ("not_applicable_for_fallback" if not _is_answer_decision(case.decision) else "unchecked")
         + "`",
         "",
         "### Selection Warnings",
@@ -258,7 +254,7 @@ def _render_case(
             "",
         ]
     )
-    if case.decision == AnswerabilityDecision.ANSWER_ALLOWED:
+    if _is_answer_decision(case.decision):
         lines.extend(_render_claim_checklist(case.answer_preview))
     else:
         lines.extend(_render_fallback_checklist(case))
@@ -342,7 +338,7 @@ def _table_cell(text: str) -> str:
 
 
 def _generated_case_count(report: GenerationEvalReport) -> int:
-    return sum(case.decision == AnswerabilityDecision.ANSWER_ALLOWED for case in report.cases)
+    return sum(_is_answer_decision(case.decision) for case in report.cases)
 
 
 def _fallback_case_count(report: GenerationEvalReport) -> int:
@@ -406,6 +402,13 @@ def _citation_summary(preview: EvidencePreview) -> str | None:
     return ", ".join(values) if values else None
 
 
+def _is_answer_decision(decision: AnswerabilityDecision) -> bool:
+    return decision in {
+        AnswerabilityDecision.ANSWER_ALLOWED,
+        AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED,
+    }
+
+
 def _priority_flags(
     case: GenerationEvalCaseResult,
     *,
@@ -416,10 +419,10 @@ def _priority_flags(
         flags.append("all-caution evidence")
     if case.manual_review_required:
         flags.append("manual-review required")
-    if case.decision != AnswerabilityDecision.ANSWER_ALLOWED:
+    if not _is_answer_decision(case.decision):
         flags.append("fallback case")
     if case.evidence_preview_missing_count or (
-        case.decision == AnswerabilityDecision.ANSWER_ALLOWED and not case.evidence_previews
+        _is_answer_decision(case.decision) and not case.evidence_previews
     ):
         flags.append("missing evidence preview")
     if answer_truncated:
@@ -428,9 +431,7 @@ def _priority_flags(
 
 
 def _review_status(report: GenerationEvalReport) -> str:
-    generated_cases = [
-        case for case in report.cases if case.decision == AnswerabilityDecision.ANSWER_ALLOWED
-    ]
+    generated_cases = [case for case in report.cases if _is_answer_decision(case.decision)]
     if (
         generated_cases
         and report.evidence_preview_missing_count == 0

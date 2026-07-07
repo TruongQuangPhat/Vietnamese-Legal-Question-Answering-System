@@ -26,6 +26,7 @@ class AnswerabilityDecision(StrEnum):
     """Evidence-gate decision for future answer generation."""
 
     ANSWER_ALLOWED = "answer_allowed"
+    ANSWER_WITH_CAUTION_ALLOWED = "answer_with_caution_allowed"
     FALLBACK_REQUIRED = "fallback_required"
     NEEDS_REVIEW = "needs_review"
 
@@ -92,6 +93,7 @@ class EvidenceSelectionConfig(BaseModel):
     require_child_text: bool = True
     fallback_on_parent_context_only: bool = True
     fallback_on_all_evidence_caution: bool = False
+    allow_answer_with_caution: bool = True
     needs_review_on_all_evidence_caution: bool = True
     max_unsafe_packets: int = Field(0, ge=0)
     include_auxiliary_context_in_rendered_output: bool = True
@@ -354,6 +356,8 @@ def select_evidence_for_answer(
             pass
         elif settings.fallback_on_all_evidence_caution:
             fallback_reasons.append(reason)
+        elif settings.allow_answer_with_caution:
+            fallback_reasons.append(reason)
         elif settings.needs_review_on_all_evidence_caution:
             fallback_reasons.append(reason)
 
@@ -549,8 +553,12 @@ def _decision_from_reasons(
         hard_fallback_codes.add(FallbackReasonCode.ALL_SELECTED_EVIDENCE_CAUTION)
     if fallback_codes & hard_fallback_codes:
         return AnswerabilityDecision.FALLBACK_REQUIRED
+    if all_caution and settings.allow_answer_with_caution:
+        return AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED
     if all_caution and settings.needs_review_on_all_evidence_caution:
         return AnswerabilityDecision.NEEDS_REVIEW
+    if settings.allow_answer_with_caution:
+        return AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED
     return AnswerabilityDecision.NEEDS_REVIEW
 
 

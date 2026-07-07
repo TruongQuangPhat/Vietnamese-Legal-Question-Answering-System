@@ -116,6 +116,7 @@ class SelectionSmokeAggregate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     answer_allowed_count: int = Field(0, ge=0)
+    answer_with_caution_allowed_count: int = Field(0, ge=0)
     fallback_required_count: int = Field(0, ge=0)
     needs_review_count: int = Field(0, ge=0)
     decision_pass_count: int = Field(0, ge=0)
@@ -285,6 +286,9 @@ async def run_selection_smoke_suite(
         error_count=aggregate.error_count,
         aggregate_decision_counts={
             AnswerabilityDecision.ANSWER_ALLOWED.value: aggregate.answer_allowed_count,
+            AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED.value: (
+                aggregate.answer_with_caution_allowed_count
+            ),
             AnswerabilityDecision.FALLBACK_REQUIRED.value: aggregate.fallback_required_count,
             AnswerabilityDecision.NEEDS_REVIEW.value: aggregate.needs_review_count,
         },
@@ -306,6 +310,11 @@ def aggregate_smoke_results(
     return SelectionSmokeAggregate(
         answer_allowed_count=sum(
             1 for item in results if item.decision == AnswerabilityDecision.ANSWER_ALLOWED
+        ),
+        answer_with_caution_allowed_count=sum(
+            1
+            for item in results
+            if item.decision == AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED
         ),
         fallback_required_count=sum(
             1 for item in results if item.decision == AnswerabilityDecision.FALLBACK_REQUIRED

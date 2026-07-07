@@ -8,7 +8,12 @@ import pytest
 from src.api.dependencies import clear_legal_qa_service_cache, get_legal_qa_service
 from src.api.schemas import LegalQARequest
 from src.api.settings import get_settings
-from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, RagCitation
+from src.retrieval.generation import (
+    FALLBACK_ANSWER_VI,
+    RagAnswerResult,
+    RagCitation,
+    UsedEvidence,
+)
 from src.retrieval.llm_client import LLMResponse, MockLLMClient
 from src.retrieval.models import RetrievalResult, RetrievedChunk
 from src.retrieval.selection import AnswerabilityDecision
@@ -97,12 +102,76 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     assert response.citations[0].citation == "Khoản 1 Điều 35 Bộ luật Lao động 2019"
     assert str(response.citations[0].source_url) == ("https://thuvienphapluat.vn/van-ban/lao-dong/")
     assert response.evidence[0].text == "Người lao động có quyền đơn phương chấm dứt."
+    assert response.evidence[0].score == 0.95
     assert response.metadata.retrieval_strategy == "coverage_aware_quota"
     assert response.metadata.model == "google/gemini-2.5-flash"
     assert retriever.calls[0]["query"] == (
         "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào? "
         "Vậy hợp đồng xác định thời hạn thì sao?"
     )
+
+
+def test_real_workflow_adapter_maps_answered_with_caution_result() -> None:
+    async def caution_runner(**_: Any) -> RagAnswerResult:
+        return RagAnswerResult(
+            query="Nghỉ phép năm bao nhiêu ngày?",
+            decision=AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED,
+            answer="Bằng chứng hiện có cho thấy lịch nghỉ do người sử dụng lao động quy định [E1].",
+            citations=[
+                RagCitation(
+                    evidence_id="E1",
+                    packet_id="P1",
+                    chunk_id="chunk-113-4",
+                    law_id="BLLD_VBHN",
+                    law_title="Bộ luật Lao động",
+                    citation="Khoản 4 Điều 113 Bộ luật Lao động",
+                    article_number="113",
+                    clause_number="4",
+                    source_url="https://thuvienphapluat.vn/van-ban/lao-dong/",
+                )
+            ],
+            used_evidence=[
+                UsedEvidence(
+                    evidence_id="E1",
+                    packet_id="P1",
+                    chunk_id="chunk-113-4",
+                    law_id="BLLD_VBHN",
+                    law_title="Bộ luật Lao động",
+                    citation="Khoản 4 Điều 113 Bộ luật Lao động",
+                    score=0.42,
+                    article_number="113",
+                    clause_number="4",
+                    source_url="https://thuvienphapluat.vn/van-ban/lao-dong/",
+                    safe_citable_text="4. Người sử dụng lao động quy định lịch nghỉ hằng năm.",
+                )
+            ],
+            fallback_reasons=["all_selected_evidence_caution"],
+            selection_warnings=["caution_evidence_selected"],
+            model="google/gemini-2.5-flash",
+            provider="openrouter",
+            llm_called=True,
+        )
+
+    workflow = RealLegalQAWorkflow(
+        retriever=StaticRetriever(_retrieval_result([])),
+        llm_client=MockLLMClient([]),
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        runner=caution_runner,
+    )
+
+    response = workflow.run(
+        LegalQAWorkflowRequest(
+            request_id="request-1",
+            question="Nghỉ phép năm bao nhiêu ngày?",
+            top_k=10,
+        )
+    )
+
+    assert response.decision == "answered_with_caution"
+    assert response.answer.startswith("Lưu ý: bằng chứng truy xuất có liên quan")
+    assert response.citations[0].evidence_id == "E1"
+    assert response.evidence[0].score == 0.42
+    assert "all_selected_evidence_caution" in response.warnings
 
 
 def test_real_workflow_adapter_maps_fallback_result() -> None:

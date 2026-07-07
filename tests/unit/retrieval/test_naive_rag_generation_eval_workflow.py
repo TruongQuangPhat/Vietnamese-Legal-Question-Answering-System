@@ -183,6 +183,7 @@ async def test_suite_can_include_evidence_previews_without_external_calls() -> N
                     evidence_id="E1",
                     packet_id="P1",
                     citation="Điều 1",
+                    score=0.9,
                     safe_citable_text="Nội dung Điều 1.",
                     citation_scope="child_exact",
                     safety_level="safe",
