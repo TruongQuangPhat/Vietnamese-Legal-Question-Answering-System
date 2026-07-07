@@ -339,6 +339,7 @@ The Legal QA product MVP is complete for fake-mode local demo usage:
 - fake/real Legal QA service mode boundary;
 - runtime settings, CORS, request safety, and safe logging;
 - optional in-process rate limiting for `POST /api/v1/legal-qa/ask`;
+- configurable conversation storage with memory default and PostgreSQL support;
 - Next.js frontend under `apps/frontend`;
 - Vietnamese ask UI with answer, citation, evidence, and metadata rendering;
 - Makefile local development commands;
@@ -373,6 +374,14 @@ mode.
 
 Fake mode does not require Qdrant, OpenRouter, embedding models, rerankers, or
 legal corpus data. It remains the routine local validation path.
+
+Conversation storage defaults to process-local memory for tests and simple
+local use. PostgreSQL-backed durable conversation storage is available through
+`LEGAL_QA_CONVERSATION_STORE=postgres` and `LEGAL_QA_DATABASE_URL` after
+applying `scripts/database/postgres_conversation_store.sql`. Managed
+PostgreSQL is the intended durable store for future Render, AWS, or Azure
+deployments. Auth/user ownership remains future work; nullable ownership fields
+exist only inside the PostgreSQL schema.
 
 ### Production deployment handoff
 

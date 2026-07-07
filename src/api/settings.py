@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping
+from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
@@ -24,6 +25,13 @@ DEFAULT_CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
 DEFAULT_DOTENV_PATH = Path(".env")
 DEFAULT_RATE_LIMIT_REQUESTS = 10
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
+
+
+class ConversationStoreMode(StrEnum):
+    """Conversation storage backends supported by the API runtime."""
+
+    MEMORY = "memory"
+    POSTGRES = "postgres"
 
 
 class RuntimeConfigurationError(RuntimeError):
@@ -57,6 +65,8 @@ class AppSettings(BaseSettings):
     legal_qa_rate_limit_enabled: bool = False
     legal_qa_rate_limit_requests: int = Field(DEFAULT_RATE_LIMIT_REQUESTS, gt=0)
     legal_qa_rate_limit_window_seconds: int = Field(DEFAULT_RATE_LIMIT_WINDOW_SECONDS, gt=0)
+    legal_qa_conversation_store: ConversationStoreMode = ConversationStoreMode.MEMORY
+    legal_qa_database_url: SecretStr | None = Field(default=None, repr=False)
 
     @classmethod
     def from_env(
@@ -128,7 +138,34 @@ class AppSettings(BaseSettings):
                 default=DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
                 name="LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS",
             ),
+            legal_qa_conversation_store=_conversation_store_mode(
+                env.get("LEGAL_QA_CONVERSATION_STORE")
+            ),
+            legal_qa_database_url=_secret_from_env(env, "LEGAL_QA_DATABASE_URL"),
         )
+
+    def conversation_configuration_issues(self) -> tuple[str, ...]:
+        """Return safe issue codes for conversation storage configuration."""
+        if (
+            self.legal_qa_conversation_store == ConversationStoreMode.POSTGRES
+            and self.legal_qa_database_url is None
+        ):
+            return ("missing_database_url",)
+        return ()
+
+    def validate_conversation_configuration(self) -> None:
+        """Reject invalid conversation storage configuration.
+
+        Raises:
+            RuntimeConfigurationError: If the selected conversation storage
+                backend lacks required settings. The message contains safe issue
+                codes only and never includes credentials.
+        """
+        issues = self.conversation_configuration_issues()
+        if issues:
+            raise RuntimeConfigurationError(
+                "Invalid conversation storage configuration: " + ", ".join(issues)
+            )
 
     def runtime_configuration_issues(self) -> tuple[str, ...]:
         """Return safe issue codes for the selected runtime mode.
@@ -137,10 +174,10 @@ class AppSettings(BaseSettings):
         does not construct clients, load an embedding model, contact Qdrant, or
         call an LLM provider.
         """
+        issues = list(self.conversation_configuration_issues())
         if self.legal_qa_service_mode == LegalQAServiceMode.FAKE:
-            return ()
+            return tuple(issues)
 
-        issues: list[str] = []
         if self.legal_qa_qdrant_url is None:
             issues.append("missing_qdrant_url")
         if self.legal_qa_collection_name is None:
@@ -220,6 +257,17 @@ def _service_mode(raw_value: str | None) -> LegalQAServiceMode:
     except ValueError as exc:
         allowed = ", ".join(item.value for item in LegalQAServiceMode)
         raise ValueError(f"LEGAL_QA_SERVICE_MODE must be one of: {allowed}") from exc
+
+
+def _conversation_store_mode(raw_value: str | None) -> ConversationStoreMode:
+    value = _non_blank(raw_value)
+    if value is None:
+        return ConversationStoreMode.MEMORY
+    try:
+        return ConversationStoreMode(value)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in ConversationStoreMode)
+        raise ValueError(f"LEGAL_QA_CONVERSATION_STORE must be one of: {allowed}") from exc
 
 
 def _parse_bool(raw_value: str | None, *, default: bool, name: str) -> bool:
