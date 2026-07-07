@@ -295,6 +295,13 @@ strict_generation_evaluation_residual_answer_allowed_improvement
 It was tried but not adopted because development improved while held-out
 regressed and `generation_error_count` became `1`.
 
+Runtime QA calibration now distinguishes three answer statuses without changing
+the official benchmark metrics above: `fallback`, `answered_with_caution`, and
+`answered`. No-evidence, unsafe, parent-only, missing-metadata, high-risk, or
+evaluation-target-missing cases still fallback and must not call the LLM.
+`answered_with_caution` is reserved for weak but citable selected evidence and
+still requires citation ID validation.
+
 ## 9. Testing State
 
 The repository now has workflow-level integration coverage under:
@@ -309,6 +316,11 @@ These tests use tiny fixtures, fake dependencies, and `tmp_path`. They do not
 call real Qdrant, real LLMs, real embedding models, real rerankers, or full
 benchmark workflows.
 
+Routine pytest runs isolate local real-mode environment variables and force
+fake-mode API dependencies by default. Real-service tests must be explicitly
+opted in with `LEGAL_QA_ALLOW_REAL_TESTS=1` and must remain separate from the
+default unit/integration suite.
+
 Unit tests cover service, processing, retrieval, and evaluation modules.
 
 ## 10. Product MVP State
@@ -317,6 +329,8 @@ The Legal QA product MVP is complete for fake-mode local demo usage:
 
 - FastAPI backend API under `src/api`;
 - `GET /health`, `GET /version`, and `POST /api/v1/legal-qa/ask`;
+- Legal QA response decisions `answered`, `answered_with_caution`, and
+  `fallback`;
 - fake/real Legal QA service mode boundary;
 - runtime settings, CORS, request safety, and safe logging;
 - Next.js frontend under `apps/frontend`;

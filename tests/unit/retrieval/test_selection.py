@@ -216,8 +216,8 @@ def test_parent_context_without_child_text_still_fallbacks() -> None:
     )
 
 
-def test_auxiliary_parent_context_does_not_rescue_ambiguous_caution() -> None:
-    """Non-auxiliary caution still blocks answerability."""
+def test_weak_citable_evidence_allows_answer_with_caution() -> None:
+    """Weak but citable evidence can proceed only through the caution status."""
     ambiguous = make_packet(
         citation="Khoản 4, Điều 113, Bộ luật Lao động",
         text="4. Người sử dụng lao động có trách nhiệm quy định lịch nghỉ hằng năm.",
@@ -233,10 +233,34 @@ def test_auxiliary_parent_context_does_not_rescue_ambiguous_caution() -> None:
 
     result = select_evidence_for_answer(make_bundle([ambiguous]))
 
-    assert result.decision == AnswerabilityDecision.NEEDS_REVIEW
+    assert result.decision == AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED
     assert FallbackReasonCode.ALL_SELECTED_EVIDENCE_CAUTION in {
         reason.code for reason in result.fallback_reasons
     }
+    assert result.rendered_context
+
+
+def test_weak_citable_evidence_can_still_require_review_when_configured() -> None:
+    """The legacy review path remains available for stricter offline gates."""
+    ambiguous = make_packet(
+        citation="Khoản 4, Điều 113, Bộ luật Lao động",
+        text="4. Người sử dụng lao động có trách nhiệm quy định lịch nghỉ hằng năm.",
+        parent_text="Điều 113. Nghỉ hằng năm\n1. Người lao động được nghỉ...",
+        issues=[
+            RetrievalIssue(
+                code="ambiguous_candidate",
+                severity=RetrievalIssueSeverity.WARNING,
+                message="candidate needs review before answer use",
+            )
+        ],
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle([ambiguous]),
+        config=EvidenceSelectionConfig(allow_answer_with_caution=False),
+    )
+
+    assert result.decision == AnswerabilityDecision.NEEDS_REVIEW
 
 
 def test_parent_text_rendered_only_as_auxiliary_context() -> None:

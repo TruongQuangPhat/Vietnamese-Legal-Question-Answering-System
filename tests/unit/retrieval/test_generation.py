@@ -74,5 +74,6 @@ def _prompt_evidence(evidence_id: str) -> PromptEvidence:
         law_title="Bộ luật Dân sự 2015",
         article_number="2",
         source_url="https://thuvienphapluat.vn/test",
+        score=0.9,
         citable_text="Quyền dân sự được công nhận, tôn trọng, bảo vệ.",
     )

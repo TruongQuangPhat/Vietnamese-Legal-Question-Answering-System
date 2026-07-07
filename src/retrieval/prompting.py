@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.retrieval.selection import EvidenceSelectionResult, SelectedEvidence
+from src.retrieval.selection import (
+    AnswerabilityDecision,
+    EvidenceSelectionResult,
+    SelectedEvidence,
+)
 
 
 class PromptEvidence(BaseModel):
@@ -22,6 +26,7 @@ class PromptEvidence(BaseModel):
     clause_number: str | None = None
     point_label: str | None = None
     source_url: str | None = None
+    score: float
     citation_scope: str | None = None
     safety_level: str | None = None
     is_directly_citable: bool = True
@@ -80,7 +85,15 @@ def build_naive_rag_prompt(
         "Không trích dẫn mã không có trong bằng chứng. "
         "Không xem Auxiliary context là căn cứ trích dẫn trực tiếp. "
         "Nếu bằng chứng không đủ, hãy nói rõ là bằng chứng chưa đủ. "
+        "Nếu yêu cầu được đánh dấu cần thận trọng, hãy nêu rõ giới hạn bằng chứng "
+        "trước khi trả lời và chỉ trả lời trong phạm vi bằng chứng đó. "
         "Trả lời bằng tiếng Việt và không thay thế tư vấn pháp lý chuyên nghiệp."
+    )
+    caution_requirement = (
+        "- Bằng chứng được chọn yếu hoặc cần thận trọng; mở đầu bằng một lưu ý ngắn "
+        "rằng câu trả lời chỉ dựa trên bằng chứng hiện có.\n"
+        if selection_result.decision == AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED
+        else ""
     )
     user_message = "\n\n".join(
         [
@@ -91,6 +104,7 @@ def build_naive_rag_prompt(
             _render_auxiliary_context(evidence_items),
             (
                 "Answer requirements:\n"
+                f"{caution_requirement}"
                 "- Trả lời ngắn gọn, có cấu trúc.\n"
                 "- Chỉ trả lời vấn đề pháp lý được hỏi; không mở rộng sang quy định liên quan gián tiếp.\n"
                 "- Không dùng mọi [E#] chỉ vì chúng được cung cấp; ưu tiên tập bằng chứng nhỏ nhất đủ trả lời.\n"
@@ -133,6 +147,7 @@ def _prompt_evidence(
         clause_number=packet.clause_number,
         point_label=packet.point_label,
         source_url=packet.source_url,
+        score=selected.score,
         citation_scope=selected.citation_scope.value,
         safety_level=selected.safety_level.value,
         is_directly_citable=True,
@@ -151,6 +166,7 @@ def _render_citable_evidence(item: PromptEvidence) -> str:
         f"Citation: {item.citation or 'MISSING'}",
         f"Law ID: {item.law_id or 'MISSING'}",
         f"Source URL: {item.source_url or 'MISSING'}",
+        f"Retrieval Score: {item.score:.6f}",
         "Text:",
         item.citable_text,
     ]

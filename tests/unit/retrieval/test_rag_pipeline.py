@@ -110,6 +110,7 @@ async def test_needs_review_selection_does_not_call_llm() -> None:
         collection_name="vnlaw_chunks_bgem3_v1_full",
         selection_config=EvidenceSelectionConfig(
             fallback_on_parent_context_only=False,
+            allow_answer_with_caution=False,
             needs_review_on_all_evidence_caution=True,
             eval_missing_target_requires_fallback=False,
         ),
@@ -118,6 +119,46 @@ async def test_needs_review_selection_does_not_call_llm() -> None:
     assert result.decision == AnswerabilityDecision.NEEDS_REVIEW
     assert result.llm_called is False
     assert llm.requests == []
+
+
+@pytest.mark.asyncio
+async def test_weak_relevant_evidence_calls_llm_with_caution_status() -> None:
+    """Citable caution evidence may answer, but only as answer-with-caution."""
+    retriever = FakeRetriever(
+        _result(
+            [
+                _chunk(
+                    law_id="BLLD_VBHN",
+                    article_number="113",
+                    clause_number="4",
+                    text="4. Người sử dụng lao động có trách nhiệm quy định lịch nghỉ hằng năm.",
+                    parent_text="Điều 113. Nghỉ hằng năm ... 1. Người lao động được nghỉ...",
+                    issues=[
+                        RetrievalIssue(
+                            code="ambiguous_candidate",
+                            severity=RetrievalIssueSeverity.WARNING,
+                            message="candidate is related but weak for the question",
+                        )
+                    ],
+                )
+            ],
+            query="Nghỉ phép năm bao nhiêu ngày?",
+        )
+    )
+    llm = MockLLMClient([_llm_response("Bằng chứng hiện có chỉ hỗ trợ lịch nghỉ [E1].")])
+
+    result = await run_naive_rag(
+        query=retriever.result.query,
+        retriever=retriever,
+        llm_client=llm,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+    )
+
+    assert result.decision == AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED
+    assert result.llm_called is True
+    assert len(llm.requests) == 1
+    assert "Bằng chứng được chọn yếu hoặc cần thận trọng" in llm.requests[0].messages[1].content
+    assert "all_selected_evidence_caution" in result.fallback_reasons
 
 
 @pytest.mark.asyncio
@@ -162,6 +203,7 @@ async def test_answer_allowed_selection_calls_llm_once_and_maps_citation() -> No
     assert result.citations[0].evidence_id == "E1"
     assert result.citations[0].citation == "Điểm d, Khoản 3, Điều 16, Luật Bảo hiểm y tế"
     assert result.used_evidence[0].safe_citable_text == "d) Trẻ em dưới 6 tuổi..."
+    assert result.used_evidence[0].score == 0.9
     assert result.used_evidence[0].citation_scope == "child_exact"
     assert result.used_evidence[0].is_directly_citable is True
     assert result.used_evidence[0].parent_context_included_in_prompt is False

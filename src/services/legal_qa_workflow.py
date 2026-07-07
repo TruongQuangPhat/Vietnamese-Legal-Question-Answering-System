@@ -34,6 +34,10 @@ DEFAULT_LLM_CONFIG_PATH = Path("configs/llm/openrouter.yml")
 DEFAULT_FINAL_TOP_K = 10
 DEFAULT_PROVIDER = "openrouter"
 DEFAULT_RETRIEVAL_STRATEGY = "coverage_aware_quota"
+CAUTION_ANSWER_PREFIX = (
+    "Lưu ý: bằng chứng truy xuất có liên quan nhưng còn yếu hoặc cần thận trọng; "
+    "câu trả lời dưới đây chỉ dựa trên các căn cứ được trích dẫn."
+)
 
 
 class LegalQAServiceMode(StrEnum):
@@ -307,11 +311,16 @@ def map_rag_answer_to_workflow_result(
         latency_ms=latency_ms,
     )
     warnings = [
+        *result.fallback_reasons,
         *result.selection_warnings,
         *[issue.code for issue in result.citation_issues],
         *result.errors,
     ]
-    if result.decision != AnswerabilityDecision.ANSWER_ALLOWED:
+    answer_decisions = {
+        AnswerabilityDecision.ANSWER_ALLOWED,
+        AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED,
+    }
+    if result.decision not in answer_decisions:
         return LegalQAWorkflowResult(
             decision=LegalQAWorkflowDecision.FALLBACK,
             answer=result.answer,
@@ -329,8 +338,12 @@ def map_rag_answer_to_workflow_result(
         )
 
     return LegalQAWorkflowResult(
-        decision=LegalQAWorkflowDecision.ANSWERED,
-        answer=result.answer,
+        decision=(
+            LegalQAWorkflowDecision.ANSWERED_WITH_CAUTION
+            if result.decision == AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED
+            else LegalQAWorkflowDecision.ANSWERED
+        ),
+        answer=_answer_with_optional_caution(result),
         citations=[
             LegalQAWorkflowCitation(
                 evidence_id=citation.evidence_id,
@@ -356,7 +369,7 @@ def map_rag_answer_to_workflow_result(
                 citation=evidence.citation or "",
                 text=evidence.safe_citable_text or "",
                 source_url=evidence.source_url or "",
-                score=0.0,
+                score=evidence.score,
             )
             for evidence in result.used_evidence
         ],
@@ -400,6 +413,14 @@ def _missing_answer_metadata(result: RagAnswerResult) -> list[str]:
         if not evidence.source_url:
             missing.append("missing_evidence_source_url")
     return list(dict.fromkeys(missing))
+
+
+def _answer_with_optional_caution(result: RagAnswerResult) -> str:
+    if result.decision != AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED:
+        return result.answer
+    if result.answer.startswith(CAUTION_ANSWER_PREFIX):
+        return result.answer
+    return f"{CAUTION_ANSWER_PREFIX}\n\n{result.answer}"
 
 
 def _hierarchy_path(

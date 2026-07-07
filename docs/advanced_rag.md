@@ -4,8 +4,8 @@
 
 Advanced RAG upgrades the Naive RAG baseline with dense BGE-M3 retrieval, BM25
 sparse retrieval, fixed Reciprocal Rank Fusion (RRF), coverage-aware quota
-selection, strict evidence selection, citation validation, and an answerability
-fallback guard.
+selection, strict evidence selection, citation validation, answer confidence
+status, and an answerability fallback guard.
 
 The adopted system is still a legal research assistant. It is not legal advice,
 and it must fall back when retrieved evidence is insufficient, unsafe, indirect,
@@ -139,6 +139,25 @@ invariants:
 The citation guard checks that generated `[E#]` IDs map to selected evidence.
 It does not by itself prove that every generated legal claim is semantically
 faithful.
+
+## Answer Status Policy
+
+The runtime evidence gate separates answerability into three user-facing
+outcomes:
+
+- `fallback`: no citable evidence exists, selected evidence is unsafe,
+  parent-context-only, missing citation/source/law/text metadata, high citation
+  risk is present, or an evaluation-only exact target gate fails. The LLM is not
+  allowed to generate a legal answer.
+- `answered_with_caution`: weak but citable evidence is selected. The LLM may
+  answer only from selected evidence, must include citations, and the response
+  includes a caution note and warning codes.
+- `answered`: sufficiently strong selected evidence exists. The LLM may answer
+  only from selected evidence and every legal claim must cite selected evidence.
+
+This calibration does not allow free-form legal answers without retrieved
+evidence. Citation ID validation remains mandatory for both `answered` and
+`answered_with_caution`.
 
 ## Final Adopted Result
 

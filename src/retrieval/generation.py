@@ -55,6 +55,7 @@ class UsedEvidence(BaseModel):
     citation: str | None = None
     law_id: str | None = None
     law_title: str | None = None
+    score: float
     article_number: str | None = None
     clause_number: str | None = None
     point_label: str | None = None
@@ -202,6 +203,7 @@ def used_evidence_from_prompt(prompt_evidence: list[PromptEvidence]) -> list[Use
             citation=item.citation,
             law_id=item.law_id,
             law_title=item.law_title,
+            score=item.score,
             article_number=item.article_number,
             clause_number=item.clause_number,
             point_label=item.point_label,

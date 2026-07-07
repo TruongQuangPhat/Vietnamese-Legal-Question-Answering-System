@@ -498,6 +498,7 @@ def _used_evidence(
         citation="Điều 1",
         law_id="BLDS_2015",
         law_title="Bộ luật Dân sự 2015",
+        score=0.9,
         article_number="1",
         source_url="https://thuvienphapluat.vn/test",
         citation_scope="child_exact",

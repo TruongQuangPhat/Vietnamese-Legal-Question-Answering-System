@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,17 @@ from src.services.legal_qa_workflow import (
     LegalQAServiceMode,
 )
 
+REAL_SERVICE_TEST_ENV_VARS = (
+    "LEGAL_QA_QDRANT_URL",
+    "LEGAL_QA_COLLECTION_NAME",
+    "LEGAL_QA_QDRANT_API_KEY",
+    "QDRANT_URL",
+    "QDRANT_COLLECTION",
+    "QDRANT_API_KEY",
+    "OPENROUTER_API_KEY",
+    "OPENROUTER_MODEL",
+)
+
 
 def test_settings_default_to_local_fake_mode() -> None:
     settings = AppSettings.from_env({})
@@ -22,6 +34,15 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.cors_allowed_origins == ["http://localhost:3000"]
     assert settings.legal_qa_service_mode == LegalQAServiceMode.FAKE
     assert settings.runtime_configuration_issues() == ()
+
+
+def test_default_pytest_environment_is_isolated_from_real_service_settings() -> None:
+    if os.environ.get("LEGAL_QA_ALLOW_REAL_TESTS") == "1":
+        pytest.skip("real-service test opt-in is enabled")
+
+    assert os.environ["LEGAL_QA_SERVICE_MODE"] == "fake"
+    for name in REAL_SERVICE_TEST_ENV_VARS:
+        assert name not in os.environ
 
 
 def test_settings_default_config_paths_exist() -> None:

@@ -359,8 +359,8 @@ def validate_generation_result(
     all_selected_evidence_caution = (
         selected_evidence_count > 0 and caution_selected_count == selected_evidence_count
     )
-    citation_id_coverage_applicable = (
-        case.requires_citation_ids and result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    citation_id_coverage_applicable = case.requires_citation_ids and _is_answer_decision(
+        result.decision
     )
     evidence_previews = (
         [
@@ -455,14 +455,12 @@ def build_generation_eval_report(
     total = len(case_list)
     passed_cases = sum(case.passed for case in case_list)
     citation_cases = [case for case in case_list if case.citation_id_coverage_applicable]
-    fallback_cases = [
-        case for case in case_list if case.decision != AnswerabilityDecision.ANSWER_ALLOWED
-    ]
+    fallback_cases = [case for case in case_list if not _is_answer_decision(case.decision)]
     blocking_cases = [case for case in case_list if case.blocking]
     cited_preview_cases = [
         case
         for case in case_list
-        if case.decision == AnswerabilityDecision.ANSWER_ALLOWED
+        if _is_answer_decision(case.decision)
         and (case.cited_evidence_preview_count or case.evidence_preview_missing_count)
     ]
     return GenerationEvalReport(
@@ -622,10 +620,10 @@ def _fallback_policy_passed(
     result: RagAnswerResult,
 ) -> bool:
     del case
-    if result.decision == AnswerabilityDecision.ANSWER_ALLOWED:
+    if _is_answer_decision(result.decision):
         return True
     return (
-        result.decision != AnswerabilityDecision.ANSWER_ALLOWED
+        not _is_answer_decision(result.decision)
         and not result.llm_called
         and not result.citations
         and result.answer == FALLBACK_ANSWER_VI
@@ -641,7 +639,7 @@ def _citation_policy_passed(
 ) -> bool:
     if unknown_count or missing_count:
         return False
-    if result.decision != AnswerabilityDecision.ANSWER_ALLOWED:
+    if not _is_answer_decision(result.decision):
         return not result.citations
     if not case.requires_citation_ids:
         return True
@@ -652,7 +650,7 @@ def _llm_call_policy_passed(
     case: GenerationEvalQuery,
     result: RagAnswerResult,
 ) -> bool:
-    decision_requires_llm = result.decision == AnswerabilityDecision.ANSWER_ALLOWED
+    decision_requires_llm = _is_answer_decision(result.decision)
     if result.llm_called != decision_requires_llm:
         return False
     return case.expected_llm_called is None or result.llm_called == case.expected_llm_called
@@ -667,6 +665,13 @@ def _metadata_count(metadata: dict[str, object], key: str) -> int:
 
 def _citation_issue_count(result: RagAnswerResult, code: str) -> int:
     return sum(issue.code == code for issue in result.citation_issues)
+
+
+def _is_answer_decision(decision: AnswerabilityDecision) -> bool:
+    return decision in {
+        AnswerabilityDecision.ANSWER_ALLOWED,
+        AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED,
+    }
 
 
 def _citation_ids(text: str) -> list[str]:

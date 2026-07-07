@@ -166,6 +166,9 @@ exceed the 512 MB memory limit and real QA serving is not reliable there.
 - Explicit `LEGAL_QA_SERVICE_MODE=fake|real`; fake is the default.
 - A real-mode adapter for coverage-aware dense plus local BM25 retrieval,
   evidence selection, strict generation, citation validation, and fallback.
+- Real-mode answer decisions now distinguish `answered`, `answered_with_caution`,
+  and `fallback`. Caution answers still require selected citable evidence and
+  valid citation IDs; no-evidence cases remain fallback and do not call the LLM.
 - Configurable CORS origins.
 - Next.js frontend clients using `NEXT_PUBLIC_API_BASE_URL`.
 - Backend and frontend Dockerfiles and a fake-mode `docker-compose.yml`.

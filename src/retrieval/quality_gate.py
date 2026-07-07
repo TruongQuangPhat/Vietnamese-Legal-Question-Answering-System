@@ -472,7 +472,10 @@ class QualityGateEvaluator:
             )
 
         fallback_case = review_case.case_verdict == "not_applicable_for_fallback"
-        generated_case = report_case.decision == AnswerabilityDecision.ANSWER_ALLOWED
+        generated_case = report_case.decision in {
+            AnswerabilityDecision.ANSWER_ALLOWED,
+            AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED,
+        }
         if fallback_case:
             self._evaluate_fallback_case(report_case, review_case, policy, hard)
         if (

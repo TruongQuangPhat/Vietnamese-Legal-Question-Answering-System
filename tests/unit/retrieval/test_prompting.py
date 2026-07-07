@@ -102,6 +102,22 @@ def test_prompt_enforces_complete_list_and_target_law_discipline() -> None:
     assert "tránh mở rộng sang luật khác" in prompt.user_message
 
 
+def test_prompt_adds_caution_requirement_for_caution_decision() -> None:
+    """Caution answers must tell the model to disclose evidence limits."""
+    selected = _selection_result(
+        [_selected(_packet(text="Bằng chứng liên quan nhưng yếu", auxiliary="Điều cha"))],
+        decision=AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED,
+    )
+
+    prompt = build_naive_rag_prompt(
+        query="Nghỉ phép năm bao nhiêu ngày?", selection_result=selected
+    )
+
+    assert "Nếu yêu cầu được đánh dấu cần thận trọng" in prompt.system_message
+    assert "Bằng chứng được chọn yếu hoặc cần thận trọng" in prompt.user_message
+    assert prompt.evidence[0].score == 0.9
+
+
 def test_prompt_can_suppress_auxiliary_context() -> None:
     """The generation config can keep parent context out of the prompt."""
     selected = _selection_result([_selected(_packet(text="Citable", auxiliary="Parent context"))])
@@ -204,9 +220,13 @@ def _selected(packet: EvidencePacket) -> SelectedEvidence:
     )
 
 
-def _selection_result(selected: list[SelectedEvidence]) -> EvidenceSelectionResult:
+def _selection_result(
+    selected: list[SelectedEvidence],
+    *,
+    decision: AnswerabilityDecision = AnswerabilityDecision.ANSWER_ALLOWED,
+) -> EvidenceSelectionResult:
     return EvidenceSelectionResult(
-        decision=AnswerabilityDecision.ANSWER_ALLOWED,
+        decision=decision,
         selected_evidence=selected,
         rejected_evidence=[],
         fallback_reasons=[],
