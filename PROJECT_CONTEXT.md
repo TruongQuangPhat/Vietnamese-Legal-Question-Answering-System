@@ -316,6 +316,11 @@ These tests use tiny fixtures, fake dependencies, and `tmp_path`. They do not
 call real Qdrant, real LLMs, real embedding models, real rerankers, or full
 benchmark workflows.
 
+Routine pytest runs isolate local real-mode environment variables and force
+fake-mode API dependencies by default. Real-service tests must be explicitly
+opted in with `LEGAL_QA_ALLOW_REAL_TESTS=1` and must remain separate from the
+default unit/integration suite.
+
 Unit tests cover service, processing, retrieval, and evaluation modules.
 
 ## 10. Product MVP State
