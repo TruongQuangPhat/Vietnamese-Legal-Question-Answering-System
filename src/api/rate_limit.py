@@ -51,12 +51,18 @@ class FixedWindowRateLimiter:
         """Return immutable limiter policy."""
         return self._policy
 
+    @property
+    def active_window_count(self) -> int:
+        """Return the number of tracked client windows."""
+        return len(self._windows)
+
     def check(self, key: str, *, now: float | None = None) -> RateLimitDecision:
         """Record one request attempt and return whether it is allowed."""
         if not self._policy.enabled:
             return RateLimitDecision(allowed=True)
 
         current_time = time.monotonic() if now is None else now
+        self._prune_expired_windows(current_time)
         window = self._windows.get(key)
         if window is None or current_time >= window.reset_at:
             self._windows[key] = _ClientWindow(
@@ -71,6 +77,15 @@ class FixedWindowRateLimiter:
 
         window.count += 1
         return RateLimitDecision(allowed=True)
+
+    def _prune_expired_windows(self, current_time: float) -> None:
+        expired_keys = [
+            client_key
+            for client_key, window in self._windows.items()
+            if current_time >= window.reset_at
+        ]
+        for client_key in expired_keys:
+            del self._windows[client_key]
 
 
 def build_rate_limiter(settings: AppSettings) -> FixedWindowRateLimiter:

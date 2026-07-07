@@ -93,18 +93,45 @@ def test_settings_parse_rate_limit_configuration() -> None:
     assert settings.legal_qa_rate_limit_window_seconds == 30
 
 
+def test_settings_rate_limit_blank_values_use_defaults() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_RATE_LIMIT_ENABLED": " ",
+            "LEGAL_QA_RATE_LIMIT_REQUESTS": " ",
+            "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS": " ",
+        }
+    )
+
+    assert settings.legal_qa_rate_limit_enabled is False
+    assert settings.legal_qa_rate_limit_requests == 10
+    assert settings.legal_qa_rate_limit_window_seconds == 60
+
+
 @pytest.mark.parametrize(
-    ("name", "value"),
+    ("name", "value", "message"),
     [
-        ("LEGAL_QA_RATE_LIMIT_ENABLED", "maybe"),
-        ("LEGAL_QA_RATE_LIMIT_REQUESTS", "0"),
-        ("LEGAL_QA_RATE_LIMIT_REQUESTS", "not-an-int"),
-        ("LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS", "-1"),
-        ("LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS", "not-an-int"),
+        ("LEGAL_QA_RATE_LIMIT_ENABLED", "maybe", "LEGAL_QA_RATE_LIMIT_ENABLED"),
+        ("LEGAL_QA_RATE_LIMIT_REQUESTS", "0", "LEGAL_QA_RATE_LIMIT_REQUESTS"),
+        ("LEGAL_QA_RATE_LIMIT_REQUESTS", "1.5", "LEGAL_QA_RATE_LIMIT_REQUESTS"),
+        ("LEGAL_QA_RATE_LIMIT_REQUESTS", "not-an-int", "LEGAL_QA_RATE_LIMIT_REQUESTS"),
+        (
+            "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS",
+            "-1",
+            "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS",
+        ),
+        (
+            "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS",
+            "not-an-int",
+            "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS",
+        ),
     ],
 )
-def test_settings_reject_invalid_rate_limit_configuration(name: str, value: str) -> None:
-    with pytest.raises(ValueError):
+def test_settings_reject_invalid_rate_limit_configuration(
+    name: str,
+    value: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
         AppSettings.from_env({name: value})
 
 

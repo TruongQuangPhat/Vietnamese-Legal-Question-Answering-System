@@ -116,6 +116,7 @@ class AppSettings(BaseSettings):
             legal_qa_rate_limit_enabled=_parse_bool(
                 env.get("LEGAL_QA_RATE_LIMIT_ENABLED"),
                 default=False,
+                name="LEGAL_QA_RATE_LIMIT_ENABLED",
             ),
             legal_qa_rate_limit_requests=_parse_positive_int(
                 env.get("LEGAL_QA_RATE_LIMIT_REQUESTS"),
@@ -221,7 +222,7 @@ def _service_mode(raw_value: str | None) -> LegalQAServiceMode:
         raise ValueError(f"LEGAL_QA_SERVICE_MODE must be one of: {allowed}") from exc
 
 
-def _parse_bool(raw_value: str | None, *, default: bool) -> bool:
+def _parse_bool(raw_value: str | None, *, default: bool, name: str) -> bool:
     value = _non_blank(raw_value)
     if value is None:
         return default
@@ -230,7 +231,7 @@ def _parse_bool(raw_value: str | None, *, default: bool) -> bool:
         return True
     if normalized in {"0", "false", "no", "off"}:
         return False
-    raise ValueError("boolean environment values must be true/false")
+    raise ValueError(f"{name} must be true or false")
 
 
 def _parse_positive_int(raw_value: str | None, *, default: int, name: str) -> int:
