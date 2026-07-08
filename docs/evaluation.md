@@ -677,6 +677,31 @@ private environment for authenticated Qdrant Cloud. Leave `QDRANT_API_KEY`
 unset or blank for unauthenticated local Qdrant. Never pass the key as a CLI
 argument, print it, or write it to reports.
 
+Official metric refreshes must use a unique non-existing output directory under
+`artifacts/reports/evaluation/`. Do not overwrite historical report
+directories. Naive RAG is a fixed historical baseline unless explicitly rerun.
+
+Example strict generation refresh command:
+
+```bash
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+OUTPUT_DIR="artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_${RUN_ID}"
+test ! -e "$OUTPUT_DIR"
+
+env UV_CACHE_DIR=/tmp/vnlaw-uv-cache \
+  uv run --extra qdrant --extra embedding \
+  python scripts/evaluation/run_strict_generation_evaluation.py \
+    --coverage-retrieval-dir artifacts/reports/evaluation/advanced_rag/coverage_aware_retrieval \
+    --generation-baseline-dir artifacts/reports/evaluation/naive_rag_baseline/generation \
+    --retrieval-config configs/retrieval/retrieval.yml \
+    --llm-config configs/llm/openrouter.yml \
+    --output-dir "$OUTPUT_DIR" \
+    --collection-name vnlaw_chunks_bgem3_v1_full \
+    --url "$QDRANT_URL" \
+    --device cpu \
+    --provider openrouter
+```
+
 ## Metrics Contract
 
 Core retrieval and strict generation metrics are implemented for the frozen
@@ -693,20 +718,28 @@ NDCG@10 = 0.6465347419
 evidence_group_coverage@10 = 0.7712765957
 ```
 
-Final adopted strict generation, all split:
+Latest Advanced RAG strict generation refresh, all split:
 
 ```text
+report = artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500
 workflow_name = strict_generation_evaluation
 retrieval_strategy = coverage_aware_quota
-decision_accuracy = 0.875
-answer_allowed_answer_rate = 0.8545454545
+decision_accuracy = 0.8671875
+answer_allowed_answer_rate = 0.8454545455
 fallback_required_fallback_rate = 1.0
-selected_evidence_group_coverage = 0.7861616162
-case_pass_rate = 0.7578125
+selected_evidence_group_coverage = 0.8702525253
+case_pass_rate = 0.75
 citation_id_validity_rate = 1.0
 retrieval_error_count = 0
 generation_error_count = 0
 ```
+
+The refreshed run used Qdrant Cloud with an API-key authenticated client. Older
+Advanced/Naive reports used local Qdrant or frozen local retrieval artifacts,
+so latency is observability-only and must not be used for direct fairness
+comparison against historical reports. Citation ID validity and
+`unsupported_or_uncited_claim_rate` are not claim-level human semantic
+faithfulness review.
 
 Reranking was evaluated with `BAAI/bge-reranker-v2-m3` and was not adopted:
 `decision = no_adoption_no_eligible_reranker`.

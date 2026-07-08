@@ -1,9 +1,12 @@
 # Evaluation Metric Refresh Plan
 
-This document prepares a controlled metric refresh after recent QA behavior
-changes. It is an audit and runbook only. No benchmark, OpenRouter call,
-production endpoint, Qdrant mutation, indexing, crawling, snapshot operation, or
-new evaluation artifact was run or written while creating it.
+This document records the evaluation refresh audit, the Qdrant Cloud
+authentication preflight patch, and the controlled Advanced RAG strict
+generation metric refresh. The real refresh was run once and saved to a unique
+output path. This document remains the runbook for any future refresh.
+
+No production endpoint, production `/ask`, Qdrant mutation, indexing, crawling,
+corpus processing, or snapshot operation was used for the refresh.
 
 ## Existing Official Artifacts
 
@@ -36,7 +39,8 @@ Current report groups under `artifacts/reports/evaluation/`:
 | `advanced_rag` | `evidence_selection_diagnostics` | Evidence selection diagnostics. |
 | `advanced_rag` | `strict_generation_evaluation` | Earlier strict generation run. |
 | `advanced_rag` | `strict_generation_evaluation_selection_policy_improvement` | Rejected trial; held-out/fallback behavior regressed. |
-| `advanced_rag` | `strict_generation_evaluation_answerability_fallback_guard` | Latest official adopted strict generation baseline. |
+| `advanced_rag` | `strict_generation_evaluation_answerability_fallback_guard` | Historical adopted strict generation baseline before the answer-policy refresh. |
+| `advanced_rag` | `strict_generation_evaluation_answer_policy_refresh_20260708_235500` | Latest official Advanced RAG strict generation refresh. |
 | `advanced_rag` | `strict_generation_error_analysis` | Error analysis over strict generation outputs. |
 
 Manual review support files also exist under `data/eval/`, including
@@ -45,38 +49,62 @@ and `manual_retrieval_queries.jsonl`. These support the older Naive RAG manual
 review/quality-gate workflow and are not a substitute for the frozen
 `v0.1.0` benchmark.
 
-## Latest Official Baseline
+## Completed Refresh
 
 Treat
-`artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answerability_fallback_guard`
-as the latest official baseline for current QA quality reporting.
+`artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500`
+as the latest official Advanced RAG quality report.
 
-All-split headline metrics from that report:
+Run context:
+
+- benchmark version: `v0.1.0`
+- query count: `128`
+- retrieval strategy: `coverage_aware_quota`
+- Qdrant collection: `vnlaw_chunks_bgem3_v1_full`
+- embedding model: `BAAI/bge-m3`
+- LLM provider/model: `openrouter` / `google/gemini-2.5-flash`
+- temperature: `0.0`
+- device: `cpu`
+- Qdrant runtime: Qdrant Cloud with API-key authenticated client
+- Naive RAG rerun: no; historical baseline reused
+
+All-split headline metrics from the refreshed report:
 
 | Metric | Value |
 | --- | ---: |
 | `query_count` | 128 |
-| `decision_accuracy` | 0.875 |
-| `answer_allowed_answer_rate` | 0.8545454545 |
+| `decision_accuracy` | 0.8671875 |
+| `answer_allowed_answer_rate` | 0.8454545455 |
 | `fallback_required_fallback_rate` | 1.0 |
-| `selected_evidence_group_coverage` | 0.7861616162 |
-| `case_pass_rate` | 0.7578125 |
+| `selected_evidence_group_coverage` | 0.8702525253 |
+| `case_pass_rate` | 0.75 |
 | `case_partial_rate` | 0.1171875 |
-| `case_fail_rate` | 0.125 |
+| `case_fail_rate` | 0.1328125 |
 | `citation_id_validity_rate` | 1.0 |
 | `retrieval_error_count` | 0 |
 | `generation_error_count` | 0 |
+| `pipeline_answer_count` | 93 |
+| `pipeline_fallback_count` | 35 |
+| `fallback_without_llm_count` | 24 |
+| `fallback_with_citations_count` | 11 |
+
+Mean latency for this run was `3064.948917453125` ms. Because this refresh
+used Qdrant Cloud while older reports used local Qdrant or frozen local
+retrieval artifacts, latency is observability-only and not a fair historical
+comparison metric.
 
 The older `naive_rag_baseline` reports should be treated as fixed historical
 comparators unless the Naive RAG implementation or frozen dense retrieval
-baseline is intentionally changed. Recent work changed the current advanced QA
-answer policy, score propagation, follow-up handling, API/session behavior, and
-deployment safety; it did not redefine Naive RAG as the product target.
+baseline is intentionally changed. The historical
+`strict_generation_evaluation_answerability_fallback_guard` report remains
+useful for comparison but is no longer the latest official Advanced RAG quality
+report.
 
 ## Recommended Refresh Target
 
-Run a new advanced RAG strict generation evaluation only, compared against the
-existing fixed Naive RAG generation baseline. Do not rerun Naive RAG by default.
+For future refreshes, run a new advanced RAG strict generation evaluation only,
+compared against the existing fixed Naive RAG generation baseline. Do not rerun
+Naive RAG by default.
 
 Rationale:
 
@@ -210,9 +238,9 @@ generation command.
 
 ## Metric Comparison Plan
 
-Compare the new strict generation report against:
+Compare future strict generation refresh reports against:
 
-1. latest official advanced baseline:
+1. previous official advanced baseline:
    `advanced_rag/strict_generation_evaluation_answerability_fallback_guard`
 2. fixed historical Naive RAG baseline:
    `naive_rag_baseline/generation`
@@ -240,9 +268,8 @@ Secondary review dimensions:
 - citation ID validity and invalid-citation fallbacks
 - top failure cases from any regenerated error analysis
 
-Do not update `PROJECT_CONTEXT.md`, `README.md`, official metric tables, or
-baseline claims until the real run has completed and the output artifacts have
-been reviewed.
+Project context, README, and durable evaluation docs may be updated only after
+the real run has completed and the output artifacts have been reviewed.
 
 ## Risks and Limitations
 
@@ -254,7 +281,10 @@ been reviewed.
 - Authenticated Qdrant Cloud access depends on `QDRANT_API_KEY` being available
   in the private environment; the value must not appear in logs, docs, or
   artifacts.
+- Older Advanced/Naive reports used local Qdrant or frozen local retrieval
+  artifacts. The refreshed Advanced RAG report used Qdrant Cloud, so latency is
+  observability-only and not a fair direct comparison against older runs.
+- `unsupported_or_uncited_claim_rate` is a citation-ID-guard-only check, not
+  claim-level human semantic faithfulness review.
 - API rate limiting, durable conversations, and session ownership are not
   benchmarked by this single-turn offline strict generation flow.
-- Do not claim refreshed official metrics until the real benchmark command has
-  actually run and artifacts are inspected.

@@ -113,6 +113,23 @@ coverage-aware hybrid retrieval
 → answerability fallback guard
 ```
 
+Latest Advanced RAG strict generation report:
+
+```text
+artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500
+decision_accuracy = 0.8671875
+fallback_required_fallback_rate = 1.0
+citation_id_validity_rate = 1.0
+retrieval_error_count = 0
+generation_error_count = 0
+```
+
+For authenticated Qdrant Cloud evaluation, use `QDRANT_API_KEY` from the
+private environment. Real benchmark runs require explicit user approval, unique
+output directories, and fixed historical reports must not be overwritten.
+Naive RAG remains a historical baseline unless explicitly rerun. Latency
+comparisons require the same runtime environment.
+
 Reranking was evaluated as a controlled ablation but was not adopted.
 
 API/backend and UI infrastructure are deployed separately from the adopted

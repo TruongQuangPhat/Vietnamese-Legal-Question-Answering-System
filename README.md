@@ -98,8 +98,8 @@ because no eligible configuration passed the adoption thresholds.
 
 ### Strict generation
 
-Final adopted workflow:
-`strict_generation_evaluation_answerability_fallback_guard`.
+Latest official Advanced RAG quality report:
+`artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500`.
 
 Provider/model used for the final evaluation:
 `openrouter` / `google/gemini-2.5-flash`.
@@ -107,17 +107,23 @@ Provider/model used for the final evaluation:
 | System | Decision accuracy | Answer-allowed answer rate | Fallback-required fallback rate | Selected evidence group coverage | Case pass rate | Citation ID validity | Retrieval errors | Generation errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `generation_baseline` | 0.430 | 0.391 | 0.667 | 0.357 | 0.375 | 1.000 | 0 | 0 |
-| Final strict generation | 0.875 | 0.855 | 1.000 | 0.786 | 0.758 | 1.000 | 0 | 0 |
+| Advanced RAG strict generation refresh | 0.867 | 0.845 | 1.000 | 0.870 | 0.750 | 1.000 | 0 | 0 |
 
-Split-level final metrics:
+Naive RAG remains a fixed historical baseline and was not rerun for this
+refresh. The refreshed Advanced RAG run used Qdrant Cloud with an API-key
+authenticated client, while older reports used local Qdrant or frozen local
+retrieval artifacts. Do not compare latency directly across those environments.
+
+Split-level refreshed metrics:
 
 | Split | Queries | Decision accuracy | Answer rate | Safe fallback rate | Group coverage | Pass rate | Retrieval errors | Generation errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| all | 128 | 0.875 | 0.855 | 1.000 | 0.786 | 0.758 | 0 | 0 |
-| development | 85 | 0.894 | 0.868 | 1.000 | 0.790 | 0.765 | 0 | 0 |
-| held_out_test | 43 | 0.837 | 0.833 | 1.000 | 0.780 | 0.744 | 0 | 0 |
+| all | 128 | 0.867 | 0.845 | 1.000 | 0.870 | 0.750 | 0 | 0 |
+| development | 85 | 0.894 | 0.868 | 1.000 | 0.867 | 0.765 | 0 | 0 |
+| held_out_test | 43 | 0.814 | 0.810 | 1.000 | 0.876 | 0.721 | 0 | 0 |
 
 The held-out split is reporting-only and was not used for tuning.
+Citation ID validity is not claim-level human semantic faithfulness review.
 
 ## Safety and Scope
 

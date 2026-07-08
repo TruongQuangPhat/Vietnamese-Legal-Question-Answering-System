@@ -238,27 +238,36 @@ reranking_used = false
 held_out_used_for_tuning = false
 ```
 
-Final adopted run:
+Latest official Advanced RAG quality report:
 
 ```text
-strict_generation_evaluation_answerability_fallback_guard
+artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500
 ```
+
+The refreshed run used Qdrant Cloud through the API-key authenticated
+evaluation client. Older Advanced/Naive reports used local Qdrant or frozen
+local retrieval artifacts, so latency is observability-only and must not be
+compared directly across those environments.
 
 All split:
 
 | Metric | Value |
 | --- | ---: |
 | query_count | 128 |
-| decision_accuracy | 0.875 |
-| answer_allowed_answer_rate | 0.8545454545 |
+| decision_accuracy | 0.8671875 |
+| answer_allowed_answer_rate | 0.8454545455 |
 | fallback_required_fallback_rate | 1.0 |
-| selected_evidence_group_coverage | 0.7861616162 |
-| case_pass_rate | 0.7578125 |
+| selected_evidence_group_coverage | 0.8702525253 |
+| case_pass_rate | 0.75 |
 | case_partial_rate | 0.1171875 |
-| case_fail_rate | 0.125 |
+| case_fail_rate | 0.1328125 |
 | citation_id_validity_rate | 1.0 |
 | retrieval_error_count | 0 |
 | generation_error_count | 0 |
+| pipeline_answer_count | 93 |
+| pipeline_fallback_count | 35 |
+| fallback_without_llm_count | 24 |
+| fallback_with_citations_count | 11 |
 
 Development split:
 
@@ -268,8 +277,9 @@ Development split:
 | decision_accuracy | 0.8941176471 |
 | answer_allowed_answer_rate | 0.8676470588 |
 | fallback_required_fallback_rate | 1.0 |
-| selected_evidence_group_coverage | 0.7897058824 |
+| selected_evidence_group_coverage | 0.8669117647 |
 | case_pass_rate | 0.7647058824 |
+| citation_id_validity_rate | 1.0 |
 | retrieval_error_count | 0 |
 | generation_error_count | 0 |
 
@@ -278,13 +288,23 @@ Held-out test split:
 | Metric | Value |
 | --- | ---: |
 | query_count | 43 |
-| decision_accuracy | 0.8372093023 |
-| answer_allowed_answer_rate | 0.8333333333 |
+| decision_accuracy | 0.8139534884 |
+| answer_allowed_answer_rate | 0.8095238095 |
 | fallback_required_fallback_rate | 1.0 |
-| selected_evidence_group_coverage | 0.7804232804 |
-| case_pass_rate | 0.7441860465 |
+| selected_evidence_group_coverage | 0.8756613757 |
+| case_pass_rate | 0.7209302326 |
+| citation_id_validity_rate | 1.0 |
 | retrieval_error_count | 0 |
 | generation_error_count | 0 |
+
+Historical adopted report:
+
+```text
+strict_generation_evaluation_answerability_fallback_guard
+```
+
+The Naive RAG generation baseline remains a fixed historical comparator and
+was not rerun during the metric refresh.
 
 Rejected trial:
 
@@ -296,11 +316,15 @@ It was tried but not adopted because development improved while held-out
 regressed and `generation_error_count` became `1`.
 
 Runtime QA calibration now distinguishes three answer statuses without changing
-the official benchmark metrics above: `fallback`, `answered_with_caution`, and
+the benchmark schema: `fallback`, `answered_with_caution`, and
 `answered`. No-evidence, unsafe, parent-only, missing-metadata, high-risk, or
 evaluation-target-missing cases still fallback and must not call the LLM.
 `answered_with_caution` is reserved for weak but citable selected evidence and
 still requires citation ID validation.
+
+Citation ID validity and the `unsupported_or_uncited_claim_rate` check are not
+claim-level human semantic faithfulness review. No qualified human legal review
+has been completed for generated claims.
 
 ## 9. Testing State
 
@@ -327,6 +351,9 @@ context-dependent references such as "vậy", "như trên", "cái đó", or
 "trường hợp này".
 
 Unit tests cover service, processing, retrieval, and evaluation modules.
+Evaluation runners that construct Qdrant clients now support authenticated
+Qdrant Cloud by resolving `QDRANT_API_KEY` from the private environment while
+preserving unauthenticated local Qdrant behavior.
 
 ## 10. Product MVP State
 
@@ -514,10 +541,10 @@ The following are not part of the current adopted evaluated pipeline unless a fu
 
 Deployment follow-up:
 
-* calibrate safe fallback/evidence gates without weakening legal safety;
-* improve retrieval and selected-evidence quality;
 * optimize real QA memory use or redesign embedding serving;
-* add authentication and rate limiting before a serious public demo;
+* optional latency benchmark under one consistent environment;
+* optional claim-level qualified human/legal review of generated claims;
+* future AWS/Azure deployment planning and managed database/runtime sizing.
 * add durable, user-scoped conversation storage if server-side history becomes
   a product requirement.
 

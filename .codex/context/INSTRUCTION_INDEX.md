@@ -56,7 +56,11 @@ Current durable status:
 * frozen benchmark `v0.1.0` has 128 queries with development and held-out reporting splits;
 * final adopted retrieval is `coverage_aware_quota`;
 * reranking was evaluated but not adopted;
+* latest Advanced RAG strict generation metrics are recorded at
+  `artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500`;
 * final adopted strict generation evaluation uses coverage-aware retrieval, strict legal generation, citation ID guard, and answerability fallback guard;
+* evaluation runners support authenticated Qdrant Cloud through private
+  `QDRANT_API_KEY` environment configuration;
 * workflow-level integration tests exist for corpus, retrieval, and evaluation;
 * Render backend and Vercel frontend infrastructure are deployed; read
   `docs/api_deployment.md` for URLs, runbook, and the Render Free memory

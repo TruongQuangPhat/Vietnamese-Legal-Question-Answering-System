@@ -139,11 +139,12 @@ Citation ID validity is required, but it is not a substitute for qualified human
 Current final strict generation result on all 128 benchmark queries:
 
 ```text
-decision_accuracy = 0.875
-answer_allowed_answer_rate = 0.8545454545
+report = artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500
+decision_accuracy = 0.8671875
+answer_allowed_answer_rate = 0.8454545455
 fallback_required_fallback_rate = 1.0
-selected_evidence_group_coverage = 0.7861616162
-case_pass_rate = 0.7578125
+selected_evidence_group_coverage = 0.8702525253
+case_pass_rate = 0.75
 citation_id_validity_rate = 1.0
 retrieval_error_count = 0
 generation_error_count = 0
@@ -244,6 +245,12 @@ Full retrieval or strict generation evaluation may require real Qdrant, real mod
 Do not run real evaluation pipelines unless explicitly scoped by the user.
 
 Never expose secrets or API keys in logs, reports, prompts, or artifacts.
+
+Evaluation runners support authenticated Qdrant Cloud through `QDRANT_API_KEY`
+from the private environment. Do not print it, pass it as a CLI argument, or
+write it to reports. Use unique output directories for official refreshes, do
+not overwrite historical reports, and do not rerun Naive RAG unless explicitly
+requested. Latency comparisons require the same Qdrant/runtime environment.
 
 ## OOP and Docstring Rules
 

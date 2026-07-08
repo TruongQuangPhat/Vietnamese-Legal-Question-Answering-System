@@ -102,7 +102,11 @@ Current durable state:
 - Frozen benchmark `v0.1.0` contains 128 queries: 85 development and 43 held-out reporting-only cases.
 - Final adopted retrieval is `coverage_aware_quota`.
 - Reranking was evaluated but not adopted.
-- Final strict generation all-split metrics include decision accuracy `0.875`, fallback-required fallback rate `1.000`, citation ID validity `1.000`, retrieval errors `0`, and generation errors `0`.
+- Latest Advanced RAG strict generation all-split metrics are recorded in
+  `artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500`
+  and include decision accuracy `0.8671875`, fallback-required fallback rate
+  `1.000`, citation ID validity `1.000`, retrieval errors `0`, and generation
+  errors `0`.
 - The Legal QA product MVP is complete for fake-mode local demo usage:
   FastAPI endpoints under `src/api`, Next.js frontend under `apps/frontend`,
   local Makefile commands, backend/frontend Dockerfiles, and
@@ -228,6 +232,9 @@ Unless explicitly scoped:
 - never print or serialize API keys;
 - never dump environment variables;
 - never write Authorization headers or tokens to reports.
+- evaluation runners support authenticated Qdrant Cloud through
+  `QDRANT_API_KEY`; use it only from the private environment and never pass it
+  as a CLI argument;
 - for local backend development, use
   `LEGAL_QA_SERVICE_MODE=fake uv run python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000`;
   do not use `uv run uvicorn`;
@@ -262,6 +269,12 @@ controlled ablation explicitly changes one component.
 
 Reranking is not part of the final adopted pipeline unless a future task
 explicitly scopes a new ablation.
+
+When refreshing official metrics, use a unique non-existing output directory
+under `artifacts/reports/evaluation/`. Do not overwrite historical reports.
+Do not rerun the Naive RAG baseline unless explicitly requested. Do not compare
+latency across local-Qdrant and Qdrant-Cloud runs; latency comparisons require
+the same runtime environment.
 
 If model training or fine-tuning is introduced, use train/validation/test splits.
 

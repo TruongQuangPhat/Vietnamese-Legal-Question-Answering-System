@@ -98,21 +98,29 @@ Strict generation was evaluated with:
 - expected answer allowed: `110`
 - expected fallback required: `18`
 
-The final adopted generation run is
+Latest official Advanced RAG quality report:
+`artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500`.
+
+The historical answerability-fallback report remains available at
 `strict_generation_evaluation_answerability_fallback_guard`.
 
 | System | Decision accuracy | Answer rate | Safe fallback rate | Group coverage | Pass rate | Citation validity | Retrieval errors | Generation errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | generation_baseline | 0.430 | 0.391 | 0.667 | 0.357 | 0.375 | 1.000 | 0 | 0 |
-| strict_generation_evaluation with answerability fallback guard | 0.875 | 0.855 | 1.000 | 0.786 | 0.758 | 1.000 | 0 | 0 |
+| Advanced RAG strict generation refresh | 0.867 | 0.845 | 1.000 | 0.870 | 0.750 | 1.000 | 0 | 0 |
 
-Split-level final strict generation metrics:
+Split-level refreshed strict generation metrics:
 
 | Split | Decision accuracy | Answer rate | Safe fallback rate | Group coverage | Pass rate | Retrieval errors | Generation errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| all | 0.875 | 0.855 | 1.000 | 0.786 | 0.758 | 0 | 0 |
-| development | 0.894 | 0.868 | 1.000 | 0.790 | 0.765 | 0 | 0 |
-| held_out_test | 0.837 | 0.833 | 1.000 | 0.780 | 0.744 | 0 | 0 |
+| all | 0.867 | 0.845 | 1.000 | 0.870 | 0.750 | 0 | 0 |
+| development | 0.894 | 0.868 | 1.000 | 0.867 | 0.765 | 0 | 0 |
+| held_out_test | 0.814 | 0.810 | 1.000 | 0.876 | 0.721 | 0 | 0 |
+
+The refreshed run used Qdrant Cloud through the API-key authenticated
+evaluation client. Historical Advanced/Naive reports used local Qdrant or
+frozen local retrieval artifacts, so latency is observability-only and must not
+be compared directly across those reports.
 
 The residual answer evidence selection trial
 `strict_generation_evaluation_residual_answer_allowed_improvement` was tried
@@ -167,19 +175,19 @@ Final adopted retrieval strategy:
 coverage_aware_quota
 ```
 
-Final adopted generation workflow:
+Latest official Advanced RAG quality report:
 
 ```text
-strict_generation_evaluation_answerability_fallback_guard
+artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500
 ```
 
-Final all-split metrics:
+Latest all-split metrics:
 
-- decision_accuracy: `0.875`
-- answer_allowed_answer_rate: `0.855`
+- decision_accuracy: `0.867`
+- answer_allowed_answer_rate: `0.845`
 - fallback_required_fallback_rate: `1.000`
-- selected_evidence_group_coverage: `0.786`
-- case_pass_rate: `0.758`
+- selected_evidence_group_coverage: `0.870`
+- case_pass_rate: `0.750`
 - citation_id_validity_rate: `1.000`
 - retrieval_error_count: `0`
 - generation_error_count: `0`
@@ -193,6 +201,8 @@ Final all-split metrics:
 - Held-out test excludes high-risk sanction/criminal QA that lacks qualified
   human legal review.
 - Provider output may be nondeterministic.
+- The refreshed run used Qdrant Cloud. Do not compare latency directly against
+  historical local-Qdrant or frozen-retrieval reports.
 - Time-aware filtering is not adopted yet.
 - API deployment is not part of this evaluation.
 
@@ -204,16 +214,28 @@ The final strict generation evaluation requires:
 - OpenRouter credentials configured;
 - existing benchmark, retrieval, and frozen generation baseline artifacts.
 
-Run:
+Run future refreshes with a unique output directory. `QDRANT_API_KEY` is read
+from the private environment when using authenticated Qdrant Cloud; leave it
+unset for unauthenticated local Qdrant.
+
+Example:
 
 ```bash
-uv run --extra qdrant --extra embedding python \
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+OUTPUT_DIR="artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_${RUN_ID}"
+test ! -e "$OUTPUT_DIR"
+
+env UV_CACHE_DIR=/tmp/vnlaw-uv-cache \
+  uv run --extra qdrant --extra embedding \
+  python \
   scripts/evaluation/run_strict_generation_evaluation.py \
   --coverage-retrieval-dir artifacts/reports/evaluation/advanced_rag/coverage_aware_retrieval \
   --generation-baseline-dir artifacts/reports/evaluation/naive_rag_baseline/generation \
-  --output-dir artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answerability_fallback_guard \
+  --retrieval-config configs/retrieval/retrieval.yml \
+  --llm-config configs/llm/openrouter.yml \
+  --output-dir "$OUTPUT_DIR" \
   --collection-name vnlaw_chunks_bgem3_v1_full \
-  --url http://localhost:6333 \
+  --url "$QDRANT_URL" \
   --device cpu \
   --provider openrouter
 ```
@@ -222,6 +244,15 @@ Do not use this command for code review or documentation-only validation. It
 runs the real evaluation workflow.
 
 ## Changelog
+
+### 2026-07-08
+
+- Refreshed Advanced RAG strict generation metrics after answer-policy
+  calibration.
+- Ran against Qdrant Cloud with API-key authenticated evaluation client.
+- Latest all-split result: `0.867` decision accuracy, `1.000` safe fallback
+  rate, `1.000` citation ID validity, `0` retrieval errors, and `0`
+  generation errors.
 
 ### 2026-06-27
 

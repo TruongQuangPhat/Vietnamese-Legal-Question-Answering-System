@@ -131,6 +131,25 @@ Do not tune on held-out test. Held-out results are reporting-only.
 
 Do not overwrite official evaluation artifacts unless explicitly scoped by the user.
 
+Latest official Advanced RAG strict generation report:
+
+```text
+artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500
+decision_accuracy = 0.8671875
+answer_allowed_answer_rate = 0.8454545455
+fallback_required_fallback_rate = 1.0
+selected_evidence_group_coverage = 0.8702525253
+case_pass_rate = 0.75
+citation_id_validity_rate = 1.0
+retrieval_error_count = 0
+generation_error_count = 0
+```
+
+Naive RAG is a fixed historical baseline unless explicitly rerun. Real
+evaluation against Qdrant Cloud uses `QDRANT_API_KEY` from the private
+environment. Use unique output directories and do not compare latency across
+local-Qdrant and Qdrant-Cloud runs.
+
 ## Implementation Boundaries
 
 Expected functional components may include:
