@@ -23,8 +23,9 @@ from src.evaluation.benchmark.fusion_ablation import (
 )
 from src.evaluation.benchmark.loader import BenchmarkFileSet
 from src.evaluation.benchmark.retrieval_baseline import aggregate_case_metrics, build_breakdowns
+from src.evaluation.qdrant import build_evaluation_qdrant_client
 from src.indexing.embedding_model import BgeM3EmbeddingModel, EmbeddingModelError
-from src.indexing.qdrant_collection import QdrantCollectionError, build_qdrant_client
+from src.indexing.qdrant_collection import QdrantCollectionError
 from src.retrieval.dense_retriever import DenseRetriever, DenseRetrieverError
 from src.retrieval.sparse_retriever import SparseBM25Retriever, SparseRetrieverError
 from src.retrieval.workflows.common import DEFAULT_CONFIG, load_retrieval_config
@@ -97,7 +98,7 @@ async def run_command(argv: list[str] | None = None) -> int:
         collection_name = args.collection_name or retrieval_config.qdrant.collection_name
         url = args.url or retrieval_config.qdrant.url
         device = args.device or retrieval_config.embedding.device
-        client = build_qdrant_client(
+        client = build_evaluation_qdrant_client(
             url=url, timeout_seconds=retrieval_config.qdrant.timeout_seconds
         )
         collection_info = await read_collection_info(client, collection_name)

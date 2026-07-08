@@ -140,11 +140,12 @@ evidence_group_coverage@10 = 0.7712765957
 Final strict generation on all 128 benchmark queries:
 
 ```text id="jsm4wz"
-decision_accuracy = 0.875
-answer_allowed_answer_rate = 0.8545454545
+report = artifacts/reports/evaluation/advanced_rag/strict_generation_evaluation_answer_policy_refresh_20260708_235500
+decision_accuracy = 0.8671875
+answer_allowed_answer_rate = 0.8454545455
 fallback_required_fallback_rate = 1.0
-selected_evidence_group_coverage = 0.7861616162
-case_pass_rate = 0.7578125
+selected_evidence_group_coverage = 0.8702525253
+case_pass_rate = 0.75
 citation_id_validity_rate = 1.0
 retrieval_error_count = 0
 generation_error_count = 0
