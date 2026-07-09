@@ -1,0 +1,45 @@
+name: Protected Path Guard
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  protected-paths:
+    name: Check protected paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail on protected path changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          changed_paths="$(
+            git diff --name-only "$BASE_SHA...$HEAD_SHA" -- \
+              data/raw \
+              data/interim \
+              data/reports \
+              data/processed/legal_chunks.jsonl \
+              data/eval \
+              artifacts/reports/evaluation
+          )"
+
+          if [ -n "$changed_paths" ]; then
+            printf 'Protected path changes require an explicitly scoped official rerun PR.\n'
+            printf 'Changed protected paths:\n'
+            printf '%s\n' "$changed_paths"
+            exit 1
+          fi
+
+          printf 'No protected path changes detected.\n'
