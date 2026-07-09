@@ -65,6 +65,11 @@ Current durable status:
 * Render backend and Vercel frontend infrastructure are deployed; read
   `docs/api_deployment.md` for URLs, runbook, and the Render Free memory
   limitation;
+* conversation storage remains memory by default, with optional PostgreSQL
+  storage guarded by `LEGAL_QA_CONVERSATION_STORE=postgres`,
+  `LEGAL_QA_DATABASE_URL`, schema file
+  `scripts/database/postgres_conversation_store.sql`, and real-DB validation
+  opt-in `LEGAL_QA_ALLOW_DB_TESTS=1`;
 * deployed backend mode remains `real`; liveness/readiness pass, while real
   `/ask` is blocked by the 512 MB Render Free limit;
 * GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part

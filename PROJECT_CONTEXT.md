@@ -408,8 +408,15 @@ local use. PostgreSQL-backed durable conversation storage is available through
 `LEGAL_QA_CONVERSATION_STORE=postgres` and `LEGAL_QA_DATABASE_URL` after
 applying `scripts/database/postgres_conversation_store.sql`. Managed
 PostgreSQL is the intended durable store for future Render, AWS, or Azure
-deployments. Full login/user accounts remain future work; nullable ownership
-fields support session ownership without requiring account records.
+deployments. A guarded smoke script exists at
+`scripts/database/smoke_postgres_conversation_store.py`, and optional real-DB
+integration coverage exists at
+`tests/integration/database/test_postgres_conversation_store.py`; both require
+`LEGAL_QA_ALLOW_DB_TESTS=1` and `LEGAL_QA_DATABASE_URL` before connecting to a
+database. Current production should remain on `LEGAL_QA_CONVERSATION_STORE=memory`
+until a dedicated managed PostgreSQL database passes this validation runbook.
+Full login/user accounts remain future work; nullable ownership fields support
+session ownership without requiring account records.
 
 Conversation APIs can enforce minimal anonymous session ownership with
 `LEGAL_QA_AUTH_ENABLED=true`, `LEGAL_QA_SESSION_SECRET`, and

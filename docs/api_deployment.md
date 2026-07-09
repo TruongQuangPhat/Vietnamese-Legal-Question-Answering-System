@@ -275,15 +275,120 @@ and requires `LEGAL_QA_DATABASE_URL` from a secret environment variable plus the
 optional `postgres` dependency extra. Apply
 `scripts/database/postgres_conversation_store.sql` to the target database before
 serving traffic in PostgreSQL mode. Managed PostgreSQL is the intended durable
-store for future Render, AWS, or Azure deployments. Default tests do not require
-local Docker or PostgreSQL. Real PostgreSQL integration tests, if added, must be
-guarded by an explicit opt-in such as `LEGAL_QA_ALLOW_DB_TESTS=1`.
+store for future Render, AWS, or Azure deployments. The schema is repeatable,
+uses text primary keys, cascades message deletion through the conversation
+foreign key, and includes nullable `owner_id` fields plus owner indexes for
+future session ownership. Default tests do not require local Docker or
+PostgreSQL. Real PostgreSQL integration tests are guarded by
+`LEGAL_QA_ALLOW_DB_TESTS=1`.
 
 For a PostgreSQL-backed deployment, install the optional extra in the backend
 build, for example by adding `--extra postgres` to the existing `uv sync`
 command. Apply the schema with an operator-controlled command such as
 `psql "$LEGAL_QA_DATABASE_URL" -f scripts/database/postgres_conversation_store.sql`.
 Do not commit database URLs, dumps, or generated local database files.
+
+### PostgreSQL conversation storage runbook
+
+Current production should remain on memory storage until a dedicated managed
+PostgreSQL database has passed smoke validation. Do not change Render
+environment values automatically, do not enable auth/session ownership in this
+stage, and do not validate this work by repeatedly calling production
+`/api/v1/legal-qa/ask`.
+
+Use a dedicated development or staging PostgreSQL database first. Install the
+optional dependency extra in the environment that will run validation:
+
+```bash
+uv sync --extra postgres
+```
+
+Set the database URL only in local environment or a secret manager:
+
+```bash
+export LEGAL_QA_DATABASE_URL='<secret managed PostgreSQL URL>'
+export LEGAL_QA_ALLOW_DB_TESTS=1
+```
+
+Apply the schema with either `psql` or the guarded smoke script. The schema file
+is:
+
+```text
+scripts/database/postgres_conversation_store.sql
+```
+
+Operator-controlled `psql` application:
+
+```bash
+psql "$LEGAL_QA_DATABASE_URL" -f scripts/database/postgres_conversation_store.sql
+```
+
+Smoke script application plus validation:
+
+```bash
+env LEGAL_QA_ALLOW_DB_TESTS=1 \
+  uv run --extra postgres python scripts/database/smoke_postgres_conversation_store.py --apply-schema
+```
+
+If the schema has already been applied, run the lifecycle smoke without schema
+application:
+
+```bash
+env LEGAL_QA_ALLOW_DB_TESTS=1 \
+  uv run --extra postgres python scripts/database/smoke_postgres_conversation_store.py
+```
+
+The smoke script creates one temporary conversation using a
+`postgres_smoke_<timestamp>_<random>` prefix, appends user and assistant
+messages, lists, reads, renames, deletes, verifies message cascade deletion, and
+cleans up its own records. It refuses to run unless
+`LEGAL_QA_ALLOW_DB_TESTS=1` and `LEGAL_QA_DATABASE_URL` are set. It does not
+call Qdrant, OpenRouter, the QA endpoint, the frontend, or production services,
+and it does not print the database URL.
+
+Optional real-DB integration tests are skipped by default. Run them only against
+a dedicated dev/staging DB:
+
+```bash
+env LEGAL_QA_ALLOW_DB_TESTS=1 \
+  uv run --extra postgres pytest tests/integration/database/test_postgres_conversation_store.py -q
+```
+
+If the test should apply the schema before executing, add:
+
+```bash
+LEGAL_QA_APPLY_DB_SCHEMA=1
+```
+
+After validation, the future Render backend change is limited to the backend
+dependency installation and secret env values:
+
+```env
+LEGAL_QA_CONVERSATION_STORE=postgres
+LEGAL_QA_DATABASE_URL=<secret managed PostgreSQL URL>
+```
+
+Keep these current production values until that validation is complete:
+
+```env
+LEGAL_QA_RATE_LIMIT_ENABLED=true
+LEGAL_QA_RATE_LIMIT_REQUESTS=10
+LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
+LEGAL_QA_CONVERSATION_STORE=memory
+LEGAL_QA_DATABASE_URL=
+LEGAL_QA_AUTH_ENABLED=false
+```
+
+Rollback is configuration-only:
+
+```env
+LEGAL_QA_CONVERSATION_STORE=memory
+LEGAL_QA_DATABASE_URL=
+```
+
+Redeploy the backend after the rollback env change. Existing PostgreSQL
+conversation rows remain in the database, but the app returns to the process
+local memory repository.
 
 `LEGAL_QA_AUTH_ENABLED=false` preserves the legacy unauthenticated conversation
 API behavior. `LEGAL_QA_AUTH_ENABLED=true` enables minimal anonymous session
@@ -1075,19 +1180,20 @@ Do not add the legal corpus or model cache to the image casually. Prefer
 explicit, read-only artifact mounts or a controlled artifact distribution
 mechanism, with integrity/version checks and least-privilege access.
 
-## Conversation persistence limitation
+## Conversation persistence status
 
-The conversation API repository is process-local and in memory. It disappears
-on restart and is not shared across workers or replicas. There is no durable
-server-side chat history unless a database-backed implementation is added.
-There is also no authenticated user ownership boundary.
+The default conversation API repository is process-local and in memory. It
+disappears on restart and is not shared across workers or replicas.
+PostgreSQL-backed durable conversation storage exists behind
+`LEGAL_QA_CONVERSATION_STORE=postgres`, but production should stay on memory
+until the managed database schema and smoke validation runbook above have been
+completed. Authenticated user ownership remains disabled unless explicitly
+enabled later.
 
 Frontend `localStorage` remains the rich UI source of truth and backend sync is
 best-effort. Backend messages do not preserve the full evidence payload needed
-for UI restoration. Multi-worker or autoscaled deployment would make current
-conversation endpoints inconsistent; deploy a single worker only for
-contract/demo use, or implement durable user-scoped persistence before relying
-on server-side history.
+for UI restoration. Multi-worker or autoscaled deployment requires PostgreSQL
+conversation storage before relying on server-side history.
 
 Conversation context is retrieval-query assistance only. It is not legal
 evidence, must not be cited, and raw context or prepared retrieval queries must
