@@ -55,7 +55,11 @@ def main() -> int:
             _apply_schema(database_url)
         _run_smoke(database_url)
     except Exception as exc:
-        print(f"PostgreSQL conversation smoke failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(
+            "PostgreSQL conversation smoke failed: "
+            f"{type(exc).__name__}: {_safe_error_message(exc)}",
+            file=sys.stderr,
+        )
         return 1
 
     print("PostgreSQL conversation smoke passed using a redacted database URL.")
@@ -191,6 +195,12 @@ def _id_factory(test_id: str):
 def _test_id() -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     return f"{TEST_PREFIX}_{timestamp}_{secrets.token_hex(4)}"
+
+
+def _safe_error_message(exc: Exception) -> str:
+    if isinstance(exc, (AssertionError, FileNotFoundError, RuntimeError)):
+        return str(exc)
+    return "validation failed; check database connectivity and schema without exposing secrets"
 
 
 if __name__ == "__main__":

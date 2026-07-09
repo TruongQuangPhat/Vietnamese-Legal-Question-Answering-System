@@ -116,6 +116,9 @@ Current durable state:
   `LEGAL_QA_DATABASE_URL`, with schema at
   `scripts/database/postgres_conversation_store.sql` and guarded real-DB
   validation through `scripts/database/smoke_postgres_conversation_store.py`.
+  Neon managed PostgreSQL validation for this store completed on 2026-07-09,
+  but production Render remains on memory storage until its environment is
+  explicitly changed.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.

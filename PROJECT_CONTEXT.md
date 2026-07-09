@@ -411,10 +411,15 @@ PostgreSQL is the intended durable store for future Render, AWS, or Azure
 deployments. A guarded smoke script exists at
 `scripts/database/smoke_postgres_conversation_store.py`, and optional real-DB
 integration coverage exists at
-`tests/integration/database/test_postgres_conversation_store.py`; both require
-`LEGAL_QA_ALLOW_DB_TESTS=1` and `LEGAL_QA_DATABASE_URL` before connecting to a
-database. Current production should remain on `LEGAL_QA_CONVERSATION_STORE=memory`
-until a dedicated managed PostgreSQL database passes this validation runbook.
+`tests/integration/database/test_postgres_conversation_store.py`. The smoke
+script requires `LEGAL_QA_ALLOW_DB_TESTS=1` and `LEGAL_QA_DATABASE_URL` before
+connecting to a database; the pytest integration test also requires the
+repository-wide `LEGAL_QA_ALLOW_REAL_TESTS=1` gate. Neon managed PostgreSQL
+validation completed on 2026-07-09: schema application passed, the standalone
+smoke script passed, and the real DB integration test passed. Current
+production remains on `LEGAL_QA_CONVERSATION_STORE=memory`; switching Render to
+PostgreSQL is a future env-only deployment step requiring
+`LEGAL_QA_CONVERSATION_STORE=postgres` and a secret `LEGAL_QA_DATABASE_URL`.
 Full login/user accounts remain future work; nullable ownership fields support
 session ownership without requiring account records.
 

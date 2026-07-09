@@ -296,6 +296,12 @@ environment values automatically, do not enable auth/session ownership in this
 stage, and do not validate this work by repeatedly calling production
 `/api/v1/legal-qa/ask`.
 
+Validation status on 2026-07-09: Neon managed PostgreSQL validation completed
+for conversation storage. Schema application through the guarded smoke script
+passed, the standalone smoke script passed, and the real DB integration test
+passed. Production Render was not switched to PostgreSQL in this branch, and
+memory remains the default until production environment values are changed.
+
 Use a dedicated development or staging PostgreSQL database first. Install the
 optional dependency extra in the environment that will run validation:
 
@@ -350,9 +356,13 @@ Optional real-DB integration tests are skipped by default. Run them only against
 a dedicated dev/staging DB:
 
 ```bash
-env LEGAL_QA_ALLOW_DB_TESTS=1 \
+env LEGAL_QA_ALLOW_DB_TESTS=1 LEGAL_QA_ALLOW_REAL_TESTS=1 \
   uv run --extra postgres pytest tests/integration/database/test_postgres_conversation_store.py -q
 ```
+
+`LEGAL_QA_ALLOW_REAL_TESTS=1` is the repository-wide pytest real-service gate;
+without it, the shared pytest safety fixture clears real-service environment
+variables and the database integration test is skipped.
 
 If the test should apply the schema before executing, add:
 
