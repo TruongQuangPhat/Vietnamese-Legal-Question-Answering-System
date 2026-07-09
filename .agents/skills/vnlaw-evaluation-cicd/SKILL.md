@@ -29,6 +29,7 @@ Current workflow-level integration tests exist under:
 tests/integration/corpus/
 tests/integration/retrieval/
 tests/integration/evaluation/
+tests/integration/database/  # guarded real-service DB tests
 ```
 
 The current final evaluated workflow uses:
@@ -70,6 +71,7 @@ release         → config validation, reproducibility, optional Docker/API chec
 ```
 
 Do not require real Qdrant, real LLMs, real embedding models, or full benchmark runs in routine unit/integration tests.
+Real database tests must remain explicitly opt-in and skipped by default.
 
 ## Relevant Files
 

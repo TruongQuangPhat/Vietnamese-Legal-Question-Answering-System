@@ -74,9 +74,12 @@ The following foundations are complete and validated:
 * strict legal generation;
 * citation ID guard;
 * answerability fallback guard;
+* optional PostgreSQL conversation-store validation with guarded smoke and
+  database integration tests;
 * retrieval evaluation;
 * strict generation evaluation;
-* workflow-level integration tests for corpus, retrieval, and evaluation.
+* workflow-level integration tests for corpus, retrieval, evaluation, and
+  guarded database validation.
 
 Current benchmark state:
 
