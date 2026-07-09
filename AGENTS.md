@@ -117,8 +117,12 @@ Current durable state:
   `scripts/database/postgres_conversation_store.sql` and guarded real-DB
   validation through `scripts/database/smoke_postgres_conversation_store.py`.
   Neon managed PostgreSQL validation for this store completed on 2026-07-09,
-  but production Render remains on memory storage until its environment is
-  explicitly changed.
+  and production Render PostgreSQL conversation storage was enabled and
+  conversation-CRUD verified on 2026-07-09. Render stores
+  `LEGAL_QA_DATABASE_URL` as a secret, uses
+  `LEGAL_QA_CONVERSATION_STORE=postgres`, keeps `LEGAL_QA_AUTH_ENABLED=false`,
+  and keeps rate limiting enabled. Do not use production
+  `/api/v1/legal-qa/ask` for conversation storage validation.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.

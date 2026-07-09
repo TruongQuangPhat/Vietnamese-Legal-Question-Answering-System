@@ -416,10 +416,14 @@ script requires `LEGAL_QA_ALLOW_DB_TESTS=1` and `LEGAL_QA_DATABASE_URL` before
 connecting to a database; the pytest integration test also requires the
 repository-wide `LEGAL_QA_ALLOW_REAL_TESTS=1` gate. Neon managed PostgreSQL
 validation completed on 2026-07-09: schema application passed, the standalone
-smoke script passed, and the real DB integration test passed. Current
-production remains on `LEGAL_QA_CONVERSATION_STORE=memory`; switching Render to
-PostgreSQL is a future env-only deployment step requiring
-`LEGAL_QA_CONVERSATION_STORE=postgres` and a secret `LEGAL_QA_DATABASE_URL`.
+smoke script passed, and the real DB integration test passed. Production Render
+PostgreSQL conversation storage was enabled and verified on 2026-07-09:
+`LEGAL_QA_CONVERSATION_STORE=postgres`, `LEGAL_QA_DATABASE_URL` stored as a
+secret, `LEGAL_QA_AUTH_ENABLED=false`, rate limiting still enabled,
+`GET /health` and `GET /api/v1/readiness` passing, and conversation create,
+read, append message, list, rename, delete, and delete verification passing.
+Production `/api/v1/legal-qa/ask` was not called for this storage validation.
+Rollback remains `LEGAL_QA_CONVERSATION_STORE=memory` plus backend redeploy.
 Full login/user accounts remain future work; nullable ownership fields support
 session ownership without requiring account records.
 

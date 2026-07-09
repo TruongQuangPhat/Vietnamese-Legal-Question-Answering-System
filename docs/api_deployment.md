@@ -400,6 +400,113 @@ Redeploy the backend after the rollback env change. Existing PostgreSQL
 conversation rows remain in the database, but the app returns to the process
 local memory repository.
 
+### Production PostgreSQL conversation storage enablement
+
+Production PostgreSQL conversation storage is enabled on Render. The Neon
+managed PostgreSQL schema was already applied and validated on 2026-07-09, and
+production conversation CRUD verification passed on 2026-07-09. If a different
+database is selected later, apply
+`scripts/database/postgres_conversation_store.sql` to that database before the
+Render switch.
+
+Before changing production, confirm the Render build installs the PostgreSQL
+optional extra:
+
+```bash
+python -m pip install --no-cache-dir uv && \
+  uv sync --frozen --no-dev --extra qdrant --extra embedding --extra postgres && \
+  python scripts/deployment/fetch_processed_chunks.py
+```
+
+The Render dashboard uses these conversation-storage values:
+
+```env
+LEGAL_QA_CONVERSATION_STORE=postgres
+LEGAL_QA_DATABASE_URL=<secret Neon/PostgreSQL URL>
+```
+
+Auth/session ownership remains disabled in this stage:
+
+```env
+LEGAL_QA_AUTH_ENABLED=false
+LEGAL_QA_SESSION_SECRET=
+LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session
+```
+
+The existing rate limit values remain enabled:
+
+```env
+LEGAL_QA_RATE_LIMIT_ENABLED=true
+LEGAL_QA_RATE_LIMIT_REQUESTS=10
+LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
+```
+
+Do not paste the database URL into chat, logs, docs, shell history, or Git.
+Store it only as a Render secret environment value. After saving the Render
+settings, redeploy the backend before verification.
+
+Production verification on 2026-07-09 did not call
+`POST /api/v1/legal-qa/ask`. It used only:
+
+```text
+GET /health
+GET /api/v1/readiness
+GET /api/v1/conversations
+POST /api/v1/conversations
+GET /api/v1/conversations/{conversation_id}
+PATCH /api/v1/conversations/{conversation_id}
+DELETE /api/v1/conversations/{conversation_id}
+POST /api/v1/conversations/{conversation_id}/messages
+```
+
+Conversation request bodies:
+
+```json
+{"title":"postgres_prod_smoke_<timestamp>"}
+```
+
+```json
+{"title":"postgres_prod_smoke_<timestamp>_renamed"}
+```
+
+```json
+{"role":"user","content":"Production PostgreSQL smoke test message."}
+```
+
+```json
+{"role":"assistant","content":"Production PostgreSQL smoke test response."}
+```
+
+The 2026-07-09 production smoke result:
+
+- `GET /health` returned HTTP 200 with `{"status":"ok"}`.
+- `GET /api/v1/readiness` returned HTTP 200 with `ready=true`,
+  `service_mode=real`, valid configuration, and Qdrant collection metadata
+  available.
+- Conversation CRUD passed against PostgreSQL-backed production storage:
+  create, read, append message, list, rename, read renamed conversation, delete,
+  and confirm deleted conversation returned 404.
+- The temporary smoke conversation was cleaned up.
+- `POST /api/v1/legal-qa/ask` was not called.
+
+Expected response shapes are `ConversationSummary` for list/create/rename
+items (`id`, `title`, `created_at`, `updated_at`, `message_count`),
+`ConversationDetail` for reads (`id`, `title`, `created_at`, `updated_at`,
+`messages`), `ConversationMessage` for message appends (`id`, `role`,
+`content`, `created_at`), and HTTP 204 for delete. With
+`LEGAL_QA_AUTH_ENABLED=false`, no `X-Legal-QA-Session` header is required and
+conversation rows are stored with no owner id.
+
+Rollback remains configuration-only:
+
+```env
+LEGAL_QA_CONVERSATION_STORE=memory
+LEGAL_QA_DATABASE_URL=
+```
+
+Redeploy the backend after rollback. PostgreSQL rows remain in the managed
+database, but the app returns to the memory repository.
+
 `LEGAL_QA_AUTH_ENABLED=false` preserves the legacy unauthenticated conversation
 API behavior. `LEGAL_QA_AUTH_ENABLED=true` enables minimal anonymous session
 ownership for conversation routes. In that mode, clients must send the
