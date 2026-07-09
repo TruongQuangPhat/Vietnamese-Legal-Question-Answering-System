@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from threading import Lock
+from typing import TYPE_CHECKING
 
 from src.api.settings import AppSettings, ConversationStoreMode, get_settings
 from src.services.conversation_service import (
@@ -10,20 +12,28 @@ from src.services.conversation_service import (
     ConversationService,
     InMemoryConversationRepository,
 )
-from src.services.legal_qa_api_service import LegalQAService
-from src.services.legal_qa_workflow import build_legal_qa_service
 from src.services.postgres_conversation_repository import PostgresConversationRepository
 from src.services.runtime_readiness import (
     QdrantCollectionReadinessProbe,
     RuntimeReadinessService,
 )
 
+if TYPE_CHECKING:
+    from src.services.legal_qa_api_service import LegalQAService
 
-@lru_cache(maxsize=1)
+_legal_qa_service: LegalQAService | None = None
+_legal_qa_service_lock = Lock()
+
+
 def _get_cached_legal_qa_service() -> LegalQAService:
-    settings = get_settings()
-    settings.validate_runtime_configuration()
-    return build_legal_qa_service(settings=settings.to_legal_qa_runtime_settings())
+    global _legal_qa_service
+    if _legal_qa_service is None:
+        with _legal_qa_service_lock:
+            if _legal_qa_service is None:
+                settings = get_settings()
+                settings.validate_runtime_configuration()
+                _legal_qa_service = _build_legal_qa_service(settings)
+    return _legal_qa_service
 
 
 async def get_legal_qa_service() -> LegalQAService:
@@ -34,6 +44,12 @@ async def get_legal_qa_service() -> LegalQAService:
         only through runtime settings.
     """
     return _get_cached_legal_qa_service()
+
+
+def _build_legal_qa_service(settings: AppSettings) -> LegalQAService:
+    from src.services.legal_qa_workflow import build_legal_qa_service
+
+    return build_legal_qa_service(settings=settings.to_legal_qa_runtime_settings())
 
 
 async def get_runtime_readiness_service() -> RuntimeReadinessService:
@@ -92,7 +108,9 @@ def _build_conversation_repository(settings: AppSettings) -> ConversationReposit
 
 def clear_legal_qa_service_cache() -> None:
     """Clear the cached Legal QA service for tests and runtime reconfiguration."""
-    _get_cached_legal_qa_service.cache_clear()
+    global _legal_qa_service
+    with _legal_qa_service_lock:
+        _legal_qa_service = None
 
 
 def clear_conversation_service_cache() -> None:

@@ -21,6 +21,22 @@ async def test_health_route_returns_ok() -> None:
 
 
 @pytest.mark.asyncio
+async def test_health_does_not_initialize_legal_qa_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_built(*args, **kwargs):
+        raise AssertionError("health must not build the Legal QA service")
+
+    monkeypatch.setattr("src.api.dependencies._build_legal_qa_service", fail_if_built)
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_version_route_returns_metadata() -> None:
     transport = httpx.ASGITransport(app=create_app())
 
@@ -54,6 +70,32 @@ async def test_fake_mode_readiness_needs_no_external_dependencies() -> None:
         "service_mode": "fake",
         "checks": [{"name": "configuration", "ready": True, "detail": "valid"}],
     }
+
+
+@pytest.mark.asyncio
+async def test_readiness_does_not_initialize_legal_qa_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_built(*args, **kwargs):
+        raise AssertionError("readiness must not build the Legal QA service")
+
+    app = create_app()
+    monkeypatch.setattr("src.api.dependencies._build_legal_qa_service", fail_if_built)
+
+    async def readiness_service() -> RuntimeReadinessService:
+        return RuntimeReadinessService(
+            service_mode=LegalQAServiceMode.FAKE,
+            configuration_issues=(),
+            qdrant_collection=None,
+        )
+
+    app.dependency_overrides[get_runtime_readiness_service] = readiness_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/readiness")
+
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio

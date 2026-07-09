@@ -474,10 +474,15 @@ The deployed app does not require local Docker or local Qdrant. Those remain
 tools for separately approved local indexing, migration, snapshot/restore, or
 retrieval debugging.
 
-Render Free has 512 MB RAM. Real `POST /api/v1/legal-qa/ask` is known to
-terminate out of memory when BGE-M3, Torch, and Transformers load. This is a
-runtime resource limit, not an infrastructure deployment failure. Keep
-production in real mode and do not repeatedly call `/ask` on Render Free.
+Render Free has 512 MB RAM. Real `POST /api/v1/legal-qa/ask` previously
+terminated out of memory when BGE-M3, Torch, and Transformers loaded. The API
+dependency path now keeps real Legal QA workflow construction lazy until the
+first `/ask` dependency resolution, caches the initialized service for reuse,
+and keeps `GET /health` plus `GET /api/v1/readiness` from loading BGE-M3 model
+weights. This reduces startup/readiness memory pressure but does not prove that
+Render Free can serve real QA. Do not repeatedly call `/ask`; run only one
+controlled production smoke after optimized code is deployed and health,
+readiness, and session ownership gates pass.
 
 `POST /api/v1/legal-qa/ask` supports optional in-process fixed-window rate
 limiting via `LEGAL_QA_RATE_LIMIT_ENABLED`,

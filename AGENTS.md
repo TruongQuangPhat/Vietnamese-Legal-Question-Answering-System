@@ -128,6 +128,12 @@ Current durable state:
   uses `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`, and conversation-ownership
   smoke verification passed on 2026-07-09. This is anonymous session ownership,
   not OAuth/login.
+- Real production `/api/v1/legal-qa/ask` remains resource-risky on Render Free.
+  FastAPI startup, `/health`, and `/api/v1/readiness` must stay lightweight and
+  must not load BGE-M3 model weights. The real Legal QA workflow is constructed
+  lazily on first `/ask` and cached for reuse. Run only one controlled
+  production `/ask` smoke after deploy confirmation; never use repeated `/ask`
+  calls as validation on Render Free.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.
