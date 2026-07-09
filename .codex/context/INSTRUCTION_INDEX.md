@@ -72,7 +72,9 @@ Current durable status:
   opt-in `LEGAL_QA_ALLOW_DB_TESTS=1`; Neon managed PostgreSQL validation
   completed on 2026-07-09, and production Render PostgreSQL conversation
   storage was enabled and conversation-CRUD verified on 2026-07-09; production
-  keeps `LEGAL_QA_AUTH_ENABLED=false` and rate limiting enabled;
+  keeps `LEGAL_QA_AUTH_ENABLED=false` and rate limiting enabled; anonymous
+  session ownership enablement is prepared but pending manual Render env
+  update, redeploy, and ownership-only smoke verification;
 * deployed backend mode remains `real`; liveness/readiness pass, while real
   `/ask` is blocked by the 512 MB Render Free limit;
 * GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part

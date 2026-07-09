@@ -522,6 +522,105 @@ localStorage and sends it only on conversation API calls; clearing localStorage
 or switching browsers/devices creates a different anonymous session. Production
 should serve it only over HTTPS and should use managed secret storage.
 
+### Production anonymous session ownership enablement
+
+Production anonymous session ownership is the next conversation API hardening
+step after PostgreSQL storage is already enabled and verified. It is not
+OAuth/login and does not create user accounts. It only scopes conversation
+list, read, rename, delete, and message append operations to an opaque owner id
+derived from a client session token.
+
+Manual Render changes:
+
+```env
+LEGAL_QA_AUTH_ENABLED=true
+LEGAL_QA_SESSION_SECRET=<strong random secret>
+LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session
+```
+
+Keep the existing PostgreSQL storage values:
+
+```env
+LEGAL_QA_CONVERSATION_STORE=postgres
+LEGAL_QA_DATABASE_URL=<secret managed PostgreSQL URL>
+```
+
+Keep the existing rate limit values:
+
+```env
+LEGAL_QA_RATE_LIMIT_ENABLED=true
+LEGAL_QA_RATE_LIMIT_REQUESTS=10
+LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
+```
+
+Generate the session secret locally or in a secure secret manager with a command
+such as:
+
+```bash
+openssl rand -hex 32
+```
+
+Do not paste the generated value into chat, logs, docs, shell history, or Git.
+Store it only as a Render secret environment value. Redeploy the backend after
+saving the Render settings.
+
+Before production verification, confirm:
+
+- Render has `LEGAL_QA_AUTH_ENABLED=true`.
+- Render has a strong `LEGAL_QA_SESSION_SECRET` set as a secret.
+- Render has `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`.
+- The backend has redeployed successfully.
+- Production `/api/v1/legal-qa/ask` will not be called.
+
+Production verification must use only:
+
+```text
+GET /health
+GET /api/v1/readiness
+OPTIONS /api/v1/conversations
+GET /api/v1/conversations
+POST /api/v1/conversations
+GET /api/v1/conversations/{conversation_id}
+PATCH /api/v1/conversations/{conversation_id}
+DELETE /api/v1/conversations/{conversation_id}
+POST /api/v1/conversations/{conversation_id}/messages
+```
+
+Use an OPTIONS preflight from the Vercel origin to confirm browser compatibility
+for the session header:
+
+```text
+Origin: https://vnlaw-qa.vercel.app
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: content-type,x-legal-qa-session
+```
+
+Expected ownership smoke:
+
+- `GET /api/v1/conversations` without `X-Legal-QA-Session` returns HTTP 401.
+- Session A creates one temporary conversation with a
+  `session_owner_prod_smoke_<timestamp>` title, reads it, appends one harmless
+  message, lists it, renames it, and reads the renamed state.
+- Session B receives HTTP 404 when reading, renaming, appending to, or deleting
+  Session A's conversation.
+- Session B list does not expose Session A's conversation.
+- Session A deletes the temporary conversation and verifies it is no longer
+  readable.
+
+Use harmless generated smoke session strings only, for example
+`prod-session-a-<timestamp>-<random>` and
+`prod-session-b-<timestamp>-<random>`. Do not document raw smoke session tokens.
+
+Rollback is configuration-only:
+
+```env
+LEGAL_QA_AUTH_ENABLED=false
+```
+
+Redeploy the backend after rollback. PostgreSQL conversation storage remains
+enabled, but conversation APIs return to the legacy unauthenticated ownership
+mode.
+
 `AppSettings.from_env()` loads the project `.env` and then overlays process
 environment values, so an exported/container value has precedence. Tests can
 pass an explicit environment mapping and bypass local `.env` state.

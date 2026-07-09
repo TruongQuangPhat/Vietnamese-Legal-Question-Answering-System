@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
+from src.api import settings as api_settings
 from src.api.dependencies import (
     clear_conversation_service_cache,
     clear_legal_qa_service_cache,
@@ -41,6 +43,7 @@ _REAL_SERVICE_ENV_VARS = (
     "OPENROUTER_MODEL",
     "OPENROUTER_BASE_URL",
 )
+_ORIGINAL_DOTENV_VALUES = api_settings.dotenv_values
 
 
 def _real_tests_enabled() -> bool:
@@ -55,12 +58,22 @@ def _force_safe_test_environment() -> None:
     os.environ["LEGAL_QA_SERVICE_MODE"] = "fake"
 
 
+def _isolated_dotenv_values(*args, **kwargs):
+    dotenv_path = args[0] if args else kwargs.get("dotenv_path")
+    if not _real_tests_enabled() and Path(dotenv_path or api_settings.DEFAULT_DOTENV_PATH) == (
+        api_settings.DEFAULT_DOTENV_PATH
+    ):
+        return {}
+    return _ORIGINAL_DOTENV_VALUES(*args, **kwargs)
+
+
 _force_safe_test_environment()
 
 
 @pytest.fixture(autouse=True)
-def isolate_real_service_environment() -> Iterator[None]:
+def isolate_real_service_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Keep default tests in fake mode and clear cached runtime services."""
+    monkeypatch.setattr(api_settings, "dotenv_values", _isolated_dotenv_values)
     _force_safe_test_environment()
     get_settings.cache_clear()
     clear_legal_qa_service_cache()

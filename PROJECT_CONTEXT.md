@@ -436,7 +436,9 @@ sends a stable anonymous session token for conversation API calls while keeping
 its localStorage conversation cache. Auth-enabled deployments must set a strong
 non-placeholder session secret; clearing localStorage or switching
 browsers/devices creates a different anonymous session. Full login/OAuth
-remains future work.
+remains future work. Production anonymous session ownership enablement is
+prepared in `docs/api_deployment.md` and remains pending manual Render env
+update, redeploy, and conversation-ownership smoke verification.
 
 ### Production deployment handoff
 
