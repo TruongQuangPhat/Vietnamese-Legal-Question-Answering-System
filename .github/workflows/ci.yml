@@ -46,7 +46,7 @@ jobs:
           enable-cache: true
 
       - name: Sync Python dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Check uv lockfile
         run: uv lock --check
