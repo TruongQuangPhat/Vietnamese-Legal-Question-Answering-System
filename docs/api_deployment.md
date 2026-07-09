@@ -522,15 +522,14 @@ localStorage and sends it only on conversation API calls; clearing localStorage
 or switching browsers/devices creates a different anonymous session. Production
 should serve it only over HTTPS and should use managed secret storage.
 
-### Production anonymous session ownership enablement
+### Production anonymous session ownership
 
-Production anonymous session ownership is the next conversation API hardening
-step after PostgreSQL storage is already enabled and verified. It is not
-OAuth/login and does not create user accounts. It only scopes conversation
-list, read, rename, delete, and message append operations to an opaque owner id
-derived from a client session token.
+Production anonymous session ownership is enabled and verified for conversation
+APIs. It is not OAuth/login and does not create user accounts. It only scopes
+conversation list, read, rename, delete, and message append operations to an
+opaque owner id derived from a client session token.
 
-Manual Render changes:
+Render uses:
 
 ```env
 LEGAL_QA_AUTH_ENABLED=true
@@ -564,15 +563,24 @@ Do not paste the generated value into chat, logs, docs, shell history, or Git.
 Store it only as a Render secret environment value. Redeploy the backend after
 saving the Render settings.
 
-Before production verification, confirm:
+Production verification on 2026-07-09 confirmed:
 
-- Render has `LEGAL_QA_AUTH_ENABLED=true`.
-- Render has a strong `LEGAL_QA_SESSION_SECRET` set as a secret.
-- Render has `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`.
-- The backend has redeployed successfully.
-- Production `/api/v1/legal-qa/ask` will not be called.
+- `GET /health` returned HTTP 200 with `{"status":"ok"}`.
+- `GET /api/v1/readiness` returned HTTP 200 with `ready=true`,
+  `service_mode=real`, valid configuration, and Qdrant collection metadata
+  available.
+- Browser preflight from `https://vnlaw-qa.vercel.app` allowed
+  `content-type,x-legal-qa-session`.
+- `GET /api/v1/conversations` without `X-Legal-QA-Session` returned HTTP 401.
+- Session A conversation lifecycle passed: create, read, append one harmless
+  message, list, rename, read renamed state, delete, and verify deletion.
+- Session B isolation passed: read, rename, append, and delete attempts against
+  Session A's conversation returned HTTP 404, and Session B list did not expose
+  Session A's conversation.
+- The temporary smoke conversation was cleaned up.
+- `POST /api/v1/legal-qa/ask` was not called.
 
-Production verification must use only:
+Future ownership verification must use only:
 
 ```text
 GET /health
@@ -595,7 +603,7 @@ Access-Control-Request-Method: POST
 Access-Control-Request-Headers: content-type,x-legal-qa-session
 ```
 
-Expected ownership smoke:
+Expected ownership smoke remains:
 
 - `GET /api/v1/conversations` without `X-Legal-QA-Session` returns HTTP 401.
 - Session A creates one temporary conversation with a

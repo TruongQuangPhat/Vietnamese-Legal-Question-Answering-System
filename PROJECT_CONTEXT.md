@@ -436,9 +436,10 @@ sends a stable anonymous session token for conversation API calls while keeping
 its localStorage conversation cache. Auth-enabled deployments must set a strong
 non-placeholder session secret; clearing localStorage or switching
 browsers/devices creates a different anonymous session. Full login/OAuth
-remains future work. Production anonymous session ownership enablement is
-prepared in `docs/api_deployment.md` and remains pending manual Render env
-update, redeploy, and conversation-ownership smoke verification.
+remains future work. Production anonymous session ownership was enabled and
+verified on 2026-07-09: missing conversation session returns HTTP 401, Session A
+lifecycle passed, Session B cross-owner access returned HTTP 404, Session B list
+did not expose Session A data, and temporary smoke records were cleaned up.
 
 ### Production deployment handoff
 

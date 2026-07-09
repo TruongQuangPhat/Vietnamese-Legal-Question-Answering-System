@@ -123,11 +123,11 @@ Current durable state:
   `LEGAL_QA_CONVERSATION_STORE=postgres`, keeps `LEGAL_QA_AUTH_ENABLED=false`,
   and keeps rate limiting enabled. Do not use production
   `/api/v1/legal-qa/ask` for conversation storage validation.
-- Production anonymous session ownership enablement is prepared but not yet
-  verified. It requires manual Render updates to
-  `LEGAL_QA_AUTH_ENABLED=true`, a strong secret
-  `LEGAL_QA_SESSION_SECRET`, `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`,
-  backend redeploy, and conversation-ownership-only smoke verification.
+- Production anonymous session ownership is enabled and verified. Render uses
+  `LEGAL_QA_AUTH_ENABLED=true`, stores `LEGAL_QA_SESSION_SECRET` as a secret,
+  uses `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`, and conversation-ownership
+  smoke verification passed on 2026-07-09. This is anonymous session ownership,
+  not OAuth/login.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.
