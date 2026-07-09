@@ -76,6 +76,8 @@ The following foundations are complete and validated:
 * answerability fallback guard;
 * optional PostgreSQL conversation-store validation with guarded smoke and
   database integration tests;
+* production anonymous session ownership enablement for conversation APIs is
+  prepared but pending Render env update and ownership-only smoke verification;
 * retrieval evaluation;
 * strict generation evaluation;
 * workflow-level integration tests for corpus, retrieval, evaluation, and
