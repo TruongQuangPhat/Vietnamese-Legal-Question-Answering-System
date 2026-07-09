@@ -189,6 +189,8 @@ and runtime defaults; `.env` only selects or overrides local runtime values.
 For backend runtime configuration and local smoke checks, see
 `docs/backend-runtime.md`.
 
+For future CI/CD workflow and deployment gate guidance, see `docs/ci_cd.md`.
+
 For frontend local development, see `apps/frontend/README.md`.
 
 ## Local Product Development

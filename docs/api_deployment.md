@@ -20,6 +20,8 @@ evidence-selection, or citation gates merely to make deployment smoke pass.
 This document records the repository state as audited without calling Qdrant,
 OpenRouter, embedding inference, or evaluation workflows.
 
+For future GitHub Actions and deployment gate design, see `docs/ci_cd.md`.
+
 ## Production deployment runbook
 
 ### Current services
