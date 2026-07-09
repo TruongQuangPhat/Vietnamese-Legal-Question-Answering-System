@@ -440,7 +440,7 @@ async def test_dependency_provider_rejects_real_mode_before_workflow_constructio
         raise AssertionError("workflow builder must not run")
 
     monkeypatch.setattr("src.api.dependencies.get_settings", lambda: settings)
-    monkeypatch.setattr("src.api.dependencies.build_legal_qa_service", fail_if_called)
+    monkeypatch.setattr("src.api.dependencies._build_legal_qa_service", fail_if_called)
     clear_legal_qa_service_cache()
 
     with pytest.raises(RuntimeConfigurationError) as exc_info:

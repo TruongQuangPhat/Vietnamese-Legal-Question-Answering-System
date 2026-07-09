@@ -1148,6 +1148,57 @@ Migration is a separately approved, one-time operator action. Render real-mode
 readiness may perform its existing bounded `get_collection` metadata read, but
 startup must not turn readiness into migration or indexing.
 
+## Production ask memory optimization
+
+The production `/api/v1/legal-qa/ask` path is intentionally heavier than
+health, readiness, and conversation routes. The real Legal QA workflow now uses
+first-request lazy construction: importing the FastAPI app and starting Uvicorn
+do not build the real RAG workflow, and `GET /health` plus
+`GET /api/v1/readiness` do not load BGE-M3 model weights. The first `/ask`
+request resolves the Legal QA dependency, validates real-mode configuration,
+constructs the Qdrant client, local BM25 retriever, BGE-M3 wrapper, and
+OpenRouter client, then reuses the initialized service for later requests in
+the same process.
+
+Readiness remains lightweight by design:
+
+- `/health` returns deterministic liveness only.
+- `/api/v1/readiness` validates safe configuration and, in real mode, performs
+  one bounded read-only Qdrant collection metadata request.
+- readiness does not embed text, run retrieval, call OpenRouter, load
+  BGE-M3/Torch model weights, mutate Qdrant, crawl, index, or evaluate.
+
+This optimization reduces startup and readiness memory pressure, but it does
+not prove that Render Free has enough memory for the request-time BGE-M3/Torch
+runtime. Do not load-test or repeatedly retry `/ask` on Render Free.
+
+After deploying this optimization, production smoke must be controlled:
+
+1. Confirm Render deployed the optimized commit and existing production env
+   remains unchanged for PostgreSQL conversation storage, anonymous session
+   ownership, Qdrant, OpenRouter, and rate limiting.
+2. Run `GET /health`.
+3. Run `GET /api/v1/readiness`.
+4. Run `GET /api/v1/conversations` without `X-Legal-QA-Session` and confirm
+   HTTP 401.
+5. If all gates pass, run exactly one `POST /api/v1/legal-qa/ask` request with
+   a generated harmless `X-Legal-QA-Session` value and one simple Vietnamese
+   legal question, such as:
+
+```text
+Điều kiện kết hôn theo pháp luật Việt Nam là gì?
+```
+
+Stop after one `/ask` request regardless of result. Record only status code,
+latency, and sanitized response shape. Do not paste a long answer, raw prompt,
+raw session token, provider response, or secret into docs or logs. A successful
+single smoke is not a benchmark, load test, or proof of broad legal QA quality.
+
+If `/ask` returns 5xx, times out, or the Render process restarts, do not retry
+repeatedly. Roll back the deployed commit or move the real backend to a runtime
+with enough memory for BGE-M3/Torch, then repeat the same single-request smoke
+only after health, readiness, and session gates pass again.
+
 ## OpenRouter assumptions and gaps
 
 - The implemented real provider is OpenRouter through its OpenAI-compatible
@@ -1328,11 +1379,13 @@ and the token is never printed. The current public artifact needs no token.
 the Docker context. It is a verified build artifact, not source code. Do not
 commit it, remove its ignore rule, or regenerate it during deployment.
 
-The first real request constructs BGE-M3 and local BM25 lazily. Readiness does
-not download or load the model, so a 200 readiness response does not prove that
-the Render plan has enough RAM, disk/cache space, startup latency, or request
-time for BGE-M3 on CPU. Review Render resource limits and Hugging Face cache
-behavior before deployment.
+The first real `/ask` request constructs the real Legal QA workflow lazily and
+then reuses the initialized service in the same process. Readiness does not
+download or load the model, so a 200 readiness response does not prove that the
+Render plan has enough RAM, disk/cache space, startup latency, or request time
+for BGE-M3 on CPU. Review Render resource limits and Hugging Face cache
+behavior before deployment, and run only the controlled single-request smoke
+described above after deployment confirmation.
 
 Use one Uvicorn worker while conversation storage remains process-local.
 Multiple workers or replicas would produce inconsistent server-side
@@ -1373,16 +1426,17 @@ These checks establish process, configuration, and read-only Qdrant
 availability only. They do not load BGE-M3 or prove that a Legal QA request can
 complete.
 
-Real `POST /api/v1/legal-qa/ask` serving is blocked on Render Free. Loading
-BGE-M3 with Torch and Transformers exceeds the 512 MB instance memory limit
-and causes an out-of-memory termination. Do not repeat `/ask` smoke requests on
-this instance.
+Real `POST /api/v1/legal-qa/ask` serving remains resource-risky on Render Free.
+The optimized API keeps startup, health, and readiness lightweight and defers
+real workflow construction until the first `/ask`, but request-time BGE-M3,
+Torch, local BM25, and generation dependencies may still exceed the 512 MB
+instance memory limit. Do not repeat `/ask` smoke requests on this instance.
 
 Runtime decision: keep `LEGAL_QA_SERVICE_MODE=real` and document the resource
 limitation. Do not switch production to fake mode to make the smoke appear to
-pass. A controlled real QA smoke remains pending until the backend runs with
-sufficient memory or the embedding runtime architecture is changed and
-reviewed.
+pass. A controlled one-request real QA smoke remains pending until this
+optimization is deployed and health, readiness, and session ownership gates
+pass.
 
 ## Container and Compose status
 

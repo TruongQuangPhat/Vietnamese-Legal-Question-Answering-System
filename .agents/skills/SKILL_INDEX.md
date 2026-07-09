@@ -78,6 +78,9 @@ The following foundations are complete and validated:
   database integration tests;
 * production anonymous session ownership for conversation APIs is enabled and
   ownership-only smoke verification passed;
+* production `/api/v1/legal-qa/ask` startup/readiness memory optimization keeps
+  health/readiness lightweight and defers real workflow construction until the
+  first controlled `/ask` request;
 * retrieval evaluation;
 * strict generation evaluation;
 * workflow-level integration tests for corpus, retrieval, evaluation, and

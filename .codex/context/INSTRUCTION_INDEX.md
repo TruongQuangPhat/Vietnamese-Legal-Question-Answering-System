@@ -76,8 +76,10 @@ Current durable status:
   `LEGAL_QA_SESSION_SECRET` stored as a Render secret, and
   `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`; ownership-only smoke
   verification passed on 2026-07-09, and rate limiting remains enabled;
-* deployed backend mode remains `real`; liveness/readiness pass, while real
-  `/ask` is blocked by the 512 MB Render Free limit;
+* deployed backend mode remains `real`; liveness/readiness pass and stay
+  lightweight; real `/ask` workflow construction is lazy on first `/ask`, but
+  Render Free remains memory-risky and a single controlled production `/ask`
+  smoke is pending deploy confirmation;
 * GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part
   of the adopted evaluated pipeline.
 
