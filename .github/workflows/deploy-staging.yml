@@ -2,61 +2,322 @@ name: Deploy Staging
 
 on:
   workflow_dispatch:
+    inputs:
+      service_mode:
+        description: "Backend service mode for staging deployment"
+        required: true
+        default: "fake"
+        type: choice
+        options:
+          - fake
+          - real
+      run_readiness:
+        description: "Run /api/v1/readiness after /health. Use only after config review."
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+  id-token: write
+
+concurrency:
+  group: azure-staging
+  cancel-in-progress: false
 
 jobs:
-  plan-staging:
-    name: Plan staging deployment
+  deploy-staging:
+    name: Deploy Azure staging container app
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     environment: staging
 
+    env:
+      SERVICE_MODE: ${{ inputs.service_mode }}
+      RUN_READINESS: ${{ inputs.run_readiness }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      AZURE_CONTAINER_APP_NAME: ${{ secrets.AZURE_CONTAINER_APP_NAME }}
+      AZURE_IMAGE_NAME: ${{ secrets.AZURE_IMAGE_NAME }}
+      AZURE_STAGING_BACKEND_URL: ${{ secrets.AZURE_STAGING_BACKEND_URL }}
+      STAGING_QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      STAGING_QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      STAGING_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      STAGING_LEGAL_QA_DATABASE_URL: ${{ secrets.LEGAL_QA_DATABASE_URL }}
+      STAGING_LEGAL_QA_SESSION_SECRET: ${{ secrets.LEGAL_QA_SESSION_SECRET }}
+      STAGING_HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
     steps:
-      - name: Confirm skeleton-only workflow
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate dispatch inputs
         run: |
           set -euo pipefail
 
-          printf 'Deploy Staging is a skeleton-only planning workflow.\n'
-          printf 'No Azure login, image push, container update, deployment, or live smoke is performed.\n'
+          case "$SERVICE_MODE" in
+            fake|real)
+              printf 'Selected staging service mode: %s\n' "$SERVICE_MODE"
+              ;;
+            *)
+              printf 'Invalid service_mode. Expected fake or real.\n'
+              exit 1
+              ;;
+          esac
 
-      - name: List future required configuration names
+          case "$RUN_READINESS" in
+            true|false)
+              printf 'Readiness smoke requested: %s\n' "$RUN_READINESS"
+              ;;
+            *)
+              printf 'Invalid run_readiness value. Expected true or false.\n'
+              exit 1
+              ;;
+          esac
+
+      - name: Validate required staging configuration
         run: |
           set -euo pipefail
 
-          cat <<'EOF'
-          Future GitHub Environment secret or configuration names:
-          - AZURE_CLIENT_ID
-          - AZURE_TENANT_ID
-          - AZURE_SUBSCRIPTION_ID
-          - AZURE_RESOURCE_GROUP
-          - AZURE_LOCATION
-          - AZURE_CONTAINER_APP_NAME
-          - AZURE_CONTAINER_APP_ENVIRONMENT
-          - AZURE_CONTAINER_REGISTRY
-          - AZURE_IMAGE_NAME
-          - AZURE_CONTAINER_REGISTRY_USERNAME if password-based registry auth is selected later
-          - AZURE_CONTAINER_REGISTRY_PASSWORD if password-based registry auth is selected later
-          - QDRANT_URL
-          - QDRANT_API_KEY
-          - OPENROUTER_API_KEY
-          - LEGAL_QA_DATABASE_URL
-          - LEGAL_QA_SESSION_SECRET
-          - HF_TOKEN only if the chunks artifact becomes private
-          EOF
+          required_pairs=(
+            AZURE_CLIENT_ID:AZURE_CLIENT_ID
+            AZURE_TENANT_ID:AZURE_TENANT_ID
+            AZURE_SUBSCRIPTION_ID:AZURE_SUBSCRIPTION_ID
+            AZURE_RESOURCE_GROUP:AZURE_RESOURCE_GROUP
+            AZURE_CONTAINER_REGISTRY:AZURE_CONTAINER_REGISTRY
+            AZURE_CONTAINER_APP_NAME:AZURE_CONTAINER_APP_NAME
+            AZURE_IMAGE_NAME:AZURE_IMAGE_NAME
+            AZURE_STAGING_BACKEND_URL:AZURE_STAGING_BACKEND_URL
+          )
 
-      - name: Print future staging smoke plan
+          if [ "$SERVICE_MODE" = "real" ]; then
+            required_pairs+=(
+              STAGING_QDRANT_URL:QDRANT_URL
+              STAGING_QDRANT_API_KEY:QDRANT_API_KEY
+              STAGING_OPENROUTER_API_KEY:OPENROUTER_API_KEY
+              STAGING_LEGAL_QA_DATABASE_URL:LEGAL_QA_DATABASE_URL
+              STAGING_LEGAL_QA_SESSION_SECRET:LEGAL_QA_SESSION_SECRET
+            )
+          fi
+
+          missing_names=()
+          for pair in "${required_pairs[@]}"; do
+            env_name="${pair%%:*}"
+            public_name="${pair#*:}"
+            if [ -z "${!env_name:-}" ]; then
+              missing_names+=("$public_name")
+            fi
+          done
+
+          if [ "${#missing_names[@]}" -gt 0 ]; then
+            printf 'Missing required staging configuration names:\n'
+            printf '%s\n' "${missing_names[@]}"
+            exit 1
+          fi
+
+          printf 'Required staging configuration names are present.\n'
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify existing Azure resources
         run: |
           set -euo pipefail
 
-          cat <<'EOF'
-          Future safe staging smoke sequence after an explicitly scoped deployment workflow:
-          1. Confirm CI and backend fake-mode container smoke passed.
-          2. Verify reviewed deployment configuration.
-          3. Smoke the backend liveness endpoint.
-          4. Smoke readiness only after configuration review.
-          5. Verify missing-session behavior if anonymous session ownership is enabled.
-          6. Run conversation CRUD smoke where appropriate.
-          7. Do not call the Legal QA ask endpoint unless a later task explicitly approves it.
-          EOF
+          az acr show \
+            --name "$AZURE_CONTAINER_REGISTRY" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query name \
+            -o tsv >/dev/null
+
+          az containerapp show \
+            --name "$AZURE_CONTAINER_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query name \
+            -o tsv >/dev/null
+
+          printf 'Verified existing Azure Container Registry: %s\n' "$AZURE_CONTAINER_REGISTRY"
+          printf 'Verified existing Azure Container App: %s\n' "$AZURE_CONTAINER_APP_NAME"
+
+      - name: Resolve ACR login server
+        run: |
+          set -euo pipefail
+
+          acr_login_server="$(
+            az acr show \
+              --name "$AZURE_CONTAINER_REGISTRY" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --query loginServer \
+              -o tsv
+          )"
+
+          if [ -z "$acr_login_server" ]; then
+            printf 'Could not resolve ACR login server.\n'
+            exit 1
+          fi
+
+          {
+            printf 'ACR_LOGIN_SERVER=%s\n' "$acr_login_server"
+            printf 'IMAGE_REF=%s/%s:%s\n' "$acr_login_server" "$AZURE_IMAGE_NAME" "$GITHUB_SHA"
+          } >> "$GITHUB_ENV"
+
+      - name: Build backend image
+        run: |
+          set -euo pipefail
+
+          docker build -f docker/backend/Dockerfile -t "$IMAGE_REF" .
+
+      - name: Login to ACR
+        run: |
+          set -euo pipefail
+
+          az acr login --name "$AZURE_CONTAINER_REGISTRY" >/dev/null
+
+      - name: Push backend image
+        run: |
+          set -euo pipefail
+
+          docker push "$IMAGE_REF"
+
+      - name: Configure real-mode Container App secrets
+        if: ${{ inputs.service_mode == 'real' }}
+        run: |
+          set -euo pipefail
+
+          secret_args=(
+            "qdrant-url=$STAGING_QDRANT_URL"
+            "qdrant-api-key=$STAGING_QDRANT_API_KEY"
+            "openrouter-api-key=$STAGING_OPENROUTER_API_KEY"
+            "legal-qa-database-url=$STAGING_LEGAL_QA_DATABASE_URL"
+            "legal-qa-session-secret=$STAGING_LEGAL_QA_SESSION_SECRET"
+          )
+
+          if [ -n "${STAGING_HF_TOKEN:-}" ]; then
+            secret_args+=("hf-token=$STAGING_HF_TOKEN")
+          fi
+
+          az containerapp secret set \
+            --name "$AZURE_CONTAINER_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --secrets "${secret_args[@]}" \
+            --output none
+
+          printf 'Configured real-mode Container App secret names.\n'
+
+      - name: Update staging Container App in fake mode
+        if: ${{ inputs.service_mode == 'fake' }}
+        run: |
+          set -euo pipefail
+
+          az containerapp update \
+            --name "$AZURE_CONTAINER_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --image "$IMAGE_REF" \
+            --set-env-vars \
+              PORT=8000 \
+              LEGAL_QA_SERVICE_MODE=fake \
+              LEGAL_QA_ALLOW_REAL_TESTS=0 \
+              LEGAL_QA_ALLOW_DB_TESTS=0 \
+              LEGAL_QA_RATE_LIMIT_ENABLED=false \
+            --output none
+
+          printf 'Updated staging Container App image and fake-mode environment.\n'
+
+      - name: Update staging Container App in real mode
+        if: ${{ inputs.service_mode == 'real' }}
+        run: |
+          set -euo pipefail
+
+          qdrant_api_env_name="QDRANT_API_KEY"
+          legal_qdrant_api_env_name="LEGAL_QA_QDRANT_API_KEY"
+          openrouter_env_name="OPENROUTER_API_KEY"
+          database_url_env_name="LEGAL_QA_DATABASE_URL"
+          session_secret_env_name="LEGAL_QA_SESSION_SECRET"
+          hf_token_env_name="HF_TOKEN"
+
+          env_args=(
+            PORT=8000
+            LEGAL_QA_SERVICE_MODE=real
+            LEGAL_QA_ALLOW_REAL_TESTS=0
+            LEGAL_QA_ALLOW_DB_TESTS=0
+            LEGAL_QA_RATE_LIMIT_ENABLED=false
+            QDRANT_URL=secretref:qdrant-url
+            "${qdrant_api_env_name}=secretref:qdrant-api-key"
+            "${legal_qdrant_api_env_name}=secretref:qdrant-api-key"
+            "${openrouter_env_name}=secretref:openrouter-api-key"
+            "${database_url_env_name}=secretref:legal-qa-database-url"
+            "${session_secret_env_name}=secretref:legal-qa-session-secret"
+          )
+
+          if [ -n "${STAGING_HF_TOKEN:-}" ]; then
+            env_args+=("${hf_token_env_name}=secretref:hf-token")
+          fi
+
+          az containerapp update \
+            --name "$AZURE_CONTAINER_APP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --image "$IMAGE_REF" \
+            --set-env-vars "${env_args[@]}" \
+            --output none
+
+          printf 'Updated staging Container App image and real-mode secret references.\n'
+
+      - name: Smoke staging health
+        run: |
+          set -euo pipefail
+
+          staging_url="${AZURE_STAGING_BACKEND_URL%/}"
+          if [ -z "$staging_url" ]; then
+            printf 'Staging backend URL is missing.\n'
+            exit 1
+          fi
+
+          health_passed=false
+          for attempt in {1..30}; do
+            if response="$(curl -fsS "$staging_url/health")"; then
+              printf 'Health response: %s\n' "$response"
+              case "$response" in
+                *'"status":"ok"'*|*'"status": "ok"'*)
+                  health_passed=true
+                  break
+                  ;;
+              esac
+              printf 'Unexpected health response payload.\n'
+              exit 1
+            fi
+            printf 'Health smoke attempt %s failed; retrying.\n' "$attempt"
+            sleep 5
+          done
+
+          if [ "$health_passed" != "true" ]; then
+            printf 'Staging health smoke did not pass in time.\n'
+            exit 1
+          fi
+
+          printf 'STAGING_HEALTH_PASSED=true\n' >> "$GITHUB_ENV"
+
+      - name: Smoke staging readiness
+        if: ${{ inputs.run_readiness }}
+        run: |
+          set -euo pipefail
+
+          staging_url="${AZURE_STAGING_BACKEND_URL%/}"
+          readiness_response="$(curl -fsS "$staging_url/api/v1/readiness")"
+          printf 'Readiness response: %s\n' "$readiness_response"
+          printf 'STAGING_READINESS_RAN=true\n' >> "$GITHUB_ENV"
+
+      - name: Print safe deployment summary
+        run: |
+          set -euo pipefail
+
+          printf 'Staging deployment image tag: %s\n' "$GITHUB_SHA"
+          printf 'Staging service mode: %s\n' "$SERVICE_MODE"
+          printf 'Health smoke passed: %s\n' "${STAGING_HEALTH_PASSED:-false}"
+          printf 'Readiness smoke ran: %s\n' "${STAGING_READINESS_RAN:-false}"

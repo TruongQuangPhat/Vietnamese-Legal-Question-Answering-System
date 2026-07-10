@@ -14,7 +14,9 @@ remains the canonical current-state source.
 Stage 1 CI quality gates exist for backend checks, frontend checks, protected
 path guarding, and lightweight secret scanning. Stage 2 backend fake-mode
 container smoke exists for packaging validation. Stage 3 Azure deployment
-workflows are skeleton-only manual planning workflows and do not deploy.
+workflows added manual planning scaffolding. Stage 4A added Azure staging
+resource planning. Stage 4B implements a manual Azure Container Apps staging
+deployment workflow. Production deployment remains skeleton-only.
 
 ## CI Principles
 
@@ -246,6 +248,393 @@ comments.
 
 For the Azure deployment skeleton and future manual rollout checklist, see
 `docs/runbooks/azure_deployment.md`.
+
+## Stage 4A - Azure Staging Resource Planning
+
+### Status
+
+Completed / planning only:
+
+- Not deployed.
+- No Azure resources created.
+- No image push.
+- No Azure login.
+- No live service calls.
+
+### Context
+
+The VnLaw-QA backend is a FastAPI container. Stage 1 proves routine code
+quality gates. Stage 2 proves the backend Docker image can build and serve
+fake-mode `GET /health`. Stage 3 added manual-only Azure deployment skeleton
+workflows. Stage 4A decides the staging resource plan before implementing any
+real Azure deployment.
+
+The current production Render backend and Vercel frontend remain unchanged by
+this planning stage.
+
+### Decision Summary
+
+Recommended default for the next implementation stage: prefer Azure Container
+Apps for staging unless Azure subscription or resource constraints force App
+Service for Containers.
+
+Reasoning:
+
+- The backend is already containerized.
+- Container Apps is container-native.
+- Revision-based updates and rollback are useful for staging and future
+  production.
+- App Service for Containers remains a viable fallback if simpler web-app
+  operations are preferred.
+
+This recommendation is tentative. It does not make cost, quota, performance, or
+memory guarantees. Real-mode sizing must be tested in the selected Azure
+environment.
+
+### Options Considered
+
+#### Option A - Azure Container Apps
+
+Azure Container Apps provides container-native backend hosting with a
+revision-based deployment model. It is suitable for staging and production
+experiments when subscription, networking, and resource constraints allow it.
+
+This option requires a container registry and a Container Apps managed
+environment. A future workflow would likely use Azure login, image build and
+push, and a container app update. Real-mode memory sizing and cold-start
+behavior must be tested separately.
+
+#### Option B - App Service for Containers
+
+App Service for Containers provides web-app oriented custom container hosting
+with familiar App Service operations. It is a viable fallback if simpler
+web-app operations are preferred.
+
+This option would likely use a registry image and an App Service deploy or
+update step in a future workflow. Real-mode memory sizing and cold-start
+behavior must be tested separately.
+
+### Non-goals
+
+The Stage 4A planning step did not:
+
+- create Azure resources;
+- implement deployment;
+- push images;
+- log in to Azure;
+- request `id-token: write`;
+- run production `/api/v1/legal-qa/ask` smoke;
+- mutate Qdrant;
+- run indexing, crawling, embedding, reranking, snapshots, or evaluation;
+- modify protected data, benchmark, or official evaluation artifact paths.
+
+### Proposed Staging Resources
+
+Resource placeholders only:
+
+- Azure subscription
+- Resource group
+- Azure region/location
+- Container registry
+- Backend container app or App Service
+- Managed environment if using Container Apps
+- Staging backend URL
+- Logs/monitoring destination if configured
+
+Suggested placeholder/configuration names:
+
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_RESOURCE_GROUP`
+- `AZURE_LOCATION`
+- `AZURE_CONTAINER_REGISTRY`
+- `AZURE_CONTAINER_APP_ENVIRONMENT`
+- `AZURE_CONTAINER_APP_NAME`
+- `AZURE_IMAGE_NAME`
+- `AZURE_STAGING_BACKEND_URL`
+
+### Future GitHub Environment Setup
+
+Use separate GitHub Environments:
+
+- `staging`
+- `production`
+
+Production requires Required reviewers. Staging may use lighter approval or no
+approval depending on project preference.
+
+Deployment skeleton workflows should not be required branch protection checks
+because they are `workflow_dispatch`-only and do not run on pull requests.
+Normal PR required checks should remain:
+
+- Backend CI
+- Frontend CI
+- Protected Path Guard
+- Secret Scan
+- Backend Container
+
+### Future Secret Names
+
+Names only, no values:
+
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_RESOURCE_GROUP`
+- `AZURE_LOCATION`
+- `AZURE_CONTAINER_REGISTRY`
+- `AZURE_CONTAINER_APP_ENVIRONMENT`
+- `AZURE_CONTAINER_APP_NAME`
+- `AZURE_IMAGE_NAME`
+- `QDRANT_URL`
+- `QDRANT_API_KEY`
+- `OPENROUTER_API_KEY`
+- `LEGAL_QA_DATABASE_URL`
+- `LEGAL_QA_SESSION_SECRET`
+- `HF_TOKEN` only if needed
+
+### Authentication Decision
+
+Use GitHub OIDC for the Stage 4B staging deployment workflow. Do not add
+`id-token: write` to any workflow unless that workflow actually uses OIDC.
+Avoid long-lived credentials when possible.
+
+If registry username/password authentication is used temporarily, store those
+values only as GitHub Environment secrets and document why the temporary path
+was selected.
+
+### Stage 4B Staging Deployment Flow
+
+Implemented staging flow:
+
+1. Required CI checks pass.
+2. Backend Container check passes.
+3. Manual staging deployment workflow is dispatched.
+4. Azure login runs through the approved authentication strategy.
+5. Image is built from `docker/backend/Dockerfile`.
+6. Image is pushed to the reviewed registry.
+7. Azure staging backend service is updated.
+8. Safe smoke runs:
+   - `GET /health`;
+   - `GET /api/v1/readiness` only after config review;
+   - missing-session `401` if auth is enabled;
+   - conversation CRUD where appropriate.
+9. Do not call `/api/v1/legal-qa/ask` unless explicitly approved.
+
+### Real-mode Risk Notes
+
+Fake mode only proves container liveness and API contract basics. Real mode may
+load embeddings, chunks, retrieval, Qdrant configuration, and LLM
+configuration. Reranking is not part of the adopted final pipeline, but future
+experiments or configuration changes must still be reviewed before enabling any
+real reranking inference.
+
+Real-mode memory and cold-start behavior must be tested separately. Do not
+switch production to fake mode to hide real-mode failures. Do not repeatedly
+retry production `/api/v1/legal-qa/ask` if timeout, out-of-memory, or `5xx`
+symptoms occur.
+
+### Rollback Plan
+
+- Roll back to the previous image or revision.
+- Preserve logs without secrets, raw prompts, raw session tokens, provider
+  keys, or database URLs.
+- Stop if `5xx`, out-of-memory, or timeout symptoms occur.
+- Do not repeatedly retry production `/api/v1/legal-qa/ask`.
+- Do not mutate Qdrant or corpus artifacts during rollback.
+
+### Azure Staging Preflight Checklist
+
+#### Repository Preconditions
+
+- [ ] Stage 1 CI checks pass.
+- [ ] Stage 2 Backend Container check passes.
+- [ ] Stage 3 deployment skeleton exists.
+- [ ] Protected Path Guard is active.
+- [ ] Secret Scan is active.
+- [ ] No uncommitted protected data/evaluation/artifact path changes exist.
+
+#### Azure Preconditions
+
+- [ ] Azure subscription confirmed.
+- [ ] Region selected.
+- [ ] Resource group selected or planned.
+- [ ] Azure Container Apps vs App Service for Containers selected.
+- [ ] Registry selected.
+- [ ] Staging backend name selected.
+- [ ] Log/monitoring approach selected.
+- [ ] Resource sizing reviewed for real mode.
+
+#### GitHub Preconditions
+
+- [ ] `staging` environment exists.
+- [ ] `production` environment exists.
+- [ ] Production Required reviewers configured.
+- [ ] Staging secrets configured only after resource creation.
+- [ ] Deploy skeleton workflows are not required branch checks.
+- [ ] Normal required PR checks remain routine CI checks.
+
+#### Secret Hygiene
+
+- [ ] No `.env` committed.
+- [ ] No `apps/frontend/.env.local` committed.
+- [ ] No raw database URL printed.
+- [ ] No session secret printed.
+- [ ] No provider key printed.
+- [ ] No Qdrant key printed.
+- [ ] No raw smoke session token printed.
+- [ ] Secrets stored only in GitHub Environment secrets or an Azure secret
+      manager.
+
+#### Safe First Staging Smoke
+
+- [ ] Call `/health` first.
+- [ ] Call `/api/v1/readiness` only after config review.
+- [ ] Verify auth/session behavior without printing tokens.
+- [ ] Run conversation CRUD smoke if scoped.
+- [ ] Run exactly one `/api/v1/legal-qa/ask` only after explicit approval.
+- [ ] Stop on timeout, out-of-memory, or `5xx`; do not retry repeatedly.
+
+#### No-Go Conditions
+
+- [ ] CI checks failing.
+- [ ] Backend Container check failing.
+- [ ] Required secrets missing.
+- [ ] Hosting option unknown.
+- [ ] Rollback unclear.
+- [ ] Protected path changes present.
+- [ ] Real provider keys exposed.
+- [ ] Staging URL not confirmed.
+- [ ] Docker image not reproducible.
+- [ ] Memory sizing not reviewed for real mode.
+
+#### Completion Criteria
+
+- [ ] Resource plan approved.
+- [ ] GitHub environments configured.
+- [ ] Required secrets listed and assigned owners.
+- [ ] Rollback path documented.
+- [ ] First staging smoke scope approved.
+- [ ] Stage 4B implementation prompt can be written.
+
+### Open Questions
+
+- Final Azure hosting option.
+- Azure region/location.
+- Resource group name.
+- Registry choice.
+- Authentication strategy.
+- Staging URL.
+- Minimum memory/CPU for real mode.
+- Whether staging initially runs fake mode or real mode.
+- Whether the chunks artifact is public or private.
+- Smoke-test scope for first real deployment.
+
+## Stage 4B - Manual Azure Staging Deployment Workflow
+
+### Status
+
+Implemented as a guarded manual staging workflow in
+`.github/workflows/deploy-staging.yml`.
+
+This workflow:
+
+- runs only through `workflow_dispatch`;
+- uses GitHub Environment `staging`;
+- uses Azure OIDC login with `id-token: write`;
+- builds `docker/backend/Dockerfile`;
+- pushes the image to the configured Azure Container Registry;
+- updates the configured Azure Container App;
+- runs safe staging smoke checks;
+- does not deploy production;
+- does not call `/api/v1/legal-qa/ask`.
+
+### Behavior
+
+The staging workflow has two inputs:
+
+- `service_mode`: `fake` or `real`, default `fake`;
+- `run_readiness`: boolean, default `false`.
+
+The first/default staging deployment mode is fake mode. Fake mode sets only
+safe liveness and CI guard environment variables:
+
+```env
+PORT=8000
+LEGAL_QA_SERVICE_MODE=fake
+LEGAL_QA_ALLOW_REAL_TESTS=0
+LEGAL_QA_ALLOW_DB_TESTS=0
+LEGAL_QA_RATE_LIMIT_ENABLED=false
+```
+
+Real mode is available only when explicitly selected and required runtime
+secrets are configured in the `staging` GitHub Environment. Real-mode staging
+still does not call `/api/v1/legal-qa/ask` from the workflow.
+
+### Required Staging Environment Secrets
+
+Names only, no values:
+
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_RESOURCE_GROUP`
+- `AZURE_CONTAINER_REGISTRY`
+- `AZURE_CONTAINER_APP_NAME`
+- `AZURE_IMAGE_NAME`
+- `AZURE_STAGING_BACKEND_URL`
+
+For real mode only:
+
+- `QDRANT_URL`
+- `QDRANT_API_KEY`
+- `OPENROUTER_API_KEY`
+- `LEGAL_QA_DATABASE_URL`
+- `LEGAL_QA_SESSION_SECRET`
+- `HF_TOKEN` only if needed by the current runtime
+
+### Authentication and Permissions
+
+`deploy-staging.yml` uses:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+`id-token: write` is present only because Azure OIDC login is implemented in
+the staging workflow. Production remains skeleton-only and must not request
+`id-token: write` until production deployment is explicitly implemented.
+
+### Safe Smoke Scope
+
+The staging workflow always runs a bounded `GET /health` smoke after updating
+the Container App. It runs `GET /api/v1/readiness` only when `run_readiness` is
+selected manually after configuration review.
+
+The staging workflow does not:
+
+- call `/api/v1/legal-qa/ask`;
+- call Qdrant directly;
+- call OpenRouter, Gemini, OpenAI, Anthropic, or another LLM provider directly;
+- run crawling, indexing, embedding, reranking, or benchmark/evaluation jobs.
+
+### Branch Protection
+
+`deploy-staging.yml` is `workflow_dispatch`-only and should not be a required
+PR check. Normal required PR checks remain:
+
+- Backend CI
+- Frontend CI
+- Protected Path Guard
+- Secret Scan
+- Backend Container
+
+### Production Boundary
+
+`.github/workflows/deploy-production.yml` remains a planning-only skeleton.
+Production deployment, production Azure login, production image push, and
+production smoke checks are not implemented in Stage 4B.
 
 ## Rollback and Incident Notes
 
