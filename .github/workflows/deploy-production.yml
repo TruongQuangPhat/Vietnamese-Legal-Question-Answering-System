@@ -1,0 +1,64 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan-production:
+    name: Plan production deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+
+    steps:
+      - name: Confirm skeleton-only workflow
+        run: |
+          set -euo pipefail
+
+          printf 'Deploy Production is a skeleton-only planning workflow.\n'
+          printf 'Production deployment must require manual approval through GitHub Environment settings.\n'
+          printf 'No Azure login, image push, container update, deployment, or live smoke is performed.\n'
+
+      - name: List future required configuration names
+        run: |
+          set -euo pipefail
+
+          cat <<'EOF'
+          Future GitHub Environment secret or configuration names:
+          - AZURE_CLIENT_ID
+          - AZURE_TENANT_ID
+          - AZURE_SUBSCRIPTION_ID
+          - AZURE_RESOURCE_GROUP
+          - AZURE_LOCATION
+          - AZURE_CONTAINER_APP_NAME
+          - AZURE_CONTAINER_APP_ENVIRONMENT
+          - AZURE_CONTAINER_REGISTRY
+          - AZURE_IMAGE_NAME
+          - AZURE_CONTAINER_REGISTRY_USERNAME if password-based registry auth is selected later
+          - AZURE_CONTAINER_REGISTRY_PASSWORD if password-based registry auth is selected later
+          - QDRANT_URL
+          - QDRANT_API_KEY
+          - OPENROUTER_API_KEY
+          - LEGAL_QA_DATABASE_URL
+          - LEGAL_QA_SESSION_SECRET
+          - HF_TOKEN only if the chunks artifact becomes private
+          EOF
+
+      - name: Print future production smoke plan
+        run: |
+          set -euo pipefail
+
+          cat <<'EOF'
+          Future safe production smoke sequence after an explicitly scoped deployment workflow:
+          1. Confirm staging passed.
+          2. Require manual production approval.
+          3. Smoke backend liveness.
+          4. Smoke readiness only after reviewed deployment configuration.
+          5. Verify missing-session behavior if anonymous session ownership is enabled.
+          6. Run conversation CRUD smoke where appropriate.
+          7. Run exactly one controlled Legal QA ask smoke only after explicit approval.
+          8. Stop on timeout, out-of-memory, or 5xx symptoms; do not loop production ask requests.
+          EOF
