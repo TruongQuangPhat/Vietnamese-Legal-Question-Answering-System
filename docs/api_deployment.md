@@ -21,6 +21,8 @@ This document records the repository state as audited without calling Qdrant,
 OpenRouter, embedding inference, or evaluation workflows.
 
 For future GitHub Actions and deployment gate design, see `docs/ci_cd.md`.
+For the Azure deployment skeleton and future manual rollout checklist, see
+`docs/runbooks/azure_deployment.md`.
 
 ## Production deployment runbook
 

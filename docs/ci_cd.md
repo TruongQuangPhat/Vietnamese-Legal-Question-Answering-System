@@ -11,9 +11,10 @@ remains the canonical current-state source.
 
 ## Current Status
 
-This setup document prepares future CI/CD implementation. Actual GitHub Actions
-workflows may not yet be implemented by this setup task, and this document does
-not create workflow automation.
+Stage 1 CI quality gates exist for backend checks, frontend checks, protected
+path guarding, and lightweight secret scanning. Stage 2 backend fake-mode
+container smoke exists for packaging validation. Stage 3 Azure deployment
+workflows are skeleton-only manual planning workflows and do not deploy.
 
 ## CI Principles
 
@@ -50,10 +51,9 @@ HF_TOKEN=
 Use repository or environment secrets only in explicitly reviewed workflows
 that require them. Do not pass secrets to forked PR workflows.
 
-## Recommended Workflow Files
+## Workflow Files
 
-These are future workflow files only. Do not create them until a task explicitly
-scopes workflow implementation.
+Current and planned workflow paths:
 
 ```text
 .github/workflows/ci.yml
@@ -243,6 +243,9 @@ LEGAL_QA_SESSION_SECRET
 
 Do not include real values in Git, workflow logs, docs, examples, or issue
 comments.
+
+For the Azure deployment skeleton and future manual rollout checklist, see
+`docs/runbooks/azure_deployment.md`.
 
 ## Rollback and Incident Notes
 
