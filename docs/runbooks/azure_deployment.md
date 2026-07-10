@@ -15,19 +15,20 @@ path guarding, and lightweight secret scanning. Stage 2 backend fake-mode
 container smoke exists and validates packaging with `LEGAL_QA_SERVICE_MODE=fake`
 and `GET /health`.
 
-Azure deployment is not active yet. The skeleton workflows
-`.github/workflows/deploy-staging.yml` and
-`.github/workflows/deploy-production.yml` are manual planning workflows only.
-They do not log in to Azure, create resources, push images, deploy containers,
-or call live endpoints.
+Azure production deployment is not active yet. The staging workflow
+`.github/workflows/deploy-staging.yml` is now a manual Azure Container Apps
+deployment workflow. It defaults to fake mode, uses Azure OIDC, updates only the
+configured staging Container App, and runs safe smoke checks. The production
+workflow `.github/workflows/deploy-production.yml` remains a manual planning
+skeleton only.
 
-The skeleton workflows do not deploy. They are `workflow_dispatch`-only and
-should not be added as required branch protection checks because they do not run
-on pull requests. Required checks for normal PRs should remain routine CI checks
-such as Backend CI, Frontend CI, Protected Path Guard, Secret Scan, and Backend
-Container.
+The staging workflow is `workflow_dispatch`-only and should not be added as a
+required branch protection check because it does not run on pull requests.
+Required checks for normal PRs should remain routine CI checks such as Backend
+CI, Frontend CI, Protected Path Guard, Secret Scan, and Backend Container.
 
-For the consolidated Azure staging resource plan and preflight checklist, see
+For the consolidated Azure staging resource plan, Stage 4B workflow behavior,
+and preflight checklist, see
 `docs/ci_cd.md`.
 
 ## Recommended Architecture
@@ -103,23 +104,25 @@ repository.
 - `LEGAL_QA_SESSION_SECRET`
 - `HF_TOKEN` only if the chunks artifact becomes private
 
-Prefer Azure OIDC in a later deployment implementation if it is explicitly
-scoped and reviewed. Do not request `id-token: write` until the workflow
-actually uses OIDC.
+The staging workflow uses Azure OIDC through `deploy-staging.yml`. Do not
+request `id-token: write` in production until production deployment is
+explicitly implemented and uses OIDC.
 
-## Future Staging Deploy Flow
+## Staging Deploy Flow
 
-1. CI checks pass.
-2. Backend fake-mode container smoke passes.
-3. Build the backend image.
-4. Push the image to the reviewed registry.
-5. Deploy or update the staging container app or service.
-6. Run safe smoke checks:
-   - `GET /health`;
-   - `GET /api/v1/readiness` after configuration review;
-   - missing-session expected `401` if anonymous session ownership is enabled;
-   - conversation CRUD where appropriate.
-7. Do not call `POST /api/v1/legal-qa/ask` unless explicitly approved.
+The manual staging workflow now:
+
+1. validates dispatch inputs and required configuration names;
+2. logs in to Azure through OIDC;
+3. verifies the configured ACR and Container App already exist;
+4. builds and pushes the backend image;
+5. updates the staging Container App;
+6. runs `GET /health`;
+7. optionally runs `GET /api/v1/readiness` when selected after config review.
+
+It does not automate `POST /api/v1/legal-qa/ask`. The first/default staging
+deployment mode is fake mode; real mode requires explicit selection and
+configured staging secrets.
 
 ## Future Production Deploy Flow
 
@@ -163,7 +166,8 @@ Rollback must be explicit and environment-aware:
 
 ## Remaining Limitations
 
-The skeleton workflows do not prove:
+The workflow and documentation do not prove the following until the staging
+workflow is manually configured and executed:
 
 - Azure resource availability;
 - registry publishing;
