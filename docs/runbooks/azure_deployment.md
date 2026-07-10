@@ -27,6 +27,9 @@ on pull requests. Required checks for normal PRs should remain routine CI checks
 such as Backend CI, Frontend CI, Protected Path Guard, Secret Scan, and Backend
 Container.
 
+For the consolidated Azure staging resource plan and preflight checklist, see
+`docs/ci_cd.md`.
+
 ## Recommended Architecture
 
 The intended high-level Azure target keeps the existing provider boundaries
