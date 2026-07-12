@@ -193,6 +193,44 @@ Migration checklist:
    separate decommission checklist removes Render secrets, disables Render
    traffic, and preserves safe logs.
 
+### Vercel Preview to Azure UI smoke
+
+Stage 9 validates browser integration before any production switch. Vercel
+Production must not be changed in this step.
+
+Set the Vercel Preview environment variable:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
+```
+
+Redeploy Vercel Preview, copy the exact Preview URL, and add that exact origin
+to Azure App Service:
+
+```env
+CORS_ALLOWED_ORIGINS=["https://<vercel-preview-origin>"]
+```
+
+Restart Azure App Service after changing `CORS_ALLOWED_ORIGINS`.
+
+Manual browser checklist:
+
+1. Open the Vercel Preview frontend.
+2. Open browser DevTools and select the Network tab.
+3. Submit exactly one safe Vietnamese legal question:
+
+   ```text
+   Theo Bộ luật Dân sự Việt Nam, hợp đồng dân sự có thể bị vô hiệu trong những trường hợp nào?
+   ```
+
+4. Verify the request URL goes to the Azure backend, not Render.
+5. Verify the UI displays a response.
+6. Verify no browser CORS error appears.
+
+This is a smoke test, not a benchmark or load test. Do not run repeated
+`/api/v1/legal-qa/ask` calls from the UI. Render remains the rollback backend
+value until a later production migration passes.
+
 ### Qdrant Cloud and chunks artifact
 
 Normal deployed serving uses Qdrant Cloud directly and expects collection
