@@ -3,14 +3,6 @@ name: Deploy Staging
 on:
   workflow_dispatch:
     inputs:
-      service_mode:
-        description: "Backend service mode for staging deployment"
-        required: true
-        default: "fake"
-        type: choice
-        options:
-          - fake
-          - real
       run_readiness:
         description: "Run /api/v1/readiness after /health. Use only after config review."
         required: true
@@ -33,7 +25,6 @@ jobs:
     environment: staging
 
     env:
-      SERVICE_MODE: ${{ inputs.service_mode }}
       RUN_READINESS: ${{ inputs.run_readiness }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -41,12 +32,6 @@ jobs:
       AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
       AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
       AZURE_STAGING_BACKEND_URL: ${{ secrets.AZURE_STAGING_BACKEND_URL }}
-      STAGING_QDRANT_URL: ${{ secrets.QDRANT_URL }}
-      STAGING_QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
-      STAGING_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      STAGING_LEGAL_QA_DATABASE_URL: ${{ secrets.LEGAL_QA_DATABASE_URL }}
-      STAGING_LEGAL_QA_SESSION_SECRET: ${{ secrets.LEGAL_QA_SESSION_SECRET }}
-      STAGING_HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
     steps:
       - name: Check out repository
@@ -65,16 +50,6 @@ jobs:
       - name: Validate workflow dispatch inputs
         run: |
           set -euo pipefail
-
-          case "$SERVICE_MODE" in
-            fake|real)
-              printf 'Selected staging service mode: %s\n' "$SERVICE_MODE"
-              ;;
-            *)
-              printf 'Invalid service_mode. Expected fake or real.\n'
-              exit 1
-              ;;
-          esac
 
           case "$RUN_READINESS" in
             true|false)
@@ -98,16 +73,6 @@ jobs:
             AZURE_WEBAPP_NAME:AZURE_WEBAPP_NAME
             AZURE_STAGING_BACKEND_URL:AZURE_STAGING_BACKEND_URL
           )
-
-          if [ "$SERVICE_MODE" = "real" ]; then
-            required_pairs+=(
-              STAGING_QDRANT_URL:QDRANT_URL
-              STAGING_QDRANT_API_KEY:QDRANT_API_KEY
-              STAGING_OPENROUTER_API_KEY:OPENROUTER_API_KEY
-              STAGING_LEGAL_QA_DATABASE_URL:LEGAL_QA_DATABASE_URL
-              STAGING_LEGAL_QA_SESSION_SECRET:LEGAL_QA_SESSION_SECRET
-            )
-          fi
 
           missing_names=()
           for pair in "${required_pairs[@]}"; do
@@ -180,27 +145,13 @@ jobs:
 
           app_settings=(
             PORT=8000
-            LEGAL_QA_SERVICE_MODE="$SERVICE_MODE"
+            LEGAL_QA_SERVICE_MODE=fake
             LEGAL_QA_ALLOW_REAL_TESTS=0
             LEGAL_QA_ALLOW_DB_TESTS=0
             LEGAL_QA_RATE_LIMIT_ENABLED=false
             LEGAL_QA_AUTH_ENABLED=false
             SCM_DO_BUILD_DURING_DEPLOYMENT=true
           )
-
-          if [ "$SERVICE_MODE" = "real" ]; then
-            app_settings+=(
-              QDRANT_URL="$STAGING_QDRANT_URL"
-              QDRANT_API_KEY="$STAGING_QDRANT_API_KEY"
-              LEGAL_QA_QDRANT_API_KEY="$STAGING_QDRANT_API_KEY"
-              OPENROUTER_API_KEY="$STAGING_OPENROUTER_API_KEY"
-              LEGAL_QA_DATABASE_URL="$STAGING_LEGAL_QA_DATABASE_URL"
-              LEGAL_QA_SESSION_SECRET="$STAGING_LEGAL_QA_SESSION_SECRET"
-            )
-            if [ -n "${STAGING_HF_TOKEN:-}" ]; then
-              app_settings+=(HF_TOKEN="$STAGING_HF_TOKEN")
-            fi
-          fi
 
           az webapp config appsettings set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -287,7 +238,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          printf 'Staging service mode: %s\n' "$SERVICE_MODE"
+          printf 'Staging service mode: fake\n'
           printf 'Health smoke passed: %s\n' "${STAGING_HEALTH_PASSED:-false}"
           printf 'Readiness smoke ran: %s\n' "${STAGING_READINESS_RAN:-false}"
           printf 'Deployment target: Azure App Service Web App\n'
