@@ -118,7 +118,8 @@ The manual staging workflow now:
    `data/processed/legal_chunks.jsonl` file;
 4. configures App Service app settings and startup command;
 5. deploys the package to the configured Azure Web App;
-6. fetches and verifies the configured chunks artifact at startup in real mode;
+6. uses plain Uvicorn startup so `/health` can serve without chunks or real
+   dependencies;
 7. runs `GET /health`;
 8. runs `GET /api/v1/readiness` when selected in fake mode or automatically
    in Stage 6 `real-readiness`.
@@ -128,13 +129,48 @@ deployment mode remains fake mode.
 
 ## Stage 6 Real-Readiness Runbook
 
-Before dispatching `Deploy Staging` with `service_mode=real-readiness`:
+The first real-readiness attempt fetched `legal_chunks.jsonl` inside the App
+Service startup command and caused Azure `ContainerTimeout` before Uvicorn
+served `/health`. Keep startup simple:
+
+```bash
+python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+```
+
+Chunks should live outside the deployed repository tree at:
+
+```text
+/home/data/legal_chunks.jsonl
+```
+
+Before using `Deploy Staging` with `service_mode=real-readiness`:
 
 1. Confirm the `staging` GitHub Environment contains the Stage 6 secret names.
 2. Confirm the Azure federated credential for GitHub OIDC is configured.
 3. Confirm the App Service is the staging Web App, not production.
-4. Dispatch the workflow manually with `service_mode=real-readiness`.
-5. Review only the safe smoke output: HTTP status, readiness `ready`,
+4. If the current deployed app files do not already include
+   `scripts/deployment/fetch_processed_chunks.py`, first dispatch the workflow
+   in default fake mode to publish the code package with the plain Uvicorn
+   startup command.
+5. Prepare the chunks artifact through the App Service SSH console or another
+   reviewed operator-controlled remote shell after deployment files are present:
+
+   ```bash
+   echo "chunk fetch: started"
+   mkdir -p /home/data
+   export LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
+   python scripts/deployment/fetch_processed_chunks.py
+   bytes="$(wc -c < /home/data/legal_chunks.jsonl)"
+   echo "chunk fetch: destination=/home/data/legal_chunks.jsonl"
+   echo "chunk fetch: bytes=${bytes}"
+   echo "chunk fetch: checksum=passed"
+   ```
+
+   The command relies on App Service application settings for
+   `LEGAL_QA_CHUNKS_URL` and `LEGAL_QA_CHUNKS_SHA256`. It must not print those
+   values.
+6. Dispatch the workflow manually with `service_mode=real-readiness`.
+7. Review only the safe smoke output: HTTP status, readiness `ready`,
    `service_mode`, and sanitized check names/details.
 
 Stop after readiness. Do not call `/api/v1/legal-qa/ask` in Stage 6. Azure Free

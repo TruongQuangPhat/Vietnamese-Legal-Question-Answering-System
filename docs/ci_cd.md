@@ -460,8 +460,8 @@ The `real-readiness` path:
 3. configures App Service for `LEGAL_QA_SERVICE_MODE=real`;
 4. keeps `LEGAL_QA_RATE_LIMIT_ENABLED=false` and `LEGAL_QA_AUTH_ENABLED=false`;
 5. sets the existing collection name `vnlaw_chunks_bgem3_v1_full`;
-6. configures the legal chunks artifact URL and SHA256 for startup-time
-   download and verification;
+6. configures the legal chunks artifact URL, SHA256, and
+   `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
 7. runs bounded `GET /health`;
 8. runs bounded `GET /api/v1/readiness`.
 
@@ -469,6 +469,19 @@ Stage 6 does not call `/api/v1/legal-qa/ask`, does not call LLM providers
 directly, does not run benchmarks, and does not crawl, index, re-embed, rerank,
 or mutate Qdrant. `/api/v1/legal-qa/ask` is deferred to Stage 7 and requires a
 separate explicit approval.
+
+The first real-readiness attempt that fetched chunks inside the App Service
+startup command caused Azure `ContainerTimeout` before Uvicorn served
+`/health`. The startup command is now always plain Uvicorn:
+
+```bash
+python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+```
+
+`/health` must not depend on chunks, Qdrant, OpenRouter, embedding models, or
+other real-mode dependencies. Chunks should be prepared outside the startup
+path into `/home/data/legal_chunks.jsonl`, then readiness can validate that
+the configured file exists and Qdrant collection metadata is readable.
 
 Azure Free F1 may not have enough memory for full real QA serving. A Stage 6
 readiness failure should be treated as a configuration, dependency, network, or
@@ -628,7 +641,9 @@ SCM_DO_BUILD_DURING_DEPLOYMENT=true
 ```
 
 The `real-readiness` path configures real mode for `/health` and
-`/api/v1/readiness` only. It does not call `/api/v1/legal-qa/ask`.
+`/api/v1/readiness` only. It sets `LEGAL_QA_CHUNKS_PATH` to
+`/home/data/legal_chunks.jsonl`, but it does not fetch chunks during App Service
+startup and does not call `/api/v1/legal-qa/ask`.
 
 ### Required Staging Environment Secrets
 

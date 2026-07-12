@@ -232,6 +232,7 @@ jobs:
               SCM_DO_BUILD_DURING_DEPLOYMENT=true
               LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
               QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+              LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
               LEGAL_QA_CHUNKS_URL="$STAGING_LEGAL_QA_CHUNKS_URL"
               LEGAL_QA_CHUNKS_SHA256="$STAGING_LEGAL_QA_CHUNKS_SHA256"
               LEGAL_QA_QDRANT_URL="${STAGING_LEGAL_QA_QDRANT_URL:-$STAGING_QDRANT_URL}"
@@ -256,15 +257,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          startup_command="python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000"
-          if [ "$SERVICE_MODE" = "real-readiness" ]; then
-            startup_command="if [ \"\$LEGAL_QA_SERVICE_MODE\" = \"real\" ]; then python scripts/deployment/fetch_processed_chunks.py; fi; python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000"
-          fi
-
           az webapp config set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_WEBAPP_NAME" \
-            --startup-file "$startup_command" \
+            --startup-file "python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000" \
             --output none
 
           printf 'Configured App Service startup command.\n'
