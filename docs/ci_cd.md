@@ -15,8 +15,10 @@ Stage 1 CI quality gates exist for backend checks, frontend checks, protected
 path guarding, and lightweight secret scanning. Stage 2 backend fake-mode
 container smoke exists for packaging validation. Stage 3 Azure deployment
 workflows added manual planning scaffolding. Stage 4A added Azure staging
-resource planning. Stage 4B implements a manual Azure Container Apps staging
-deployment workflow. Production deployment remains skeleton-only.
+resource planning. Stage 4B initially targeted Azure Container Apps, but Azure
+for Students policy blocked Azure Container Registry, Azure Container Apps, and
+Log Analytics Workspace. Stage 5 pivots staging to Azure App Service code
+deploy in Japan East. Production deployment remains skeleton-only.
 
 ## CI Principles
 
@@ -225,17 +227,36 @@ Rules:
 - Keep corpus, chunking, retrieval, generator, evidence-selection, fallback,
   and evaluation code fixed unless the task scopes a controlled ablation.
 
-## Azure Readiness Notes
+## Azure Staging Notes
 
-Azure deployment workflows should be added later after subscription and
-resource decisions are made. Use placeholders only in workflow documentation and
-repository examples:
+Azure for Students policy currently blocks these previously planned staging
+resources:
+
+- Azure Container Registry;
+- Azure Container Apps;
+- Log Analytics Workspace.
+
+Allowed Azure Policy locations found for the student subscription:
 
 ```text
-AZURE_CREDENTIALS
+uaenorth
+koreacentral
+japaneast
+malaysiawest
+indonesiacentral
+```
+
+Stage 5 uses Azure App Service code deploy in Japan East as the current
+student-compatible staging target. Use environment variable and secret names
+only in workflow documentation and repository examples:
+
+```text
+AZURE_CLIENT_ID
+AZURE_TENANT_ID
+AZURE_SUBSCRIPTION_ID
 AZURE_RESOURCE_GROUP
-AZURE_CONTAINER_APP_NAME
-AZURE_CONTAINER_REGISTRY
+AZURE_WEBAPP_NAME
+AZURE_STAGING_BACKEND_URL
 QDRANT_URL
 QDRANT_API_KEY
 OPENROUTER_API_KEY
@@ -274,9 +295,8 @@ this planning stage.
 
 ### Decision Summary
 
-Recommended default for the next implementation stage: prefer Azure Container
-Apps for staging unless Azure subscription or resource constraints force App
-Service for Containers.
+The original recommendation preferred Azure Container Apps for staging unless
+Azure subscription or resource constraints forced App Service.
 
 Reasoning:
 
@@ -287,9 +307,10 @@ Reasoning:
 - App Service for Containers remains a viable fallback if simpler web-app
   operations are preferred.
 
-This recommendation is tentative. It does not make cost, quota, performance, or
-memory guarantees. Real-mode sizing must be tested in the selected Azure
-environment.
+Azure for Students policy later blocked Azure Container Registry and Container
+Apps, so Stage 5 selected Azure App Service code deploy instead. This decision
+does not make cost, quota, performance, or memory guarantees. Real-mode sizing
+must be tested in the selected Azure environment.
 
 ### Options Considered
 
@@ -304,15 +325,15 @@ environment. A future workflow would likely use Azure login, image build and
 push, and a container app update. Real-mode memory sizing and cold-start
 behavior must be tested separately.
 
-#### Option B - App Service for Containers
+#### Option B - App Service
 
-App Service for Containers provides web-app oriented custom container hosting
-with familiar App Service operations. It is a viable fallback if simpler
-web-app operations are preferred.
+App Service provides web-app oriented hosting with familiar App Service
+operations. For the current Azure for Students staging target, code deploy is
+used instead of App Service for Containers because ACR is blocked.
 
-This option would likely use a registry image and an App Service deploy or
-update step in a future workflow. Real-mode memory sizing and cold-start
-behavior must be tested separately.
+This option uses an App Service deployment package and Oryx build on App
+Service. Real-mode memory sizing and cold-start behavior must be tested
+separately.
 
 ### Non-goals
 
@@ -335,21 +356,17 @@ Resource placeholders only:
 - Azure subscription
 - Resource group
 - Azure region/location
-- Container registry
-- Backend container app or App Service
-- Managed environment if using Container Apps
+- Azure App Service Web App
+- App Service plan
 - Staging backend URL
-- Logs/monitoring destination if configured
+- Logs/monitoring approach within student subscription policy limits
 
 Suggested placeholder/configuration names:
 
 - `AZURE_SUBSCRIPTION_ID`
 - `AZURE_RESOURCE_GROUP`
 - `AZURE_LOCATION`
-- `AZURE_CONTAINER_REGISTRY`
-- `AZURE_CONTAINER_APP_ENVIRONMENT`
-- `AZURE_CONTAINER_APP_NAME`
-- `AZURE_IMAGE_NAME`
+- `AZURE_WEBAPP_NAME`
 - `AZURE_STAGING_BACKEND_URL`
 
 ### Future GitHub Environment Setup
@@ -380,11 +397,7 @@ Names only, no values:
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
 - `AZURE_RESOURCE_GROUP`
-- `AZURE_LOCATION`
-- `AZURE_CONTAINER_REGISTRY`
-- `AZURE_CONTAINER_APP_ENVIRONMENT`
-- `AZURE_CONTAINER_APP_NAME`
-- `AZURE_IMAGE_NAME`
+- `AZURE_WEBAPP_NAME`
 - `QDRANT_URL`
 - `QDRANT_API_KEY`
 - `OPENROUTER_API_KEY`
@@ -394,30 +407,25 @@ Names only, no values:
 
 ### Authentication Decision
 
-Use GitHub OIDC for the Stage 4B staging deployment workflow. Do not add
+Use GitHub OIDC for the staging deployment workflow. Do not add
 `id-token: write` to any workflow unless that workflow actually uses OIDC.
 Avoid long-lived credentials when possible.
 
-If registry username/password authentication is used temporarily, store those
-values only as GitHub Environment secrets and document why the temporary path
-was selected.
-
-### Stage 4B Staging Deployment Flow
+### Stage 5 Staging Deployment Flow
 
 Implemented staging flow:
 
 1. Required CI checks pass.
 2. Backend Container check passes.
 3. Manual staging deployment workflow is dispatched.
-4. Azure login runs through the approved authentication strategy.
-5. Image is built from `docker/backend/Dockerfile`.
-6. Image is pushed to the reviewed registry.
-7. Azure staging backend service is updated.
+4. Azure login runs through GitHub OIDC.
+5. A backend repository deployment package is created for App Service.
+6. App Service fake-mode settings and startup command are configured.
+7. The package is deployed to the configured Azure Web App.
 8. Safe smoke runs:
    - `GET /health`;
    - `GET /api/v1/readiness` only after config review;
-   - missing-session `401` if auth is enabled;
-   - conversation CRUD where appropriate.
+   - no automated `/api/v1/legal-qa/ask`.
 9. Do not call `/api/v1/legal-qa/ask` unless explicitly approved.
 
 ### Real-mode Risk Notes
@@ -435,7 +443,7 @@ symptoms occur.
 
 ### Rollback Plan
 
-- Roll back to the previous image or revision.
+- Roll back to the previous reviewed App Service deployment.
 - Preserve logs without secrets, raw prompts, raw session tokens, provider
   keys, or database URLs.
 - Stop if `5xx`, out-of-memory, or timeout symptoms occur.
@@ -458,10 +466,9 @@ symptoms occur.
 - [ ] Azure subscription confirmed.
 - [ ] Region selected.
 - [ ] Resource group selected or planned.
-- [ ] Azure Container Apps vs App Service for Containers selected.
-- [ ] Registry selected.
+- [ ] Azure App Service selected.
 - [ ] Staging backend name selected.
-- [ ] Log/monitoring approach selected.
+- [ ] Log/monitoring approach reviewed within current policy limits.
 - [ ] Resource sizing reviewed for real mode.
 
 #### GitHub Preconditions
@@ -491,7 +498,7 @@ symptoms occur.
 - [ ] Call `/api/v1/readiness` only after config review.
 - [ ] Verify auth/session behavior without printing tokens.
 - [ ] Run conversation CRUD smoke if scoped.
-- [ ] Run exactly one `/api/v1/legal-qa/ask` only after explicit approval.
+- [ ] Do not automate `/api/v1/legal-qa/ask`.
 - [ ] Stop on timeout, out-of-memory, or `5xx`; do not retry repeatedly.
 
 #### No-Go Conditions
@@ -499,12 +506,12 @@ symptoms occur.
 - [ ] CI checks failing.
 - [ ] Backend Container check failing.
 - [ ] Required secrets missing.
-- [ ] Hosting option unknown.
+- [ ] App Service resource missing.
 - [ ] Rollback unclear.
 - [ ] Protected path changes present.
 - [ ] Real provider keys exposed.
 - [ ] Staging URL not confirmed.
-- [ ] Docker image not reproducible.
+- [ ] App Service deployment package cannot be reproduced.
 - [ ] Memory sizing not reviewed for real mode.
 
 #### Completion Criteria
@@ -514,36 +521,41 @@ symptoms occur.
 - [ ] Required secrets listed and assigned owners.
 - [ ] Rollback path documented.
 - [ ] First staging smoke scope approved.
-- [ ] Stage 4B implementation prompt can be written.
+- [ ] Stage 5 App Service workflow can be manually dispatched.
 
 ### Open Questions
 
-- Final Azure hosting option.
-- Azure region/location.
-- Resource group name.
-- Registry choice.
-- Authentication strategy.
-- Staging URL.
 - Minimum memory/CPU for real mode.
-- Whether staging initially runs fake mode or real mode.
 - Whether the chunks artifact is public or private.
 - Smoke-test scope for first real deployment.
 
-## Stage 4B - Manual Azure Staging Deployment Workflow
+## Stage 5 - Manual Azure App Service Staging Deployment
 
 ### Status
 
 Implemented as a guarded manual staging workflow in
 `.github/workflows/deploy-staging.yml`.
 
+Current staging resources:
+
+```text
+AZURE_WEBAPP_NAME=vnlaw-backend-staging-phat
+AZURE_RESOURCE_GROUP=rg-vnlaw-staging
+AZURE_LOCATION=japaneast
+AZURE_STAGING_BACKEND_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
+APP_SERVICE_PLAN=asp-vnlaw-staging
+```
+
 This workflow:
 
 - runs only through `workflow_dispatch`;
 - uses GitHub Environment `staging`;
 - uses Azure OIDC login with `id-token: write`;
-- builds `docker/backend/Dockerfile`;
-- pushes the image to the configured Azure Container Registry;
-- updates the configured Azure Container App;
+- creates a code deployment package for Azure App Service;
+- excludes heavy cache, frontend build, protected data, and official
+  evaluation report paths from the package;
+- deploys the package to the configured Azure Web App;
+- configures fake-mode App Service settings and the FastAPI startup command;
 - runs safe staging smoke checks;
 - does not deploy production;
 - does not call `/api/v1/legal-qa/ask`.
@@ -564,6 +576,8 @@ LEGAL_QA_SERVICE_MODE=fake
 LEGAL_QA_ALLOW_REAL_TESTS=0
 LEGAL_QA_ALLOW_DB_TESTS=0
 LEGAL_QA_RATE_LIMIT_ENABLED=false
+LEGAL_QA_AUTH_ENABLED=false
+SCM_DO_BUILD_DURING_DEPLOYMENT=true
 ```
 
 Real mode is available only when explicitly selected and required runtime
@@ -578,9 +592,7 @@ Names only, no values:
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
 - `AZURE_RESOURCE_GROUP`
-- `AZURE_CONTAINER_REGISTRY`
-- `AZURE_CONTAINER_APP_NAME`
-- `AZURE_IMAGE_NAME`
+- `AZURE_WEBAPP_NAME`
 - `AZURE_STAGING_BACKEND_URL`
 
 For real mode only:
@@ -608,8 +620,8 @@ the staging workflow. Production remains skeleton-only and must not request
 
 ### Safe Smoke Scope
 
-The staging workflow always runs a bounded `GET /health` smoke after updating
-the Container App. It runs `GET /api/v1/readiness` only when `run_readiness` is
+The staging workflow always runs a bounded `GET /health` smoke after deploying
+to the Azure Web App. It runs `GET /api/v1/readiness` only when `run_readiness` is
 selected manually after configuration review.
 
 The staging workflow does not:
@@ -634,7 +646,7 @@ PR check. Normal required PR checks remain:
 
 `.github/workflows/deploy-production.yml` remains a planning-only skeleton.
 Production deployment, production Azure login, production image push, and
-production smoke checks are not implemented in Stage 4B.
+production smoke checks are not implemented in Stage 5.
 
 ## Rollback and Incident Notes
 

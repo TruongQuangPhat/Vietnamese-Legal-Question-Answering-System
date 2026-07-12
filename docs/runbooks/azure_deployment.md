@@ -16,18 +16,23 @@ container smoke exists and validates packaging with `LEGAL_QA_SERVICE_MODE=fake`
 and `GET /health`.
 
 Azure production deployment is not active yet. The staging workflow
-`.github/workflows/deploy-staging.yml` is now a manual Azure Container Apps
+`.github/workflows/deploy-staging.yml` is now a manual Azure App Service code
 deployment workflow. It defaults to fake mode, uses Azure OIDC, updates only the
-configured staging Container App, and runs safe smoke checks. The production
-workflow `.github/workflows/deploy-production.yml` remains a manual planning
-skeleton only.
+configured staging Web App, and runs safe smoke checks. The production workflow
+`.github/workflows/deploy-production.yml` remains a manual planning skeleton
+only.
+
+Azure App Service is the current student-compatible staging target. Azure for
+Students policy currently blocks Azure Container Registry, Azure Container Apps,
+and Log Analytics Workspace, so the staging workflow does not build, push, or
+deploy container images.
 
 The staging workflow is `workflow_dispatch`-only and should not be added as a
 required branch protection check because it does not run on pull requests.
 Required checks for normal PRs should remain routine CI checks such as Backend
 CI, Frontend CI, Protected Path Guard, Secret Scan, and Backend Container.
 
-For the consolidated Azure staging resource plan, Stage 4B workflow behavior,
+For the consolidated Azure staging resource plan, Stage 5 workflow behavior,
 and preflight checklist, see
 `docs/ci_cd.md`.
 
@@ -37,7 +42,7 @@ The intended high-level Azure target keeps the existing provider boundaries
 unless a later task explicitly changes them:
 
 - Vercel frontend remains the public UI.
-- Azure backend container hosts the FastAPI API.
+- Azure App Service hosts the FastAPI API for the current staging deployment.
 - Neon or another reviewed PostgreSQL service remains conversation storage
   unless separately changed.
 - Qdrant Cloud remains the vector database unless separately changed.
@@ -50,14 +55,10 @@ the Azure deployment skeleton stage.
 
 ## Azure Options
 
-Azure Container Apps is the tentative preference for container-native staging
-and production experiments if subscription, networking, and resource
-constraints allow it.
-
-App Service for Containers is also acceptable if simpler web-app operations are
-preferred. Choose between these options only after reviewing Azure subscription
-limits, networking, secret management, logs, rollback support, and runtime
-memory needs.
+Azure App Service code deploy is the current staging target because it is
+compatible with the active Azure for Students policy. Azure Container Apps and
+Azure Container Registry remain blocked by policy for this subscription and are
+not used by the staging workflow.
 
 ## GitHub Environments
 
@@ -88,15 +89,8 @@ repository.
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
 - `AZURE_RESOURCE_GROUP`
-- `AZURE_LOCATION`
-- `AZURE_CONTAINER_APP_NAME`
-- `AZURE_CONTAINER_APP_ENVIRONMENT`
-- `AZURE_CONTAINER_REGISTRY`
-- `AZURE_IMAGE_NAME`
-- `AZURE_CONTAINER_REGISTRY_USERNAME` if password-based registry auth is used
-  later
-- `AZURE_CONTAINER_REGISTRY_PASSWORD` if password-based registry auth is used
-  later
+- `AZURE_WEBAPP_NAME`
+- `AZURE_STAGING_BACKEND_URL`
 - `QDRANT_URL`
 - `QDRANT_API_KEY`
 - `OPENROUTER_API_KEY`
@@ -114,9 +108,9 @@ The manual staging workflow now:
 
 1. validates dispatch inputs and required configuration names;
 2. logs in to Azure through OIDC;
-3. verifies the configured ACR and Container App already exist;
-4. builds and pushes the backend image;
-5. updates the staging Container App;
+3. creates an App Service deployment package;
+4. configures App Service app settings and startup command;
+5. deploys the package to the configured Azure Web App;
 6. runs `GET /health`;
 7. optionally runs `GET /api/v1/readiness` when selected after config review.
 
@@ -139,7 +133,7 @@ configured staging secrets.
 
 Rollback must be explicit and environment-aware:
 
-- Roll back to the previous reviewed image or Azure revision.
+- Roll back to the previous reviewed App Service deployment.
 - Do not switch production to fake mode to hide real-mode failures.
 - Roll back conversation store or session-auth configuration only with reviewed
   operator intent.
