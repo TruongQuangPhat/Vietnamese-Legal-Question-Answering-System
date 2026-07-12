@@ -204,6 +204,45 @@ Stop after readiness. Do not call `/api/v1/legal-qa/ask` in Stage 6. The
 separate `/ask` smoke is a later controlled step after explicit approval and
 reviewed environment readiness.
 
+## Stage 7 Controlled Ask Smoke Runbook
+
+Stage 7 uses `.github/workflows/staging-ask-smoke.yml`. It is a separate manual
+workflow and is not part of `deploy-staging.yml`.
+
+Use this only after Stage 6 real-readiness has passed:
+
+```text
+GET /health -> HTTP 200
+GET /api/v1/readiness -> HTTP 200 and ready true
+```
+
+This step calls real services and may incur Azure, Qdrant, and LLM provider
+costs. It must not be used as a benchmark or load test.
+
+Operator steps:
+
+1. Confirm the current GitHub branch selector is `main`.
+2. Open `Staging Ask Smoke`.
+3. Use GitHub Environment `staging`.
+4. Set `confirm_real_ask` exactly to:
+
+   ```text
+   I_UNDERSTAND_THIS_CALLS_REAL_SERVICES
+   ```
+
+5. Use the default low-risk legal research question or provide another
+   non-sensitive Vietnamese legal research question.
+6. Keep `timeout_seconds` at `120` unless a reviewed staging resource issue
+   requires a different bounded timeout.
+7. Dispatch the workflow once.
+8. Review only the safe summary: HTTP status, response JSON keys, answer length,
+   citation count, evidence count, and response latency when present.
+
+Stop after one `/api/v1/legal-qa/ask` request. Do not retry repeatedly, do not
+run concurrent requests, and do not paste full generated answers, prompts,
+evidence text, headers, session identifiers, provider keys, database URLs, or
+environment variables into logs or tickets.
+
 ## Future Production Deploy Flow
 
 1. Staging passes.

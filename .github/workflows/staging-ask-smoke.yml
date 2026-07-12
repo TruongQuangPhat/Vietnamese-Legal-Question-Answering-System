@@ -1,0 +1,190 @@
+name: Staging Ask Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_real_ask:
+        description: "Type I_UNDERSTAND_THIS_CALLS_REAL_SERVICES to run one real /ask smoke."
+        required: true
+        type: string
+      question:
+        description: "Safe Vietnamese legal research question for the single smoke request."
+        required: false
+        default: "Theo Bộ luật Dân sự Việt Nam, hợp đồng dân sự có thể bị vô hiệu trong những trường hợp nào?"
+        type: string
+      timeout_seconds:
+        description: "Per-request timeout in seconds."
+        required: false
+        default: 120
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-staging-ask-smoke
+  cancel-in-progress: false
+
+jobs:
+  staging-ask-smoke:
+    name: Run one Azure staging ask smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+
+    env:
+      AZURE_STAGING_BACKEND_URL: ${{ secrets.AZURE_STAGING_BACKEND_URL }}
+      CONFIRM_REAL_ASK: ${{ inputs.confirm_real_ask }}
+      SMOKE_QUESTION: ${{ inputs.question }}
+      TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
+
+    steps:
+      - name: Validate dispatch guard
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF_NAME:-}" != "main" ]; then
+            printf 'This smoke workflow must be dispatched from main.\n'
+            exit 1
+          fi
+
+          if [ "$CONFIRM_REAL_ASK" != "I_UNDERSTAND_THIS_CALLS_REAL_SERVICES" ]; then
+            printf 'Confirmation phrase did not match; no real service request was sent.\n'
+            exit 1
+          fi
+
+          if [ -z "${AZURE_STAGING_BACKEND_URL:-}" ]; then
+            printf 'Missing required GitHub Environment secret name: AZURE_STAGING_BACKEND_URL\n'
+            exit 1
+          fi
+
+          case "$TIMEOUT_SECONDS" in
+            ''|*[!0-9]*)
+              printf 'timeout_seconds must be a positive integer.\n'
+              exit 1
+              ;;
+          esac
+
+          if [ "$TIMEOUT_SECONDS" -lt 1 ] || [ "$TIMEOUT_SECONDS" -gt 300 ]; then
+            printf 'timeout_seconds must be between 1 and 300.\n'
+            exit 1
+          fi
+
+      - name: Check health and readiness
+        run: |
+          set -euo pipefail
+
+          base_url="${AZURE_STAGING_BACKEND_URL%/}"
+
+          health_file="$(mktemp)"
+          health_status="$(
+            curl -sS --max-time "$TIMEOUT_SECONDS" -o "$health_file" -w '%{http_code}' "$base_url/health"
+          )"
+          printf 'Health HTTP status: %s\n' "$health_status"
+          if [ "$health_status" != "200" ]; then
+            rm -f "$health_file"
+            printf 'Health check failed; ask smoke was not sent.\n'
+            exit 1
+          fi
+          rm -f "$health_file"
+
+          readiness_file="$(mktemp)"
+          readiness_status="$(
+            curl -sS --max-time "$TIMEOUT_SECONDS" -o "$readiness_file" -w '%{http_code}' "$base_url/api/v1/readiness"
+          )"
+          printf 'Readiness HTTP status: %s\n' "$readiness_status"
+          if [ "$readiness_status" != "200" ]; then
+            rm -f "$readiness_file"
+            printf 'Readiness check failed; ask smoke was not sent.\n'
+            exit 1
+          fi
+
+          READINESS_FILE="$readiness_file" python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(Path(os.environ["READINESS_FILE"]).read_text(encoding="utf-8"))
+          print(f"Readiness ready: {payload.get('ready')}")
+          print(f"Readiness service_mode: {payload.get('service_mode')}")
+          if payload.get("ready") is not True:
+              raise SystemExit("Readiness was not ready; ask smoke was not sent.")
+          PY
+          rm -f "$readiness_file"
+
+      - name: Send one ask request
+        run: |
+          set -euo pipefail
+
+          base_url="${AZURE_STAGING_BACKEND_URL%/}"
+          payload_file="$(mktemp)"
+          response_file="$(mktemp)"
+
+          SMOKE_PAYLOAD_FILE="$payload_file" python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "question": os.environ["SMOKE_QUESTION"],
+              "include_evidence": False,
+              "include_debug": False,
+          }
+          Path(os.environ["SMOKE_PAYLOAD_FILE"]).write_text(
+              json.dumps(payload, ensure_ascii=False),
+              encoding="utf-8",
+          )
+          PY
+
+          started_at="$(date +%s)"
+          ask_status="$(
+            curl -sS --max-time "$TIMEOUT_SECONDS" \
+              -H 'Content-Type: application/json' \
+              -o "$response_file" \
+              -w '%{http_code}' \
+              --data-binary "@$payload_file" \
+              "$base_url/api/v1/legal-qa/ask"
+          )"
+          finished_at="$(date +%s)"
+          duration_seconds="$((finished_at - started_at))"
+          rm -f "$payload_file"
+
+          printf 'Ask HTTP status: %s\n' "$ask_status"
+          printf 'Ask request duration seconds: %s\n' "$duration_seconds"
+          if [ "$ask_status" != "200" ]; then
+            rm -f "$response_file"
+            printf 'Ask smoke failed.\n'
+            exit 1
+          fi
+
+          RESPONSE_FILE="$response_file" python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(Path(os.environ["RESPONSE_FILE"]).read_text(encoding="utf-8"))
+          keys = sorted(payload.keys())
+          answer = payload.get("answer")
+          citations = payload.get("citations")
+          evidence = payload.get("evidence")
+          metadata = payload.get("metadata")
+
+          print("Response JSON keys: " + ", ".join(keys))
+          if isinstance(answer, str):
+              print(f"Answer length: {len(answer)}")
+          if isinstance(citations, list):
+              print(f"Citation count: {len(citations)}")
+          if isinstance(evidence, list):
+              print(f"Evidence count: {len(evidence)}")
+          if isinstance(metadata, dict):
+              latency_ms = metadata.get("latency_ms")
+              if latency_ms is not None:
+                  print(f"Response latency_ms: {latency_ms}")
+          PY
+          rm -f "$response_file"
