@@ -204,6 +204,65 @@ def test_service_hides_evidence_when_requested() -> None:
     assert response.evidence == []
 
 
+def test_service_falls_back_for_ui_payload_with_invalid_traceability_url() -> None:
+    service = LegalQAService(
+        workflow=StaticLegalQAWorkflow(
+            LegalQAWorkflowResult(
+                decision=LegalQAWorkflowDecision.ANSWERED,
+                answer="Câu trả lời không được xuất bản nếu nguồn không hợp lệ [E1].",
+                citations=[
+                    LegalQAWorkflowCitation(
+                        evidence_id="E1",
+                        chunk_id="chunk-001",
+                        law_id="law-001",
+                        law_name="Bộ luật Dân sự",
+                        citation="Điều 123 Bộ luật Dân sự",
+                        source_url="Unknown",
+                        hierarchy_path="Điều 123",
+                    )
+                ],
+                evidence=[
+                    LegalQAWorkflowEvidence(
+                        evidence_id="E1",
+                        chunk_id="chunk-001",
+                        law_id="law-001",
+                        law_name="Bộ luật Dân sự",
+                        citation="Điều 123 Bộ luật Dân sự",
+                        text="Giao dịch dân sự vô hiệu khi vi phạm điều cấm.",
+                        source_url="Unknown",
+                        score=0.91,
+                    )
+                ],
+                metadata=LegalQAWorkflowMetadata(model="fake-workflow", latency_ms=7),
+            )
+        )
+    )
+
+    response = service.answer(
+        LegalQARequest(
+            question=(
+                "Theo Bộ luật Dân sự Việt Nam, hợp đồng dân sự có thể bị vô hiệu "
+                "trong những trường hợp nào?"
+            ),
+            conversation_id="cbe5be82-8924-4cd4-acb4-a00ca1e70d52",
+            conversation_context=[
+                {"role": "user", "content": "Câu hỏi trước"},
+                {"role": "assistant", "content": "Câu trả lời trước"},
+            ],
+            top_k=10,
+            include_evidence=True,
+            include_debug=False,
+        )
+    )
+
+    assert response.decision == "fallback"
+    assert response.citations == []
+    assert response.evidence == []
+    assert "invalid_citation_source_url" in response.warnings
+    assert "invalid_evidence_source_url" in response.warnings
+    assert "fallback" in response.warnings
+
+
 def test_service_preserves_citation_fields() -> None:
     service = LegalQAService(workflow=StaticLegalQAWorkflow(_answered_result()))
 

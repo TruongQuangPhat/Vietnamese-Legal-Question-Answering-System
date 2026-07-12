@@ -20,7 +20,15 @@ from src.api.schemas import (
     ResponseMetadataDTO,
 )
 from src.api.settings import AppSettings
-from src.services.legal_qa_api_service import LegalQAService, LegalQAWorkflowRequest
+from src.services.legal_qa_api_service import (
+    LegalQAService,
+    LegalQAWorkflowCitation,
+    LegalQAWorkflowDecision,
+    LegalQAWorkflowEvidence,
+    LegalQAWorkflowMetadata,
+    LegalQAWorkflowRequest,
+    LegalQAWorkflowResult,
+)
 from src.services.legal_qa_workflow import LegalQAServiceMode
 from src.services.runtime_readiness import RuntimeReadinessService
 
@@ -268,6 +276,76 @@ async def test_ask_route_returns_safe_error_when_service_fails() -> None:
 
 
 @pytest.mark.asyncio
+async def test_ask_route_ui_payload_with_invalid_traceability_returns_fallback() -> None:
+    app = create_app()
+
+    class InvalidTraceabilityWorkflow:
+        def run(self, request: LegalQAWorkflowRequest) -> LegalQAWorkflowResult:
+            return LegalQAWorkflowResult(
+                decision=LegalQAWorkflowDecision.ANSWERED,
+                answer="Câu trả lời không được xuất bản nếu nguồn không hợp lệ [E1].",
+                citations=[
+                    LegalQAWorkflowCitation(
+                        evidence_id="E1",
+                        chunk_id="chunk-001",
+                        law_id="BLDS_2015",
+                        law_name="Bộ luật Dân sự",
+                        citation="Điều 123 Bộ luật Dân sự",
+                        source_url="Unknown",
+                        hierarchy_path="Điều 123",
+                    )
+                ],
+                evidence=[
+                    LegalQAWorkflowEvidence(
+                        evidence_id="E1",
+                        chunk_id="chunk-001",
+                        law_id="BLDS_2015",
+                        law_name="Bộ luật Dân sự",
+                        citation="Điều 123 Bộ luật Dân sự",
+                        text="Giao dịch dân sự vô hiệu khi vi phạm điều cấm.",
+                        source_url="Unknown",
+                        score=0.91,
+                    )
+                ],
+                metadata=LegalQAWorkflowMetadata(model="fake-workflow", latency_ms=7),
+            )
+
+    async def get_invalid_traceability_service() -> LegalQAService:
+        return LegalQAService(workflow=InvalidTraceabilityWorkflow())
+
+    app.dependency_overrides[get_legal_qa_service] = get_invalid_traceability_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": (
+                    "Theo Bộ luật Dân sự Việt Nam, hợp đồng dân sự có thể bị vô hiệu "
+                    "trong những trường hợp nào?"
+                ),
+                "conversation_id": "cbe5be82-8924-4cd4-acb4-a00ca1e70d52",
+                "conversation_context": [
+                    {"role": "user", "content": "Câu hỏi trước"},
+                    {"role": "assistant", "content": "Câu trả lời trước"},
+                ],
+                "top_k": 10,
+                "include_evidence": True,
+                "include_debug": False,
+            },
+        )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["decision"] == "fallback"
+    assert body["citations"] == []
+    assert body["evidence"] == []
+    assert "internal_error" not in body["warnings"]
+    assert "invalid_citation_source_url" in body["warnings"]
+    assert "invalid_evidence_source_url" in body["warnings"]
+
+
+@pytest.mark.asyncio
 async def test_ask_route_logs_safe_completion_metadata(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
     transport = httpx.ASGITransport(app=create_app())
@@ -307,7 +385,17 @@ async def test_ask_route_logs_safe_error_metadata(caplog: pytest.LogCaptureFixtu
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/api/v1/legal-qa/ask",
-            json={"question": "Câu hỏi hợp lệ?"},
+            json={
+                "question": "Câu hỏi hợp lệ?",
+                "conversation_id": "conversation-1",
+                "conversation_context": [
+                    {"role": "user", "content": "Nội dung riêng tư không được log."},
+                    {"role": "assistant", "content": "Câu trả lời riêng tư không được log."},
+                ],
+                "top_k": 10,
+                "include_evidence": True,
+                "include_debug": False,
+            },
         )
 
     assert response.status_code == 200
@@ -315,7 +403,14 @@ async def test_ask_route_logs_safe_error_metadata(caplog: pytest.LogCaptureFixtu
     assert record.request_id == response.json()["request_id"]
     assert record.error_type == "RuntimeError"
     assert isinstance(record.latency_ms, int)
+    assert record.top_k == 10
+    assert record.include_evidence is True
+    assert record.include_debug is False
+    assert record.has_conversation_id is True
+    assert record.conversation_context_message_count == 2
     assert "secret traceback details" not in caplog.text
+    assert "Nội dung riêng tư" not in caplog.text
+    assert "conversation-1" not in caplog.text
 
 
 @pytest.mark.asyncio
