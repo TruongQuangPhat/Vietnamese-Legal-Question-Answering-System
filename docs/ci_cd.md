@@ -418,12 +418,12 @@ Stage 6 `real-readiness` additionally requires:
 - `OPENROUTER_API_KEY`
 - `LEGAL_QA_DATABASE_URL`
 - `LEGAL_QA_SESSION_SECRET`
+- `LEGAL_QA_CHUNKS_URL`
+- `LEGAL_QA_CHUNKS_SHA256`
 
 Optional only if a later runtime packaging change needs it:
 
 - `HF_TOKEN`
-- `LEGAL_QA_CHUNKS_URL`
-- `LEGAL_QA_CHUNKS_SHA256`
 
 ### Authentication Decision
 
@@ -460,8 +460,10 @@ The `real-readiness` path:
 3. configures App Service for `LEGAL_QA_SERVICE_MODE=real`;
 4. keeps `LEGAL_QA_RATE_LIMIT_ENABLED=false` and `LEGAL_QA_AUTH_ENABLED=false`;
 5. sets the existing collection name `vnlaw_chunks_bgem3_v1_full`;
-6. runs bounded `GET /health`;
-7. runs bounded `GET /api/v1/readiness`.
+6. configures the legal chunks artifact URL and SHA256 for startup-time
+   download and verification;
+7. runs bounded `GET /health`;
+8. runs bounded `GET /api/v1/readiness`.
 
 Stage 6 does not call `/api/v1/legal-qa/ask`, does not call LLM providers
 directly, does not run benchmarks, and does not crawl, index, re-embed, rerank,
@@ -646,6 +648,8 @@ For `real-readiness` only:
 - `OPENROUTER_API_KEY`
 - `LEGAL_QA_DATABASE_URL`
 - `LEGAL_QA_SESSION_SECRET`
+- `LEGAL_QA_CHUNKS_URL`
+- `LEGAL_QA_CHUNKS_SHA256`
 
 ### Authentication and Permissions
 

@@ -101,6 +101,8 @@ repository.
 - `OPENROUTER_API_KEY` for Stage 6 `real-readiness`
 - `LEGAL_QA_DATABASE_URL` for Stage 6 `real-readiness`
 - `LEGAL_QA_SESSION_SECRET` for Stage 6 `real-readiness`
+- `LEGAL_QA_CHUNKS_URL` for Stage 6 `real-readiness`
+- `LEGAL_QA_CHUNKS_SHA256` for Stage 6 `real-readiness`
 
 The staging workflow uses Azure OIDC through `deploy-staging.yml`. Do not
 request `id-token: write` in production until production deployment is
@@ -112,11 +114,13 @@ The manual staging workflow now:
 
 1. validates dispatch inputs and required configuration names;
 2. logs in to Azure through OIDC;
-3. creates an App Service deployment package;
+3. creates an App Service deployment package without the protected local
+   `data/processed/legal_chunks.jsonl` file;
 4. configures App Service app settings and startup command;
 5. deploys the package to the configured Azure Web App;
-6. runs `GET /health`;
-7. runs `GET /api/v1/readiness` when selected in fake mode or automatically
+6. fetches and verifies the configured chunks artifact at startup in real mode;
+7. runs `GET /health`;
+8. runs `GET /api/v1/readiness` when selected in fake mode or automatically
    in Stage 6 `real-readiness`.
 
 It does not automate `POST /api/v1/legal-qa/ask`. The first/default staging

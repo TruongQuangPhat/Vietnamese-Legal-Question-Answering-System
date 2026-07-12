@@ -46,6 +46,9 @@ jobs:
       STAGING_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       STAGING_LEGAL_QA_DATABASE_URL: ${{ secrets.LEGAL_QA_DATABASE_URL }}
       STAGING_LEGAL_QA_SESSION_SECRET: ${{ secrets.LEGAL_QA_SESSION_SECRET }}
+      STAGING_LEGAL_QA_CHUNKS_URL: ${{ secrets.LEGAL_QA_CHUNKS_URL }}
+      STAGING_LEGAL_QA_CHUNKS_SHA256: ${{ secrets.LEGAL_QA_CHUNKS_SHA256 }}
+      STAGING_LEGAL_QA_QDRANT_URL: ${{ secrets.LEGAL_QA_QDRANT_URL }}
 
     steps:
       - name: Check out repository
@@ -105,6 +108,8 @@ jobs:
               STAGING_OPENROUTER_API_KEY
               STAGING_LEGAL_QA_DATABASE_URL
               STAGING_LEGAL_QA_SESSION_SECRET
+              STAGING_LEGAL_QA_CHUNKS_URL
+              STAGING_LEGAL_QA_CHUNKS_SHA256
             )
           fi
 
@@ -126,6 +131,12 @@ jobs:
                 ;;
               STAGING_LEGAL_QA_SESSION_SECRET)
                 public_name="LEGAL_QA_SESSION_SECRET"
+                ;;
+              STAGING_LEGAL_QA_CHUNKS_URL)
+                public_name="LEGAL_QA_CHUNKS_URL"
+                ;;
+              STAGING_LEGAL_QA_CHUNKS_SHA256)
+                public_name="LEGAL_QA_CHUNKS_SHA256"
                 ;;
             esac
             if [ -z "${!env_name:-}" ]; then
@@ -168,6 +179,7 @@ jobs:
             --exclude 'apps/frontend/.next' \
             --exclude 'data/raw' \
             --exclude 'data/interim' \
+            --exclude 'data/processed/legal_chunks.jsonl' \
             --exclude 'data/reports' \
             --exclude 'data/eval' \
             --exclude 'artifacts/reports/evaluation'
@@ -205,6 +217,7 @@ jobs:
 
           if [ "$SERVICE_MODE" = "real-readiness" ]; then
             qdrant_api_key_name="QDRANT_API_KEY"
+            legal_qa_qdrant_api_key_name="LEGAL_QA_QDRANT_API_KEY"
             openrouter_api_key_name="OPENROUTER_API_KEY"
             database_url_name="LEGAL_QA_DATABASE_URL"
             session_secret_name="LEGAL_QA_SESSION_SECRET"
@@ -218,8 +231,13 @@ jobs:
               LEGAL_QA_AUTH_ENABLED=false
               SCM_DO_BUILD_DURING_DEPLOYMENT=true
               LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
+              QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+              LEGAL_QA_CHUNKS_URL="$STAGING_LEGAL_QA_CHUNKS_URL"
+              LEGAL_QA_CHUNKS_SHA256="$STAGING_LEGAL_QA_CHUNKS_SHA256"
+              LEGAL_QA_QDRANT_URL="${STAGING_LEGAL_QA_QDRANT_URL:-$STAGING_QDRANT_URL}"
               QDRANT_URL="$STAGING_QDRANT_URL"
               "${qdrant_api_key_name}=$STAGING_QDRANT_API_KEY"
+              "${legal_qa_qdrant_api_key_name}=$STAGING_QDRANT_API_KEY"
               "${openrouter_api_key_name}=$STAGING_OPENROUTER_API_KEY"
               "${database_url_name}=$STAGING_LEGAL_QA_DATABASE_URL"
               "${session_secret_name}=$STAGING_LEGAL_QA_SESSION_SECRET"
@@ -238,10 +256,15 @@ jobs:
         run: |
           set -euo pipefail
 
+          startup_command="python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000"
+          if [ "$SERVICE_MODE" = "real-readiness" ]; then
+            startup_command="if [ \"\$LEGAL_QA_SERVICE_MODE\" = \"real\" ]; then python scripts/deployment/fetch_processed_chunks.py; fi; python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000"
+          fi
+
           az webapp config set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_WEBAPP_NAME" \
-            --startup-file "python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000" \
+            --startup-file "$startup_command" \
             --output none
 
           printf 'Configured App Service startup command.\n'
