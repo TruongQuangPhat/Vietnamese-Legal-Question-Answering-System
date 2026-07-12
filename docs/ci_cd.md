@@ -19,7 +19,8 @@ resource planning. Stage 4B initially targeted Azure Container Apps, but Azure
 for Students policy blocked Azure Container Registry, Azure Container Apps, and
 Log Analytics Workspace. Stage 5 pivots staging to Azure App Service code
 deploy in Japan East and passed fake-mode `/health`. Stage 6 adds a controlled
-real-mode readiness preflight for staging. Production deployment remains
+real-mode readiness preflight for staging and has passed after preparing chunks
+at `/home/data/legal_chunks.jsonl`. Production deployment remains
 skeleton-only.
 
 ## CI Principles
@@ -252,7 +253,9 @@ Stage 5 uses Azure App Service code deploy in Japan East as the current
 student-compatible staging target. Stage 5 fake-mode deployment passed with
 `GET /health` returning `{"status":"ok"}`. Stage 6 extends the same manual
 workflow with a controlled `real-readiness` mode that configures real-mode
-settings and calls only `GET /health` plus `GET /api/v1/readiness`.
+settings and calls only `GET /health` plus `GET /api/v1/readiness`. Stage 6
+passed on the B1 staging App Service after the chunks artifact was prepared at
+`/home/data/legal_chunks.jsonl`.
 
 Use environment variable and secret names only in workflow documentation and
 repository examples:
@@ -457,13 +460,15 @@ The `real-readiness` path:
 
 1. validates the required Azure and real-readiness GitHub Environment secrets;
 2. deploys the same App Service package with the Qdrant optional dependency;
-3. configures App Service for `LEGAL_QA_SERVICE_MODE=real`;
-4. keeps `LEGAL_QA_RATE_LIMIT_ENABLED=false` and `LEGAL_QA_AUTH_ENABLED=false`;
-5. sets the existing collection name `vnlaw_chunks_bgem3_v1_full`;
-6. configures the legal chunks artifact URL, SHA256, and
+3. verifies `scripts/deployment/fetch_processed_chunks.py` is present in the
+   App Service deployment package for operator-controlled chunk preparation;
+4. configures App Service for `LEGAL_QA_SERVICE_MODE=real`;
+5. keeps `LEGAL_QA_RATE_LIMIT_ENABLED=false` and `LEGAL_QA_AUTH_ENABLED=false`;
+6. sets the existing collection name `vnlaw_chunks_bgem3_v1_full`;
+7. configures the legal chunks artifact URL, SHA256, and
    `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
-7. runs bounded `GET /health`;
-8. runs bounded `GET /api/v1/readiness`.
+8. runs bounded `GET /health`;
+9. runs bounded `GET /api/v1/readiness`.
 
 Stage 6 does not call `/api/v1/legal-qa/ask`, does not call LLM providers
 directly, does not run benchmarks, and does not crawl, index, re-embed, rerank,
@@ -483,9 +488,30 @@ other real-mode dependencies. Chunks should be prepared outside the startup
 path into `/home/data/legal_chunks.jsonl`, then readiness can validate that
 the configured file exists and Qdrant collection metadata is readable.
 
-Azure Free F1 may not have enough memory for full real QA serving. A Stage 6
-readiness failure should be treated as a configuration, dependency, network, or
-resource-sizing signal, not as a broad legal QA quality result.
+The successful Stage 6 readiness criteria are:
+
+```text
+GET /health -> HTTP 200
+GET /api/v1/readiness -> HTTP 200 and ready true
+```
+
+The observed successful readiness response was sanitized to:
+
+```json
+{
+  "ready": true,
+  "service_mode": "real",
+  "checks": [
+    {"name": "configuration", "ready": true, "detail": "valid"},
+    {"name": "qdrant", "ready": true, "detail": "collection_available"}
+  ]
+}
+```
+
+Azure B1 is enough for the current readiness preflight. Full real QA serving is
+separate from readiness, and failures should be treated as configuration,
+dependency, network, or resource-sizing signals, not as broad legal QA quality
+results.
 
 ### Real-mode Risk Notes
 

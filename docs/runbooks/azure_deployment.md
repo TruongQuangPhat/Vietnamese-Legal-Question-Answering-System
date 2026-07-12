@@ -30,7 +30,8 @@ deploy container images.
 Stage 5 staging fake-mode deployment passed with `GET /health`. Stage 6 adds a
 controlled `real-readiness` mode to the same staging workflow. It configures
 real-mode app settings and checks only `GET /health` plus
-`GET /api/v1/readiness`.
+`GET /api/v1/readiness`. Stage 6 passed on the B1 staging App Service after the
+chunks artifact was prepared at `/home/data/legal_chunks.jsonl`.
 
 The staging workflow is `workflow_dispatch`-only and should not be added as a
 required branch protection check because it does not run on pull requests.
@@ -115,7 +116,8 @@ The manual staging workflow now:
 1. validates dispatch inputs and required configuration names;
 2. logs in to Azure through OIDC;
 3. creates an App Service deployment package without the protected local
-   `data/processed/legal_chunks.jsonl` file;
+   `data/processed/legal_chunks.jsonl` file, and verifies the operator chunks
+   fetch script is included;
 4. configures App Service app settings and startup command;
 5. deploys the package to the configured Azure Web App;
 6. uses plain Uvicorn startup so `/health` can serve without chunks or real
@@ -143,15 +145,20 @@ Chunks should live outside the deployed repository tree at:
 /home/data/legal_chunks.jsonl
 ```
 
+The workflow package step verifies that
+`scripts/deployment/fetch_processed_chunks.py` is included in the App Service
+deployment package. If that file is missing under `/home/site/wwwroot` in the
+SSH console, dispatch the default fake-mode deployment first so the latest code
+package is present without changing real-readiness settings.
+
 Before using `Deploy Staging` with `service_mode=real-readiness`:
 
 1. Confirm the `staging` GitHub Environment contains the Stage 6 secret names.
 2. Confirm the Azure federated credential for GitHub OIDC is configured.
 3. Confirm the App Service is the staging Web App, not production.
-4. If the current deployed app files do not already include
-   `scripts/deployment/fetch_processed_chunks.py`, first dispatch the workflow
-   in default fake mode to publish the code package with the plain Uvicorn
-   startup command.
+4. Confirm `/home/site/wwwroot/scripts/deployment/fetch_processed_chunks.py`
+   exists. If it does not, dispatch the workflow in default fake mode to publish
+   the code package with the plain Uvicorn startup command.
 5. Prepare the chunks artifact through the App Service SSH console or another
    reviewed operator-controlled remote shell after deployment files are present:
 
@@ -173,10 +180,29 @@ Before using `Deploy Staging` with `service_mode=real-readiness`:
 7. Review only the safe smoke output: HTTP status, readiness `ready`,
    `service_mode`, and sanitized check names/details.
 
-Stop after readiness. Do not call `/api/v1/legal-qa/ask` in Stage 6. Azure Free
-F1 may be insufficient for full real QA serving, so readiness failures should
-be treated cautiously and investigated as configuration, dependency, network, or
-resource-sizing signals.
+Successful Stage 6 readiness requires:
+
+```text
+GET /health -> HTTP 200
+GET /api/v1/readiness -> HTTP 200 and ready true
+```
+
+The observed successful readiness response was sanitized to:
+
+```json
+{
+  "ready": true,
+  "service_mode": "real",
+  "checks": [
+    {"name": "configuration", "ready": true, "detail": "valid"},
+    {"name": "qdrant", "ready": true, "detail": "collection_available"}
+  ]
+}
+```
+
+Stop after readiness. Do not call `/api/v1/legal-qa/ask` in Stage 6. The
+separate `/ask` smoke is a later controlled step after explicit approval and
+reviewed environment readiness.
 
 ## Future Production Deploy Flow
 

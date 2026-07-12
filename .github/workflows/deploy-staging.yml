@@ -184,6 +184,11 @@ jobs:
             --exclude 'data/eval' \
             --exclude 'artifacts/reports/evaluation'
 
+          if [ ! -f "$package_root/scripts/deployment/fetch_processed_chunks.py" ]; then
+            printf 'Missing operator chunks fetch script in deployment package.\n'
+            exit 1
+          fi
+
           uv export --frozen --no-dev --extra qdrant --no-hashes --output-file "$package_root/requirements.txt"
 
           (
