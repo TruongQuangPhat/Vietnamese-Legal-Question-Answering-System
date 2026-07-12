@@ -3,6 +3,14 @@ name: Deploy Staging
 on:
   workflow_dispatch:
     inputs:
+      service_mode:
+        description: "Backend service mode for staging deployment"
+        required: true
+        default: "fake"
+        type: choice
+        options:
+          - fake
+          - real-readiness
       run_readiness:
         description: "Run /api/v1/readiness after /health. Use only after config review."
         required: true
@@ -25,6 +33,7 @@ jobs:
     environment: staging
 
     env:
+      SERVICE_MODE: ${{ inputs.service_mode }}
       RUN_READINESS: ${{ inputs.run_readiness }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -32,6 +41,11 @@ jobs:
       AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
       AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
       AZURE_STAGING_BACKEND_URL: ${{ secrets.AZURE_STAGING_BACKEND_URL }}
+      STAGING_QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      STAGING_QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      STAGING_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      STAGING_LEGAL_QA_DATABASE_URL: ${{ secrets.LEGAL_QA_DATABASE_URL }}
+      STAGING_LEGAL_QA_SESSION_SECRET: ${{ secrets.LEGAL_QA_SESSION_SECRET }}
 
     steps:
       - name: Check out repository
@@ -51,6 +65,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          case "$SERVICE_MODE" in
+            fake|real-readiness)
+              printf 'Selected staging service mode: %s\n' "$SERVICE_MODE"
+              ;;
+            *)
+              printf 'Invalid service_mode. Expected fake or real-readiness.\n'
+              exit 1
+              ;;
+          esac
+
           case "$RUN_READINESS" in
             true|false)
               printf 'Readiness smoke requested: %s\n' "$RUN_READINESS"
@@ -65,19 +89,45 @@ jobs:
         run: |
           set -euo pipefail
 
-          required_pairs=(
-            AZURE_CLIENT_ID:AZURE_CLIENT_ID
-            AZURE_TENANT_ID:AZURE_TENANT_ID
-            AZURE_SUBSCRIPTION_ID:AZURE_SUBSCRIPTION_ID
-            AZURE_RESOURCE_GROUP:AZURE_RESOURCE_GROUP
-            AZURE_WEBAPP_NAME:AZURE_WEBAPP_NAME
-            AZURE_STAGING_BACKEND_URL:AZURE_STAGING_BACKEND_URL
+          required_env_names=(
+            AZURE_CLIENT_ID
+            AZURE_TENANT_ID
+            AZURE_SUBSCRIPTION_ID
+            AZURE_RESOURCE_GROUP
+            AZURE_WEBAPP_NAME
+            AZURE_STAGING_BACKEND_URL
           )
 
+          if [ "$SERVICE_MODE" = "real-readiness" ]; then
+            required_env_names+=(
+              STAGING_QDRANT_URL
+              STAGING_QDRANT_API_KEY
+              STAGING_OPENROUTER_API_KEY
+              STAGING_LEGAL_QA_DATABASE_URL
+              STAGING_LEGAL_QA_SESSION_SECRET
+            )
+          fi
+
           missing_names=()
-          for pair in "${required_pairs[@]}"; do
-            env_name="${pair%%:*}"
-            public_name="${pair#*:}"
+          for env_name in "${required_env_names[@]}"; do
+            public_name="$env_name"
+            case "$env_name" in
+              STAGING_QDRANT_URL)
+                public_name="QDRANT_URL"
+                ;;
+              STAGING_QDRANT_API_KEY)
+                public_name="QDRANT_API_KEY"
+                ;;
+              STAGING_OPENROUTER_API_KEY)
+                public_name="OPENROUTER_API_KEY"
+                ;;
+              STAGING_LEGAL_QA_DATABASE_URL)
+                public_name="LEGAL_QA_DATABASE_URL"
+                ;;
+              STAGING_LEGAL_QA_SESSION_SECRET)
+                public_name="LEGAL_QA_SESSION_SECRET"
+                ;;
+            esac
             if [ -z "${!env_name:-}" ]; then
               missing_names+=("$public_name")
             fi
@@ -96,7 +146,7 @@ jobs:
           set -euo pipefail
 
           uv lock --check
-          uv sync --frozen --no-dev
+          uv sync --frozen --no-dev --extra qdrant
           uv run python -m py_compile src/api/app.py
 
       - name: Create App Service deployment package
@@ -122,7 +172,7 @@ jobs:
             --exclude 'data/eval' \
             --exclude 'artifacts/reports/evaluation'
 
-          uv export --frozen --no-dev --no-hashes --output-file "$package_root/requirements.txt"
+          uv export --frozen --no-dev --extra qdrant --no-hashes --output-file "$package_root/requirements.txt"
 
           (
             cd "$package_root"
@@ -152,6 +202,29 @@ jobs:
             LEGAL_QA_AUTH_ENABLED=false
             SCM_DO_BUILD_DURING_DEPLOYMENT=true
           )
+
+          if [ "$SERVICE_MODE" = "real-readiness" ]; then
+            qdrant_api_key_name="QDRANT_API_KEY"
+            openrouter_api_key_name="OPENROUTER_API_KEY"
+            database_url_name="LEGAL_QA_DATABASE_URL"
+            session_secret_name="LEGAL_QA_SESSION_SECRET"
+
+            app_settings=(
+              PORT=8000
+              LEGAL_QA_SERVICE_MODE=real
+              LEGAL_QA_ALLOW_REAL_TESTS=0
+              LEGAL_QA_ALLOW_DB_TESTS=0
+              LEGAL_QA_RATE_LIMIT_ENABLED=false
+              LEGAL_QA_AUTH_ENABLED=false
+              SCM_DO_BUILD_DURING_DEPLOYMENT=true
+              LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
+              QDRANT_URL="$STAGING_QDRANT_URL"
+              "${qdrant_api_key_name}=$STAGING_QDRANT_API_KEY"
+              "${openrouter_api_key_name}=$STAGING_OPENROUTER_API_KEY"
+              "${database_url_name}=$STAGING_LEGAL_QA_DATABASE_URL"
+              "${session_secret_name}=$STAGING_LEGAL_QA_SESSION_SECRET"
+            )
+          fi
 
           az webapp config appsettings set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -202,8 +275,14 @@ jobs:
 
           health_passed=false
           for attempt in {1..30}; do
-            if response="$(curl -fsS "$staging_url/health")"; then
-              printf 'Health response: %s\n' "$response"
+            response_file="$(mktemp)"
+            http_status="$(
+              curl -sS -o "$response_file" -w '%{http_code}' "$staging_url/health" || true
+            )"
+            if [ "$http_status" = "200" ]; then
+              response="$(cat "$response_file")"
+              rm -f "$response_file"
+              printf 'Health HTTP status: %s\n' "$http_status"
               case "$response" in
                 *'"status":"ok"'*|*'"status": "ok"'*)
                   health_passed=true
@@ -213,6 +292,7 @@ jobs:
               printf 'Unexpected health response payload.\n'
               exit 1
             fi
+            rm -f "$response_file"
             printf 'Health smoke attempt %s failed; retrying.\n' "$attempt"
             sleep 5
           done
@@ -225,20 +305,58 @@ jobs:
           printf 'STAGING_HEALTH_PASSED=true\n' >> "$GITHUB_ENV"
 
       - name: Smoke staging readiness
-        if: ${{ inputs.run_readiness }}
+        if: ${{ inputs.run_readiness || inputs.service_mode == 'real-readiness' }}
         run: |
           set -euo pipefail
 
           staging_url="${AZURE_STAGING_BACKEND_URL%/}"
-          readiness_response="$(curl -fsS "$staging_url/api/v1/readiness")"
-          printf 'Readiness response: %s\n' "$readiness_response"
+          readiness_passed=false
+          for attempt in {1..20}; do
+            response_file="$(mktemp)"
+            http_status="$(
+              curl -sS -o "$response_file" -w '%{http_code}' "$staging_url/api/v1/readiness" || true
+            )"
+            response="$(cat "$response_file")"
+            rm -f "$response_file"
+
+            printf 'Readiness HTTP status: %s\n' "$http_status"
+            if [ "$http_status" = "200" ]; then
+              READINESS_RESPONSE="$response" python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+
+          payload = json.loads(os.environ["READINESS_RESPONSE"])
+          checks = payload.get("checks", [])
+          print(f"Readiness ready: {payload.get('ready')}")
+          print(f"Readiness service_mode: {payload.get('service_mode')}")
+          for check in checks:
+              print(
+                  "Readiness check: "
+                  f"{check.get('name')} ready={check.get('ready')} detail={check.get('detail')}"
+              )
+          PY
+              readiness_passed=true
+              break
+            fi
+
+            printf 'Readiness smoke attempt %s failed; retrying.\n' "$attempt"
+            sleep 5
+          done
+
+          if [ "$readiness_passed" != "true" ]; then
+            printf 'Staging readiness smoke did not pass in time.\n'
+            exit 1
+          fi
+
           printf 'STAGING_READINESS_RAN=true\n' >> "$GITHUB_ENV"
 
       - name: Print safe deployment summary
         run: |
           set -euo pipefail
 
-          printf 'Staging service mode: fake\n'
+          printf 'Staging service mode: %s\n' "$SERVICE_MODE"
           printf 'Health smoke passed: %s\n' "${STAGING_HEALTH_PASSED:-false}"
           printf 'Readiness smoke ran: %s\n' "${STAGING_READINESS_RAN:-false}"
           printf 'Deployment target: Azure App Service Web App\n'

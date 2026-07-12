@@ -18,7 +18,9 @@ workflows added manual planning scaffolding. Stage 4A added Azure staging
 resource planning. Stage 4B initially targeted Azure Container Apps, but Azure
 for Students policy blocked Azure Container Registry, Azure Container Apps, and
 Log Analytics Workspace. Stage 5 pivots staging to Azure App Service code
-deploy in Japan East. Production deployment remains skeleton-only.
+deploy in Japan East and passed fake-mode `/health`. Stage 6 adds a controlled
+real-mode readiness preflight for staging. Production deployment remains
+skeleton-only.
 
 ## CI Principles
 
@@ -247,8 +249,13 @@ indonesiacentral
 ```
 
 Stage 5 uses Azure App Service code deploy in Japan East as the current
-student-compatible staging target. Use environment variable and secret names
-only in workflow documentation and repository examples:
+student-compatible staging target. Stage 5 fake-mode deployment passed with
+`GET /health` returning `{"status":"ok"}`. Stage 6 extends the same manual
+workflow with a controlled `real-readiness` mode that configures real-mode
+settings and calls only `GET /health` plus `GET /api/v1/readiness`.
+
+Use environment variable and secret names only in workflow documentation and
+repository examples:
 
 ```text
 AZURE_CLIENT_ID
@@ -263,6 +270,10 @@ OPENROUTER_API_KEY
 LEGAL_QA_DATABASE_URL
 LEGAL_QA_SESSION_SECRET
 ```
+
+Stage 6 may reference GitHub Environment secrets through exact GitHub Actions
+secret expressions in workflow YAML. The lightweight secret guard still blocks
+raw values and non-placeholder assignments.
 
 Do not include real values in Git, workflow logs, docs, examples, or issue
 comments.
@@ -389,7 +400,7 @@ Normal PR required checks should remain:
 - Secret Scan
 - Backend Container
 
-### Stage 5 Secret Names
+### Stage 5/6 Secret Names
 
 Names only, no values:
 
@@ -398,12 +409,21 @@ Names only, no values:
 - `AZURE_SUBSCRIPTION_ID`
 - `AZURE_RESOURCE_GROUP`
 - `AZURE_WEBAPP_NAME`
+- `AZURE_STAGING_BACKEND_URL`
+
+Stage 6 `real-readiness` additionally requires:
+
 - `QDRANT_URL`
 - `QDRANT_API_KEY`
 - `OPENROUTER_API_KEY`
 - `LEGAL_QA_DATABASE_URL`
 - `LEGAL_QA_SESSION_SECRET`
-- `HF_TOKEN` only if needed
+
+Optional only if a later runtime packaging change needs it:
+
+- `HF_TOKEN`
+- `LEGAL_QA_CHUNKS_URL`
+- `LEGAL_QA_CHUNKS_SHA256`
 
 ### Authentication Decision
 
@@ -428,8 +448,29 @@ Implemented staging flow:
    - no automated `/api/v1/legal-qa/ask`.
 9. Do not call `/api/v1/legal-qa/ask` unless explicitly approved.
 
-Real-mode Azure staging is deferred to a later stage so the fake-mode staging
-workflow stays compatible with the lightweight secret guard.
+### Stage 6 Real-Readiness Preflight
+
+Stage 6 extends `.github/workflows/deploy-staging.yml` with a
+`service_mode=real-readiness` dispatch option. The default remains `fake`.
+
+The `real-readiness` path:
+
+1. validates the required Azure and real-readiness GitHub Environment secrets;
+2. deploys the same App Service package with the Qdrant optional dependency;
+3. configures App Service for `LEGAL_QA_SERVICE_MODE=real`;
+4. keeps `LEGAL_QA_RATE_LIMIT_ENABLED=false` and `LEGAL_QA_AUTH_ENABLED=false`;
+5. sets the existing collection name `vnlaw_chunks_bgem3_v1_full`;
+6. runs bounded `GET /health`;
+7. runs bounded `GET /api/v1/readiness`.
+
+Stage 6 does not call `/api/v1/legal-qa/ask`, does not call LLM providers
+directly, does not run benchmarks, and does not crawl, index, re-embed, rerank,
+or mutate Qdrant. `/api/v1/legal-qa/ask` is deferred to Stage 7 and requires a
+separate explicit approval.
+
+Azure Free F1 may not have enough memory for full real QA serving. A Stage 6
+readiness failure should be treated as a configuration, dependency, network, or
+resource-sizing signal, not as a broad legal QA quality result.
 
 ### Real-mode Risk Notes
 
@@ -524,13 +565,14 @@ symptoms occur.
 - [ ] Required secrets listed and assigned owners.
 - [ ] Rollback path documented.
 - [ ] First staging smoke scope approved.
-- [ ] Stage 5 App Service workflow can be manually dispatched.
+- [ ] Stage 6 App Service workflow can be manually dispatched.
 
 ### Open Questions
 
-- Minimum memory/CPU for real mode.
-- Whether the chunks artifact is public or private.
-- Smoke-test scope for first real deployment.
+- Minimum memory/CPU for full real QA serving.
+- Whether the chunks artifact should remain packaged or be fetched for later
+  real-mode deploys.
+- Smoke-test scope for Stage 7 `/api/v1/legal-qa/ask`.
 
 ## Stage 5 - Manual Azure App Service Staging Deployment
 
@@ -565,12 +607,13 @@ This workflow:
 
 ### Behavior
 
-The staging workflow has one input:
+The staging workflow has two inputs:
 
+- `service_mode`: `fake` or `real-readiness`, default `fake`;
 - `run_readiness`: boolean, default `false`.
 
-Stage 5 always deploys fake mode. It sets only safe liveness and CI guard
-environment variables:
+The default fake path sets only safe liveness and CI guard environment
+variables:
 
 ```env
 PORT=8000
@@ -582,8 +625,8 @@ LEGAL_QA_AUTH_ENABLED=false
 SCM_DO_BUILD_DURING_DEPLOYMENT=true
 ```
 
-Real-mode Azure staging is intentionally out of scope for Stage 5 and must be
-implemented in a later workflow revision after a separate secret-scan review.
+The `real-readiness` path configures real mode for `/health` and
+`/api/v1/readiness` only. It does not call `/api/v1/legal-qa/ask`.
 
 ### Required Staging Environment Secrets
 
@@ -595,6 +638,14 @@ Names only, no values:
 - `AZURE_RESOURCE_GROUP`
 - `AZURE_WEBAPP_NAME`
 - `AZURE_STAGING_BACKEND_URL`
+
+For `real-readiness` only:
+
+- `QDRANT_URL`
+- `QDRANT_API_KEY`
+- `OPENROUTER_API_KEY`
+- `LEGAL_QA_DATABASE_URL`
+- `LEGAL_QA_SESSION_SECRET`
 
 ### Authentication and Permissions
 
@@ -613,8 +664,9 @@ the staging workflow. Production remains skeleton-only and must not request
 ### Safe Smoke Scope
 
 The staging workflow always runs a bounded `GET /health` smoke after deploying
-to the Azure Web App. It runs `GET /api/v1/readiness` only when `run_readiness` is
-selected manually after configuration review.
+to the Azure Web App. It runs `GET /api/v1/readiness` when `run_readiness` is
+selected manually in fake mode, and always runs readiness for
+`service_mode=real-readiness`.
 
 The staging workflow does not:
 
@@ -638,7 +690,7 @@ PR check. Normal required PR checks remain:
 
 `.github/workflows/deploy-production.yml` remains a planning-only skeleton.
 Production deployment, production Azure login, production image push, and
-production smoke checks are not implemented in Stage 5.
+production smoke checks are not implemented in Stage 6.
 
 ## Rollback and Incident Notes
 

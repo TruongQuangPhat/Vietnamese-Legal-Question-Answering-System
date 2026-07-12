@@ -27,15 +27,17 @@ Students policy currently blocks Azure Container Registry, Azure Container Apps,
 and Log Analytics Workspace, so the staging workflow does not build, push, or
 deploy container images.
 
-Stage 5 staging is fake-mode only. Real-mode Azure staging is deferred to a
-later stage and is not configured by `.github/workflows/deploy-staging.yml`.
+Stage 5 staging fake-mode deployment passed with `GET /health`. Stage 6 adds a
+controlled `real-readiness` mode to the same staging workflow. It configures
+real-mode app settings and checks only `GET /health` plus
+`GET /api/v1/readiness`.
 
 The staging workflow is `workflow_dispatch`-only and should not be added as a
 required branch protection check because it does not run on pull requests.
 Required checks for normal PRs should remain routine CI checks such as Backend
 CI, Frontend CI, Protected Path Guard, Secret Scan, and Backend Container.
 
-For the consolidated Azure staging resource plan, Stage 5 workflow behavior,
+For the consolidated Azure staging resource plan, Stage 6 workflow behavior,
 and preflight checklist, see
 `docs/ci_cd.md`.
 
@@ -94,12 +96,11 @@ repository.
 - `AZURE_RESOURCE_GROUP`
 - `AZURE_WEBAPP_NAME`
 - `AZURE_STAGING_BACKEND_URL`
-- `QDRANT_URL`
-- `QDRANT_API_KEY`
-- `OPENROUTER_API_KEY`
-- `LEGAL_QA_DATABASE_URL`
-- `LEGAL_QA_SESSION_SECRET`
-- `HF_TOKEN` only if the chunks artifact becomes private
+- `QDRANT_URL` for Stage 6 `real-readiness`
+- `QDRANT_API_KEY` for Stage 6 `real-readiness`
+- `OPENROUTER_API_KEY` for Stage 6 `real-readiness`
+- `LEGAL_QA_DATABASE_URL` for Stage 6 `real-readiness`
+- `LEGAL_QA_SESSION_SECRET` for Stage 6 `real-readiness`
 
 The staging workflow uses Azure OIDC through `deploy-staging.yml`. Do not
 request `id-token: write` in production until production deployment is
@@ -115,11 +116,27 @@ The manual staging workflow now:
 4. configures App Service app settings and startup command;
 5. deploys the package to the configured Azure Web App;
 6. runs `GET /health`;
-7. optionally runs `GET /api/v1/readiness` when selected after config review.
+7. runs `GET /api/v1/readiness` when selected in fake mode or automatically
+   in Stage 6 `real-readiness`.
 
 It does not automate `POST /api/v1/legal-qa/ask`. The first/default staging
-deployment mode is fake mode, and Stage 5 does not support real-mode staging
-secrets or app settings.
+deployment mode remains fake mode.
+
+## Stage 6 Real-Readiness Runbook
+
+Before dispatching `Deploy Staging` with `service_mode=real-readiness`:
+
+1. Confirm the `staging` GitHub Environment contains the Stage 6 secret names.
+2. Confirm the Azure federated credential for GitHub OIDC is configured.
+3. Confirm the App Service is the staging Web App, not production.
+4. Dispatch the workflow manually with `service_mode=real-readiness`.
+5. Review only the safe smoke output: HTTP status, readiness `ready`,
+   `service_mode`, and sanitized check names/details.
+
+Stop after readiness. Do not call `/api/v1/legal-qa/ask` in Stage 6. Azure Free
+F1 may be insufficient for full real QA serving, so readiness failures should
+be treated cautiously and investigated as configuration, dependency, network, or
+resource-sizing signals.
 
 ## Future Production Deploy Flow
 
