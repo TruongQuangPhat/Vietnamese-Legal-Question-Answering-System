@@ -55,6 +55,23 @@ Set the production build environment:
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
 ```
 
+For Stage 8 Azure backend integration, do not change production blindly. First
+set a Vercel Preview or staging deployment to:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
+```
+
+The Azure backend must allow the exact Vercel Preview origin before browser
+traffic will pass CORS. Vercel Preview URLs are deployment-specific, so add the
+actual preview URL shown by Vercel to the Azure App Service
+`CORS_ALLOWED_ORIGINS` JSON array.
+
+After the preview UI smoke passes, switch Vercel Production by changing the
+Production `NEXT_PUBLIC_API_BASE_URL` from the Render backend origin to the
+Azure backend origin and redeploying. Keep the Render URL available as the
+rollback value until Azure production traffic is accepted.
+
 The backend must allow the deployed frontend origin:
 
 ```env
