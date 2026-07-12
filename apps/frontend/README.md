@@ -55,8 +55,8 @@ Set the production build environment:
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
 ```
 
-For Stage 8 Azure backend integration, do not change production blindly. First
-set a Vercel Preview or staging deployment to:
+For Stage 9 Azure backend UI smoke, do not change production blindly. First set
+a Vercel Preview deployment to:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
@@ -65,7 +65,25 @@ NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.jap
 The Azure backend must allow the exact Vercel Preview origin before browser
 traffic will pass CORS. Vercel Preview URLs are deployment-specific, so add the
 actual preview URL shown by Vercel to the Azure App Service
-`CORS_ALLOWED_ORIGINS` JSON array.
+`CORS_ALLOWED_ORIGINS` JSON array and restart the Azure App Service after
+saving the setting.
+
+Manual Preview smoke:
+
+1. Redeploy Vercel Preview after setting `NEXT_PUBLIC_API_BASE_URL`.
+2. Copy the exact Vercel Preview URL.
+3. Add that exact origin to Azure `CORS_ALLOWED_ORIGINS`.
+4. Restart Azure App Service.
+5. Open the Vercel Preview frontend.
+6. Open browser DevTools and select the Network tab.
+7. Submit exactly one safe Vietnamese legal question:
+
+   ```text
+   Theo Bộ luật Dân sự Việt Nam, hợp đồng dân sự có thể bị vô hiệu trong những trường hợp nào?
+   ```
+
+8. Verify the request URL goes to the Azure backend, not Render.
+9. Verify the UI displays a response and no browser CORS error appears.
 
 After the preview UI smoke passes, switch Vercel Production by changing the
 Production `NEXT_PUBLIC_API_BASE_URL` from the Render backend origin to the

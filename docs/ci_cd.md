@@ -878,6 +878,85 @@ Migration checklist:
       remove Render-specific secrets, disable Render traffic, preserve safe
       logs, and document final rollback limits.
 
+## Stage 9 - Vercel Preview to Azure Backend UI Smoke
+
+Stage 9 prepares a manual browser smoke where the Vercel Preview frontend calls
+the Azure App Service backend. It does not change Vercel Production and does
+not modify frontend code. The frontend still reads:
+
+```env
+NEXT_PUBLIC_API_BASE_URL
+```
+
+Vercel Preview setup:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
+```
+
+After Vercel creates the Preview deployment, copy the exact Preview URL and add
+that origin to Azure App Service:
+
+```env
+CORS_ALLOWED_ORIGINS=["https://<vercel-preview-origin>"]
+```
+
+If Azure must also allow the production Vercel origin during the same test
+window, include both exact origins:
+
+```env
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app","https://<vercel-preview-origin>"]
+```
+
+Restart Azure App Service after changing `CORS_ALLOWED_ORIGINS`; do not rely on
+the new value being picked up without a restart.
+
+Manual UI smoke checklist:
+
+- [ ] Set Vercel Preview `NEXT_PUBLIC_API_BASE_URL` to the Azure backend URL.
+- [ ] Redeploy Vercel Preview.
+- [ ] Copy the exact Vercel Preview URL.
+- [ ] Add the exact Preview origin to Azure `CORS_ALLOWED_ORIGINS`.
+- [ ] Restart Azure App Service.
+- [ ] Open the Vercel Preview frontend.
+- [ ] Open browser DevTools and select the Network tab.
+- [ ] Submit exactly one safe Vietnamese legal question:
+
+      ```text
+      Theo Bộ luật Dân sự Việt Nam, hợp đồng dân sự có thể bị vô hiệu trong những trường hợp nào?
+      ```
+
+- [ ] Verify the request URL goes to the Azure backend, not Render.
+- [ ] Verify the UI displays a response.
+- [ ] Verify no browser CORS error appears.
+
+Pass criteria:
+
+- Vercel Preview is built with the Azure `NEXT_PUBLIC_API_BASE_URL`.
+- Browser Network shows the `/api/v1/legal-qa/ask` request going to
+  `vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net`.
+- The UI renders a response.
+- No CORS error appears in the browser.
+- Exactly one UI question is submitted; no loop, benchmark, load test, or
+  concurrent request test is run.
+
+Fail criteria:
+
+- The browser request still goes to Render.
+- The browser blocks the request with CORS.
+- The UI cannot render a response.
+- Multiple `/api/v1/legal-qa/ask` requests are sent unintentionally.
+
+Rollback and production hold:
+
+- Do not switch Vercel Production in Stage 9.
+- Keep Render as the rollback backend value until the later production migration
+  passes.
+- If Preview fails, restore the Preview `NEXT_PUBLIC_API_BASE_URL` to the prior
+  value or delete the Preview override, then redeploy Preview.
+- Do not decommission Render until Azure production traffic is accepted and a
+  separate Render decommission checklist is executed.
+
 ## Rollback and Incident Notes
 
 Production rollback must be explicit and environment-aware. CI/CD must not hide

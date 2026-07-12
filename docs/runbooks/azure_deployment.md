@@ -318,6 +318,71 @@ Migration checklist:
    Render-only secrets, disable Render traffic, preserve safe logs, and record
    the final rollback boundary.
 
+## Stage 9 Vercel Preview UI Smoke Runbook
+
+Stage 9 is a manual browser smoke from Vercel Preview to the Azure staging
+backend. It does not switch Vercel Production.
+
+1. In Vercel Preview environment settings, set:
+
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
+   ```
+
+2. Redeploy Vercel Preview.
+3. Copy the exact generated Vercel Preview URL.
+4. In Azure App Service app settings, set `CORS_ALLOWED_ORIGINS` to include the
+   exact Preview origin. If only Preview should be allowed during the smoke:
+
+   ```env
+   CORS_ALLOWED_ORIGINS=["https://<vercel-preview-origin>"]
+   ```
+
+   If Production and Preview should both be allowed:
+
+   ```env
+   CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app","https://<vercel-preview-origin>"]
+   ```
+
+5. Restart Azure App Service after saving `CORS_ALLOWED_ORIGINS`.
+6. Open the Vercel Preview frontend.
+7. Open browser DevTools and select the Network tab.
+8. Submit exactly one safe Vietnamese legal question:
+
+   ```text
+   Theo Bộ luật Dân sự Việt Nam, hợp đồng dân sự có thể bị vô hiệu trong những trường hợp nào?
+   ```
+
+9. Verify the request URL goes to Azure:
+
+   ```text
+   https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
+   ```
+
+10. Verify the request does not go to Render.
+11. Verify the UI displays a response.
+12. Verify no browser CORS error appears.
+
+Pass criteria:
+
+- Vercel Preview uses the Azure backend origin.
+- Azure CORS allows the exact Vercel Preview origin.
+- The UI renders one response.
+- Exactly one question is submitted.
+- No CORS error appears.
+
+Fail and rollback notes:
+
+- If the Network tab shows Render, fix Vercel Preview
+  `NEXT_PUBLIC_API_BASE_URL` and redeploy Preview.
+- If CORS fails, fix Azure `CORS_ALLOWED_ORIGINS`, restart App Service, and
+  retest once.
+- If the UI cannot render a response, stop and preserve safe browser/Azure logs
+  without full answer text, prompts, headers, session identifiers, provider
+  keys, database URLs, or environment dumps.
+- Do not switch Vercel Production in Stage 9.
+- Render remains the rollback backend until a later production migration passes.
+
 ## Future Production Deploy Flow
 
 1. Staging passes.
