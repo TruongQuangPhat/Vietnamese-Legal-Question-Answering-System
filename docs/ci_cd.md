@@ -206,10 +206,12 @@ Deployment should follow this path:
 2. Merge to `main`.
 3. Deploy staging.
 4. Run safe staging smoke with `/health` and `/api/v1/readiness`.
-5. Run conversation CRUD smoke where appropriate.
-6. Require manual approval.
-7. Deploy production.
-8. Run safe production smoke with `/health` and `/api/v1/readiness`.
+5. Run exactly one controlled staging `/api/v1/legal-qa/ask` smoke only after
+   real-readiness passes and the operator confirms real-service usage.
+6. Run conversation CRUD smoke where appropriate.
+7. Require manual approval.
+8. Deploy production.
+9. Run safe production smoke with `/health` and `/api/v1/readiness`.
 
 A controlled `POST /api/v1/legal-qa/ask` smoke is manual, exactly one request,
 and only after explicit approval and reviewed environment readiness. Do not use
@@ -512,6 +514,60 @@ Azure B1 is enough for the current readiness preflight. Full real QA serving is
 separate from readiness, and failures should be treated as configuration,
 dependency, network, or resource-sizing signals, not as broad legal QA quality
 results.
+
+### Stage 7 Controlled Staging Ask Smoke
+
+Stage 7 adds `.github/workflows/staging-ask-smoke.yml` as a separate manual
+workflow. It is not part of `deploy-staging.yml` and does not deploy code or
+change App Service configuration.
+
+Prerequisites:
+
+1. Stage 6 real-readiness has passed on Azure staging.
+2. `GET /health` returns HTTP 200.
+3. `GET /api/v1/readiness` returns HTTP 200 with `ready=true`,
+   `service_mode=real`, configuration `valid`, and Qdrant
+   `collection_available`.
+4. The workflow is dispatched from `main`.
+5. The operator types `I_UNDERSTAND_THIS_CALLS_REAL_SERVICES`.
+
+The workflow calls only:
+
+```text
+GET /health
+GET /api/v1/readiness
+POST /api/v1/legal-qa/ask
+```
+
+It sends exactly one `/api/v1/legal-qa/ask` request, with no loop, no retry, no
+concurrency, no benchmark, and no load test. The minimal request body follows
+the current `LegalQARequest` API schema:
+
+```json
+{
+  "question": "<workflow input>",
+  "include_evidence": false,
+  "include_debug": false
+}
+```
+
+Pass criteria:
+
+- `/health` returns HTTP 200;
+- `/api/v1/readiness` returns HTTP 200 and `ready=true`;
+- `/api/v1/legal-qa/ask` returns HTTP 200;
+- logs show only HTTP status, response JSON keys, answer length, citation count,
+  evidence count, and response latency when present.
+
+Failure handling:
+
+- Stop after the first failure.
+- Do not rerun repeatedly to chase intermittent provider, memory, or timeout
+  symptoms.
+- Do not print full answers, prompts, evidence text, headers, provider keys,
+  database URLs, session secrets, or environment variables.
+- Treat failures as deployment/resource/provider signals, not as legal-quality
+  benchmark results.
 
 ### Real-mode Risk Notes
 
