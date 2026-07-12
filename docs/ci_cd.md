@@ -814,6 +814,70 @@ PR check. Normal required PR checks remain:
 Production deployment, production Azure login, production image push, and
 production smoke checks are not implemented in Stage 6.
 
+## Stage 8 - Frontend to Azure Backend Integration Audit
+
+The frontend API base URL is configured through:
+
+```env
+NEXT_PUBLIC_API_BASE_URL
+```
+
+The Next.js client reads this value in `apps/frontend/src/lib/api-config.ts`.
+It is browser-visible and embedded during `next build`; changing it requires a
+new Vercel deployment. Do not put secrets in any `NEXT_PUBLIC_*` value.
+
+Current frontend code does not hardcode the Render backend URL. Render backend
+references remain in deployment documentation and frontend setup guidance as
+the current production value:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+```
+
+For Vercel Preview or staging validation against Azure App Service, set:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
+```
+
+Do not change Vercel Production until a Preview deployment passes UI smoke.
+The later Production migration step is to change Vercel Production
+`NEXT_PUBLIC_API_BASE_URL` from the Render backend origin to the accepted Azure
+backend origin and redeploy the frontend.
+
+Backend CORS is controlled by `CORS_ALLOWED_ORIGINS`. The backend default only
+allows `http://localhost:3000`; deployed browser traffic requires exact Vercel
+origins in the backend environment. For Azure Preview/Staging, include the
+actual Vercel Preview URL produced by Vercel. For Production, include:
+
+```env
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
+```
+
+If Preview and Production are both routed to Azure, the Azure App Service value
+should be a JSON array containing every accepted exact origin, for example:
+
+```env
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app","https://<vercel-preview-origin>"]
+```
+
+Migration checklist:
+
+- [ ] Set Vercel Preview `NEXT_PUBLIC_API_BASE_URL` to the Azure staging backend
+      origin.
+- [ ] Add the exact Vercel Preview origin to Azure App Service
+      `CORS_ALLOWED_ORIGINS`.
+- [ ] Redeploy Vercel Preview and run UI smoke against Azure.
+- [ ] Confirm no `/api/v1/legal-qa/ask` loop, benchmark, or load test is run
+      from the UI smoke.
+- [ ] Switch Vercel Production `NEXT_PUBLIC_API_BASE_URL` from Render to the
+      accepted Azure backend origin only after Preview passes.
+- [ ] Keep the previous Render backend URL as the rollback value until Azure
+      production traffic is accepted.
+- [ ] After Azure production is accepted, plan Render decommission separately:
+      remove Render-specific secrets, disable Render traffic, preserve safe
+      logs, and document final rollback limits.
+
 ## Rollback and Incident Notes
 
 Production rollback must be explicit and environment-aware. CI/CD must not hide
