@@ -243,6 +243,26 @@ run concurrent requests, and do not paste full generated answers, prompts,
 evidence text, headers, session identifiers, provider keys, database URLs, or
 environment variables into logs or tickets.
 
+Observed Stage 7 result:
+
+- Controlled Staging Ask Smoke workflow passed.
+- `/api/v1/legal-qa/ask` returned HTTP 200.
+- Ask request duration was 54 seconds.
+- Response JSON keys were `answer`, `citations`, `decision`, `evidence`,
+  `metadata`, `request_id`, and `warnings`.
+- Answer length was 54 characters.
+- Citation count was 0 and evidence count was 0.
+- Response `metadata.latency_ms` was 1995.
+- No full answer, secrets, headers, or environment variables were printed.
+- No repeated `/api/v1/legal-qa/ask` calls were made.
+
+The zero citation/evidence count should be investigated in a later
+quality/citation validation stage. It is not a Stage 7 failure because this
+runbook step validates one controlled real request, bounded logging, and no
+repeated `/ask` calls. The difference between 54 seconds of workflow request
+duration and 1995 ms response latency is also a follow-up observation for
+cold-start, network, App Service, or client-side timing analysis.
+
 ## Future Production Deploy Flow
 
 1. Staging passes.

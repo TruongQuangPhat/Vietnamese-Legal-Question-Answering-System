@@ -559,6 +559,27 @@ Pass criteria:
 - logs show only HTTP status, response JSON keys, answer length, citation count,
   evidence count, and response latency when present.
 
+Observed Stage 7 result:
+
+- Controlled Staging Ask Smoke workflow passed.
+- `/api/v1/legal-qa/ask` returned HTTP 200.
+- Ask request duration was 54 seconds.
+- Response JSON keys were `answer`, `citations`, `decision`, `evidence`,
+  `metadata`, `request_id`, and `warnings`.
+- Answer length was 54 characters.
+- Citation count was 0 and evidence count was 0.
+- Response `metadata.latency_ms` was 1995.
+- No full answer, secrets, headers, or environment variables were printed.
+- No repeated `/api/v1/legal-qa/ask` calls were made.
+
+The zero citation/evidence count is not a Stage 7 deployment-smoke failure
+because Stage 7 only proves that one controlled real `/ask` request can complete
+without unsafe logging or repeated calls. Citation and evidence quality should
+be investigated in a later quality/citation validation stage. The difference
+between the 54-second workflow request duration and the 1995 ms response
+latency is a follow-up observation for cold-start, network, App Service, or
+client-side timing analysis.
+
 Failure handling:
 
 - Stop after the first failure.
