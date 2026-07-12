@@ -27,6 +27,9 @@ Students policy currently blocks Azure Container Registry, Azure Container Apps,
 and Log Analytics Workspace, so the staging workflow does not build, push, or
 deploy container images.
 
+Stage 5 staging is fake-mode only. Real-mode Azure staging is deferred to a
+later stage and is not configured by `.github/workflows/deploy-staging.yml`.
+
 The staging workflow is `workflow_dispatch`-only and should not be added as a
 required branch protection check because it does not run on pull requests.
 Required checks for normal PRs should remain routine CI checks such as Backend
@@ -115,8 +118,8 @@ The manual staging workflow now:
 7. optionally runs `GET /api/v1/readiness` when selected after config review.
 
 It does not automate `POST /api/v1/legal-qa/ask`. The first/default staging
-deployment mode is fake mode; real mode requires explicit selection and
-configured staging secrets.
+deployment mode is fake mode, and Stage 5 does not support real-mode staging
+secrets or app settings.
 
 ## Future Production Deploy Flow
 

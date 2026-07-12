@@ -389,7 +389,7 @@ Normal PR required checks should remain:
 - Secret Scan
 - Backend Container
 
-### Future Secret Names
+### Stage 5 Secret Names
 
 Names only, no values:
 
@@ -427,6 +427,9 @@ Implemented staging flow:
    - `GET /api/v1/readiness` only after config review;
    - no automated `/api/v1/legal-qa/ask`.
 9. Do not call `/api/v1/legal-qa/ask` unless explicitly approved.
+
+Real-mode Azure staging is deferred to a later stage so the fake-mode staging
+workflow stays compatible with the lightweight secret guard.
 
 ### Real-mode Risk Notes
 
@@ -562,13 +565,12 @@ This workflow:
 
 ### Behavior
 
-The staging workflow has two inputs:
+The staging workflow has one input:
 
-- `service_mode`: `fake` or `real`, default `fake`;
 - `run_readiness`: boolean, default `false`.
 
-The first/default staging deployment mode is fake mode. Fake mode sets only
-safe liveness and CI guard environment variables:
+Stage 5 always deploys fake mode. It sets only safe liveness and CI guard
+environment variables:
 
 ```env
 PORT=8000
@@ -580,9 +582,8 @@ LEGAL_QA_AUTH_ENABLED=false
 SCM_DO_BUILD_DURING_DEPLOYMENT=true
 ```
 
-Real mode is available only when explicitly selected and required runtime
-secrets are configured in the `staging` GitHub Environment. Real-mode staging
-still does not call `/api/v1/legal-qa/ask` from the workflow.
+Real-mode Azure staging is intentionally out of scope for Stage 5 and must be
+implemented in a later workflow revision after a separate secret-scan review.
 
 ### Required Staging Environment Secrets
 
@@ -594,15 +595,6 @@ Names only, no values:
 - `AZURE_RESOURCE_GROUP`
 - `AZURE_WEBAPP_NAME`
 - `AZURE_STAGING_BACKEND_URL`
-
-For real mode only:
-
-- `QDRANT_URL`
-- `QDRANT_API_KEY`
-- `OPENROUTER_API_KEY`
-- `LEGAL_QA_DATABASE_URL`
-- `LEGAL_QA_SESSION_SECRET`
-- `HF_TOKEN` only if needed by the current runtime
 
 ### Authentication and Permissions
 
