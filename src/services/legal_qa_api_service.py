@@ -7,6 +7,8 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import uuid4
 
+from pydantic import HttpUrl, TypeAdapter, ValidationError
+
 from src.api.schemas import (
     CitationDTO,
     EvidenceDTO,
@@ -19,6 +21,8 @@ from src.services.legal_qa_context import (
     LegalQAContextPreparer,
     PreparedLegalQAContext,
 )
+
+_HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 
 
 class LegalQAWorkflowDecision(StrEnum):
@@ -258,17 +262,20 @@ def map_workflow_result_to_response(
         to avoid presenting insufficient evidence as a confident legal basis.
     """
     if result.decision == LegalQAWorkflowDecision.FALLBACK:
-        warnings = list(result.warnings)
-        if "fallback" not in warnings:
-            warnings.append("fallback")
-        return LegalQAResponse(
+        return _fallback_response(
             request_id=request_id,
-            decision=LegalQADecision.FALLBACK,
             answer=result.answer,
-            citations=[],
-            evidence=[],
-            warnings=warnings,
-            metadata=_map_metadata(result.metadata),
+            warnings=result.warnings,
+            metadata=result.metadata,
+        )
+
+    metadata_issues = _answer_metadata_issues(result)
+    if metadata_issues:
+        return _fallback_response(
+            request_id=request_id,
+            answer="Không tìm thấy đủ căn cứ pháp lý trong nguồn hiện có.",
+            warnings=[*result.warnings, *metadata_issues],
+            metadata=result.metadata,
         )
 
     decision = (
@@ -310,6 +317,60 @@ def map_workflow_result_to_response(
         warnings=list(result.warnings),
         metadata=_map_metadata(result.metadata),
     )
+
+
+def _fallback_response(
+    *,
+    request_id: str,
+    answer: str,
+    warnings: list[str],
+    metadata: LegalQAWorkflowMetadata,
+) -> LegalQAResponse:
+    safe_warnings = list(warnings)
+    if "fallback" not in safe_warnings:
+        safe_warnings.append("fallback")
+    return LegalQAResponse(
+        request_id=request_id,
+        decision=LegalQADecision.FALLBACK,
+        answer=answer,
+        citations=[],
+        evidence=[],
+        warnings=safe_warnings,
+        metadata=_map_metadata(metadata),
+    )
+
+
+def _answer_metadata_issues(result: LegalQAWorkflowResult) -> list[str]:
+    if not result.citations:
+        return ["missing_citations"]
+    issues: list[str] = []
+    for citation in result.citations:
+        if not citation.chunk_id:
+            issues.append("missing_citation_chunk_id")
+        if not citation.law_id:
+            issues.append("missing_citation_law_id")
+        if not citation.citation:
+            issues.append("missing_citation_label")
+        if not citation.source_url:
+            issues.append("missing_citation_source_url")
+        elif not _is_valid_http_url(citation.source_url):
+            issues.append("invalid_citation_source_url")
+    for evidence in result.evidence:
+        if not evidence.text:
+            issues.append("missing_evidence_text")
+        if not evidence.source_url:
+            issues.append("missing_evidence_source_url")
+        elif not _is_valid_http_url(evidence.source_url):
+            issues.append("invalid_evidence_source_url")
+    return list(dict.fromkeys(issues))
+
+
+def _is_valid_http_url(value: str) -> bool:
+    try:
+        _HTTP_URL_ADAPTER.validate_python(value)
+    except ValidationError:
+        return False
+    return True
 
 
 def _map_metadata(metadata: LegalQAWorkflowMetadata) -> ResponseMetadataDTO:

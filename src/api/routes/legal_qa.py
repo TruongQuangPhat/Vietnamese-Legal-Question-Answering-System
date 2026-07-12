@@ -46,6 +46,7 @@ async def ask_legal_question(
         latency_ms = int((perf_counter() - started_at) * 1000)
         request_id = LegalQAService.create_request_id()
         _log_request_failed(
+            request=request,
             request_id=request_id,
             error_type=type(exc).__name__,
             latency_ms=latency_ms,
@@ -81,12 +82,23 @@ def _log_request_completed(response: LegalQAResponse) -> None:
     )
 
 
-def _log_request_failed(*, request_id: str, error_type: str, latency_ms: int) -> None:
+def _log_request_failed(
+    *,
+    request: LegalQARequest,
+    request_id: str,
+    error_type: str,
+    latency_ms: int,
+) -> None:
     logger.warning(
         "legal_qa_request_failed",
         extra={
             "request_id": request_id,
             "error_type": error_type,
             "latency_ms": latency_ms,
+            "top_k": request.top_k,
+            "include_evidence": request.include_evidence,
+            "include_debug": request.include_debug,
+            "has_conversation_id": request.conversation_id is not None,
+            "conversation_context_message_count": len(request.conversation_context),
         },
     )
