@@ -29,7 +29,7 @@ jobs:
   deploy-staging:
     name: Deploy Azure App Service staging
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     environment: staging
 
     env:
@@ -157,17 +157,19 @@ jobs:
           set -euo pipefail
 
           uv lock --check
-          uv sync --frozen --no-dev --extra qdrant --extra embedding
           uv run python -m py_compile src/api/app.py
 
-      - name: Create App Service deployment package
+      - name: Create prebuilt App Service deployment package
+        timeout-minutes: 40
         run: |
           set -euo pipefail
 
           package_root="$RUNNER_TEMP/vnlaw-app-service-package"
           package_zip="$RUNNER_TEMP/vnlaw-app-service-package.zip"
-          rm -rf "$package_root" "$package_zip"
-          mkdir -p "$package_root"
+          full_requirements="$RUNNER_TEMP/vnlaw-app-service-requirements.full.txt"
+          site_packages="$package_root/.python_packages/lib/site-packages"
+          rm -rf "$package_root" "$package_zip" "$full_requirements"
+          mkdir -p "$package_root" "$site_packages"
 
           rsync -a ./ "$package_root"/ \
             --exclude '.git' \
@@ -189,7 +191,25 @@ jobs:
             exit 1
           fi
 
-          uv export --frozen --no-dev --extra qdrant --extra embedding --no-hashes --output-file "$package_root/requirements.txt"
+          export UV_TORCH_BACKEND=cpu
+          uv export \
+            --frozen \
+            --no-dev \
+            --extra qdrant \
+            --extra embedding \
+            --no-hashes \
+            --no-emit-project \
+            --no-annotate \
+            --no-header \
+            --output-file "$full_requirements"
+          grep -Ev '^(cuda-|nvidia-|triton==)' "$full_requirements" > "$package_root/requirements.txt"
+
+          printf 'Prebuilding App Service Python dependencies in GitHub Actions.\n'
+          uv pip install \
+            --python "$(command -v python)" \
+            --torch-backend cpu \
+            --target "$site_packages" \
+            --requirement "$package_root/requirements.txt"
 
           (
             cd "$package_root"
@@ -197,7 +217,7 @@ jobs:
           )
 
           printf 'DEPLOY_PACKAGE=%s\n' "$package_zip" >> "$GITHUB_ENV"
-          printf 'Created App Service deployment package.\n'
+          printf 'Created prebuilt App Service deployment package.\n'
 
       - name: Azure login
         uses: azure/login@v2
@@ -217,7 +237,9 @@ jobs:
             LEGAL_QA_ALLOW_DB_TESTS=0
             LEGAL_QA_RATE_LIMIT_ENABLED=false
             LEGAL_QA_AUTH_ENABLED=false
-            SCM_DO_BUILD_DURING_DEPLOYMENT=true
+            SCM_DO_BUILD_DURING_DEPLOYMENT=false
+            ENABLE_ORYX_BUILD=false
+            PYTHONPATH=/home/site/wwwroot/.python_packages/lib/site-packages
           )
 
           if [ "$SERVICE_MODE" = "real-readiness" ]; then
@@ -234,7 +256,9 @@ jobs:
               LEGAL_QA_ALLOW_DB_TESTS=0
               LEGAL_QA_RATE_LIMIT_ENABLED=false
               LEGAL_QA_AUTH_ENABLED=false
-              SCM_DO_BUILD_DURING_DEPLOYMENT=true
+              SCM_DO_BUILD_DURING_DEPLOYMENT=false
+              ENABLE_ORYX_BUILD=false
+              PYTHONPATH=/home/site/wwwroot/.python_packages/lib/site-packages
               LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
               QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
               LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
@@ -270,11 +294,20 @@ jobs:
 
           printf 'Configured App Service startup command.\n'
 
-      - name: Deploy package to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          package: ${{ env.DEPLOY_PACKAGE }}
+      - name: Deploy prebuilt package to Azure Web App
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+
+          az webapp deploy \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --src-path "$DEPLOY_PACKAGE" \
+            --type zip \
+            --timeout 1500 \
+            --output none
+
+          printf 'Prebuilt package deployment completed.\n'
 
       - name: Restart Azure Web App
         run: |

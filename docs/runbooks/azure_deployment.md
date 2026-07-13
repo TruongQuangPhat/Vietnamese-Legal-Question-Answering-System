@@ -116,10 +116,12 @@ The manual staging workflow now:
 1. validates dispatch inputs and required configuration names;
 2. logs in to Azure through OIDC;
 3. creates an App Service deployment package without the protected local
-   `data/processed/legal_chunks.jsonl` file, and verifies the operator chunks
-   fetch script is included;
+   `data/processed/legal_chunks.jsonl` file, verifies the operator chunks
+   fetch script is included, and prebuilds Python dependencies into
+   `.python_packages/lib/site-packages`;
 4. configures App Service app settings and startup command;
-5. deploys the package to the configured Azure Web App;
+5. deploys the prebuilt package to the configured Azure Web App with Azure
+   remote build disabled;
 6. uses plain Uvicorn startup so `/health` can serve without chunks or real
    dependencies;
 7. runs `GET /health`;
@@ -128,6 +130,40 @@ The manual staging workflow now:
 
 It does not automate `POST /api/v1/legal-qa/ask`. The first/default staging
 deployment mode remains fake mode.
+
+### App Service dependency build strategy
+
+The real `/ask` path needs both `qdrant` and `embedding` optional dependency
+groups. The `embedding` group includes `flagembedding`, `sentence-transformers`,
+`transformers`, and `torch`, so Azure App Service/Oryx source deployment can be
+slow on B1. One failed deployment showed Oryx dependency installation completing
+after roughly 412 seconds, build snippets after roughly 429 seconds, and then
+OneDeploy spending the remaining workflow time compressing/deploying until the
+GitHub job was canceled near 29 minutes.
+
+The staging workflow therefore prebuilds dependencies on the GitHub-hosted
+Linux runner into:
+
+```text
+.python_packages/lib/site-packages
+```
+
+and configures App Service with:
+
+```env
+SCM_DO_BUILD_DURING_DEPLOYMENT=false
+ENABLE_ORYX_BUILD=false
+PYTHONPATH=/home/site/wwwroot/.python_packages/lib/site-packages
+```
+
+This keeps the startup command lightweight and avoids running the heavy Oryx
+remote build during each deployment. The workflow package step has a bounded
+timeout for dependency prebuild, exports requirements without the local editable
+project entry, filters CUDA/Triton packages for the CPU-only B1 target, and the
+Azure deploy step has a bounded CLI deployment timeout. If the prebuilt package
+becomes too large or still times out, treat that as an App Service source-deploy
+limitation and review a container-based deployment or lighter query-embedding
+runtime as a later separate architecture decision.
 
 ## Stage 6 Real-Readiness Runbook
 
