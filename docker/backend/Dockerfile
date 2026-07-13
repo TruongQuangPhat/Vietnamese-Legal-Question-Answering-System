@@ -24,7 +24,6 @@ RUN uv sync \
     --extra embedding \
     --no-install-project \
     --no-cache \
-    --torch-backend cpu \
     && uv cache clean \
     && rm -rf /root/.cache/pip /tmp/*
 
