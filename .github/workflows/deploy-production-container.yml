@@ -1,0 +1,329 @@
+name: Deploy Production Container Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production_container_deploy:
+        description: "Type I_UNDERSTAND_THIS_DEPLOYS_PRODUCTION_CONTAINER_BACKEND to deploy the production backend container."
+        required: true
+        type: string
+      image_tag:
+        description: "Optional image tag suffix. Defaults to the commit SHA."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: azure-production-container-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy-production-container:
+    name: Build and deploy production backend container
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production
+
+    env:
+      CONFIRM_PRODUCTION_CONTAINER_DEPLOY: ${{ inputs.confirm_production_container_deploy }}
+      IMAGE_TAG_INPUT: ${{ inputs.image_tag }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      AZURE_ACR_NAME: ${{ secrets.AZURE_ACR_NAME }}
+      AZURE_ACR_LOGIN_SERVER: ${{ secrets.AZURE_ACR_LOGIN_SERVER }}
+      AZURE_PRODUCTION_WEBAPP_NAME: ${{ secrets.AZURE_PRODUCTION_WEBAPP_NAME }}
+      AZURE_PRODUCTION_BACKEND_URL: ${{ secrets.AZURE_PRODUCTION_BACKEND_URL }}
+      PRODUCTION_QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      PRODUCTION_QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      PRODUCTION_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      PRODUCTION_LEGAL_QA_DATABASE_URL: ${{ secrets.LEGAL_QA_DATABASE_URL }}
+      PRODUCTION_LEGAL_QA_SESSION_SECRET: ${{ secrets.LEGAL_QA_SESSION_SECRET }}
+      PRODUCTION_LEGAL_QA_CHUNKS_URL: ${{ secrets.LEGAL_QA_CHUNKS_URL }}
+      PRODUCTION_LEGAL_QA_CHUNKS_SHA256: ${{ secrets.LEGAL_QA_CHUNKS_SHA256 }}
+      PRODUCTION_CORS_ALLOWED_ORIGINS: '["https://vnlaw-qa.vercel.app"]'
+      DOCKER_BUILDKIT: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate dispatch guard and required secret names
+        run: |
+          set -euo pipefail
+
+          if [ "$CONFIRM_PRODUCTION_CONTAINER_DEPLOY" != "I_UNDERSTAND_THIS_DEPLOYS_PRODUCTION_CONTAINER_BACKEND" ]; then
+            printf 'Confirmation phrase did not match; production container deploy was not started.\n'
+            exit 1
+          fi
+
+          required_env_names=(
+            AZURE_CLIENT_ID
+            AZURE_TENANT_ID
+            AZURE_SUBSCRIPTION_ID
+            AZURE_RESOURCE_GROUP
+            AZURE_ACR_NAME
+            AZURE_ACR_LOGIN_SERVER
+            AZURE_PRODUCTION_WEBAPP_NAME
+            AZURE_PRODUCTION_BACKEND_URL
+            PRODUCTION_QDRANT_URL
+            PRODUCTION_QDRANT_API_KEY
+            PRODUCTION_OPENROUTER_API_KEY
+            PRODUCTION_LEGAL_QA_DATABASE_URL
+            PRODUCTION_LEGAL_QA_SESSION_SECRET
+            PRODUCTION_LEGAL_QA_CHUNKS_URL
+            PRODUCTION_LEGAL_QA_CHUNKS_SHA256
+          )
+
+          missing_names=()
+          for env_name in "${required_env_names[@]}"; do
+            if [ -z "${!env_name:-}" ]; then
+              missing_names+=("$env_name")
+            fi
+          done
+
+          if [ "${#missing_names[@]}" -gt 0 ]; then
+            printf 'Missing required GitHub Environment secret names:\n'
+            printf '%s\n' "${missing_names[@]}"
+            exit 1
+          fi
+
+          tag="${IMAGE_TAG_INPUT:-${GITHUB_SHA}}"
+          tag="${tag//[^A-Za-z0-9_.-]/-}"
+          if [ -z "$tag" ]; then
+            printf 'Image tag resolved to an empty value.\n'
+            exit 1
+          fi
+
+          printf 'IMAGE_TAG=%s\n' "$tag" >> "$GITHUB_ENV"
+          printf 'IMAGE_REPOSITORY=vnlaw-backend\n' >> "$GITHUB_ENV"
+          printf 'Production container deployment inputs are valid.\n'
+
+      - name: Fetch and verify legal chunks artifact
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+
+          chunks_dir="$RUNNER_TEMP/legal-chunks"
+          chunks_file="$chunks_dir/legal_chunks.jsonl"
+          rm -rf "$chunks_dir"
+          mkdir -p "$chunks_dir"
+
+          curl -fsSL --retry 3 --connect-timeout 15 --max-time 600 \
+            -o "$chunks_file" \
+            "$PRODUCTION_LEGAL_QA_CHUNKS_URL"
+
+          actual_sha="$(sha256sum "$chunks_file" | awk '{print $1}')"
+          if [ "$actual_sha" != "$PRODUCTION_LEGAL_QA_CHUNKS_SHA256" ]; then
+            rm -f "$chunks_file"
+            printf 'Legal chunks checksum verification failed.\n'
+            exit 1
+          fi
+
+          bytes="$(wc -c < "$chunks_file" | tr -d ' ')"
+          printf 'LEGAL_CHUNKS_CONTEXT=%s\n' "$chunks_dir" >> "$GITHUB_ENV"
+          printf 'Legal chunks artifact verified. bytes=%s\n' "$bytes"
+
+      - name: Build production backend image
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+
+          image_uri="$AZURE_ACR_LOGIN_SERVER/$IMAGE_REPOSITORY:$IMAGE_TAG"
+          docker build \
+            --build-context legal_chunks="$LEGAL_CHUNKS_CONTEXT" \
+            --target production-with-chunks \
+            --file docker/backend/Dockerfile \
+            --tag "$image_uri" \
+            .
+
+          printf 'IMAGE_URI=%s\n' "$image_uri" >> "$GITHUB_ENV"
+          printf 'Built production backend image.\n'
+
+      - name: Run local fake-mode container health smoke
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+
+          docker run \
+            --detach \
+            --name vnlaw-production-backend-smoke \
+            --publish 127.0.0.1:8080:8000 \
+            --env PORT=8000 \
+            --env LEGAL_QA_SERVICE_MODE=fake \
+            --env LEGAL_QA_ALLOW_REAL_TESTS=0 \
+            --env LEGAL_QA_ALLOW_DB_TESTS=0 \
+            --env LEGAL_QA_RATE_LIMIT_ENABLED=false \
+            --env LEGAL_QA_AUTH_ENABLED=false \
+            "$IMAGE_URI"
+
+          for attempt in {1..30}; do
+            if response="$(curl -fsS http://127.0.0.1:8080/health)"; then
+              printf 'Local container health HTTP status: 200\n'
+              case "$response" in
+                *'"status":"ok"'*|*'"status": "ok"'*)
+                  exit 0
+                  ;;
+              esac
+              printf 'Unexpected local container health response payload.\n'
+              exit 1
+            fi
+            printf 'Local container health attempt %s failed; retrying.\n' "$attempt"
+            sleep 2
+          done
+
+          printf 'Local fake-mode container health smoke did not pass in time.\n'
+          exit 1
+
+      - name: Stop local smoke container
+        if: always()
+        run: docker rm -f vnlaw-production-backend-smoke >/dev/null 2>&1 || true
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Push image to Azure Container Registry
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+
+          az acr login --name "$AZURE_ACR_NAME"
+          docker push "$IMAGE_URI"
+          printf 'Pushed production backend image to registry.\n'
+
+      - name: Configure production App Service container settings
+        run: |
+          set -euo pipefail
+
+          qdrant_api_key_name="QDRANT_API_KEY"
+          legal_qa_qdrant_api_key_name="LEGAL_QA_QDRANT_API_KEY"
+          openrouter_api_key_name="OPENROUTER_API_KEY"
+          database_url_name="LEGAL_QA_DATABASE_URL"
+          session_secret_name="LEGAL_QA_SESSION_SECRET"
+
+          app_settings=(
+            WEBSITES_PORT=8000
+            PORT=8000
+            APP_ENV=production
+            LEGAL_QA_SERVICE_MODE=real
+            LEGAL_QA_ALLOW_REAL_TESTS=0
+            LEGAL_QA_ALLOW_DB_TESTS=0
+            LEGAL_QA_RATE_LIMIT_ENABLED=true
+            LEGAL_QA_AUTH_ENABLED=false
+            LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
+            QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
+            LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
+            LEGAL_QA_QDRANT_URL="$PRODUCTION_QDRANT_URL"
+            QDRANT_URL="$PRODUCTION_QDRANT_URL"
+            CORS_ALLOWED_ORIGINS="$PRODUCTION_CORS_ALLOWED_ORIGINS"
+            "${qdrant_api_key_name}=$PRODUCTION_QDRANT_API_KEY"
+            "${legal_qa_qdrant_api_key_name}=$PRODUCTION_QDRANT_API_KEY"
+            "${openrouter_api_key_name}=$PRODUCTION_OPENROUTER_API_KEY"
+            "${database_url_name}=$PRODUCTION_LEGAL_QA_DATABASE_URL"
+            "${session_secret_name}=$PRODUCTION_LEGAL_QA_SESSION_SECRET"
+          )
+
+          az webapp config appsettings set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
+            --settings "${app_settings[@]}" \
+            --output none
+
+          az webapp config container set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
+            --docker-custom-image-name "$IMAGE_URI" \
+            --docker-registry-server-url "https://$AZURE_ACR_LOGIN_SERVER" \
+            --output none
+
+          printf 'Configured production App Service container setting names.\n'
+
+      - name: Restart production backend
+        run: |
+          set -euo pipefail
+
+          az webapp restart \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
+            --output none
+
+          printf 'Restarted production backend App Service.\n'
+
+      - name: Smoke production health and readiness
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+
+          base_url="${AZURE_PRODUCTION_BACKEND_URL%/}"
+          if [ -z "$base_url" ]; then
+            printf 'Production backend URL is missing.\n'
+            exit 1
+          fi
+
+          health_passed=false
+          for attempt in {1..30}; do
+            health_file="$(mktemp)"
+            health_status="$(
+              curl -sS --max-time 15 -o "$health_file" -w '%{http_code}' "$base_url/health" || true
+            )"
+            rm -f "$health_file"
+            printf 'Production health HTTP status: %s\n' "$health_status"
+            if [ "$health_status" = "200" ]; then
+              health_passed=true
+              break
+            fi
+            printf 'Production health attempt %s failed; retrying.\n' "$attempt"
+            sleep 10
+          done
+
+          if [ "$health_passed" != "true" ]; then
+            printf 'Production health smoke did not pass in time.\n'
+            exit 1
+          fi
+
+          readiness_file="$(mktemp)"
+          readiness_status="$(
+            curl -sS --max-time 30 -o "$readiness_file" -w '%{http_code}' "$base_url/api/v1/readiness"
+          )"
+          printf 'Production readiness HTTP status: %s\n' "$readiness_status"
+          if [ "$readiness_status" != "200" ]; then
+            rm -f "$readiness_file"
+            printf 'Production readiness smoke failed.\n'
+            exit 1
+          fi
+
+          READINESS_FILE="$readiness_file" python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(Path(os.environ["READINESS_FILE"]).read_text(encoding="utf-8"))
+          print(f"Readiness ready: {payload.get('ready')}")
+          print(f"Readiness service_mode: {payload.get('service_mode')}")
+          for check in payload.get("checks", []):
+              print(
+                  "Readiness check: "
+                  f"{check.get('name')} ready={check.get('ready')} detail={check.get('detail')}"
+              )
+          if payload.get("ready") is not True:
+              raise SystemExit("Production readiness returned ready=false.")
+          PY
+          rm -f "$readiness_file"
+
+      - name: Print safe production deployment summary
+        run: |
+          set -euo pipefail
+
+          printf 'Deployment target: Azure App Service for Containers\n'
+          printf 'Production backend image repository: %s\n' "$IMAGE_REPOSITORY"
+          printf 'Production smoke scope: /health and /api/v1/readiness only\n'

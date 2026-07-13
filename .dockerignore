@@ -17,6 +17,10 @@ apps/frontend/.next
 apps/frontend/.env.local
 node_modules
 
+docs
+notebooks
+tests
+
 data/raw
 data/interim
 data/reports

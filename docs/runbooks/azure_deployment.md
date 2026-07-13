@@ -15,17 +15,21 @@ path guarding, and lightweight secret scanning. Stage 2 backend fake-mode
 container smoke exists and validates packaging with `LEGAL_QA_SERVICE_MODE=fake`
 and `GET /health`.
 
-Azure production deployment is not active yet. The staging workflow
-`.github/workflows/deploy-staging.yml` is now a manual Azure App Service code
-deployment workflow. It defaults to fake mode, uses Azure OIDC, updates only the
-configured staging Web App, and runs safe smoke checks. The production workflow
-`.github/workflows/deploy-production.yml` remains a manual planning skeleton
-only.
+The staging workflow `.github/workflows/deploy-staging.yml` is a manual Azure
+App Service source-deploy workflow for the restored staging/recovery Web App.
+It defaults to fake mode, uses Azure OIDC, updates only the configured staging
+Web App, and runs safe smoke checks. App Service source/zip deployment is legacy
+and must not be used for production real embedding dependencies.
 
-Azure App Service is the current student-compatible staging target. Azure for
-Students policy currently blocks Azure Container Registry, Azure Container Apps,
-and Log Analytics Workspace, so the staging workflow does not build, push, or
-deploy container images.
+Production backend deployment is now container-based through
+`.github/workflows/deploy-production-container.yml`. The planning-only
+`.github/workflows/deploy-production.yml` remains non-deploying.
+
+Azure App Service source deploy remains the current staging/recovery fallback.
+For production, use Azure Container Registry plus Azure App Service for
+Containers. If App Service for Containers proves unsuitable, review Azure
+Container Apps as a separate fallback rather than returning to source/zip deploy
+for real embedding dependencies.
 
 Stage 5 staging fake-mode deployment passed with `GET /health`. Stage 6 adds a
 controlled `real-readiness` mode to the same staging workflow. It configures
@@ -48,7 +52,10 @@ The intended high-level Azure target keeps the existing provider boundaries
 unless a later task explicitly changes them:
 
 - Vercel frontend remains the public UI.
-- Azure App Service hosts the FastAPI API for the current staging deployment.
+- Azure App Service hosts the FastAPI API for the current staging/recovery
+  deployment.
+- Azure App Service for Containers hosts the production backend after the
+  production container workflow passes smoke checks.
 - Neon or another reviewed PostgreSQL service remains conversation storage
   unless separately changed.
 - Qdrant Cloud remains the vector database unless separately changed.
@@ -61,10 +68,20 @@ the Azure deployment skeleton stage.
 
 ## Azure Options
 
-Azure App Service code deploy is the current staging target because it is
-compatible with the active Azure for Students policy. Azure Container Apps and
-Azure Container Registry remain blocked by policy for this subscription and are
-not used by the staging workflow.
+Azure App Service code deploy is the current staging/recovery target. It is not
+the production real-embedding deployment path. Remote Oryx source builds with
+the embedding extra timed out, and prebuilt zip deployment produced a large
+package that Kudu rejected with `502`; partially applied settings then caused
+startup failure with `No module named uvicorn`.
+
+Use Azure Container Registry plus Azure App Service for Containers for the first
+production backend path. Required Azure resources should exist before dispatch:
+
+- Azure Container Registry;
+- production Web App such as `vnlaw-backend-prod-phat`;
+- App Service plan sized for BGE-M3/Torch CPU runtime;
+- managed identity with `AcrPull` or equivalent image-pull permission;
+- production backend URL stored as `AZURE_PRODUCTION_BACKEND_URL`.
 
 ## GitHub Environments
 
@@ -105,6 +122,21 @@ repository.
 - `LEGAL_QA_CHUNKS_URL` for Stage 6 `real-readiness`
 - `LEGAL_QA_CHUNKS_SHA256` for Stage 6 `real-readiness`
 
+For production container deployment, also configure the GitHub Environment
+`production` with these secret names:
+
+- `AZURE_ACR_NAME`
+- `AZURE_ACR_LOGIN_SERVER`
+- `AZURE_PRODUCTION_WEBAPP_NAME`
+- `AZURE_PRODUCTION_BACKEND_URL`
+- `QDRANT_URL`
+- `QDRANT_API_KEY`
+- `OPENROUTER_API_KEY`
+- `LEGAL_QA_DATABASE_URL`
+- `LEGAL_QA_SESSION_SECRET`
+- `LEGAL_QA_CHUNKS_URL`
+- `LEGAL_QA_CHUNKS_SHA256`
+
 The staging workflow uses Azure OIDC through `deploy-staging.yml`. Do not
 request `id-token: write` in production until production deployment is
 explicitly implemented and uses OIDC.
@@ -130,6 +162,10 @@ The manual staging workflow now:
 
 It does not automate `POST /api/v1/legal-qa/ask`. The first/default staging
 deployment mode remains fake mode.
+
+Do not extend this source/zip path for real embedding production. It is kept so
+the restored `vnlaw-backend-staging-phat` source-deploy app can remain a
+staging/recovery fallback.
 
 ### App Service dependency build strategy
 
@@ -429,6 +465,107 @@ Fail and rollback notes:
    after explicit approval and reviewed environment readiness.
 6. Stop if timeout, out-of-memory, or `5xx` symptoms occur. Do not retry
    production ask requests repeatedly.
+
+## Production Container Backend Runbook
+
+Use `.github/workflows/deploy-production-container.yml` only after the Azure
+production container resources are created and reviewed.
+
+Manual dispatch guard:
+
+```text
+I_UNDERSTAND_THIS_DEPLOYS_PRODUCTION_CONTAINER_BACKEND
+```
+
+The workflow:
+
+1. checks out the repository;
+2. validates required secret names without printing values;
+3. downloads `legal_chunks.jsonl` into GitHub runner temporary storage;
+4. verifies the configured SHA256;
+5. builds `docker/backend/Dockerfile` target `production-with-chunks`;
+6. runs local fake-mode container `GET /health`;
+7. logs in to Azure with OIDC;
+8. pushes the image to Azure Container Registry;
+9. configures the separate production Web App container image and settings;
+10. restarts the production backend;
+11. runs production `GET /health`;
+12. runs production `GET /api/v1/readiness`.
+
+It must not call `/api/v1/legal-qa/ask`. It must not fetch chunks during app
+startup. The chunks file is copied into the private production image at:
+
+```text
+/home/data/legal_chunks.jsonl
+```
+
+Production container app settings include:
+
+```env
+WEBSITES_PORT=8000
+PORT=8000
+LEGAL_QA_SERVICE_MODE=real
+LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
+CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
+```
+
+Secrets remain environment values only: Qdrant, OpenRouter, database URL, and
+session secret values must never be printed in workflow logs.
+
+## Production Ask Smoke Runbook
+
+Run `.github/workflows/production-ask-smoke.yml` only after production
+container deploy returns healthy and ready.
+
+Manual dispatch guard:
+
+```text
+I_UNDERSTAND_THIS_CALLS_REAL_PRODUCTION_SERVICES
+```
+
+The workflow calls exactly:
+
+```text
+GET /health
+GET /api/v1/readiness
+POST /api/v1/legal-qa/ask
+```
+
+It sends one request only. It fails if the response reports `decision=error`,
+contains `internal_error`, has `metadata.model=null`, has
+`metadata.retrieval_question_prepared=false`, or returns the generic internal
+error answer. It prints only safe summary fields: HTTP status, response keys,
+answer length, citation/evidence counts, and latency when present.
+
+## Vercel Production Cutover
+
+Do not change Vercel Production until the Azure production container backend
+has passed deploy smoke and one controlled production ask smoke.
+
+Cutover sequence:
+
+1. Deploy Azure production container backend.
+2. Confirm `/health` returns HTTP 200.
+3. Confirm `/api/v1/readiness` returns HTTP 200 and `ready=true`.
+4. Run one controlled production `/ask` smoke.
+5. Confirm Azure `CORS_ALLOWED_ORIGINS` includes exactly:
+
+   ```text
+   https://vnlaw-qa.vercel.app
+   ```
+
+6. Set Vercel Production:
+
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=<Azure production container backend URL>
+   ```
+
+7. Redeploy Vercel Production.
+8. Run one browser UI smoke against Vercel Production.
+9. Keep Render as rollback until Azure production is stable.
+10. Decommission Render only after a separate reviewed cleanup plan removes
+    Render-only secrets, disables Render traffic, preserves safe logs, and
+    records the rollback boundary.
 
 ## Rollback
 
