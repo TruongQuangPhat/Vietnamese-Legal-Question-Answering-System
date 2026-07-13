@@ -211,6 +211,7 @@ jobs:
 
           app_settings=(
             WEBSITES_PORT=8000
+            WEBSITES_CONTAINER_START_TIME_LIMIT=1800
             PORT=8000
             APP_ENV=production
             LEGAL_QA_SERVICE_MODE=real
@@ -237,11 +238,24 @@ jobs:
             --settings "${app_settings[@]}" \
             --output none
 
+          az webapp config set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
+            --always-on true \
+            --generic-configurations '{"acrUseManagedIdentityCreds": true}' \
+            --output none
+
           az webapp config container set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
             --docker-custom-image-name "$IMAGE_URI" \
             --docker-registry-server-url "https://$AZURE_ACR_LOGIN_SERVER" \
+            --output none
+
+          az webapp log config \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
+            --docker-container-logging filesystem \
             --output none
 
           printf 'Configured production App Service container setting names.\n'
@@ -258,7 +272,7 @@ jobs:
           printf 'Restarted production backend App Service.\n'
 
       - name: Smoke production health and readiness
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: |
           set -euo pipefail
 
@@ -269,13 +283,13 @@ jobs:
           fi
 
           health_passed=false
-          for attempt in {1..30}; do
+          for attempt in {1..90}; do
             health_file="$(mktemp)"
             health_status="$(
               curl -sS --max-time 15 -o "$health_file" -w '%{http_code}' "$base_url/health" || true
             )"
             rm -f "$health_file"
-            printf 'Production health HTTP status: %s\n' "$health_status"
+            printf 'Production health attempt %s/90 HTTP status: %s\n' "$attempt" "$health_status"
             if [ "$health_status" = "200" ]; then
               health_passed=true
               break
@@ -289,14 +303,24 @@ jobs:
             exit 1
           fi
 
-          readiness_file="$(mktemp)"
-          readiness_status="$(
-            curl -sS --max-time 30 -o "$readiness_file" -w '%{http_code}' "$base_url/api/v1/readiness"
-          )"
-          printf 'Production readiness HTTP status: %s\n' "$readiness_status"
-          if [ "$readiness_status" != "200" ]; then
+          readiness_passed=false
+          for attempt in {1..45}; do
+            readiness_file="$(mktemp)"
+            readiness_status="$(
+              curl -sS --max-time 30 -o "$readiness_file" -w '%{http_code}' "$base_url/api/v1/readiness" || true
+            )"
+            printf 'Production readiness attempt %s/45 HTTP status: %s\n' "$attempt" "$readiness_status"
+            if [ "$readiness_status" = "200" ]; then
+              readiness_passed=true
+              break
+            fi
             rm -f "$readiness_file"
-            printf 'Production readiness smoke failed.\n'
+            printf 'Production readiness attempt %s failed; retrying.\n' "$attempt"
+            sleep 10
+          done
+
+          if [ "$readiness_passed" != "true" ]; then
+            printf 'Production readiness smoke did not pass in time.\n'
             exit 1
           fi
 

@@ -510,6 +510,55 @@ async def test_ask_route_does_not_log_raw_question(caplog: pytest.LogCaptureFixt
 
 
 @pytest.mark.asyncio
+async def test_ask_route_logs_sanitized_timing_metadata(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
+    raw_question = "Câu hỏi có mã riêng tư SECRET-TIMING-54321?"
+    conversation_id = "conversation-timing-secret-1"
+    private_context = "Nội dung riêng tư TIMING-CONTEXT-7821"
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": raw_question,
+                "conversation_id": conversation_id,
+                "conversation_context": [{"role": "user", "content": private_context}],
+                "top_k": 7,
+                "include_evidence": True,
+                "include_debug": False,
+            },
+        )
+
+    assert response.status_code == 200
+    timing_records = _log_records_prefix(caplog, "legal_qa_request_timing")
+    stages = {record.stage for record in timing_records}
+    assert {
+        "request_received",
+        "request_validation",
+        "conversation_context_loading",
+        "retrieval_question_preparation",
+        "response_mapping",
+        "request_completed",
+    }.issubset(stages)
+    completed = next(record for record in timing_records if record.stage == "request_completed")
+    assert completed.request_id == response.json()["request_id"]
+    assert completed.top_k == 7
+    assert completed.include_evidence is True
+    assert completed.include_debug is False
+    assert completed.has_conversation_id is True
+    assert completed.context_message_count == 1
+    assert completed.service_mode in {"fake", "unknown"}
+    assert isinstance(completed.elapsed_ms, int)
+    assert isinstance(completed.total_elapsed_ms, int)
+    assert raw_question not in caplog.text
+    assert private_context not in caplog.text
+    assert conversation_id not in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_ask_route_offloads_service_answer_from_event_loop() -> None:
     app = create_app()
     event_loop_thread_id = get_ident()
@@ -695,3 +744,14 @@ def _single_log_record_prefix(
     ]
     assert len(matching_records) == 1
     return matching_records[0]
+
+
+def _log_records_prefix(
+    caplog: pytest.LogCaptureFixture,
+    message_prefix: str,
+) -> list[logging.LogRecord]:
+    matching_records = [
+        record for record in caplog.records if record.getMessage().startswith(message_prefix)
+    ]
+    assert matching_records
+    return matching_records

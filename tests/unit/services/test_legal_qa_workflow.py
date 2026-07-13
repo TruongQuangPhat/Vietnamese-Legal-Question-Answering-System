@@ -111,6 +111,58 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     )
 
 
+def test_real_workflow_adapter_emits_sanitized_timing_stages() -> None:
+    retriever = StaticRetriever(_retrieval_result([_retrieved_chunk()]))
+    llm_client = MockLLMClient(
+        [
+            LLMResponse(
+                text="Người lao động có quyền theo căn cứ đã chọn [E1].",
+                model="google/gemini-2.5-flash",
+                provider="openrouter",
+                latency_ms=12.0,
+                finish_reason="stop",
+            )
+        ]
+    )
+    workflow = RealLegalQAWorkflow(
+        retriever=retriever,
+        llm_client=llm_client,
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+    )
+    events: list[tuple[str, str | None, int, int, str | None]] = []
+
+    def timing_logger(
+        stage: str,
+        request_id: str | None,
+        elapsed_ms: int,
+        total_elapsed_ms: int,
+        exception_class: str | None,
+    ) -> None:
+        events.append((stage, request_id, elapsed_ms, total_elapsed_ms, exception_class))
+
+    response = workflow.run(
+        LegalQAWorkflowRequest(
+            request_id="request-1",
+            question="Câu hỏi riêng tư không được log?",
+            top_k=10,
+            timing_logger=timing_logger,
+            timing_started_at=0.0,
+        )
+    )
+
+    stages = [event[0] for event in events]
+    assert response.decision == "answered"
+    assert "embedding_model_initialization_or_loading" in stages
+    assert "query_embedding" in stages
+    assert "qdrant_retrieval" in stages
+    assert "llm_generation_provider_call" in stages
+    assert {event[1] for event in events} == {"request-1"}
+    assert all(isinstance(event[2], int) for event in events)
+    assert all(isinstance(event[3], int) for event in events)
+    assert all(event[4] is None for event in events)
+    assert "Câu hỏi riêng tư" not in repr(events)
+
+
 def test_real_workflow_adapter_keeps_short_standalone_query_for_retrieval() -> None:
     retriever = StaticRetriever(_retrieval_result([_retrieved_chunk()]))
     llm_client = MockLLMClient(

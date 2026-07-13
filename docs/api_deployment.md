@@ -164,6 +164,21 @@ production ask smoke pass, switch Vercel Production by changing
 redeploying the frontend. Keep the Render origin as the rollback value until
 Azure production traffic is accepted.
 
+Azure production container backend status:
+
+```text
+Backend URL: https://vnlaw-backend-prod-phat.azurewebsites.net
+GET /health -> HTTP 200
+GET /api/v1/readiness -> HTTP 200 and ready true
+```
+
+Vercel Production must not be switched until the controlled production `/ask`
+smoke passes. If `/ask` times out, use sanitized Azure
+`legal_qa_request_timing` logs to identify whether the slow stage is model
+loading/query embedding, Qdrant retrieval, provider generation, or response
+mapping. Do not print prompts, retrieved text, answers, headers, cookies, or
+secret values while diagnosing.
+
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the
 default only allows `http://localhost:3000`. For Preview, add the exact Vercel

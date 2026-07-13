@@ -311,6 +311,41 @@ def test_service_attaches_request_id() -> None:
     assert workflow.requests[0].request_id == response.request_id
 
 
+def test_service_emits_sanitized_timing_stages() -> None:
+    workflow = StaticLegalQAWorkflow(_answered_result())
+    service = LegalQAService(workflow=workflow)
+    events: list[tuple[str, str | None, int, int, str | None]] = []
+
+    def timing_logger(
+        stage: str,
+        request_id: str | None,
+        elapsed_ms: int,
+        total_elapsed_ms: int,
+        exception_class: str | None,
+    ) -> None:
+        events.append((stage, request_id, elapsed_ms, total_elapsed_ms, exception_class))
+
+    response = service.answer(
+        LegalQARequest(
+            question="Câu hỏi riêng tư không được log?",
+            conversation_context=[{"role": "user", "content": "Nội dung riêng tư"}],
+        ),
+        timing_logger=timing_logger,
+    )
+
+    stages = [event[0] for event in events]
+    assert response.request_id
+    assert stages == [
+        "conversation_context_loading",
+        "retrieval_question_preparation",
+        "response_mapping",
+    ]
+    assert {event[1] for event in events} == {response.request_id}
+    assert all(isinstance(event[2], int) for event in events)
+    assert all(isinstance(event[3], int) for event in events)
+    assert all(event[4] is None for event in events)
+
+
 def _answered_result() -> LegalQAWorkflowResult:
     return LegalQAWorkflowResult(
         decision=LegalQAWorkflowDecision.ANSWERED,

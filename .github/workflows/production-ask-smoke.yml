@@ -13,9 +13,9 @@ on:
         default: "Vậy hợp đồng này có thể bị vô hiệu khi nào?"
         type: string
       timeout_seconds:
-        description: "Per-request timeout in seconds."
+        description: "Per-request timeout in seconds. Use up to 600 seconds for production ML cold start."
         required: false
-        default: 120
+        default: 600
         type: number
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
   production-ask-smoke:
     name: Run one production ask smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     environment: production
 
     env:
@@ -65,8 +65,8 @@ jobs:
               ;;
           esac
 
-          if [ "$TIMEOUT_SECONDS" -lt 1 ] || [ "$TIMEOUT_SECONDS" -gt 300 ]; then
-            printf 'timeout_seconds must be between 1 and 300.\n'
+          if [ "$TIMEOUT_SECONDS" -lt 1 ] || [ "$TIMEOUT_SECONDS" -gt 600 ]; then
+            printf 'timeout_seconds must be between 1 and 600.\n'
             exit 1
           fi
 
@@ -198,13 +198,19 @@ jobs:
               latency_ms = metadata.get("latency_ms")
               if latency_ms is not None:
                   print(f"Response latency_ms: {latency_ms}")
-              if metadata.get("model") is None:
+              model_exists = metadata.get("model") is not None
+              retrieval_question_prepared = metadata.get("retrieval_question_prepared")
+              print(f"Metadata model exists: {model_exists}")
+              print(f"Retrieval question prepared: {retrieval_question_prepared}")
+              if model_exists is False:
                   raise SystemExit("Ask smoke returned null metadata.model.")
-              if metadata.get("retrieval_question_prepared") is False:
+              if retrieval_question_prepared is False:
                   raise SystemExit("Ask smoke did not prepare a retrieval question.")
           else:
               raise SystemExit("Ask smoke response metadata was missing or invalid.")
 
+          if isinstance(warnings, list):
+              print("Warnings: " + ", ".join(str(item) for item in warnings))
           if decision == "error":
               raise SystemExit("Ask smoke returned decision=error.")
           if isinstance(warnings, list) and "internal_error" in warnings:

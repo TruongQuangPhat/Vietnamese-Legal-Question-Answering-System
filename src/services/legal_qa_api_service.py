@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from time import perf_counter
 from typing import Protocol
 from uuid import uuid4
 
@@ -23,6 +25,8 @@ from src.services.legal_qa_context import (
 )
 
 _HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
+
+LegalQATimingLogger = Callable[[str, str | None, int, int, str | None], None]
 
 
 class LegalQAWorkflowDecision(StrEnum):
@@ -49,6 +53,8 @@ class LegalQAWorkflowRequest:
     top_k: int
     context: PreparedLegalQAContext | None = None
     include_debug: bool = False
+    timing_logger: LegalQATimingLogger | None = field(default=None, repr=False, compare=False)
+    timing_started_at: float | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -224,25 +230,57 @@ class LegalQAService:
         """
         return str(uuid4())
 
-    def answer(self, request: LegalQARequest) -> LegalQAResponse:
+    def answer(
+        self,
+        request: LegalQARequest,
+        *,
+        timing_logger: LegalQATimingLogger | None = None,
+    ) -> LegalQAResponse:
         """Run the configured workflow and map its result to the API contract.
 
         Args:
             request: Validated legal QA request.
+            timing_logger: Optional sanitized stage timing sink. It must not log
+                question text, conversation text, retrieved evidence, provider
+                responses, secrets, headers, or cookies.
 
         Returns:
             Stable API response preserving request ID, citations, optional evidence,
             warnings, and safe workflow metadata.
         """
         request_id = self.create_request_id()
+        timing_started_at = perf_counter()
         try:
+            stage_started_at = perf_counter()
             prepared_context = self._context_preparer.prepare(request)
         except Exception as exc:
+            _emit_timing(
+                timing_logger=timing_logger,
+                stage="conversation_context_loading",
+                request_id=request_id,
+                stage_started_at=stage_started_at,
+                timing_started_at=timing_started_at,
+                exception_class=_root_exception_class(exc),
+            )
             raise LegalQAServiceError(
                 failure_stage="context_preparation",
                 original_exception=exc,
                 request_id=request_id,
             ) from exc
+        _emit_timing(
+            timing_logger=timing_logger,
+            stage="conversation_context_loading",
+            request_id=request_id,
+            stage_started_at=stage_started_at,
+            timing_started_at=timing_started_at,
+        )
+        _emit_timing(
+            timing_logger=timing_logger,
+            stage="retrieval_question_preparation",
+            request_id=request_id,
+            stage_started_at=None,
+            timing_started_at=timing_started_at,
+        )
 
         workflow_request = LegalQAWorkflowRequest(
             request_id=request_id,
@@ -250,10 +288,20 @@ class LegalQAService:
             top_k=request.top_k,
             context=prepared_context,
             include_debug=request.include_debug,
+            timing_logger=timing_logger,
+            timing_started_at=timing_started_at,
         )
         try:
             result = self._workflow.run(workflow_request)
         except Exception as exc:
+            _emit_timing(
+                timing_logger=timing_logger,
+                stage="workflow_run",
+                request_id=request_id,
+                stage_started_at=None,
+                timing_started_at=timing_started_at,
+                exception_class=_root_exception_class(exc),
+            )
             raise LegalQAServiceError(
                 failure_stage="workflow_run",
                 original_exception=exc,
@@ -261,6 +309,7 @@ class LegalQAService:
             ) from exc
 
         try:
+            stage_started_at = perf_counter()
             result = replace(
                 result,
                 metadata=replace(
@@ -273,12 +322,28 @@ class LegalQAService:
                     ),
                 ),
             )
-            return map_workflow_result_to_response(
+            response = map_workflow_result_to_response(
                 request_id=request_id,
                 result=result,
                 include_evidence=request.include_evidence,
             )
+            _emit_timing(
+                timing_logger=timing_logger,
+                stage="response_mapping",
+                request_id=request_id,
+                stage_started_at=stage_started_at,
+                timing_started_at=timing_started_at,
+            )
+            return response
         except Exception as exc:
+            _emit_timing(
+                timing_logger=timing_logger,
+                stage="response_mapping",
+                request_id=request_id,
+                stage_started_at=stage_started_at,
+                timing_started_at=timing_started_at,
+                exception_class=_root_exception_class(exc),
+            )
             raise LegalQAServiceError(
                 failure_stage="response_mapping",
                 original_exception=exc,
@@ -422,6 +487,23 @@ def _root_exception_class(exc: BaseException) -> str:
         seen.add(id(root))
         root = root.__cause__
     return type(root).__name__
+
+
+def _emit_timing(
+    *,
+    timing_logger: LegalQATimingLogger | None,
+    stage: str,
+    request_id: str | None,
+    stage_started_at: float | None,
+    timing_started_at: float,
+    exception_class: str | None = None,
+) -> None:
+    if timing_logger is None:
+        return
+    now = perf_counter()
+    elapsed_ms = int((now - stage_started_at) * 1000) if stage_started_at is not None else 0
+    total_elapsed_ms = int((now - timing_started_at) * 1000)
+    timing_logger(stage, request_id, elapsed_ms, total_elapsed_ms, exception_class)
 
 
 def _map_metadata(metadata: LegalQAWorkflowMetadata) -> ResponseMetadataDTO:
