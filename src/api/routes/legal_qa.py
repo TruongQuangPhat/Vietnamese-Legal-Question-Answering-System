@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from time import perf_counter
+from typing import Any
 
 import anyio
 from fastapi import APIRouter, Depends
@@ -11,7 +13,11 @@ from fastapi import APIRouter, Depends
 from src.api.dependencies import get_legal_qa_service
 from src.api.rate_limit import enforce_ask_rate_limit
 from src.api.schemas import LegalQADecision, LegalQARequest, LegalQAResponse, ResponseMetadataDTO
-from src.services.legal_qa_api_service import LegalQAService, LegalQAServiceError
+from src.services.legal_qa_api_service import (
+    LegalQAService,
+    LegalQAServiceError,
+    LegalQATimingLogger,
+)
 
 router = APIRouter(prefix="/legal-qa", tags=["legal-qa"])
 logger = logging.getLogger(__name__)
@@ -38,8 +44,36 @@ async def ask_legal_question(
         prompts, secrets, or internal debug data.
     """
     started_at = perf_counter()
+    _log_request_timing(
+        request=request,
+        stage="request_received",
+        request_id=None,
+        elapsed_ms=0,
+        total_elapsed_ms=0,
+    )
+    _log_request_timing(
+        request=request,
+        stage="request_validation",
+        request_id=None,
+        elapsed_ms=0,
+        total_elapsed_ms=0,
+    )
+    timing_logger = _build_timing_logger(request)
     try:
-        response = await anyio.to_thread.run_sync(service.answer, request)
+        response = await anyio.to_thread.run_sync(
+            _answer_with_optional_timing,
+            service,
+            request,
+            timing_logger,
+        )
+        latency_ms = int((perf_counter() - started_at) * 1000)
+        _log_request_timing(
+            request=request,
+            stage="request_completed",
+            request_id=response.request_id,
+            elapsed_ms=latency_ms,
+            total_elapsed_ms=latency_ms,
+        )
         _log_request_completed(response)
         return response
     except Exception as exc:
@@ -62,6 +96,14 @@ async def ask_legal_question(
             failure_stage=failure_stage,
             latency_ms=latency_ms,
         )
+        _log_request_timing(
+            request=request,
+            stage="request_failed",
+            request_id=request_id,
+            elapsed_ms=latency_ms,
+            total_elapsed_ms=latency_ms,
+            exception_class=exception_class,
+        )
         return LegalQAResponse(
             request_id=request_id,
             decision=LegalQADecision.ERROR,
@@ -76,6 +118,36 @@ async def ask_legal_question(
                 latency_ms=latency_ms,
             ),
         )
+
+
+def _answer_with_optional_timing(
+    service: Any,
+    request: LegalQARequest,
+    timing_logger: LegalQATimingLogger,
+) -> LegalQAResponse:
+    if isinstance(service, LegalQAService):
+        return service.answer(request, timing_logger=timing_logger)
+    return service.answer(request)
+
+
+def _build_timing_logger(request: LegalQARequest) -> LegalQATimingLogger:
+    def log_timing(
+        stage: str,
+        request_id: str | None,
+        elapsed_ms: int,
+        total_elapsed_ms: int,
+        exception_class: str | None,
+    ) -> None:
+        _log_request_timing(
+            request=request,
+            stage=stage,
+            request_id=request_id,
+            elapsed_ms=elapsed_ms,
+            total_elapsed_ms=total_elapsed_ms,
+            exception_class=exception_class,
+        )
+
+    return log_timing
 
 
 def _log_request_completed(response: LegalQAResponse) -> None:
@@ -117,3 +189,38 @@ def _log_request_failed(
             "context_message_count": len(request.conversation_context),
         },
     )
+
+
+def _log_request_timing(
+    *,
+    request: LegalQARequest,
+    stage: str,
+    request_id: str | None,
+    elapsed_ms: int,
+    total_elapsed_ms: int,
+    exception_class: str | None = None,
+) -> None:
+    logger.info(
+        "legal_qa_request_timing stage=%s",
+        stage,
+        extra={
+            "request_id": request_id,
+            "stage": stage,
+            "elapsed_ms": elapsed_ms,
+            "total_elapsed_ms": total_elapsed_ms,
+            "exception_class": exception_class,
+            "top_k": request.top_k,
+            "include_evidence": request.include_evidence,
+            "include_debug": request.include_debug,
+            "has_conversation_id": request.conversation_id is not None,
+            "context_message_count": len(request.conversation_context),
+            "service_mode": _safe_service_mode(),
+        },
+    )
+
+
+def _safe_service_mode() -> str:
+    raw_mode = os.getenv("LEGAL_QA_SERVICE_MODE")
+    if raw_mode in {"fake", "real"}:
+        return raw_mode
+    return "unknown"

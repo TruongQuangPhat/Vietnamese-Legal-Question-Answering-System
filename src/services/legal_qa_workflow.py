@@ -12,13 +12,14 @@ from pathlib import Path
 
 from src.retrieval.coverage_aware import CoverageAwareFusionConfig
 from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, RagGenerationConfig
-from src.retrieval.llm_client import LLMClientProtocol
+from src.retrieval.llm_client import LLMClientProtocol, LLMRequest, LLMResponse
 from src.retrieval.models import RetrievalResult
 from src.retrieval.rag_pipeline import RagRetrieverProtocol, run_naive_rag
 from src.retrieval.selection import AnswerabilityDecision, EvidenceSelectionConfig
 from src.services.legal_qa_api_service import (
     FakeLegalQAWorkflow,
     LegalQAService,
+    LegalQATimingLogger,
     LegalQAWorkflow,
     LegalQAWorkflowCitation,
     LegalQAWorkflowDecision,
@@ -146,8 +147,16 @@ class RealLegalQAWorkflow:
                 retriever=_RetrievalQuestionOverride(
                     retriever=self._retriever,
                     retrieval_question=retrieval_question,
+                    request_id=request.request_id,
+                    timing_logger=request.timing_logger,
+                    timing_started_at=request.timing_started_at,
                 ),
-                llm_client=self._llm_client,
+                llm_client=_TimedLLMClient(
+                    llm_client=self._llm_client,
+                    request_id=request.request_id,
+                    timing_logger=request.timing_logger,
+                    timing_started_at=request.timing_started_at,
+                ),
                 collection_name=self._collection_name,
                 top_k=self._final_top_k,
                 generation_config=self._generation_config,
@@ -171,9 +180,15 @@ class _RetrievalQuestionOverride:
         *,
         retriever: RagRetrieverProtocol,
         retrieval_question: str,
+        request_id: str,
+        timing_logger: LegalQATimingLogger | None,
+        timing_started_at: float | None,
     ) -> None:
         self._retriever = retriever
         self._retrieval_question = retrieval_question
+        self._request_id = request_id
+        self._timing_logger = timing_logger
+        self._timing_started_at = timing_started_at
 
     async def retrieve(
         self,
@@ -182,11 +197,109 @@ class _RetrievalQuestionOverride:
         top_k: int | None = None,
         collection_name: str | None = None,
     ) -> RetrievalResult:
-        return await self._retriever.retrieve(
-            query=self._retrieval_question,
-            top_k=top_k,
-            collection_name=collection_name,
+        _emit_workflow_timing(
+            timing_logger=self._timing_logger,
+            stage="embedding_model_initialization_or_loading",
+            request_id=self._request_id,
+            stage_started_at=None,
+            timing_started_at=self._timing_started_at,
         )
+        _emit_workflow_timing(
+            timing_logger=self._timing_logger,
+            stage="query_embedding",
+            request_id=self._request_id,
+            stage_started_at=None,
+            timing_started_at=self._timing_started_at,
+        )
+        stage_started_at = time.perf_counter()
+        try:
+            result = await self._retriever.retrieve(
+                query=self._retrieval_question,
+                top_k=top_k,
+                collection_name=collection_name,
+            )
+        except Exception as exc:
+            _emit_workflow_timing(
+                timing_logger=self._timing_logger,
+                stage="qdrant_retrieval",
+                request_id=self._request_id,
+                stage_started_at=stage_started_at,
+                timing_started_at=self._timing_started_at,
+                exception_class=type(exc).__name__,
+            )
+            raise
+        _emit_workflow_timing(
+            timing_logger=self._timing_logger,
+            stage="qdrant_retrieval",
+            request_id=self._request_id,
+            stage_started_at=stage_started_at,
+            timing_started_at=self._timing_started_at,
+        )
+        return result
+
+
+class _TimedLLMClient:
+    """Emit sanitized timing around the provider generation boundary."""
+
+    def __init__(
+        self,
+        *,
+        llm_client: LLMClientProtocol,
+        request_id: str,
+        timing_logger: LegalQATimingLogger | None,
+        timing_started_at: float | None,
+    ) -> None:
+        self._llm_client = llm_client
+        self._request_id = request_id
+        self._timing_logger = timing_logger
+        self._timing_started_at = timing_started_at
+
+    async def generate(self, request: LLMRequest) -> LLMResponse:
+        _emit_workflow_timing(
+            timing_logger=self._timing_logger,
+            stage="llm_generation_provider_call",
+            request_id=self._request_id,
+            stage_started_at=None,
+            timing_started_at=self._timing_started_at,
+        )
+        stage_started_at = time.perf_counter()
+        try:
+            response = await self._llm_client.generate(request)
+        except Exception as exc:
+            _emit_workflow_timing(
+                timing_logger=self._timing_logger,
+                stage="llm_generation_provider_call",
+                request_id=self._request_id,
+                stage_started_at=stage_started_at,
+                timing_started_at=self._timing_started_at,
+                exception_class=type(exc).__name__,
+            )
+            raise
+        _emit_workflow_timing(
+            timing_logger=self._timing_logger,
+            stage="llm_generation_provider_call",
+            request_id=self._request_id,
+            stage_started_at=stage_started_at,
+            timing_started_at=self._timing_started_at,
+        )
+        return response
+
+
+def _emit_workflow_timing(
+    *,
+    timing_logger: LegalQATimingLogger | None,
+    stage: str,
+    request_id: str,
+    stage_started_at: float | None,
+    timing_started_at: float | None,
+    exception_class: str | None = None,
+) -> None:
+    if timing_logger is None or timing_started_at is None:
+        return
+    now = time.perf_counter()
+    elapsed_ms = int((now - stage_started_at) * 1000) if stage_started_at is not None else 0
+    total_elapsed_ms = int((now - timing_started_at) * 1000)
+    timing_logger(stage, request_id, elapsed_ms, total_elapsed_ms, exception_class)
 
 
 def build_legal_qa_service(

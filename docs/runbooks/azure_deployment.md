@@ -502,6 +502,8 @@ startup. The chunks file is copied into the private production image at:
 Production container app settings include:
 
 ```env
+acrUseManagedIdentityCreds=true
+WEBSITES_CONTAINER_START_TIME_LIMIT=1800
 WEBSITES_PORT=8000
 PORT=8000
 LEGAL_QA_SERVICE_MODE=real
@@ -509,8 +511,51 @@ LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
 CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
 ```
 
+The Web App must also keep `alwaysOn=true` and Docker container logging set to
+`filesystem`. The production deploy workflow persists these settings so manual
+portal fixes are not required after each deployment.
+
 Secrets remain environment values only: Qdrant, OpenRouter, database URL, and
 session secret values must never be printed in workflow logs.
+
+### Production container troubleshooting
+
+App Service source/zip deployment is deprecated for the real embedding path.
+Remote Oryx builds with the embedding extra timed out, and the prebuilt zip
+package became too large for reliable Kudu deployment. Use the container
+workflow for real production dependencies and keep the restored source-deploy
+staging app only as a recovery fallback.
+
+If `/health` returns `503` after deployment:
+
+- Confirm the production Web App is using the pushed container image.
+- Confirm `acrUseManagedIdentityCreds=true` and the Web App identity has
+  `AcrPull` on the registry.
+- Confirm `WEBSITES_PORT=8000`, `PORT=8000`, and the container command starts
+  Uvicorn on `0.0.0.0:8000`.
+- Confirm `WEBSITES_CONTAINER_START_TIME_LIMIT=1800` and `alwaysOn=true`.
+- Use Docker container filesystem logs and Azure log stream, but do not print
+  secrets, environment dumps, headers, cookies, prompts, retrieved legal text,
+  provider responses, or full user questions.
+
+If `/api/v1/legal-qa/ask` times out:
+
+- Do not loop real ask requests. Run only the single manually confirmed smoke.
+- Check sanitized `legal_qa_request_timing` entries for the last completed
+  stage: request validation, context loading, retrieval-question preparation,
+  embedding/model loading, query embedding, Qdrant retrieval, provider call,
+  response mapping, completion, or failure.
+- The embedding/model-loading and query-embedding entries are coarse markers:
+  BGE-M3 model loading and query embedding occur inside the retrieval adapter,
+  so the following retrieval timing may include both embedding and Qdrant work.
+- A timeout before `qdrant_retrieval` completes usually points to BGE-M3 or
+  retrieval cold-start cost on CPU. A timeout after `llm_generation_provider_call`
+  starts points to provider latency or egress.
+- Scale from B1 to B2 or P1v3 when model cold loading, CPU query embedding, or
+  memory pressure remains above the bounded smoke timeout.
+- Bake the model cache into the image only after confirming the bottleneck is
+  repeated model download or initialization, and keep the image private.
+- Keep Vercel Production unchanged until production ask smoke passes.
 
 ## Production Ask Smoke Runbook
 
@@ -531,11 +576,14 @@ GET /api/v1/readiness
 POST /api/v1/legal-qa/ask
 ```
 
-It sends one request only. It fails if the response reports `decision=error`,
-contains `internal_error`, has `metadata.model=null`, has
+It sends one request only. `timeout_seconds` is configurable up to 600 seconds
+for production ML cold start. It fails if the response reports
+`decision=error`, contains `internal_error`, has `metadata.model=null`, has
 `metadata.retrieval_question_prepared=false`, or returns the generic internal
 error answer. It prints only safe summary fields: HTTP status, response keys,
-answer length, citation/evidence counts, and latency when present.
+answer length, citation/evidence counts, model-present status,
+retrieval-question-prepared status, sanitized warnings, and latency when
+present.
 
 ## Vercel Production Cutover
 

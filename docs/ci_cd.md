@@ -887,8 +887,12 @@ Required production resources and settings:
 - production Web App such as `vnlaw-backend-prod-phat`;
 - production App Service plan sized for BGE-M3/Torch CPU memory;
 - managed identity with `AcrPull` or equivalent registry pull permission;
+- `acrUseManagedIdentityCreds=true`;
+- `WEBSITES_CONTAINER_START_TIME_LIMIT=1800`;
 - `WEBSITES_PORT=8000`;
 - `PORT=8000`;
+- `alwaysOn=true`;
+- Docker container logging set to `filesystem`;
 - `LEGAL_QA_SERVICE_MODE=real`;
 - `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
 - Qdrant URL/API key through `QDRANT_URL` and `QDRANT_API_KEY`;
@@ -918,10 +922,19 @@ GET /api/v1/readiness
 POST /api/v1/legal-qa/ask
 ```
 
-It sends exactly one `/ask` request, prints only safe summary fields, and fails
+It sends exactly one `/ask` request with a configurable timeout up to 600
+seconds for production ML cold start, prints only safe summary fields, and fails
 if `decision == "error"`, `warnings` contains `internal_error`,
 `metadata.model` is null, `metadata.retrieval_question_prepared` is false, or
 the answer is the generic internal-error answer.
+
+Production `/ask` timeout diagnostics come from sanitized
+`legal_qa_request_timing` logs. The logs record stage names and elapsed
+milliseconds for request validation, context loading, retrieval-question
+preparation, embedding/retrieval, provider call, response mapping, completion,
+and failure without logging question text, conversation content, retrieved
+legal text, prompts, full answers, headers, cookies, provider responses, or
+secret values.
 
 ## Stage 8 - Frontend to Azure Backend Integration Audit
 
