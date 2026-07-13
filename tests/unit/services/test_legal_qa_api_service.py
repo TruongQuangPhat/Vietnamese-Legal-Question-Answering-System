@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.api.schemas import LegalQARequest
 from src.services.legal_qa_api_service import (
     LegalQAService,
+    LegalQAServiceError,
     LegalQAWorkflowCitation,
     LegalQAWorkflowDecision,
     LegalQAWorkflowEvidence,
@@ -202,6 +203,28 @@ def test_service_hides_evidence_when_requested() -> None:
 
     assert response.citations
     assert response.evidence == []
+
+
+def test_service_wraps_workflow_failure_with_safe_stage_and_root_exception_class() -> None:
+    class FailingWorkflow:
+        def run(self, request: LegalQAWorkflowRequest) -> None:
+            try:
+                raise ImportError("private dependency path")
+            except ImportError as exc:
+                raise RuntimeError("private wrapper detail") from exc
+
+    service = LegalQAService(workflow=FailingWorkflow())
+
+    try:
+        service.answer(LegalQARequest(question="Hợp đồng dân sự vô hiệu khi nào?"))
+    except LegalQAServiceError as exc:
+        assert exc.failure_stage == "workflow_run"
+        assert exc.exception_class == "ImportError"
+        assert exc.request_id
+        assert "private dependency path" not in str(exc)
+        assert "private wrapper detail" not in str(exc)
+    else:
+        raise AssertionError("expected LegalQAServiceError")
 
 
 def test_service_falls_back_for_ui_payload_with_invalid_traceability_url() -> None:

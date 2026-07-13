@@ -124,6 +124,25 @@ class LegalQAWorkflow(Protocol):
         ...
 
 
+class LegalQAServiceError(RuntimeError):
+    """Sanitized internal service failure with safe diagnostic metadata."""
+
+    def __init__(
+        self,
+        *,
+        failure_stage: str,
+        original_exception: BaseException,
+        request_id: str | None = None,
+    ) -> None:
+        self.failure_stage = failure_stage
+        self.request_id = request_id
+        self.exception_class = _root_exception_class(original_exception)
+        super().__init__(
+            "Legal QA service failed "
+            f"at stage {failure_stage} with exception class {self.exception_class}"
+        )
+
+
 class FakeLegalQAWorkflow:
     """Deterministic fake workflow for API contract tests and local development.
 
@@ -216,7 +235,15 @@ class LegalQAService:
             warnings, and safe workflow metadata.
         """
         request_id = self.create_request_id()
-        prepared_context = self._context_preparer.prepare(request)
+        try:
+            prepared_context = self._context_preparer.prepare(request)
+        except Exception as exc:
+            raise LegalQAServiceError(
+                failure_stage="context_preparation",
+                original_exception=exc,
+                request_id=request_id,
+            ) from exc
+
         workflow_request = LegalQAWorkflowRequest(
             request_id=request_id,
             question=prepared_context.effective_question,
@@ -224,24 +251,39 @@ class LegalQAService:
             context=prepared_context,
             include_debug=request.include_debug,
         )
-        result = self._workflow.run(workflow_request)
-        result = replace(
-            result,
-            metadata=replace(
-                result.metadata,
-                conversation_context_used=prepared_context.context_used,
-                conversation_context_message_count=prepared_context.message_count,
-                follow_up_detected=prepared_context.follow_up_detected,
-                retrieval_question_prepared=(
-                    prepared_context.retrieval_question != prepared_context.original_question
+        try:
+            result = self._workflow.run(workflow_request)
+        except Exception as exc:
+            raise LegalQAServiceError(
+                failure_stage="workflow_run",
+                original_exception=exc,
+                request_id=request_id,
+            ) from exc
+
+        try:
+            result = replace(
+                result,
+                metadata=replace(
+                    result.metadata,
+                    conversation_context_used=prepared_context.context_used,
+                    conversation_context_message_count=prepared_context.message_count,
+                    follow_up_detected=prepared_context.follow_up_detected,
+                    retrieval_question_prepared=(
+                        prepared_context.retrieval_question != prepared_context.original_question
+                    ),
                 ),
-            ),
-        )
-        return map_workflow_result_to_response(
-            request_id=request_id,
-            result=result,
-            include_evidence=request.include_evidence,
-        )
+            )
+            return map_workflow_result_to_response(
+                request_id=request_id,
+                result=result,
+                include_evidence=request.include_evidence,
+            )
+        except Exception as exc:
+            raise LegalQAServiceError(
+                failure_stage="response_mapping",
+                original_exception=exc,
+                request_id=request_id,
+            ) from exc
 
 
 def map_workflow_result_to_response(
@@ -371,6 +413,15 @@ def _is_valid_http_url(value: str) -> bool:
     except ValidationError:
         return False
     return True
+
+
+def _root_exception_class(exc: BaseException) -> str:
+    root = exc
+    seen: set[int] = set()
+    while root.__cause__ is not None and id(root.__cause__) not in seen:
+        seen.add(id(root))
+        root = root.__cause__
+    return type(root).__name__
 
 
 def _map_metadata(metadata: LegalQAWorkflowMetadata) -> ResponseMetadataDTO:

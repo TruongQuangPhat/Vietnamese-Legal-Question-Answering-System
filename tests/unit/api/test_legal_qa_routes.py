@@ -100,6 +100,78 @@ async def test_ask_route_hides_evidence_when_requested() -> None:
     assert response.status_code == 200
     assert body["citations"]
     assert body["evidence"] == []
+    assert "internal_error" not in body["warnings"]
+
+
+@pytest.mark.asyncio
+async def test_ask_route_minimal_payload_does_not_return_internal_error() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Hợp đồng dân sự vô hiệu khi nào?",
+                "top_k": 10,
+                "include_evidence": False,
+                "include_debug": False,
+            },
+        )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["decision"] == "answered"
+    assert body["metadata"]["model"] == "stub"
+    assert "internal_error" not in body["warnings"]
+
+
+@pytest.mark.asyncio
+async def test_ask_route_include_evidence_payload_does_not_return_internal_error() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Hợp đồng dân sự vô hiệu khi nào?",
+                "top_k": 10,
+                "include_evidence": True,
+                "include_debug": False,
+            },
+        )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["decision"] == "answered"
+    assert body["evidence"]
+    assert "internal_error" not in body["warnings"]
+
+
+@pytest.mark.asyncio
+async def test_ask_route_ui_style_payload_does_not_return_internal_error() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={
+                "question": "Hợp đồng dân sự vô hiệu khi nào?",
+                "conversation_id": "cbe5be82-8924-4cd4-acb4-a00ca1e70d52",
+                "conversation_context": [
+                    {"role": "user", "content": "Câu hỏi trước"},
+                    {"role": "assistant", "content": "Câu trả lời trước"},
+                ],
+                "top_k": 10,
+                "include_evidence": True,
+                "include_debug": False,
+            },
+        )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["decision"] == "answered"
+    assert body["metadata"]["conversation_context_message_count"] == 2
+    assert "internal_error" not in body["warnings"]
 
 
 @pytest.mark.asyncio
@@ -371,10 +443,15 @@ async def test_ask_route_logs_safe_completion_metadata(caplog: pytest.LogCapture
 async def test_ask_route_logs_safe_error_metadata(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.WARNING, logger="src.api.routes.legal_qa")
     app = create_app()
+    raw_question = "Câu hỏi hợp lệ có SECRET-QUESTION-8899?"
+    conversation_id = "conversation-secret-id-1"
 
     class FailingLegalQAWorkflow:
         def run(self, request: LegalQAWorkflowRequest) -> None:
-            raise RuntimeError("secret traceback details")
+            try:
+                raise ValueError("secret traceback details")
+            except ValueError as exc:
+                raise RuntimeError("outer secret traceback details") from exc
 
     async def get_failing_service() -> LegalQAService:
         return LegalQAService(workflow=FailingLegalQAWorkflow())
@@ -386,8 +463,8 @@ async def test_ask_route_logs_safe_error_metadata(caplog: pytest.LogCaptureFixtu
         response = await client.post(
             "/api/v1/legal-qa/ask",
             json={
-                "question": "Câu hỏi hợp lệ?",
-                "conversation_id": "conversation-1",
+                "question": raw_question,
+                "conversation_id": conversation_id,
                 "conversation_context": [
                     {"role": "user", "content": "Nội dung riêng tư không được log."},
                     {"role": "assistant", "content": "Câu trả lời riêng tư không được log."},
@@ -399,18 +476,21 @@ async def test_ask_route_logs_safe_error_metadata(caplog: pytest.LogCaptureFixtu
         )
 
     assert response.status_code == 200
-    record = _single_log_record(caplog, "legal_qa_request_failed")
+    record = _single_log_record_prefix(caplog, "legal_qa_request_failed")
     assert record.request_id == response.json()["request_id"]
-    assert record.error_type == "RuntimeError"
+    assert record.exception_class == "ValueError"
+    assert record.failure_stage == "workflow_run"
     assert isinstance(record.latency_ms, int)
     assert record.top_k == 10
     assert record.include_evidence is True
     assert record.include_debug is False
     assert record.has_conversation_id is True
-    assert record.conversation_context_message_count == 2
+    assert record.context_message_count == 2
     assert "secret traceback details" not in caplog.text
+    assert "outer secret traceback details" not in caplog.text
+    assert raw_question not in caplog.text
     assert "Nội dung riêng tư" not in caplog.text
-    assert "conversation-1" not in caplog.text
+    assert conversation_id not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -602,5 +682,16 @@ def _rate_limit_settings(
 
 def _single_log_record(caplog: pytest.LogCaptureFixture, message: str) -> logging.LogRecord:
     matching_records = [record for record in caplog.records if record.getMessage() == message]
+    assert len(matching_records) == 1
+    return matching_records[0]
+
+
+def _single_log_record_prefix(
+    caplog: pytest.LogCaptureFixture,
+    message_prefix: str,
+) -> logging.LogRecord:
+    matching_records = [
+        record for record in caplog.records if record.getMessage().startswith(message_prefix)
+    ]
     assert len(matching_records) == 1
     return matching_records[0]

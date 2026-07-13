@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends
 from src.api.dependencies import get_legal_qa_service
 from src.api.rate_limit import enforce_ask_rate_limit
 from src.api.schemas import LegalQADecision, LegalQARequest, LegalQAResponse, ResponseMetadataDTO
-from src.services.legal_qa_api_service import LegalQAService
+from src.services.legal_qa_api_service import LegalQAService, LegalQAServiceError
 
 router = APIRouter(prefix="/legal-qa", tags=["legal-qa"])
 logger = logging.getLogger(__name__)
@@ -44,11 +44,22 @@ async def ask_legal_question(
         return response
     except Exception as exc:
         latency_ms = int((perf_counter() - started_at) * 1000)
-        request_id = LegalQAService.create_request_id()
+        request_id = (
+            exc.request_id
+            if isinstance(exc, LegalQAServiceError) and exc.request_id is not None
+            else LegalQAService.create_request_id()
+        )
+        exception_class = (
+            exc.exception_class if isinstance(exc, LegalQAServiceError) else type(exc).__name__
+        )
+        failure_stage = (
+            exc.failure_stage if isinstance(exc, LegalQAServiceError) else "route_handler"
+        )
         _log_request_failed(
             request=request,
             request_id=request_id,
-            error_type=type(exc).__name__,
+            exception_class=exception_class,
+            failure_stage=failure_stage,
             latency_ms=latency_ms,
         )
         return LegalQAResponse(
@@ -86,19 +97,23 @@ def _log_request_failed(
     *,
     request: LegalQARequest,
     request_id: str,
-    error_type: str,
+    exception_class: str,
+    failure_stage: str,
     latency_ms: int,
 ) -> None:
     logger.warning(
-        "legal_qa_request_failed",
+        "legal_qa_request_failed failure_stage=%s exception_class=%s",
+        failure_stage,
+        exception_class,
         extra={
             "request_id": request_id,
-            "error_type": error_type,
+            "exception_class": exception_class,
+            "failure_stage": failure_stage,
             "latency_ms": latency_ms,
             "top_k": request.top_k,
             "include_evidence": request.include_evidence,
             "include_debug": request.include_debug,
             "has_conversation_id": request.conversation_id is not None,
-            "conversation_context_message_count": len(request.conversation_context),
+            "context_message_count": len(request.conversation_context),
         },
     )
