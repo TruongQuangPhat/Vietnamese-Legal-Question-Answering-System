@@ -461,7 +461,8 @@ Stage 6 extends `.github/workflows/deploy-staging.yml` with a
 The `real-readiness` path:
 
 1. validates the required Azure and real-readiness GitHub Environment secrets;
-2. deploys the same App Service package with the Qdrant optional dependency;
+2. deploys the same App Service package with the Qdrant and embedding optional
+   dependencies prebuilt on the GitHub runner;
 3. verifies `scripts/deployment/fetch_processed_chunks.py` is present in the
    App Service deployment package for operator-controlled chunk preparation;
 4. configures App Service for `LEGAL_QA_SERVICE_MODE=real`;
@@ -740,13 +741,43 @@ LEGAL_QA_ALLOW_REAL_TESTS=0
 LEGAL_QA_ALLOW_DB_TESTS=0
 LEGAL_QA_RATE_LIMIT_ENABLED=false
 LEGAL_QA_AUTH_ENABLED=false
-SCM_DO_BUILD_DURING_DEPLOYMENT=true
+SCM_DO_BUILD_DURING_DEPLOYMENT=false
+ENABLE_ORYX_BUILD=false
+PYTHONPATH=/home/site/wwwroot/.python_packages/lib/site-packages
 ```
 
 The `real-readiness` path configures real mode for `/health` and
 `/api/v1/readiness` only. It sets `LEGAL_QA_CHUNKS_PATH` to
 `/home/data/legal_chunks.jsonl`, but it does not fetch chunks during App Service
 startup and does not call `/api/v1/legal-qa/ask`.
+
+### Azure App Service Dependency Packaging
+
+The real `/ask` path requires `--extra qdrant --extra embedding`. The embedding
+extra brings in `flagembedding`, `sentence-transformers`, `transformers`, and
+`torch`; Azure App Service/Oryx remote source builds became too slow after that
+extra was added. The observed failed deployment completed dependency install in
+about 412 seconds and build snippets in about 429 seconds, then remained in
+OneDeploy compression/deployment until the GitHub job was canceled near 29
+minutes.
+
+The staging workflow now uses a prebuilt App Service package:
+
+1. GitHub Actions exports the locked non-dev requirements with `qdrant` and
+   `embedding`, without the local editable project entry.
+2. GitHub Actions installs them into
+   `.python_packages/lib/site-packages` with CPU Torch resolution, filtering
+   CUDA/Triton packages that are not needed on the B1 CPU App Service target.
+3. App Service remote build is disabled with
+   `SCM_DO_BUILD_DURING_DEPLOYMENT=false` and `ENABLE_ORYX_BUILD=false`.
+4. `PYTHONPATH` points at the packaged dependency directory.
+5. Azure CLI zip deployment runs with a bounded timeout.
+
+This keeps real `/ask` dependencies available while avoiding heavy Oryx work on
+the B1 App Service instance. If the prebuilt package still exceeds App Service
+source-deploy limits, the next reviewed option is a separate container-based
+deployment or a lighter query-embedding architecture; do not reintroduce chunk
+fetching or model loading into the startup command.
 
 ### Required Staging Environment Secrets
 
