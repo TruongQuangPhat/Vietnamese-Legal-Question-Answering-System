@@ -173,9 +173,13 @@ jobs:
           answer = payload.get("answer")
           citations = payload.get("citations")
           evidence = payload.get("evidence")
+          warnings = payload.get("warnings")
+          decision = payload.get("decision")
           metadata = payload.get("metadata")
+          generic_error_answer = "Không thể xử lý yêu cầu lúc này. Vui lòng thử lại sau."
 
           print("Response JSON keys: " + ", ".join(keys))
+          print(f"Decision: {decision}")
           if isinstance(answer, str):
               print(f"Answer length: {len(answer)}")
           if isinstance(citations, list):
@@ -186,5 +190,18 @@ jobs:
               latency_ms = metadata.get("latency_ms")
               if latency_ms is not None:
                   print(f"Response latency_ms: {latency_ms}")
+              if metadata.get("model") is None:
+                  raise SystemExit("Ask smoke returned null metadata.model.")
+              if metadata.get("retrieval_question_prepared") is False:
+                  raise SystemExit("Ask smoke did not prepare a retrieval question.")
+          else:
+              raise SystemExit("Ask smoke response metadata was missing or invalid.")
+
+          if decision == "error":
+              raise SystemExit("Ask smoke returned decision=error.")
+          if isinstance(warnings, list) and "internal_error" in warnings:
+              raise SystemExit("Ask smoke returned internal_error warning.")
+          if answer == generic_error_answer:
+              raise SystemExit("Ask smoke returned the generic internal-error answer.")
           PY
           rm -f "$response_file"
