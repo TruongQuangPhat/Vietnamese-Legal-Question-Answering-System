@@ -20,8 +20,12 @@ for Students policy blocked Azure Container Registry, Azure Container Apps, and
 Log Analytics Workspace. Stage 5 pivots staging to Azure App Service code
 deploy in Japan East and passed fake-mode `/health`. Stage 6 adds a controlled
 real-mode readiness preflight for staging and has passed after preparing chunks
-at `/home/data/legal_chunks.jsonl`. Production deployment remains
-skeleton-only.
+at `/home/data/legal_chunks.jsonl`.
+
+App Service source/zip deployment is now legacy/recovery only for this project.
+Remote Oryx source builds with the embedding extra timed out, and prebuilt zip
+source deployment was too large for reliable Kudu deployment. Production real
+embedding dependencies must be deployed as a container image.
 
 ## CI Principles
 
@@ -70,6 +74,8 @@ Current and planned workflow paths:
 .github/workflows/backend-container.yml
 .github/workflows/deploy-staging.yml
 .github/workflows/deploy-production.yml
+.github/workflows/deploy-production-container.yml
+.github/workflows/production-ask-smoke.yml
 .github/workflows/evaluation-refresh.yml
 ```
 
@@ -779,6 +785,13 @@ source-deploy limits, the next reviewed option is a separate container-based
 deployment or a lighter query-embedding architecture; do not reintroduce chunk
 fetching or model loading into the startup command.
 
+Status update: the prebuilt source package also proved unsuitable for reliable
+App Service source deployment. The prebuilt package was about 362 MB, Kudu
+returned `502`, and partially applied app settings caused startup failure with
+`No module named uvicorn`. Treat `deploy-staging.yml` as a legacy recovery path
+for the restored staging source-deploy app only. Do not use source/zip deploy
+for production real embedding dependencies.
+
 ### Required Staging Environment Secrets
 
 Names only, no values:
@@ -839,11 +852,76 @@ PR check. Normal required PR checks remain:
 - Secret Scan
 - Backend Container
 
-### Production Boundary
+### Production Container Backend
 
-`.github/workflows/deploy-production.yml` remains a planning-only skeleton.
-Production deployment, production Azure login, production image push, and
-production smoke checks are not implemented in Stage 6.
+Production backend deployment is implemented separately in
+`.github/workflows/deploy-production-container.yml`. It is `workflow_dispatch`
+only, uses the GitHub Environment `production`, and requires the confirmation
+phrase:
+
+```text
+I_UNDERSTAND_THIS_DEPLOYS_PRODUCTION_CONTAINER_BACKEND
+```
+
+The workflow:
+
+1. validates required production secret names without printing values;
+2. downloads `legal_chunks.jsonl` from `LEGAL_QA_CHUNKS_URL` into the GitHub
+   runner temp directory;
+3. verifies `LEGAL_QA_CHUNKS_SHA256`;
+4. builds `docker/backend/Dockerfile` target `production-with-chunks`;
+5. runs local fake-mode container `GET /health`;
+6. pushes the image to Azure Container Registry only after local smoke passes;
+7. configures a separate production App Service for Containers Web App;
+8. restarts the production backend;
+9. runs bounded `GET /health` and `GET /api/v1/readiness`.
+
+The deploy workflow does not call `/api/v1/legal-qa/ask`. It does not crawl,
+index, re-embed, rerank, run benchmarks, mutate Qdrant, or modify protected
+paths.
+
+Required production resources and settings:
+
+- Azure Container Registry, with login server stored as
+  `AZURE_ACR_LOGIN_SERVER`;
+- production Web App such as `vnlaw-backend-prod-phat`;
+- production App Service plan sized for BGE-M3/Torch CPU memory;
+- managed identity with `AcrPull` or equivalent registry pull permission;
+- `WEBSITES_PORT=8000`;
+- `PORT=8000`;
+- `LEGAL_QA_SERVICE_MODE=real`;
+- `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
+- Qdrant URL/API key through `QDRANT_URL` and `QDRANT_API_KEY`;
+- `OPENROUTER_API_KEY`;
+- `LEGAL_QA_DATABASE_URL`;
+- `LEGAL_QA_SESSION_SECRET`;
+- `CORS_ALLOWED_ORIGINS` including `https://vnlaw-qa.vercel.app`.
+
+`.github/workflows/deploy-production.yml` remains planning-only and is not the
+container deployment path.
+
+### Production Ask Smoke
+
+Production `/ask` validation is separate in
+`.github/workflows/production-ask-smoke.yml`. It is `workflow_dispatch` only,
+uses the GitHub Environment `production`, and requires:
+
+```text
+I_UNDERSTAND_THIS_CALLS_REAL_PRODUCTION_SERVICES
+```
+
+It calls only:
+
+```text
+GET /health
+GET /api/v1/readiness
+POST /api/v1/legal-qa/ask
+```
+
+It sends exactly one `/ask` request, prints only safe summary fields, and fails
+if `decision == "error"`, `warnings` contains `internal_error`,
+`metadata.model` is null, `metadata.retrieval_question_prepared` is false, or
+the answer is the generic internal-error answer.
 
 ## Stage 8 - Frontend to Azure Backend Integration Audit
 

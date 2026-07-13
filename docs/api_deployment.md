@@ -129,9 +129,9 @@ CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
 
 ### Frontend to Azure backend migration audit
 
-Render remains the currently documented production backend value, but Render
-Free has OOM limitations for real `/api/v1/legal-qa/ask` serving and should not
-be the long-term production backend. Azure App Service staging has passed:
+Render remains the current rollback backend value, but Render Free has OOM
+limitations for real `/api/v1/legal-qa/ask` serving and should not be the
+long-term production backend. Azure App Service staging has passed:
 
 ```text
 GET /health -> HTTP 200
@@ -158,10 +158,11 @@ Do not change Vercel Production blindly. The current production value is still:
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
 ```
 
-After Preview UI smoke passes, switch Vercel Production by changing
-`NEXT_PUBLIC_API_BASE_URL` to the accepted Azure backend origin and redeploying
-the frontend. Keep the Render origin as the rollback value until Azure
-production traffic is accepted.
+After Azure production container backend deploy, readiness, and one controlled
+production ask smoke pass, switch Vercel Production by changing
+`NEXT_PUBLIC_API_BASE_URL` to the accepted Azure production backend origin and
+redeploying the frontend. Keep the Render origin as the rollback value until
+Azure production traffic is accepted.
 
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the
@@ -185,11 +186,14 @@ Migration checklist:
    origin.
 2. Add the exact Vercel Preview origin to Azure `CORS_ALLOWED_ORIGINS`.
 3. Redeploy Vercel Preview and run UI smoke without repeated `/ask` calls.
-4. Switch Vercel Production `NEXT_PUBLIC_API_BASE_URL` from Render to Azure only
-   after Preview passes.
-5. Roll back by restoring the Render `NEXT_PUBLIC_API_BASE_URL` value and
+4. Deploy the Azure production container backend.
+5. Confirm production `/health` and `/api/v1/readiness`.
+6. Run one controlled production `/ask` smoke.
+7. Switch Vercel Production `NEXT_PUBLIC_API_BASE_URL` from Render to Azure only
+   after the Azure production backend passes those checks.
+8. Roll back by restoring the Render `NEXT_PUBLIC_API_BASE_URL` value and
    redeploying Vercel if Azure UI traffic fails.
-6. Decommission Render only after Azure production traffic is accepted and a
+9. Decommission Render only after Azure production traffic is accepted and a
    separate decommission checklist removes Render secrets, disables Render
    traffic, and preserves safe logs.
 
@@ -1548,23 +1552,31 @@ pass.
 
 ## Container and Compose status
 
-The existing files remain intentionally fake-mode foundations and are not the
-chosen Render deployment path:
+`docker/backend/Dockerfile` now supports a production backend runtime image. It
+installs non-dev runtime dependencies plus the `qdrant` and `embedding` optional
+dependency groups with CPU Torch resolution, exposes port `8000`, and starts:
 
-- `docker/backend/Dockerfile` installs default dependencies only. It does not
-  install the `qdrant` and `embedding` optional dependency groups.
-- The backend image copies `src` and `configs`, but not the processed chunks
-  file and not a model cache.
-- `docker-compose.yml` fixes `LEGAL_QA_SERVICE_MODE=fake`, defines no Qdrant
-  service or external Qdrant connection, injects no real-mode configuration,
-  and builds the frontend against localhost.
-- The Compose health check reaches liveness only.
-- The containers do not define a non-root runtime user or production resource
-  limits.
+```bash
+python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+```
 
-Do not add the legal corpus or model cache to the image casually. Prefer
-explicit, read-only artifact mounts or a controlled artifact distribution
-mechanism, with integrity/version checks and least-privilege access.
+The default Dockerfile target remains suitable for fake-mode local/container
+smoke without committing or copying `data/processed/legal_chunks.jsonl`. The
+production workflow builds target `production-with-chunks`, where
+`legal_chunks.jsonl` is downloaded into GitHub runner temporary storage,
+checksum-verified, and copied into the private production image at:
+
+```text
+/home/data/legal_chunks.jsonl
+```
+
+Do not fetch chunks during container startup. Do not commit the chunks file.
+Do not put model caches, `.env`, frontend `node_modules`, tests, notebooks, or
+protected artifacts into the production image.
+
+`docker-compose.yml` remains a fake-mode local stack. It defines no Qdrant
+service or external Qdrant connection, injects no real-mode configuration, and
+builds the frontend against localhost.
 
 ## Conversation persistence status
 
