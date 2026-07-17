@@ -179,6 +179,23 @@ loading/query embedding, Qdrant retrieval, provider generation, or response
 mapping. Do not print prompts, retrieved text, answers, headers, cookies, or
 secret values while diagnosing.
 
+Production `/ask` has internal fail-fast settings so the API can return
+controlled JSON before Azure emits `502` or `504`:
+
+```env
+LEGAL_QA_ASK_TIMEOUT_SECONDS=90
+LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60
+LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45
+LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30
+LEGAL_QA_LLM_TIMEOUT_SECONDS=30
+LEGAL_QA_MAX_TOP_K=5
+LEGAL_QA_RERANKING_ENABLED=false
+```
+
+These settings do not make real QA quality acceptable by themselves. They are
+runtime guardrails for diagnosing whether the bottleneck is model loading,
+query embedding, Qdrant retrieval, provider generation, or memory pressure.
+
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the
 default only allows `http://localhost:3000`. For Preview, add the exact Vercel

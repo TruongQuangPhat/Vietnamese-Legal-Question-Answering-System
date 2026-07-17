@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from threading import Thread, get_ident
@@ -556,6 +557,53 @@ async def test_ask_route_logs_sanitized_timing_metadata(
     assert raw_question not in caplog.text
     assert private_context not in caplog.text
     assert conversation_id not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_ask_route_returns_controlled_timeout_response(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
+    raw_question = "Câu hỏi có mã riêng tư SECRET-TIMEOUT-9911?"
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "fake",
+            "LEGAL_QA_ASK_TIMEOUT_SECONDS": "0.01",
+            "LEGAL_QA_MAX_TOP_K": "5",
+        }
+    )
+    app = create_app(settings)
+
+    async def slow_run_sync(
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        await asyncio.sleep(1)
+        return func(*args)
+
+    monkeypatch.setattr("src.api.routes.legal_qa.anyio.to_thread.run_sync", slow_run_sync)
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": raw_question, "top_k": 10},
+        )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["decision"] == "error"
+    assert body["warnings"] == ["ask_timeout"]
+    assert body["answer"] == "Yêu cầu xử lý quá lâu. Vui lòng thử lại sau."
+    record = _single_log_record_prefix(caplog, "legal_qa_request_failed")
+    assert record.failure_stage == "ask_timeout"
+    assert record.exception_class == "TimeoutError"
+    timing_records = _log_records_prefix(caplog, "legal_qa_request_timing")
+    assert any(record.stage == "request_failed" for record in timing_records)
+    assert all(record.top_k == 5 for record in timing_records)
+    assert raw_question not in caplog.text
 
 
 @pytest.mark.asyncio

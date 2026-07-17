@@ -35,6 +35,10 @@ DEFAULT_LLM_CONFIG_PATH = Path("configs/llm/openrouter.yml")
 DEFAULT_FINAL_TOP_K = 10
 DEFAULT_PROVIDER = "openrouter"
 DEFAULT_RETRIEVAL_STRATEGY = "coverage_aware_quota"
+DEFAULT_RETRIEVAL_TIMEOUT_SECONDS = 60.0
+DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
+DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
+DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
 CAUTION_ANSWER_PREFIX = (
     "Lưu ý: bằng chứng truy xuất có liên quan nhưng còn yếu hoặc cần thận trọng; "
     "câu trả lời dưới đây chỉ dựa trên các căn cứ được trích dẫn."
@@ -65,6 +69,11 @@ class LegalQARuntimeSettings:
     qdrant_api_key: str | None = field(default=None, repr=False)
     device: str | None = None
     model: str | None = None
+    retrieval_timeout_seconds: float = DEFAULT_RETRIEVAL_TIMEOUT_SECONDS
+    query_embedding_timeout_seconds: float = DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS
+    qdrant_timeout_seconds: float = DEFAULT_QDRANT_TIMEOUT_SECONDS
+    llm_timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
+    reranking_enabled: bool = False
 
     @classmethod
     def from_env(
@@ -96,6 +105,31 @@ class LegalQARuntimeSettings:
             ),
             device=_non_blank(env.get("LEGAL_QA_DEVICE")),
             model=_non_blank(env.get("LEGAL_QA_MODEL") or env.get("OPENROUTER_MODEL")),
+            retrieval_timeout_seconds=_positive_float(
+                env.get("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS"),
+                default=DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
+                name="LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS",
+            ),
+            query_embedding_timeout_seconds=_positive_float(
+                env.get("LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS"),
+                default=DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS,
+                name="LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS",
+            ),
+            qdrant_timeout_seconds=_positive_float(
+                env.get("LEGAL_QA_QDRANT_TIMEOUT_SECONDS"),
+                default=DEFAULT_QDRANT_TIMEOUT_SECONDS,
+                name="LEGAL_QA_QDRANT_TIMEOUT_SECONDS",
+            ),
+            llm_timeout_seconds=_positive_float(
+                env.get("LEGAL_QA_LLM_TIMEOUT_SECONDS"),
+                default=DEFAULT_LLM_TIMEOUT_SECONDS,
+                name="LEGAL_QA_LLM_TIMEOUT_SECONDS",
+            ),
+            reranking_enabled=_bool(
+                env.get("LEGAL_QA_RERANKING_ENABLED"),
+                default=False,
+                name="LEGAL_QA_RERANKING_ENABLED",
+            ),
         )
 
 
@@ -117,6 +151,8 @@ class RealLegalQAWorkflow:
         generation_config: RagGenerationConfig | None = None,
         selection_config: EvidenceSelectionConfig | None = None,
         runner: Callable[..., Awaitable[RagAnswerResult]] = run_naive_rag,
+        retrieval_timeout_seconds: float = DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
+        llm_timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS,
     ) -> None:
         """Initialize the real workflow adapter with injected dependencies."""
         self._retriever = retriever
@@ -128,6 +164,8 @@ class RealLegalQAWorkflow:
         )
         self._selection_config = selection_config or EvidenceSelectionConfig()
         self._runner = runner
+        self._retrieval_timeout_seconds = retrieval_timeout_seconds
+        self._llm_timeout_seconds = llm_timeout_seconds
 
     def run(self, request: LegalQAWorkflowRequest) -> LegalQAWorkflowResult:
         """Run RAG with an enriched retrieval query and original answer question.
@@ -150,12 +188,14 @@ class RealLegalQAWorkflow:
                     request_id=request.request_id,
                     timing_logger=request.timing_logger,
                     timing_started_at=request.timing_started_at,
+                    timeout_seconds=self._retrieval_timeout_seconds,
                 ),
                 llm_client=_TimedLLMClient(
                     llm_client=self._llm_client,
                     request_id=request.request_id,
                     timing_logger=request.timing_logger,
                     timing_started_at=request.timing_started_at,
+                    timeout_seconds=self._llm_timeout_seconds,
                 ),
                 collection_name=self._collection_name,
                 top_k=self._final_top_k,
@@ -183,12 +223,14 @@ class _RetrievalQuestionOverride:
         request_id: str,
         timing_logger: LegalQATimingLogger | None,
         timing_started_at: float | None,
+        timeout_seconds: float,
     ) -> None:
         self._retriever = retriever
         self._retrieval_question = retrieval_question
         self._request_id = request_id
         self._timing_logger = timing_logger
         self._timing_started_at = timing_started_at
+        self._timeout_seconds = timeout_seconds
 
     async def retrieve(
         self,
@@ -213,11 +255,27 @@ class _RetrievalQuestionOverride:
         )
         stage_started_at = time.perf_counter()
         try:
-            result = await self._retriever.retrieve(
-                query=self._retrieval_question,
-                top_k=top_k,
-                collection_name=collection_name,
+            result = await asyncio.wait_for(
+                self._retriever.retrieve(
+                    query=self._retrieval_question,
+                    top_k=top_k,
+                    collection_name=collection_name,
+                ),
+                timeout=self._timeout_seconds,
             )
+        except TimeoutError as exc:
+            _emit_workflow_timing(
+                timing_logger=self._timing_logger,
+                stage="qdrant_retrieval",
+                request_id=self._request_id,
+                stage_started_at=stage_started_at,
+                timing_started_at=self._timing_started_at,
+                exception_class="TimeoutError",
+            )
+            raise LegalQAWorkflowTimeoutError(
+                failure_stage="qdrant_retrieval",
+                timeout_seconds=self._timeout_seconds,
+            ) from exc
         except Exception as exc:
             _emit_workflow_timing(
                 timing_logger=self._timing_logger,
@@ -248,11 +306,13 @@ class _TimedLLMClient:
         request_id: str,
         timing_logger: LegalQATimingLogger | None,
         timing_started_at: float | None,
+        timeout_seconds: float,
     ) -> None:
         self._llm_client = llm_client
         self._request_id = request_id
         self._timing_logger = timing_logger
         self._timing_started_at = timing_started_at
+        self._timeout_seconds = timeout_seconds
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         _emit_workflow_timing(
@@ -264,7 +324,23 @@ class _TimedLLMClient:
         )
         stage_started_at = time.perf_counter()
         try:
-            response = await self._llm_client.generate(request)
+            response = await asyncio.wait_for(
+                self._llm_client.generate(request),
+                timeout=self._timeout_seconds,
+            )
+        except TimeoutError as exc:
+            _emit_workflow_timing(
+                timing_logger=self._timing_logger,
+                stage="llm_generation_provider_call",
+                request_id=self._request_id,
+                stage_started_at=stage_started_at,
+                timing_started_at=self._timing_started_at,
+                exception_class="TimeoutError",
+            )
+            raise LegalQAWorkflowTimeoutError(
+                failure_stage="llm_generation_provider_call",
+                timeout_seconds=self._timeout_seconds,
+            ) from exc
         except Exception as exc:
             _emit_workflow_timing(
                 timing_logger=self._timing_logger,
@@ -283,6 +359,15 @@ class _TimedLLMClient:
             timing_started_at=self._timing_started_at,
         )
         return response
+
+
+class LegalQAWorkflowTimeoutError(TimeoutError):
+    """Safe timeout marker for one real Legal QA workflow stage."""
+
+    def __init__(self, *, failure_stage: str, timeout_seconds: float) -> None:
+        self.failure_stage = failure_stage
+        self.timeout_seconds = timeout_seconds
+        super().__init__(f"{failure_stage} exceeded configured timeout")
 
 
 def _emit_workflow_timing(
@@ -370,6 +455,8 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         expected_vector_dim=retrieval_config.dense_retrieval.expected_vector_dim,
         default_top_k=fusion_config.dense_candidate_k,
         embedding_batch_size=retrieval_config.embedding.batch_size,
+        query_embedding_timeout_seconds=settings.query_embedding_timeout_seconds,
+        qdrant_timeout_seconds=settings.qdrant_timeout_seconds,
     )
     sparse_retriever = SparseBM25Retriever.from_jsonl(
         settings.chunks_path,
@@ -395,7 +482,7 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         model=provider_settings.model,
         temperature=0.0,
         max_tokens=1024,
-        timeout_s=30.0,
+        timeout_s=settings.llm_timeout_seconds,
         include_auxiliary_context=True,
         fail_on_invalid_citation=True,
     )
@@ -407,6 +494,8 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         final_top_k=fusion_config.final_top_k,
         generation_config=generation_config,
         selection_config=selection_config,
+        retrieval_timeout_seconds=settings.retrieval_timeout_seconds,
+        llm_timeout_seconds=settings.llm_timeout_seconds,
     )
 
 
@@ -580,3 +669,28 @@ def _non_blank(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _positive_float(raw_value: str | None, *, default: float, name: str) -> float:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive number") from exc
+    if parsed <= 0:
+        raise ValueError(f"{name} must be a positive number")
+    return parsed
+
+
+def _bool(raw_value: str | None, *, default: bool, name: str) -> bool:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    normalized = value.casefold()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be true or false")

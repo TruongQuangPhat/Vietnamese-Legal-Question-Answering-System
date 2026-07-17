@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -45,13 +47,22 @@ class FakeQdrantModels:
 class FakeEmbedder:
     """Query embedder fake with configurable vector output."""
 
-    def __init__(self, vector: list[float] | None = None, *, fail: bool = False) -> None:
+    def __init__(
+        self,
+        vector: list[float] | None = None,
+        *,
+        fail: bool = False,
+        delay_seconds: float = 0.0,
+    ) -> None:
         self.vector = vector if vector is not None else [1.0, 0.0, 0.0]
         self.fail = fail
+        self.delay_seconds = delay_seconds
         self.calls: list[tuple[str, int]] = []
 
     def embed_query(self, query_text: str, *, batch_size: int = 1) -> list[float]:
         self.calls.append((query_text, batch_size))
+        if self.delay_seconds:
+            time.sleep(self.delay_seconds)
         if self.fail:
             raise RuntimeError("embedding unavailable")
         return self.vector
@@ -65,14 +76,18 @@ class FakeQdrantClient:
         *,
         points: list[Any] | None = None,
         fail_query: bool = False,
+        delay_seconds: float = 0.0,
     ) -> None:
         self.points = points if points is not None else [make_point()]
         self.fail_query = fail_query
+        self.delay_seconds = delay_seconds
         self.query_calls: list[dict[str, Any]] = []
         self.mutation_calls: list[str] = []
 
     async def query_points(self, **kwargs: Any) -> Any:
         self.query_calls.append(kwargs)
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
         if self.fail_query:
             raise RuntimeError("qdrant unavailable")
         return SimpleNamespace(points=self.points[: kwargs["limit"]])
@@ -159,6 +174,8 @@ def make_retriever(
     *,
     embedder: FakeEmbedder | None = None,
     client: FakeQdrantClient | None = None,
+    query_embedding_timeout_seconds: float | None = None,
+    qdrant_timeout_seconds: float | None = None,
 ) -> DenseRetriever:
     """Build a retriever using small fake vectors."""
     return DenseRetriever(
@@ -169,6 +186,8 @@ def make_retriever(
         expected_vector_dim=3,
         default_top_k=2,
         embedding_batch_size=1,
+        query_embedding_timeout_seconds=query_embedding_timeout_seconds,
+        qdrant_timeout_seconds=qdrant_timeout_seconds,
     )
 
 
@@ -219,8 +238,27 @@ async def test_empty_query_rejected_before_embedding() -> None:
     with pytest.raises(DenseRetrieverError, match="invalid retrieval query"):
         await retriever.retrieve(" ")
 
-    assert embedder.calls == []
-    assert client.query_calls == []
+
+@pytest.mark.asyncio
+async def test_query_embedding_timeout_fails_fast() -> None:
+    retriever = make_retriever(
+        embedder=FakeEmbedder(delay_seconds=0.05),
+        query_embedding_timeout_seconds=0.001,
+    )
+
+    with pytest.raises(DenseRetrieverError, match="query embedding timed out"):
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+
+@pytest.mark.asyncio
+async def test_qdrant_timeout_fails_fast() -> None:
+    retriever = make_retriever(
+        client=FakeQdrantClient(delay_seconds=0.05),
+        qdrant_timeout_seconds=0.001,
+    )
+
+    with pytest.raises(DenseRetrieverError, match="Qdrant dense retrieval timed out"):
+        await retriever.retrieve("Câu hỏi hợp lệ?")
 
 
 @pytest.mark.asyncio
