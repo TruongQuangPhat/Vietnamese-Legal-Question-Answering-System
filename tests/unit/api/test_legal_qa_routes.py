@@ -21,6 +21,7 @@ from src.api.schemas import (
     ResponseMetadataDTO,
 )
 from src.api.settings import AppSettings
+from src.retrieval.dense_retriever import QueryEmbeddingTimeoutError
 from src.services.legal_qa_api_service import (
     LegalQAService,
     LegalQAWorkflowCitation,
@@ -604,6 +605,87 @@ async def test_ask_route_returns_controlled_timeout_response(
     assert any(record.stage == "request_failed" for record in timing_records)
     assert all(record.top_k == 5 for record in timing_records)
     assert raw_question not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_ask_route_returns_precise_query_embedding_timeout_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
+    app = create_app(
+        AppSettings.from_env(
+            {
+                "LEGAL_QA_SERVICE_MODE": "fake",
+                "LEGAL_QA_ASK_TIMEOUT_SECONDS": "10",
+            }
+        )
+    )
+
+    class QueryEmbeddingTimeoutWorkflow:
+        def run(self, request: LegalQAWorkflowRequest) -> None:
+            raise QueryEmbeddingTimeoutError(timeout_seconds=0.001)
+
+    async def get_timeout_service() -> LegalQAService:
+        return LegalQAService(workflow=QueryEmbeddingTimeoutWorkflow())
+
+    app.dependency_overrides[get_legal_qa_service] = get_timeout_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Câu hỏi riêng tư SECRET-EMBEDDING-TIMEOUT?"},
+        )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["decision"] == "error"
+    assert body["warnings"] == ["query_embedding_timeout"]
+    assert body["answer"] == "Yêu cầu xử lý quá lâu. Vui lòng thử lại sau."
+    assert "SECRET-EMBEDDING-TIMEOUT" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_warmup_endpoint_is_disabled_by_default() -> None:
+    app = create_app()
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/legal-qa/warmup")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_warmup_endpoint_returns_sanitized_status_when_enabled() -> None:
+    app = create_app(
+        AppSettings.from_env(
+            {
+                "LEGAL_QA_SERVICE_MODE": "fake",
+                "LEGAL_QA_WARMUP_ENDPOINT_ENABLED": "true",
+            }
+        )
+    )
+
+    class WarmableService:
+        def warmup_embedding(self):
+            return type(
+                "WarmupResult",
+                (),
+                {"warmed": True, "elapsed_ms": 7, "exception_class": None},
+            )()
+
+    async def get_warmable_service() -> WarmableService:
+        return WarmableService()
+
+    app.dependency_overrides[get_legal_qa_service] = get_warmable_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/legal-qa/warmup")
+
+    assert response.status_code == 200
+    assert response.json() == {"warmed": True, "elapsed_ms": 7, "exception_class": None}
 
 
 @pytest.mark.asyncio

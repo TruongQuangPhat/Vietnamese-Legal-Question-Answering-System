@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
+from src.retrieval.dense_retriever import DenseRetrieverError
 from src.retrieval.fusion import (
     DiversitySelectionConfig,
     QuotaSelectionConfig,
     reciprocal_rank_fusion,
 )
-from src.retrieval.models import RetrievalResult
+from src.retrieval.models import RetrievalIssue, RetrievalIssueSeverity, RetrievalResult
+from src.retrieval.timing import emit_retrieval_timing, safe_exception_class
 
 FusionMode = Literal["weighted_rrf", "quota", "diversity"]
 
@@ -113,6 +116,9 @@ class CoverageAwareQuotaRetriever:
         config: CoverageAwareFusionConfig,
         collection_name: str,
         vector_name: str,
+        dense_fallback_enabled: bool = False,
+        dense_fallback_mode: Literal["sparse"] = "sparse",
+        dense_fallback_timeout_seconds: float = 10.0,
     ) -> None:
         """Initialize the fixed retrieval strategy.
 
@@ -136,6 +142,9 @@ class CoverageAwareQuotaRetriever:
         self._config = config
         self._collection_name = collection_name
         self._vector_name = vector_name
+        self._dense_fallback_enabled = dense_fallback_enabled
+        self._dense_fallback_mode = dense_fallback_mode
+        self._dense_fallback_timeout_seconds = dense_fallback_timeout_seconds
 
     async def retrieve(
         self,
@@ -154,10 +163,29 @@ class CoverageAwareQuotaRetriever:
             raise CoverageAwareRetrievalError("collection override does not match config")
 
         started = time.perf_counter()
-        dense_result = await self._dense_retriever.retrieve(
-            query,
-            top_k=self._config.dense_candidate_k,
-        )
+        dense_result: RetrievalResult | None = None
+        dense_issue: RetrievalIssue | None = None
+        try:
+            dense_result = await self._dense_retriever.retrieve(
+                query,
+                top_k=self._config.dense_candidate_k,
+            )
+        except DenseRetrieverError as exc:
+            if not self._dense_fallback_enabled:
+                raise
+            dense_issue = _dense_fallback_issue(exc)
+            emit_retrieval_timing(
+                stage="dense_retriever_failed",
+                stage_started_at=started,
+                exception_class=exc.cause_class or safe_exception_class(exc),
+                fallback_used=True,
+                top_k=self._config.dense_candidate_k,
+            )
+            return await self._fallback_sparse_result(
+                query=query,
+                started=started,
+                dense_issue=dense_issue,
+            )
         sparse_result = await self._sparse_retriever.retrieve(
             query,
             top_k=self._config.sparse_candidate_k,
@@ -181,6 +209,87 @@ class CoverageAwareQuotaRetriever:
             results=fused,
             issues=[*dense_result.issues, *sparse_result.issues],
         )
+
+    async def _fallback_sparse_result(
+        self,
+        *,
+        query: str,
+        started: float,
+        dense_issue: RetrievalIssue | None,
+    ) -> RetrievalResult:
+        if self._dense_fallback_mode != "sparse":
+            raise CoverageAwareRetrievalError("unsupported dense retrieval fallback mode")
+        fallback_started = time.perf_counter()
+        emit_retrieval_timing(
+            stage="dense_retrieval_fallback_started",
+            timeout_seconds=self._dense_fallback_timeout_seconds,
+            fallback_used=True,
+            top_k=self._config.final_top_k,
+        )
+        try:
+            bounded_sparse_result = await asyncio.wait_for(
+                self._sparse_retriever.retrieve(query, top_k=self._config.final_top_k),
+                timeout=self._dense_fallback_timeout_seconds,
+            )
+        except TimeoutError:
+            emit_retrieval_timing(
+                stage="dense_retrieval_fallback_timeout",
+                stage_started_at=fallback_started,
+                exception_class="TimeoutError",
+                timeout_seconds=self._dense_fallback_timeout_seconds,
+                fallback_used=True,
+                top_k=self._config.final_top_k,
+            )
+            raise CoverageAwareRetrievalError("sparse fallback timed out") from None
+        except Exception as exc:
+            emit_retrieval_timing(
+                stage="dense_retriever_failed",
+                stage_started_at=fallback_started,
+                exception_class=safe_exception_class(exc),
+                timeout_seconds=self._dense_fallback_timeout_seconds,
+                fallback_used=True,
+                top_k=self._config.final_top_k,
+            )
+            raise CoverageAwareRetrievalError("sparse fallback failed") from exc
+        emit_retrieval_timing(
+            stage="dense_retriever_completed",
+            stage_started_at=started,
+            fallback_used=True,
+            top_k=self._config.final_top_k,
+        )
+        issues = list(bounded_sparse_result.issues)
+        if dense_issue is not None:
+            issues.insert(0, dense_issue)
+        return RetrievalResult(
+            query=query,
+            collection_name=self._collection_name,
+            vector_name="sparse_bm25_fallback",
+            top_k=self._config.final_top_k,
+            elapsed_ms=(time.perf_counter() - started) * 1000,
+            query_vector_dimension=0,
+            results=bounded_sparse_result.results[: self._config.final_top_k],
+            issues=issues,
+        )
+
+    async def warmup_embedding(self) -> None:
+        """Warm only the dense embedding dependency, without retrieval or LLM calls."""
+        warmup = getattr(self._dense_retriever, "warmup_embedding", None)
+        if warmup is None or not callable(warmup):
+            return
+        await warmup()
+
+
+def _dense_fallback_issue(exc: DenseRetrieverError) -> RetrievalIssue:
+    return RetrievalIssue(
+        code=exc.warning_code,
+        severity=RetrievalIssueSeverity.WARNING,
+        message="dense retrieval failed and sparse fallback was attempted",
+        details={
+            "failure_stage": exc.failure_stage,
+            "exception_class": exc.cause_class or type(exc).__name__,
+            "fallback_used": True,
+        },
+    )
 
 
 def coverage_aware_config_from_payload(payload: dict[str, Any]) -> CoverageAwareFusionConfig:

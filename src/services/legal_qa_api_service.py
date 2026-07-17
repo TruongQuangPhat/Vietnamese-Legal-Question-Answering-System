@@ -130,6 +130,15 @@ class LegalQAWorkflow(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class LegalQAWarmupResult:
+    """Sanitized warmup result for explicit embedding initialization."""
+
+    warmed: bool
+    elapsed_ms: int
+    exception_class: str | None = None
+
+
 class LegalQAServiceError(RuntimeError):
     """Sanitized internal service failure with safe diagnostic metadata."""
 
@@ -353,6 +362,30 @@ class LegalQAService:
                 original_exception=exc,
                 request_id=request_id,
             ) from exc
+
+    def warmup_embedding(self) -> LegalQAWarmupResult:
+        """Warm the embedding dependency when the workflow supports it.
+
+        Returns:
+            Sanitized warmup status. This method does not expose prompt text,
+            retrieved evidence, generated answers, secrets, or raw exception text.
+        """
+        started_at = perf_counter()
+        warmup = getattr(self._workflow, "warmup_embedding", None)
+        if warmup is None or not callable(warmup):
+            return LegalQAWarmupResult(warmed=False, elapsed_ms=0)
+        try:
+            warmup()
+        except Exception as exc:
+            return LegalQAWarmupResult(
+                warmed=False,
+                elapsed_ms=int((perf_counter() - started_at) * 1000),
+                exception_class=_root_exception_class(exc),
+            )
+        return LegalQAWarmupResult(
+            warmed=True,
+            elapsed_ms=int((perf_counter() - started_at) * 1000),
+        )
 
 
 def map_workflow_result_to_response(

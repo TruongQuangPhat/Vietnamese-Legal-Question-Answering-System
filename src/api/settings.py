@@ -31,6 +31,12 @@ DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
 DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_TOP_K = 10
+DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED = True
+DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE = "sparse"
+DEFAULT_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS = 10.0
+DEFAULT_EMBEDDING_WARMUP_ENABLED = False
+DEFAULT_WARMUP_ENDPOINT_ENABLED = False
+DEFAULT_WARMUP_TIMEOUT_SECONDS = 60.0
 MIN_SESSION_SECRET_LENGTH = 16
 WEAK_SESSION_SECRET_PLACEHOLDERS = {
     "changeme",
@@ -103,6 +109,15 @@ class AppSettings(BaseSettings):
     legal_qa_llm_timeout_seconds: float = Field(DEFAULT_LLM_TIMEOUT_SECONDS, gt=0.0)
     legal_qa_max_top_k: int = Field(DEFAULT_MAX_TOP_K, gt=0)
     legal_qa_reranking_enabled: bool = False
+    legal_qa_dense_retrieval_fallback_enabled: bool = DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED
+    legal_qa_dense_retrieval_fallback_mode: str = DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE
+    legal_qa_dense_retrieval_fallback_timeout_seconds: float = Field(
+        DEFAULT_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS,
+        gt=0.0,
+    )
+    legal_qa_embedding_warmup_enabled: bool = DEFAULT_EMBEDDING_WARMUP_ENABLED
+    legal_qa_warmup_endpoint_enabled: bool = DEFAULT_WARMUP_ENDPOINT_ENABLED
+    legal_qa_warmup_timeout_seconds: float = Field(DEFAULT_WARMUP_TIMEOUT_SECONDS, gt=0.0)
 
     @classmethod
     def from_env(
@@ -220,6 +235,34 @@ class AppSettings(BaseSettings):
                 default=False,
                 name="LEGAL_QA_RERANKING_ENABLED",
             ),
+            legal_qa_dense_retrieval_fallback_enabled=_parse_bool(
+                env.get("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_ENABLED"),
+                default=DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED,
+                name="LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_ENABLED",
+            ),
+            legal_qa_dense_retrieval_fallback_mode=_fallback_mode(
+                env.get("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_MODE")
+            ),
+            legal_qa_dense_retrieval_fallback_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS"),
+                default=DEFAULT_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS,
+                name="LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS",
+            ),
+            legal_qa_embedding_warmup_enabled=_parse_bool(
+                env.get("LEGAL_QA_EMBEDDING_WARMUP_ENABLED"),
+                default=DEFAULT_EMBEDDING_WARMUP_ENABLED,
+                name="LEGAL_QA_EMBEDDING_WARMUP_ENABLED",
+            ),
+            legal_qa_warmup_endpoint_enabled=_parse_bool(
+                env.get("LEGAL_QA_WARMUP_ENDPOINT_ENABLED"),
+                default=DEFAULT_WARMUP_ENDPOINT_ENABLED,
+                name="LEGAL_QA_WARMUP_ENDPOINT_ENABLED",
+            ),
+            legal_qa_warmup_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_WARMUP_TIMEOUT_SECONDS"),
+                default=DEFAULT_WARMUP_TIMEOUT_SECONDS,
+                name="LEGAL_QA_WARMUP_TIMEOUT_SECONDS",
+            ),
         )
 
     def auth_configuration_issues(self) -> tuple[str, ...]:
@@ -327,6 +370,11 @@ class AppSettings(BaseSettings):
             qdrant_timeout_seconds=self.legal_qa_qdrant_timeout_seconds,
             llm_timeout_seconds=self.legal_qa_llm_timeout_seconds,
             reranking_enabled=self.legal_qa_reranking_enabled,
+            dense_retrieval_fallback_enabled=self.legal_qa_dense_retrieval_fallback_enabled,
+            dense_retrieval_fallback_mode=self.legal_qa_dense_retrieval_fallback_mode,
+            dense_retrieval_fallback_timeout_seconds=(
+                self.legal_qa_dense_retrieval_fallback_timeout_seconds
+            ),
         )
 
 
@@ -376,6 +424,15 @@ def _conversation_store_mode(raw_value: str | None) -> ConversationStoreMode:
     except ValueError as exc:
         allowed = ", ".join(item.value for item in ConversationStoreMode)
         raise ValueError(f"LEGAL_QA_CONVERSATION_STORE must be one of: {allowed}") from exc
+
+
+def _fallback_mode(raw_value: str | None) -> str:
+    value = _non_blank(raw_value)
+    if value is None:
+        return DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE
+    if value != "sparse":
+        raise ValueError("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_MODE must be sparse")
+    return value
 
 
 def _session_header(raw_value: str | None) -> str:

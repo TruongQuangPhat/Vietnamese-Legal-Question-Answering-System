@@ -9,7 +9,7 @@ from time import perf_counter
 from typing import Any
 
 import anyio
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from src.api.dependencies import get_legal_qa_service
 from src.api.rate_limit import enforce_ask_rate_limit
@@ -148,13 +148,17 @@ async def ask_legal_question(
             exception_class=exception_class,
             failure_stage=failure_stage,
         )
+        warning = _warning_for_failure(
+            exception_class=exception_class,
+            failure_stage=failure_stage,
+        )
         return LegalQAResponse(
             request_id=request_id,
             decision=LegalQADecision.ERROR,
             answer=SAFE_TIMEOUT_ANSWER if timeout_failure else SAFE_ERROR_ANSWER,
             citations=[],
             evidence=[],
-            warnings=["ask_timeout"] if timeout_failure else ["internal_error"],
+            warnings=[warning],
             metadata=ResponseMetadataDTO(
                 retrieval_strategy="coverage_aware_quota",
                 model=None,
@@ -162,6 +166,36 @@ async def ask_legal_question(
                 latency_ms=latency_ms,
             ),
         )
+
+
+@router.get("/warmup")
+async def warmup_legal_qa(
+    http_request: Request,
+    service: LegalQAService = Depends(get_legal_qa_service),
+) -> dict[str, object]:
+    """Explicitly warm the embedding model without running retrieval or generation."""
+    settings = _request_settings(http_request)
+    if not settings.legal_qa_warmup_endpoint_enabled:
+        raise HTTPException(status_code=404, detail="not_found")
+    started_at = perf_counter()
+    try:
+        with anyio.fail_after(settings.legal_qa_warmup_timeout_seconds):
+            result = await anyio.to_thread.run_sync(
+                service.warmup_embedding,
+                abandon_on_cancel=True,
+            )
+    except TimeoutError:
+        elapsed_ms = int((perf_counter() - started_at) * 1000)
+        return {
+            "warmed": False,
+            "elapsed_ms": elapsed_ms,
+            "exception_class": "TimeoutError",
+        }
+    return {
+        "warmed": result.warmed,
+        "elapsed_ms": result.elapsed_ms,
+        "exception_class": result.exception_class,
+    }
 
 
 def _answer_with_optional_timing(
@@ -191,6 +225,28 @@ def _is_timeout_failure(*, exception_class: str, failure_stage: str) -> bool:
     return exception_class.endswith("TimeoutError") or failure_stage.endswith("_timeout")
 
 
+def _warning_for_failure(*, exception_class: str, failure_stage: str) -> str:
+    if failure_stage in {
+        "embedding_model_load_timeout",
+        "query_embedding_timeout",
+        "qdrant_retrieval_timeout",
+        "retrieval_timeout",
+        "llm_generation_provider_call",
+        "ask_timeout",
+    }:
+        return failure_stage
+    if failure_stage in {
+        "embedding_model_load_error",
+        "query_embedding_error",
+        "qdrant_retrieval_error",
+        "dense_retriever_error",
+    }:
+        return failure_stage
+    if exception_class.endswith("TimeoutError"):
+        return "ask_timeout"
+    return "internal_error"
+
+
 def _build_timing_logger(request: LegalQARequest) -> LegalQATimingLogger:
     def log_timing(
         stage: str,
@@ -198,6 +254,7 @@ def _build_timing_logger(request: LegalQARequest) -> LegalQATimingLogger:
         elapsed_ms: int,
         total_elapsed_ms: int,
         exception_class: str | None,
+        **metadata: Any,
     ) -> None:
         _log_request_timing(
             request=request,
@@ -206,6 +263,9 @@ def _build_timing_logger(request: LegalQARequest) -> LegalQATimingLogger:
             elapsed_ms=elapsed_ms,
             total_elapsed_ms=total_elapsed_ms,
             exception_class=exception_class,
+            timeout_seconds=_safe_optional_float(metadata.get("timeout_seconds")),
+            fallback_used=bool(metadata.get("fallback_used", False)),
+            top_k_override=_safe_optional_int(metadata.get("top_k")),
         )
 
     return log_timing
@@ -260,6 +320,9 @@ def _log_request_timing(
     elapsed_ms: int,
     total_elapsed_ms: int,
     exception_class: str | None = None,
+    timeout_seconds: float | None = None,
+    fallback_used: bool = False,
+    top_k_override: int | None = None,
 ) -> None:
     payload = {
         "event": "legal_qa_request_timing",
@@ -269,12 +332,14 @@ def _log_request_timing(
         "elapsed_ms": elapsed_ms,
         "total_elapsed_ms": total_elapsed_ms,
         "exception_class": exception_class,
-        "top_k": request.top_k,
+        "top_k": request.top_k if top_k_override is None else top_k_override,
         "include_evidence": request.include_evidence,
         "include_debug": request.include_debug,
         "has_conversation_id": request.conversation_id is not None,
         "context_message_count": len(request.conversation_context),
         "service_mode": _safe_service_mode(),
+        "timeout_seconds": timeout_seconds,
+        "fallback_used": fallback_used,
     }
     logger.info(
         "legal_qa_request_timing stage=%s",
@@ -289,3 +354,15 @@ def _safe_service_mode() -> str:
     if raw_mode in {"fake", "real"}:
         return raw_mode
     return "unknown"
+
+
+def _safe_optional_float(value: Any) -> float | None:
+    if isinstance(value, int | float):
+        return float(value)
+    return None
+
+
+def _safe_optional_int(value: Any) -> int | None:
+    if isinstance(value, int) and value > 0:
+        return value
+    return None

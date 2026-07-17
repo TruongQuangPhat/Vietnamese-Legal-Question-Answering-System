@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
 from src.retrieval.coverage_aware import CoverageAwareFusionConfig
 from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, RagGenerationConfig
@@ -16,6 +17,7 @@ from src.retrieval.llm_client import LLMClientProtocol, LLMRequest, LLMResponse
 from src.retrieval.models import RetrievalResult
 from src.retrieval.rag_pipeline import RagRetrieverProtocol, run_naive_rag
 from src.retrieval.selection import AnswerabilityDecision, EvidenceSelectionConfig
+from src.retrieval.timing import RetrievalTimingContext, retrieval_timing_context
 from src.services.legal_qa_api_service import (
     FakeLegalQAWorkflow,
     LegalQAService,
@@ -39,6 +41,9 @@ DEFAULT_RETRIEVAL_TIMEOUT_SECONDS = 60.0
 DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
 DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
+DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED = True
+DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE = "sparse"
+DEFAULT_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS = 10.0
 CAUTION_ANSWER_PREFIX = (
     "Lưu ý: bằng chứng truy xuất có liên quan nhưng còn yếu hoặc cần thận trọng; "
     "câu trả lời dưới đây chỉ dựa trên các căn cứ được trích dẫn."
@@ -74,6 +79,11 @@ class LegalQARuntimeSettings:
     qdrant_timeout_seconds: float = DEFAULT_QDRANT_TIMEOUT_SECONDS
     llm_timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
     reranking_enabled: bool = False
+    dense_retrieval_fallback_enabled: bool = DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED
+    dense_retrieval_fallback_mode: Literal["sparse"] = DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE
+    dense_retrieval_fallback_timeout_seconds: float = (
+        DEFAULT_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS
+    )
 
     @classmethod
     def from_env(
@@ -129,6 +139,19 @@ class LegalQARuntimeSettings:
                 env.get("LEGAL_QA_RERANKING_ENABLED"),
                 default=False,
                 name="LEGAL_QA_RERANKING_ENABLED",
+            ),
+            dense_retrieval_fallback_enabled=_bool(
+                env.get("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_ENABLED"),
+                default=DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED,
+                name="LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_ENABLED",
+            ),
+            dense_retrieval_fallback_mode=_fallback_mode(
+                env.get("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_MODE")
+            ),
+            dense_retrieval_fallback_timeout_seconds=_positive_float(
+                env.get("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS"),
+                default=DEFAULT_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS,
+                name="LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS",
             ),
         )
 
@@ -211,6 +234,13 @@ class RealLegalQAWorkflow:
             latency_ms=latency_ms,
         )
 
+    def warmup_embedding(self) -> None:
+        """Initialize the dense embedding dependency without retrieval or generation."""
+        warmup = getattr(self._retriever, "warmup_embedding", None)
+        if warmup is None or not callable(warmup):
+            return
+        _run_async(warmup())
+
 
 class _RetrievalQuestionOverride:
     """Use a prepared query only at the retriever boundary."""
@@ -239,60 +269,60 @@ class _RetrievalQuestionOverride:
         top_k: int | None = None,
         collection_name: str | None = None,
     ) -> RetrievalResult:
-        _emit_workflow_timing(
-            timing_logger=self._timing_logger,
-            stage="embedding_model_initialization_or_loading",
-            request_id=self._request_id,
-            stage_started_at=None,
-            timing_started_at=self._timing_started_at,
-        )
-        _emit_workflow_timing(
-            timing_logger=self._timing_logger,
-            stage="query_embedding",
-            request_id=self._request_id,
-            stage_started_at=None,
-            timing_started_at=self._timing_started_at,
-        )
         stage_started_at = time.perf_counter()
         try:
-            result = await asyncio.wait_for(
-                self._retriever.retrieve(
-                    query=self._retrieval_question,
-                    top_k=top_k,
-                    collection_name=collection_name,
-                ),
-                timeout=self._timeout_seconds,
+            context = (
+                RetrievalTimingContext(
+                    logger=self._timing_logger,
+                    request_id=self._request_id,
+                    timing_started_at=self._timing_started_at,
+                )
+                if self._timing_logger is not None and self._timing_started_at is not None
+                else None
             )
+            with retrieval_timing_context(context):
+                result = await asyncio.wait_for(
+                    self._retriever.retrieve(
+                        query=self._retrieval_question,
+                        top_k=top_k,
+                        collection_name=collection_name,
+                    ),
+                    timeout=self._timeout_seconds,
+                )
         except TimeoutError as exc:
+            precise_stage = _safe_failure_stage(exc, default="")
+            if precise_stage:
+                _emit_workflow_timing(
+                    timing_logger=self._timing_logger,
+                    stage=precise_stage,
+                    request_id=self._request_id,
+                    stage_started_at=stage_started_at,
+                    timing_started_at=self._timing_started_at,
+                    exception_class=type(exc).__name__,
+                )
+                raise
             _emit_workflow_timing(
                 timing_logger=self._timing_logger,
-                stage="qdrant_retrieval",
+                stage="retrieval_timeout",
                 request_id=self._request_id,
                 stage_started_at=stage_started_at,
                 timing_started_at=self._timing_started_at,
                 exception_class="TimeoutError",
             )
             raise LegalQAWorkflowTimeoutError(
-                failure_stage="qdrant_retrieval",
+                failure_stage="retrieval_timeout",
                 timeout_seconds=self._timeout_seconds,
             ) from exc
         except Exception as exc:
             _emit_workflow_timing(
                 timing_logger=self._timing_logger,
-                stage="qdrant_retrieval",
+                stage=_safe_failure_stage(exc, default="retrieval_failed"),
                 request_id=self._request_id,
                 stage_started_at=stage_started_at,
                 timing_started_at=self._timing_started_at,
                 exception_class=type(exc).__name__,
             )
             raise
-        _emit_workflow_timing(
-            timing_logger=self._timing_logger,
-            stage="qdrant_retrieval",
-            request_id=self._request_id,
-            stage_started_at=stage_started_at,
-            timing_started_at=self._timing_started_at,
-        )
         return result
 
 
@@ -468,6 +498,9 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         config=fusion_config,
         collection_name=collection_name,
         vector_name=retrieval_config.dense_retrieval.vector_name,
+        dense_fallback_enabled=settings.dense_retrieval_fallback_enabled,
+        dense_fallback_mode=settings.dense_retrieval_fallback_mode,
+        dense_fallback_timeout_seconds=settings.dense_retrieval_fallback_timeout_seconds,
     )
     provider_settings = resolve_openrouter_settings(
         cli_model=settings.model,
@@ -515,6 +548,7 @@ def map_rag_answer_to_workflow_result(
     warnings = [
         *result.fallback_reasons,
         *result.selection_warnings,
+        *_retrieval_warning_codes(result),
         *[issue.code for issue in result.citation_issues],
         *result.errors,
     ]
@@ -617,6 +651,13 @@ def _missing_answer_metadata(result: RagAnswerResult) -> list[str]:
     return list(dict.fromkeys(missing))
 
 
+def _retrieval_warning_codes(result: RagAnswerResult) -> list[str]:
+    codes = result.retrieval_metadata.get("retrieval_issue_codes")
+    if not isinstance(codes, list):
+        return []
+    return [str(code) for code in codes if isinstance(code, str) and code.strip()]
+
+
 def _answer_with_optional_caution(result: RagAnswerResult) -> str:
     if result.decision != AnswerabilityDecision.ANSWER_WITH_CAUTION_ALLOWED:
         return result.answer
@@ -664,6 +705,13 @@ def _service_mode(raw_value: str | None) -> LegalQAServiceMode:
         raise ValueError(f"LEGAL_QA_SERVICE_MODE must be one of: {allowed}") from exc
 
 
+def _safe_failure_stage(exc: BaseException, *, default: str) -> str:
+    stage = getattr(exc, "failure_stage", None)
+    if isinstance(stage, str) and stage.replace("_", "").isalnum():
+        return stage
+    return default
+
+
 def _non_blank(value: str | None) -> str | None:
     if value is None:
         return None
@@ -694,3 +742,12 @@ def _bool(raw_value: str | None, *, default: bool, name: str) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"{name} must be true or false")
+
+
+def _fallback_mode(raw_value: str | None) -> Literal["sparse"]:
+    value = _non_blank(raw_value)
+    if value is None:
+        return DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE
+    if value != "sparse":
+        raise ValueError("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_MODE must be sparse")
+    return value

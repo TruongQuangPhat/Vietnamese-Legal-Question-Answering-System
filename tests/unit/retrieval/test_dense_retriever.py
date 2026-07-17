@@ -10,8 +10,15 @@ from typing import Any
 
 import pytest
 
-from src.retrieval.dense_retriever import DenseRetriever, DenseRetrieverError
+from src.retrieval.dense_retriever import (
+    DenseRetriever,
+    DenseRetrieverError,
+    QdrantRetrievalTimeoutError,
+    QueryEmbeddingError,
+    QueryEmbeddingTimeoutError,
+)
 from src.retrieval.models import RetrievalFilters, RetrievalQuery
+from src.retrieval.timing import RetrievalTimingContext, retrieval_timing_context
 
 
 class FakeMatchValue:
@@ -241,13 +248,19 @@ async def test_empty_query_rejected_before_embedding() -> None:
 
 @pytest.mark.asyncio
 async def test_query_embedding_timeout_fails_fast() -> None:
+    client = FakeQdrantClient()
     retriever = make_retriever(
         embedder=FakeEmbedder(delay_seconds=0.05),
+        client=client,
         query_embedding_timeout_seconds=0.001,
     )
 
-    with pytest.raises(DenseRetrieverError, match="query embedding timed out"):
+    with pytest.raises(QueryEmbeddingTimeoutError, match="query embedding timed out") as error:
         await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert error.value.failure_stage == "query_embedding_timeout"
+    assert error.value.warning_code == "query_embedding_timeout"
+    assert client.query_calls == []
 
 
 @pytest.mark.asyncio
@@ -257,7 +270,7 @@ async def test_qdrant_timeout_fails_fast() -> None:
         qdrant_timeout_seconds=0.001,
     )
 
-    with pytest.raises(DenseRetrieverError, match="Qdrant dense retrieval timed out"):
+    with pytest.raises(QdrantRetrievalTimeoutError, match="Qdrant dense retrieval timed out"):
         await retriever.retrieve("Câu hỏi hợp lệ?")
 
 
@@ -303,8 +316,10 @@ async def test_embedding_failure_is_reported() -> None:
     """Embedding failures become retrieval errors."""
     retriever = make_retriever(embedder=FakeEmbedder(fail=True))
 
-    with pytest.raises(DenseRetrieverError, match="query embedding failed"):
+    with pytest.raises(QueryEmbeddingError, match="query embedding failed") as error:
         await retriever.retrieve("test")
+
+    assert error.value.failure_stage == "query_embedding_error"
 
 
 @pytest.mark.asyncio
@@ -365,3 +380,50 @@ async def test_invalid_score_fails_mapping() -> None:
 
     with pytest.raises(DenseRetrieverError, match="invalid score"):
         await retriever.retrieve("test")
+
+
+@pytest.mark.asyncio
+async def test_dense_retriever_timing_logs_do_not_include_raw_query() -> None:
+    """Request-scoped dense timing records only sanitized stage metadata."""
+    events: list[dict[str, Any]] = []
+
+    def timing_logger(
+        stage: str,
+        request_id: str | None,
+        elapsed_ms: int,
+        total_elapsed_ms: int,
+        exception_class: str | None,
+        **metadata: Any,
+    ) -> None:
+        events.append(
+            {
+                "stage": stage,
+                "request_id": request_id,
+                "elapsed_ms": elapsed_ms,
+                "total_elapsed_ms": total_elapsed_ms,
+                "exception_class": exception_class,
+                **metadata,
+            }
+        )
+
+    raw_query = "Câu hỏi có mã riêng tư SECRET-DENSE-123?"
+    retriever = make_retriever()
+    context = RetrievalTimingContext(
+        logger=timing_logger,
+        request_id="request-1",
+        timing_started_at=time.perf_counter(),
+    )
+
+    with retrieval_timing_context(context):
+        await retriever.retrieve(raw_query)
+
+    stages = {event["stage"] for event in events}
+    assert {
+        "dense_retriever_started",
+        "query_embedding_started",
+        "query_embedding_completed",
+        "qdrant_retrieval_started",
+        "qdrant_retrieval_completed",
+        "dense_retriever_completed",
+    }.issubset(stages)
+    assert raw_query not in repr(events)

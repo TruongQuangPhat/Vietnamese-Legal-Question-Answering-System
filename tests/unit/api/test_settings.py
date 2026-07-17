@@ -126,6 +126,12 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
             "LEGAL_QA_LLM_TIMEOUT_SECONDS": "20",
             "LEGAL_QA_MAX_TOP_K": "5",
             "LEGAL_QA_RERANKING_ENABLED": "false",
+            "LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_ENABLED": "true",
+            "LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_MODE": "sparse",
+            "LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS": "8",
+            "LEGAL_QA_EMBEDDING_WARMUP_ENABLED": "false",
+            "LEGAL_QA_WARMUP_ENDPOINT_ENABLED": "true",
+            "LEGAL_QA_WARMUP_TIMEOUT_SECONDS": "55",
         }
     )
 
@@ -136,6 +142,12 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
     assert settings.legal_qa_llm_timeout_seconds == 20.0
     assert settings.legal_qa_max_top_k == 5
     assert settings.legal_qa_reranking_enabled is False
+    assert settings.legal_qa_dense_retrieval_fallback_enabled is True
+    assert settings.legal_qa_dense_retrieval_fallback_mode == "sparse"
+    assert settings.legal_qa_dense_retrieval_fallback_timeout_seconds == 8.0
+    assert settings.legal_qa_embedding_warmup_enabled is False
+    assert settings.legal_qa_warmup_endpoint_enabled is True
+    assert settings.legal_qa_warmup_timeout_seconds == 55.0
 
 
 def test_settings_rate_limit_blank_values_use_defaults() -> None:
@@ -190,6 +202,12 @@ def test_settings_reject_invalid_rate_limit_configuration(
         ("LEGAL_QA_QDRANT_TIMEOUT_SECONDS", "0"),
         ("LEGAL_QA_LLM_TIMEOUT_SECONDS", "-2"),
         ("LEGAL_QA_RERANKING_ENABLED", "maybe"),
+        ("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_ENABLED", "maybe"),
+        ("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_MODE", "dense"),
+        ("LEGAL_QA_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS", "0"),
+        ("LEGAL_QA_EMBEDDING_WARMUP_ENABLED", "maybe"),
+        ("LEGAL_QA_WARMUP_ENDPOINT_ENABLED", "maybe"),
+        ("LEGAL_QA_WARMUP_TIMEOUT_SECONDS", "-1"),
     ],
 )
 def test_settings_reject_invalid_ask_runtime_safety_configuration(

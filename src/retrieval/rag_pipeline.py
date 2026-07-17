@@ -71,6 +71,9 @@ async def run_naive_rag(
         "elapsed_ms": retrieval_result.elapsed_ms,
         "query_vector_dimension": retrieval_result.query_vector_dimension,
         "issue_count": len(retrieval_result.issues),
+        "retrieval_issue_codes": list(
+            dict.fromkeys(issue.code for issue in retrieval_result.issues)
+        ),
     }
     evidence_bundle = build_evidence_bundle(retrieval_result, evidence_config)
     selection_result = select_evidence_for_answer(

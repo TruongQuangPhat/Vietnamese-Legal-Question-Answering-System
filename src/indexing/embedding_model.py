@@ -86,6 +86,15 @@ class BgeM3EmbeddingModel:
         """Return the resolved device after model loading, if known."""
         return self._device_effective
 
+    @property
+    def is_loaded(self) -> bool:
+        """Return whether the heavy encoder has already been constructed."""
+        return self._encoder is not None
+
+    def ensure_loaded(self) -> None:
+        """Load the heavy encoder without embedding user text."""
+        self._get_encoder()
+
     def embed_dense(
         self,
         inputs: Sequence[EmbeddingInput],
