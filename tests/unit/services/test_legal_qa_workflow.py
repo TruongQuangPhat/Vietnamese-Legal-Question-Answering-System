@@ -157,9 +157,6 @@ def test_real_workflow_adapter_emits_sanitized_timing_stages() -> None:
 
     stages = [event[0] for event in events]
     assert response.decision == "answered"
-    assert "embedding_model_initialization_or_loading" in stages
-    assert "query_embedding" in stages
-    assert "qdrant_retrieval" in stages
     assert "llm_generation_provider_call" in stages
     assert {event[1] for event in events} == {"request-1"}
     assert all(isinstance(event[2], int) for event in events)
@@ -193,10 +190,10 @@ def test_real_workflow_timeout_reports_safe_failure_stage() -> None:
             timing_logger=timing_logger,
         )
 
-    assert error.value.failure_stage == "qdrant_retrieval"
+    assert error.value.failure_stage == "retrieval_timeout"
     assert error.value.exception_class == "LegalQAWorkflowTimeoutError"
     assert any(
-        stage == "qdrant_retrieval" and exception_class == "TimeoutError"
+        stage == "retrieval_timeout" and exception_class == "TimeoutError"
         for stage, _, _, _, exception_class in events
     )
     assert "Câu hỏi riêng tư" not in repr(events)

@@ -23,12 +23,110 @@ from src.retrieval.models import (
     RetrievalResult,
     RetrievedChunk,
 )
+from src.retrieval.timing import emit_retrieval_timing, safe_exception_class
 
 CRITICAL_PAYLOAD_FIELDS = ("chunk_id", "law_id", "citation", "text")
 
 
 class DenseRetrieverError(RuntimeError):
-    """Raised when dense retrieval cannot safely complete."""
+    """Raised when dense retrieval cannot safely complete.
+
+    Attributes:
+        failure_stage: Sanitized machine-readable failure stage.
+        warning_code: Sanitized API warning code suitable for client responses.
+        cause_class: Sanitized root exception class, when known.
+    """
+
+    failure_stage = "dense_retriever_error"
+    warning_code = "dense_retriever_error"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        failure_stage: str | None = None,
+        warning_code: str | None = None,
+        cause_class: str | None = None,
+    ) -> None:
+        self.failure_stage = failure_stage or self.failure_stage
+        self.warning_code = warning_code or self.warning_code
+        self.cause_class = cause_class
+        super().__init__(message)
+
+
+class EmbeddingModelLoadTimeoutError(DenseRetrieverError, TimeoutError):
+    """Raised when embedding model initialization exceeds its timeout."""
+
+    def __init__(self, *, timeout_seconds: float) -> None:
+        self.timeout_seconds = timeout_seconds
+        super().__init__(
+            "embedding model load timed out",
+            failure_stage="embedding_model_load_timeout",
+            warning_code="embedding_model_load_timeout",
+            cause_class="TimeoutError",
+        )
+
+
+class EmbeddingModelLoadError(DenseRetrieverError):
+    """Raised when embedding model initialization fails before query encoding."""
+
+    def __init__(self, *, cause_class: str) -> None:
+        super().__init__(
+            "embedding model load failed",
+            failure_stage="embedding_model_load_error",
+            warning_code="embedding_model_load_error",
+            cause_class=cause_class,
+        )
+
+
+class QueryEmbeddingTimeoutError(DenseRetrieverError, TimeoutError):
+    """Raised when query embedding exceeds its timeout."""
+
+    def __init__(self, *, timeout_seconds: float) -> None:
+        self.timeout_seconds = timeout_seconds
+        super().__init__(
+            "query embedding timed out",
+            failure_stage="query_embedding_timeout",
+            warning_code="query_embedding_timeout",
+            cause_class="TimeoutError",
+        )
+
+
+class QueryEmbeddingError(DenseRetrieverError):
+    """Raised when query embedding fails after model loading."""
+
+    def __init__(self, *, cause_class: str) -> None:
+        super().__init__(
+            "query embedding failed",
+            failure_stage="query_embedding_error",
+            warning_code="query_embedding_error",
+            cause_class=cause_class,
+        )
+
+
+class QdrantRetrievalTimeoutError(DenseRetrieverError, TimeoutError):
+    """Raised when the Qdrant search call exceeds its timeout."""
+
+    def __init__(self, *, timeout_seconds: float) -> None:
+        self.timeout_seconds = timeout_seconds
+        super().__init__(
+            "Qdrant dense retrieval timed out",
+            failure_stage="qdrant_retrieval_timeout",
+            warning_code="qdrant_retrieval_timeout",
+            cause_class="TimeoutError",
+        )
+
+
+class QdrantRetrievalError(DenseRetrieverError):
+    """Raised when Qdrant search fails after the call has started."""
+
+    def __init__(self, *, cause_class: str) -> None:
+        super().__init__(
+            "Qdrant dense retrieval failed",
+            failure_stage="qdrant_retrieval_error",
+            warning_code="qdrant_retrieval_error",
+            cause_class=cause_class,
+        )
 
 
 class QueryEmbeddingModel(Protocol):
@@ -134,6 +232,10 @@ class DenseRetriever:
             filters=filters,
         )
         started = time.perf_counter()
+        emit_retrieval_timing(
+            stage="dense_retriever_started",
+            top_k=retrieval_query.top_k,
+        )
         vector = await self._embed_query(retrieval_query.query)
         self._validate_query_vector(vector)
 
@@ -154,6 +256,12 @@ class DenseRetriever:
             search_kwargs["query_filter"] = query_filter
 
         try:
+            qdrant_started = time.perf_counter()
+            emit_retrieval_timing(
+                stage="qdrant_retrieval_started",
+                top_k=retrieval_query.top_k,
+                timeout_seconds=self.qdrant_timeout_seconds,
+            )
             qdrant_call = self._qdrant_client.query_points(**search_kwargs)
             if self.qdrant_timeout_seconds is None:
                 response = await qdrant_call
@@ -163,9 +271,30 @@ class DenseRetriever:
                     timeout=self.qdrant_timeout_seconds,
                 )
         except TimeoutError as exc:
-            raise DenseRetrieverError("Qdrant dense retrieval timed out") from exc
+            emit_retrieval_timing(
+                stage="qdrant_retrieval_timeout",
+                stage_started_at=qdrant_started,
+                exception_class="TimeoutError",
+                timeout_seconds=self.qdrant_timeout_seconds,
+                top_k=retrieval_query.top_k,
+            )
+            raise QdrantRetrievalTimeoutError(
+                timeout_seconds=self.qdrant_timeout_seconds or 0.0
+            ) from exc
         except Exception as exc:
-            raise DenseRetrieverError(f"Qdrant dense retrieval failed: {exc}") from exc
+            emit_retrieval_timing(
+                stage="dense_retriever_failed",
+                stage_started_at=qdrant_started,
+                exception_class=safe_exception_class(exc),
+                timeout_seconds=self.qdrant_timeout_seconds,
+                top_k=retrieval_query.top_k,
+            )
+            raise QdrantRetrievalError(cause_class=safe_exception_class(exc)) from exc
+        emit_retrieval_timing(
+            stage="qdrant_retrieval_completed",
+            stage_started_at=qdrant_started,
+            top_k=retrieval_query.top_k,
+        )
 
         points = getattr(response, "points", None)
         if points is None:
@@ -180,7 +309,7 @@ class DenseRetriever:
             chunks.append(chunk)
             result_issues.extend(chunk.issues)
 
-        return RetrievalResult(
+        result = RetrievalResult(
             query=retrieval_query.query,
             collection_name=retrieval_query.collection_name,
             vector_name=self.dense_vector_name,
@@ -191,6 +320,12 @@ class DenseRetriever:
             results=chunks,
             issues=result_issues,
         )
+        emit_retrieval_timing(
+            stage="dense_retriever_completed",
+            stage_started_at=started,
+            top_k=retrieval_query.top_k,
+        )
+        return result
 
     def _coerce_query(
         self,
@@ -217,7 +352,13 @@ class DenseRetriever:
             raise DenseRetrieverError(f"invalid retrieval query: {exc}") from exc
 
     async def _embed_query(self, query_text: str) -> list[float]:
+        await self._load_embedding_model_if_supported()
         try:
+            started = time.perf_counter()
+            emit_retrieval_timing(
+                stage="query_embedding_started",
+                timeout_seconds=self.query_embedding_timeout_seconds,
+            )
             embedding_call = asyncio.to_thread(
                 self._embedding_model.embed_query,
                 query_text,
@@ -231,10 +372,72 @@ class DenseRetriever:
                     timeout=self.query_embedding_timeout_seconds,
                 )
         except TimeoutError as exc:
-            raise DenseRetrieverError("query embedding timed out") from exc
+            emit_retrieval_timing(
+                stage="query_embedding_timeout",
+                stage_started_at=started,
+                exception_class="TimeoutError",
+                timeout_seconds=self.query_embedding_timeout_seconds,
+            )
+            raise QueryEmbeddingTimeoutError(
+                timeout_seconds=self.query_embedding_timeout_seconds or 0.0
+            ) from exc
         except Exception as exc:
-            raise DenseRetrieverError(f"query embedding failed: {exc}") from exc
+            emit_retrieval_timing(
+                stage="dense_retriever_failed",
+                stage_started_at=started,
+                exception_class=safe_exception_class(exc),
+                timeout_seconds=self.query_embedding_timeout_seconds,
+            )
+            raise QueryEmbeddingError(cause_class=safe_exception_class(exc)) from exc
+        emit_retrieval_timing(stage="query_embedding_completed", stage_started_at=started)
         return vector
+
+    async def _load_embedding_model_if_supported(self) -> None:
+        is_loaded = getattr(self._embedding_model, "is_loaded", None)
+        ensure_loaded = getattr(self._embedding_model, "ensure_loaded", None)
+        if ensure_loaded is None or not callable(ensure_loaded):
+            return
+        if isinstance(is_loaded, bool) and is_loaded:
+            return
+        started = time.perf_counter()
+        emit_retrieval_timing(
+            stage="embedding_model_load_started",
+            timeout_seconds=self.query_embedding_timeout_seconds,
+        )
+        try:
+            load_call = asyncio.to_thread(ensure_loaded)
+            if self.query_embedding_timeout_seconds is None:
+                await load_call
+            else:
+                await asyncio.wait_for(
+                    load_call,
+                    timeout=self.query_embedding_timeout_seconds,
+                )
+        except TimeoutError as exc:
+            emit_retrieval_timing(
+                stage="embedding_model_load_timeout",
+                stage_started_at=started,
+                exception_class="TimeoutError",
+                timeout_seconds=self.query_embedding_timeout_seconds,
+            )
+            raise EmbeddingModelLoadTimeoutError(
+                timeout_seconds=self.query_embedding_timeout_seconds or 0.0
+            ) from exc
+        except Exception as exc:
+            emit_retrieval_timing(
+                stage="dense_retriever_failed",
+                stage_started_at=started,
+                exception_class=safe_exception_class(exc),
+                timeout_seconds=self.query_embedding_timeout_seconds,
+            )
+            raise EmbeddingModelLoadError(cause_class=safe_exception_class(exc)) from exc
+        emit_retrieval_timing(stage="embedding_model_load_completed", stage_started_at=started)
+
+    async def warmup_embedding(self) -> None:
+        """Load the embedding model and run one fixed non-sensitive embedding."""
+        await self._load_embedding_model_if_supported()
+        vector = await self._embed_query("legal qa warmup")
+        self._validate_query_vector(vector)
 
     def _validate_query_vector(self, vector: Sequence[Any]) -> None:
         if not vector:

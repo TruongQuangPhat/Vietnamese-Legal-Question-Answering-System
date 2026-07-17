@@ -113,6 +113,41 @@ jobs:
           PY
           rm -f "$readiness_file"
 
+      - name: Warm production embedding model once
+        run: |
+          set -euo pipefail
+
+          base_url="${AZURE_PRODUCTION_BACKEND_URL%/}"
+          response_file="$(mktemp)"
+          warmup_status="$(
+            curl -sS --max-time 90 -o "$response_file" -w '%{http_code}' \
+              "$base_url/api/v1/legal-qa/warmup"
+          )"
+          printf 'Warmup HTTP status: %s\n' "$warmup_status"
+          if [ "$warmup_status" != "200" ]; then
+            rm -f "$response_file"
+            printf 'Warmup endpoint did not return 200; ask smoke was not sent.\n'
+            exit 1
+          fi
+
+          RESPONSE_FILE="$response_file" python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(Path(os.environ["RESPONSE_FILE"]).read_text(encoding="utf-8"))
+          print(f"Warmup warmed: {payload.get('warmed')}")
+          print(f"Warmup elapsed_ms: {payload.get('elapsed_ms')}")
+          exception_class = payload.get("exception_class")
+          if exception_class is not None:
+              print(f"Warmup exception_class: {exception_class}")
+          if payload.get("warmed") is not True:
+              raise SystemExit("Warmup did not complete; ask smoke was not sent.")
+          PY
+          rm -f "$response_file"
+
       - name: Send exactly one production ask request
         run: |
           set -euo pipefail
@@ -216,6 +251,11 @@ jobs:
               raise SystemExit("Ask smoke returned decision=error.")
           if isinstance(warnings, list) and "internal_error" in warnings:
               raise SystemExit("Ask smoke returned internal_error warning.")
+          if isinstance(warnings, list) and "ask_timeout" in warnings:
+              raise SystemExit("Ask smoke returned ask_timeout warning.")
+          if isinstance(warnings, list) and "query_embedding_timeout" in warnings:
+              if decision not in {"answered", "answered_with_caution"}:
+                  raise SystemExit("Ask smoke returned query_embedding_timeout without a valid answer.")
           if answer == generic_error_answer:
               raise SystemExit("Ask smoke returned the generic internal-error answer.")
           PY

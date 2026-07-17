@@ -113,6 +113,11 @@ def clear_legal_qa_service_cache() -> None:
         _legal_qa_service = None
 
 
+def warmup_cached_legal_qa_service() -> object:
+    """Build the cached Legal QA service and warm embedding when supported."""
+    return _get_cached_legal_qa_service().warmup_embedding()
+
+
 def clear_conversation_service_cache() -> None:
     """Clear process-local conversation state for tests."""
     _get_cached_conversation_service.cache_clear()
