@@ -894,6 +894,13 @@ Required production resources and settings:
 - `alwaysOn=true`;
 - Docker container logging set to `filesystem`;
 - `LEGAL_QA_SERVICE_MODE=real`;
+- `LEGAL_QA_ASK_TIMEOUT_SECONDS=90`;
+- `LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60`;
+- `LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45`;
+- `LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30`;
+- `LEGAL_QA_LLM_TIMEOUT_SECONDS=30`;
+- `LEGAL_QA_MAX_TOP_K=5`;
+- `LEGAL_QA_RERANKING_ENABLED=false`;
 - `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
 - Qdrant URL/API key through `QDRANT_URL` and `QDRANT_API_KEY`;
 - `OPENROUTER_API_KEY`;
@@ -923,7 +930,7 @@ POST /api/v1/legal-qa/ask
 ```
 
 It sends exactly one `/ask` request with a configurable timeout up to 600
-seconds for production ML cold start, prints only safe summary fields, and fails
+seconds for production ML cold start and `top_k=5`, prints only safe summary fields, and fails
 if `decision == "error"`, `warnings` contains `internal_error`,
 `metadata.model` is null, `metadata.retrieval_question_prepared` is false, or
 the answer is the generic internal-error answer.

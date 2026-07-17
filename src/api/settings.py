@@ -25,6 +25,12 @@ DEFAULT_CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
 DEFAULT_DOTENV_PATH = Path(".env")
 DEFAULT_RATE_LIMIT_REQUESTS = 10
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
+DEFAULT_ASK_TIMEOUT_SECONDS = 90.0
+DEFAULT_RETRIEVAL_TIMEOUT_SECONDS = 60.0
+DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
+DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
+DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
+DEFAULT_MAX_TOP_K = 10
 MIN_SESSION_SECRET_LENGTH = 16
 WEAK_SESSION_SECRET_PLACEHOLDERS = {
     "changeme",
@@ -84,6 +90,19 @@ class AppSettings(BaseSettings):
     legal_qa_auth_enabled: bool = False
     legal_qa_session_secret: SecretStr | None = Field(default=None, repr=False)
     legal_qa_session_header: str = "X-Legal-QA-Session"
+    legal_qa_ask_timeout_seconds: float = Field(DEFAULT_ASK_TIMEOUT_SECONDS, gt=0.0)
+    legal_qa_retrieval_timeout_seconds: float = Field(
+        DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
+        gt=0.0,
+    )
+    legal_qa_query_embedding_timeout_seconds: float = Field(
+        DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS,
+        gt=0.0,
+    )
+    legal_qa_qdrant_timeout_seconds: float = Field(DEFAULT_QDRANT_TIMEOUT_SECONDS, gt=0.0)
+    legal_qa_llm_timeout_seconds: float = Field(DEFAULT_LLM_TIMEOUT_SECONDS, gt=0.0)
+    legal_qa_max_top_k: int = Field(DEFAULT_MAX_TOP_K, gt=0)
+    legal_qa_reranking_enabled: bool = False
 
     @classmethod
     def from_env(
@@ -166,6 +185,41 @@ class AppSettings(BaseSettings):
             ),
             legal_qa_session_secret=_secret_from_env(env, "LEGAL_QA_SESSION_SECRET"),
             legal_qa_session_header=_session_header(env.get("LEGAL_QA_SESSION_HEADER")),
+            legal_qa_ask_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_ASK_TIMEOUT_SECONDS"),
+                default=DEFAULT_ASK_TIMEOUT_SECONDS,
+                name="LEGAL_QA_ASK_TIMEOUT_SECONDS",
+            ),
+            legal_qa_retrieval_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS"),
+                default=DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
+                name="LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS",
+            ),
+            legal_qa_query_embedding_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS"),
+                default=DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS,
+                name="LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS",
+            ),
+            legal_qa_qdrant_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_QDRANT_TIMEOUT_SECONDS"),
+                default=DEFAULT_QDRANT_TIMEOUT_SECONDS,
+                name="LEGAL_QA_QDRANT_TIMEOUT_SECONDS",
+            ),
+            legal_qa_llm_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_LLM_TIMEOUT_SECONDS"),
+                default=DEFAULT_LLM_TIMEOUT_SECONDS,
+                name="LEGAL_QA_LLM_TIMEOUT_SECONDS",
+            ),
+            legal_qa_max_top_k=_parse_positive_int(
+                env.get("LEGAL_QA_MAX_TOP_K"),
+                default=DEFAULT_MAX_TOP_K,
+                name="LEGAL_QA_MAX_TOP_K",
+            ),
+            legal_qa_reranking_enabled=_parse_bool(
+                env.get("LEGAL_QA_RERANKING_ENABLED"),
+                default=False,
+                name="LEGAL_QA_RERANKING_ENABLED",
+            ),
         )
 
     def auth_configuration_issues(self) -> tuple[str, ...]:
@@ -268,6 +322,11 @@ class AppSettings(BaseSettings):
             ),
             device=self.legal_qa_device,
             model=self.legal_qa_model,
+            retrieval_timeout_seconds=self.legal_qa_retrieval_timeout_seconds,
+            query_embedding_timeout_seconds=self.legal_qa_query_embedding_timeout_seconds,
+            qdrant_timeout_seconds=self.legal_qa_qdrant_timeout_seconds,
+            llm_timeout_seconds=self.legal_qa_llm_timeout_seconds,
+            reranking_enabled=self.legal_qa_reranking_enabled,
         )
 
 
@@ -350,6 +409,19 @@ def _parse_positive_int(raw_value: str | None, *, default: int, name: str) -> in
         raise ValueError(f"{name} must be a positive integer") from exc
     if parsed <= 0:
         raise ValueError(f"{name} must be a positive integer")
+    return parsed
+
+
+def _parse_positive_float(raw_value: str | None, *, default: float, name: str) -> float:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive number") from exc
+    if parsed <= 0:
+        raise ValueError(f"{name} must be a positive number")
     return parsed
 
 

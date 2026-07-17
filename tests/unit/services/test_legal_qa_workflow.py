@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from src.retrieval.selection import AnswerabilityDecision
 from src.services.legal_qa_api_service import (
     FakeLegalQAWorkflow,
     LegalQAService,
+    LegalQAServiceError,
     LegalQAWorkflowRequest,
 )
 from src.services.legal_qa_context import LegalQAContextPreparer
@@ -32,8 +34,9 @@ from src.services.legal_qa_workflow import (
 
 
 class StaticRetriever:
-    def __init__(self, result: RetrievalResult) -> None:
+    def __init__(self, result: RetrievalResult, *, delay_seconds: float = 0.0) -> None:
         self.result = result
+        self.delay_seconds = delay_seconds
         self.calls: list[dict[str, object]] = []
 
     async def retrieve(
@@ -50,6 +53,8 @@ class StaticRetriever:
                 "collection_name": collection_name,
             }
         )
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
         return self.result.model_copy(update={"query": query})
 
 
@@ -160,6 +165,40 @@ def test_real_workflow_adapter_emits_sanitized_timing_stages() -> None:
     assert all(isinstance(event[2], int) for event in events)
     assert all(isinstance(event[3], int) for event in events)
     assert all(event[4] is None for event in events)
+    assert "Câu hỏi riêng tư" not in repr(events)
+
+
+def test_real_workflow_timeout_reports_safe_failure_stage() -> None:
+    workflow = RealLegalQAWorkflow(
+        retriever=StaticRetriever(_retrieval_result([_retrieved_chunk()]), delay_seconds=0.05),
+        llm_client=MockLLMClient([]),
+        collection_name="vnlaw_chunks_bgem3_v1_full",
+        retrieval_timeout_seconds=0.001,
+    )
+    service = LegalQAService(workflow=workflow)
+    events: list[tuple[str, str | None, int, int, str | None]] = []
+
+    def timing_logger(
+        stage: str,
+        request_id: str | None,
+        elapsed_ms: int,
+        total_elapsed_ms: int,
+        exception_class: str | None,
+    ) -> None:
+        events.append((stage, request_id, elapsed_ms, total_elapsed_ms, exception_class))
+
+    with pytest.raises(LegalQAServiceError) as error:
+        service.answer(
+            LegalQARequest(question="Câu hỏi riêng tư không được log?"),
+            timing_logger=timing_logger,
+        )
+
+    assert error.value.failure_stage == "qdrant_retrieval"
+    assert error.value.exception_class == "LegalQAWorkflowTimeoutError"
+    assert any(
+        stage == "qdrant_retrieval" and exception_class == "TimeoutError"
+        for stage, _, _, _, exception_class in events
+    )
     assert "Câu hỏi riêng tư" not in repr(events)
 
 

@@ -507,6 +507,13 @@ WEBSITES_CONTAINER_START_TIME_LIMIT=1800
 WEBSITES_PORT=8000
 PORT=8000
 LEGAL_QA_SERVICE_MODE=real
+LEGAL_QA_ASK_TIMEOUT_SECONDS=90
+LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60
+LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45
+LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30
+LEGAL_QA_LLM_TIMEOUT_SECONDS=30
+LEGAL_QA_MAX_TOP_K=5
+LEGAL_QA_RERANKING_ENABLED=false
 LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
 CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
 ```
@@ -541,6 +548,12 @@ If `/health` returns `503` after deployment:
 If `/api/v1/legal-qa/ask` times out:
 
 - Do not loop real ask requests. Run only the single manually confirmed smoke.
+- Treat Azure `504` around four minutes or `502` followed by a site restart as
+  container/runtime instability, not as a frontend, CORS, ACR, image-pull, or
+  port problem when `/health` and `/api/v1/readiness` already pass.
+- The API has an internal 90-second `/ask` timeout. Expected controlled
+  timeout failures return HTTP 200 JSON with `decision=error` and
+  `warnings=["ask_timeout"]` before Azure gateway timeouts.
 - Check sanitized `legal_qa_request_timing` entries for the last completed
   stage: request validation, context loading, retrieval-question preparation,
   embedding/model loading, query embedding, Qdrant retrieval, provider call,

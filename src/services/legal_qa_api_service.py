@@ -140,12 +140,16 @@ class LegalQAServiceError(RuntimeError):
         original_exception: BaseException,
         request_id: str | None = None,
     ) -> None:
-        self.failure_stage = failure_stage
+        self.failure_stage = _safe_failure_stage(original_exception, default=failure_stage)
         self.request_id = request_id
-        self.exception_class = _root_exception_class(original_exception)
+        self.exception_class = (
+            type(original_exception).__name__
+            if isinstance(original_exception, TimeoutError)
+            else _root_exception_class(original_exception)
+        )
         super().__init__(
             "Legal QA service failed "
-            f"at stage {failure_stage} with exception class {self.exception_class}"
+            f"at stage {self.failure_stage} with exception class {self.exception_class}"
         )
 
 
@@ -487,6 +491,13 @@ def _root_exception_class(exc: BaseException) -> str:
         seen.add(id(root))
         root = root.__cause__
     return type(root).__name__
+
+
+def _safe_failure_stage(exc: BaseException, *, default: str) -> str:
+    stage = getattr(exc, "failure_stage", None)
+    if isinstance(stage, str) and stage.replace("_", "").isalnum():
+        return stage
+    return default
 
 
 def _emit_timing(

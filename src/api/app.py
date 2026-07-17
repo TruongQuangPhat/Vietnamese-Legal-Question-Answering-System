@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,7 +26,9 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
         Configured FastAPI application with health and legal QA routes.
     """
     runtime_settings = settings or get_settings()
+    configure_logging(runtime_settings)
     app = FastAPI(title="VnLaw-QA API", version="0.1.0")
+    app.state.settings = runtime_settings
     app.state.ask_rate_limiter = build_rate_limiter(runtime_settings)
     app.include_router(health_router)
     app.include_router(legal_qa_router, prefix="/api/v1")
@@ -41,6 +46,18 @@ def configure_cors(app: FastAPI, settings: AppSettings) -> None:
         allow_headers=["*"],
         allow_credentials=False,
     )
+
+
+def configure_logging(settings: AppSettings) -> None:
+    """Ensure application logs are emitted to stdout in container runtimes."""
+    level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+        root_logger.addHandler(handler)
+    root_logger.setLevel(level)
+    logging.getLogger("src.api.routes.legal_qa").setLevel(level)
 
 
 app = create_app()

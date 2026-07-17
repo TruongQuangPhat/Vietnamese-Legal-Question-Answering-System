@@ -139,6 +139,7 @@ jobs:
                       ),
                   }
               ],
+              "top_k": 5,
               "include_evidence": False,
               "include_debug": False,
           }

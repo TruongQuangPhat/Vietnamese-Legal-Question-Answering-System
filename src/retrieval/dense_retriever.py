@@ -76,6 +76,8 @@ class DenseRetriever:
         expected_vector_dim: int = DEFAULT_DENSE_DIMENSION,
         default_top_k: int = DEFAULT_TOP_K,
         embedding_batch_size: int = 1,
+        query_embedding_timeout_seconds: float | None = None,
+        qdrant_timeout_seconds: float | None = None,
     ) -> None:
         if not collection_name.strip():
             raise DenseRetrieverError("collection_name must not be blank")
@@ -87,6 +89,10 @@ class DenseRetriever:
             raise DenseRetrieverError("default_top_k must be positive")
         if embedding_batch_size <= 0:
             raise DenseRetrieverError("embedding_batch_size must be positive")
+        if query_embedding_timeout_seconds is not None and query_embedding_timeout_seconds <= 0:
+            raise DenseRetrieverError("query_embedding_timeout_seconds must be positive")
+        if qdrant_timeout_seconds is not None and qdrant_timeout_seconds <= 0:
+            raise DenseRetrieverError("qdrant_timeout_seconds must be positive")
 
         self._qdrant_client = qdrant_client
         self._embedding_model = embedding_model
@@ -95,6 +101,8 @@ class DenseRetriever:
         self.expected_vector_dim = expected_vector_dim
         self.default_top_k = default_top_k
         self.embedding_batch_size = embedding_batch_size
+        self.query_embedding_timeout_seconds = query_embedding_timeout_seconds
+        self.qdrant_timeout_seconds = qdrant_timeout_seconds
 
     async def retrieve(
         self,
@@ -146,7 +154,16 @@ class DenseRetriever:
             search_kwargs["query_filter"] = query_filter
 
         try:
-            response = await self._qdrant_client.query_points(**search_kwargs)
+            qdrant_call = self._qdrant_client.query_points(**search_kwargs)
+            if self.qdrant_timeout_seconds is None:
+                response = await qdrant_call
+            else:
+                response = await asyncio.wait_for(
+                    qdrant_call,
+                    timeout=self.qdrant_timeout_seconds,
+                )
+        except TimeoutError as exc:
+            raise DenseRetrieverError("Qdrant dense retrieval timed out") from exc
         except Exception as exc:
             raise DenseRetrieverError(f"Qdrant dense retrieval failed: {exc}") from exc
 
@@ -201,11 +218,20 @@ class DenseRetriever:
 
     async def _embed_query(self, query_text: str) -> list[float]:
         try:
-            vector = await asyncio.to_thread(
+            embedding_call = asyncio.to_thread(
                 self._embedding_model.embed_query,
                 query_text,
                 batch_size=self.embedding_batch_size,
             )
+            if self.query_embedding_timeout_seconds is None:
+                vector = await embedding_call
+            else:
+                vector = await asyncio.wait_for(
+                    embedding_call,
+                    timeout=self.query_embedding_timeout_seconds,
+                )
+        except TimeoutError as exc:
+            raise DenseRetrieverError("query embedding timed out") from exc
         except Exception as exc:
             raise DenseRetrieverError(f"query embedding failed: {exc}") from exc
         return vector

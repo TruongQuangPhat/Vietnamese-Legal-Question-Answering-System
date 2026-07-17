@@ -52,6 +52,13 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.legal_qa_auth_enabled is False
     assert settings.legal_qa_session_secret is None
     assert settings.legal_qa_session_header == "X-Legal-QA-Session"
+    assert settings.legal_qa_ask_timeout_seconds == 90.0
+    assert settings.legal_qa_retrieval_timeout_seconds == 60.0
+    assert settings.legal_qa_query_embedding_timeout_seconds == 45.0
+    assert settings.legal_qa_qdrant_timeout_seconds == 30.0
+    assert settings.legal_qa_llm_timeout_seconds == 30.0
+    assert settings.legal_qa_max_top_k == 10
+    assert settings.legal_qa_reranking_enabled is False
     assert settings.runtime_configuration_issues() == ()
 
 
@@ -109,6 +116,28 @@ def test_settings_parse_rate_limit_configuration() -> None:
     assert settings.legal_qa_rate_limit_window_seconds == 30
 
 
+def test_settings_parse_ask_runtime_safety_configuration() -> None:
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_ASK_TIMEOUT_SECONDS": "75.5",
+            "LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS": "50",
+            "LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS": "25",
+            "LEGAL_QA_QDRANT_TIMEOUT_SECONDS": "10",
+            "LEGAL_QA_LLM_TIMEOUT_SECONDS": "20",
+            "LEGAL_QA_MAX_TOP_K": "5",
+            "LEGAL_QA_RERANKING_ENABLED": "false",
+        }
+    )
+
+    assert settings.legal_qa_ask_timeout_seconds == 75.5
+    assert settings.legal_qa_retrieval_timeout_seconds == 50.0
+    assert settings.legal_qa_query_embedding_timeout_seconds == 25.0
+    assert settings.legal_qa_qdrant_timeout_seconds == 10.0
+    assert settings.legal_qa_llm_timeout_seconds == 20.0
+    assert settings.legal_qa_max_top_k == 5
+    assert settings.legal_qa_reranking_enabled is False
+
+
 def test_settings_rate_limit_blank_values_use_defaults() -> None:
     settings = AppSettings.from_env(
         {
@@ -140,6 +169,7 @@ def test_settings_rate_limit_blank_values_use_defaults() -> None:
             "not-an-int",
             "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS",
         ),
+        ("LEGAL_QA_MAX_TOP_K", "0", "LEGAL_QA_MAX_TOP_K"),
     ],
 )
 def test_settings_reject_invalid_rate_limit_configuration(
@@ -148,6 +178,25 @@ def test_settings_reject_invalid_rate_limit_configuration(
     message: str,
 ) -> None:
     with pytest.raises(ValueError, match=message):
+        AppSettings.from_env({name: value})
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("LEGAL_QA_ASK_TIMEOUT_SECONDS", "0"),
+        ("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS", "-1"),
+        ("LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS", "not-a-number"),
+        ("LEGAL_QA_QDRANT_TIMEOUT_SECONDS", "0"),
+        ("LEGAL_QA_LLM_TIMEOUT_SECONDS", "-2"),
+        ("LEGAL_QA_RERANKING_ENABLED", "maybe"),
+    ],
+)
+def test_settings_reject_invalid_ask_runtime_safety_configuration(
+    name: str,
+    value: str,
+) -> None:
+    with pytest.raises(ValueError, match=name):
         AppSettings.from_env({name: value})
 
 
