@@ -64,16 +64,24 @@ def test_production_ask_smoke_requires_packaged_model_warmup() -> None:
     workflow = (REPO_ROOT / ".github/workflows/production-ask-smoke.yml").read_text(
         encoding="utf-8"
     )
+    validator = (
+        REPO_ROOT / "scripts/deployment/validate_production_ask_smoke_response.py"
+    ).read_text(encoding="utf-8")
+    combined = workflow + "\n" + validator
 
     assert "Verify production embedding warmup" in workflow
     assert "--max-time 220" in workflow
-    assert "Warmup did not complete successfully; ask smoke was not sent." in workflow
-    assert '"model_path_configured"' in workflow
-    assert '"model_path_exists"' in workflow
-    assert '"required_files_present"' in workflow
-    assert '"model_load_completed"' in workflow
-    assert '"encode_completed"' in workflow
-    assert '"cache_hit_after"' in workflow
+    assert "validate_warmup_payload" in workflow
+    assert workflow.count("$base_url/api/v1/legal-qa/warmup") == 2
+    assert '"model_path_configured"' in combined
+    assert '"model_path_exists"' in combined
+    assert '"required_files_present"' in combined
+    assert '"model_load_completed"' in combined
+    assert '"encode_completed"' in combined
+    assert '"cache_hit_after"' in combined
+    assert "require_cache_hit_before=True" in workflow
+    assert "WARMUP_MODEL_CACHE_KEY" in workflow
+    assert "--expected-model-cache-key" in workflow
 
 
 def test_sparse_mode_is_documented_as_emergency_degraded_only() -> None:

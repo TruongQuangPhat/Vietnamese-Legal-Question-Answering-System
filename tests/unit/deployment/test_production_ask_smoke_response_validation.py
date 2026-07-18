@@ -7,6 +7,7 @@ from scripts.deployment.validate_production_ask_smoke_response import (
     SEVERE_WARNINGS,
     SmokeValidationError,
     validate_response_payload,
+    validate_warmup_payload,
 )
 
 DEFAULT_CITATIONS = object()
@@ -111,6 +112,16 @@ def test_smoke_validation_fails_when_hybrid_dense_was_not_used() -> None:
         validate_response_payload(payload)
 
 
+@pytest.mark.parametrize("retrieval_mode", [None, "sparse"])
+def test_smoke_validation_fails_when_retrieval_mode_is_not_hybrid(
+    retrieval_mode: object,
+) -> None:
+    payload = _valid_payload(metadata_overrides={"retrieval_mode": retrieval_mode})
+
+    with pytest.raises(SmokeValidationError, match="hybrid retrieval mode"):
+        validate_response_payload(payload)
+
+
 def test_smoke_validation_fails_when_hybrid_ask_misses_embedding_cache() -> None:
     payload = _valid_payload(metadata_overrides={"embedding_model_cache_hit": False})
 
@@ -118,8 +129,18 @@ def test_smoke_validation_fails_when_hybrid_ask_misses_embedding_cache() -> None
         validate_response_payload(payload)
 
 
+def test_smoke_validation_fails_when_ask_cache_key_differs_from_warmup() -> None:
+    payload = _valid_payload(metadata_overrides={"model_cache_key": "bge-m3:other-cache"})
+
+    with pytest.raises(SmokeValidationError, match="model_cache_key did not match warmup"):
+        validate_response_payload(payload, expected_model_cache_key="bge-m3:test-cache")
+
+
 def test_smoke_validation_passes_with_evidence_caution_warning() -> None:
-    lines = validate_response_payload(_valid_payload(warnings=["all_selected_evidence_caution"]))
+    lines = validate_response_payload(
+        _valid_payload(warnings=["all_selected_evidence_caution"]),
+        expected_model_cache_key="bge-m3:test-cache",
+    )
 
     assert "Warnings: all_selected_evidence_caution" in lines
 
@@ -156,6 +177,52 @@ def test_smoke_validation_logs_sanitized_summary_fields() -> None:
     assert "Warnings: " in lines
 
 
+def test_warmup_validation_passes_for_first_warmup_cache_fill() -> None:
+    lines = validate_warmup_payload(_valid_warmup_payload(cache_hit_before=False))
+
+    assert "Warmup warmed: True" in lines
+    assert "Warmup cache_hit_after: True" in lines
+    assert "Warmup model_cache_key: bge-m3:test-cache" in lines
+
+
+def test_warmup_validation_passes_for_second_warmup_cache_hit() -> None:
+    lines = validate_warmup_payload(
+        _valid_warmup_payload(cache_hit_before=True),
+        require_cache_hit_before=True,
+        expected_model_cache_key="bge-m3:test-cache",
+    )
+
+    assert "Warmup cache_hit_before: True" in lines
+
+
+def test_warmup_validation_fails_if_cache_hit_after_is_false() -> None:
+    payload = _valid_warmup_payload(cache_hit_after=False)
+
+    with pytest.raises(SmokeValidationError, match="cache_hit_after"):
+        validate_warmup_payload(payload)
+
+
+def test_warmup_validation_fails_if_model_load_timed_out() -> None:
+    payload = _valid_warmup_payload(model_load_timeout=True)
+
+    with pytest.raises(SmokeValidationError, match="model_load_timeout"):
+        validate_warmup_payload(payload)
+
+
+def test_warmup_validation_fails_if_second_warmup_misses_cache() -> None:
+    payload = _valid_warmup_payload(cache_hit_before=False)
+
+    with pytest.raises(SmokeValidationError, match="Second warmup"):
+        validate_warmup_payload(payload, require_cache_hit_before=True)
+
+
+def test_warmup_validation_fails_if_cache_key_differs() -> None:
+    payload = _valid_warmup_payload(model_cache_key="bge-m3:other-cache")
+
+    with pytest.raises(SmokeValidationError, match="model_cache_key"):
+        validate_warmup_payload(payload, expected_model_cache_key="bge-m3:test-cache")
+
+
 def _valid_payload(
     *,
     answer: str = "Câu trả lời hợp lệ có căn cứ trích dẫn và đủ dài cho smoke kiểm tra sản xuất.",
@@ -190,4 +257,31 @@ def _valid_payload(
         "metadata": metadata,
         "request_id": "test-request",
         "warnings": [] if warnings is None else warnings,
+    }
+
+
+def _valid_warmup_payload(
+    *,
+    cache_hit_before: bool = False,
+    cache_hit_after: bool = True,
+    model_load_timeout: bool = False,
+    encode_timeout: bool = False,
+    model_cache_key: str = "bge-m3:test-cache",
+) -> dict[str, object]:
+    return {
+        "warmed": True,
+        "elapsed_ms": 1234,
+        "exception_class": None,
+        "model_path_configured": True,
+        "model_path_exists": True,
+        "required_files_present": True,
+        "model_load_started": not cache_hit_before,
+        "model_load_completed": True,
+        "model_load_timeout": model_load_timeout,
+        "encode_started": True,
+        "encode_completed": True,
+        "encode_timeout": encode_timeout,
+        "cache_hit_before": cache_hit_before,
+        "cache_hit_after": cache_hit_after,
+        "model_cache_key": model_cache_key,
     }

@@ -35,12 +35,90 @@ class SmokeValidationError(ValueError):
     """Raised when a Production Ask Smoke response fails validation."""
 
 
-def validate_response_payload(payload: dict[str, Any], *, http_status: str = "200") -> list[str]:
+def validate_warmup_payload(
+    payload: dict[str, Any],
+    *,
+    http_status: str = "200",
+    require_cache_hit_before: bool = False,
+    expected_model_cache_key: str | None = None,
+) -> list[str]:
+    """Validate one production embedding warmup response.
+
+    Args:
+        payload: Parsed warmup response JSON.
+        http_status: HTTP status returned by curl.
+        require_cache_hit_before: Whether this is a second warmup that must
+            prove the previous warmup populated the process-local cache.
+        expected_model_cache_key: Optional opaque cache key from a previous
+            warmup that must match this response.
+
+    Returns:
+        Sanitized diagnostic log lines.
+
+    Raises:
+        SmokeValidationError: If warmup did not prove the model is loaded and
+            cached for the following ask request.
+    """
+    if http_status != "200":
+        raise SmokeValidationError("Warmup failed with non-200 HTTP status.")
+
+    model_cache_key = payload.get("model_cache_key")
+    lines = [
+        f"Warmup warmed: {payload.get('warmed')}",
+        f"Warmup elapsed_ms: {payload.get('elapsed_ms')}",
+        f"Warmup model_path_configured: {payload.get('model_path_configured')}",
+        f"Warmup model_path_exists: {payload.get('model_path_exists')}",
+        f"Warmup required_files_present: {payload.get('required_files_present')}",
+        f"Warmup model_load_completed: {payload.get('model_load_completed')}",
+        f"Warmup model_load_timeout: {payload.get('model_load_timeout')}",
+        f"Warmup encode_completed: {payload.get('encode_completed')}",
+        f"Warmup encode_timeout: {payload.get('encode_timeout')}",
+        f"Warmup cache_hit_before: {payload.get('cache_hit_before')}",
+        f"Warmup cache_hit_after: {payload.get('cache_hit_after')}",
+        f"Warmup model_cache_key: {model_cache_key}",
+    ]
+    exception_class = payload.get("exception_class")
+    if exception_class is not None:
+        lines.append(f"Warmup exception_class: {exception_class}")
+
+    required_true = (
+        "warmed",
+        "model_path_configured",
+        "model_path_exists",
+        "required_files_present",
+        "model_load_completed",
+        "encode_completed",
+        "cache_hit_after",
+    )
+    missing = [name for name in required_true if payload.get(name) is not True]
+    if missing:
+        raise SmokeValidationError("Warmup missing required true fields: " + ", ".join(missing))
+    required_false = ("model_load_timeout", "encode_timeout")
+    failed_false = [name for name in required_false if payload.get(name) is not False]
+    if failed_false:
+        raise SmokeValidationError("Warmup had timeout field(s): " + ", ".join(failed_false))
+    if require_cache_hit_before and payload.get("cache_hit_before") is not True:
+        raise SmokeValidationError("Second warmup did not start from the embedding cache.")
+    if not isinstance(model_cache_key, str) or not model_cache_key.strip():
+        raise SmokeValidationError("Warmup did not return a model_cache_key.")
+    if expected_model_cache_key is not None and model_cache_key != expected_model_cache_key:
+        raise SmokeValidationError("Warmup model_cache_key did not match the first warmup.")
+    return lines
+
+
+def validate_response_payload(
+    payload: dict[str, Any],
+    *,
+    http_status: str = "200",
+    expected_model_cache_key: str | None = None,
+) -> list[str]:
     """Validate one production `/ask` smoke response.
 
     Args:
         payload: Parsed response JSON.
         http_status: HTTP status returned by curl.
+        expected_model_cache_key: Optional opaque cache key from successful
+            warmup that the ask metadata must match.
 
     Returns:
         Sanitized diagnostic log lines.
@@ -128,17 +206,26 @@ def validate_response_payload(payload: dict[str, Any], *, http_status: str = "20
         )
     if citation_count < 1:
         raise SmokeValidationError("Ask smoke returned no citations.")
-    if retrieval_mode in {None, "hybrid"}:
-        if fallback_used is True or dense_retrieval_fallback_used is True:
-            raise SmokeValidationError(
-                "Ask smoke used degraded dense retrieval fallback in hybrid mode."
-            )
-        if dense_retrieval_used is not True:
-            raise SmokeValidationError("Ask smoke did not use dense retrieval in hybrid mode.")
-        if embedding_model_cache_hit is not True:
-            raise SmokeValidationError(
-                "Ask smoke did not start from the warmed embedding model cache in hybrid mode."
-            )
+    if retrieval_mode != "hybrid":
+        raise SmokeValidationError("Ask smoke did not report hybrid retrieval mode.")
+    if fallback_used is True or dense_retrieval_fallback_used is True:
+        raise SmokeValidationError(
+            "Ask smoke used degraded dense retrieval fallback in hybrid mode."
+        )
+    if dense_retrieval_used is not True:
+        raise SmokeValidationError("Ask smoke did not use dense retrieval in hybrid mode.")
+    if embedding_model_cache_hit is not True:
+        raise SmokeValidationError(
+            "Ask smoke did not start from the warmed embedding model cache in hybrid mode."
+        )
+    if embedding_model_loaded_before_request is not True:
+        raise SmokeValidationError(
+            "Ask smoke did not report embedding model loaded before request in hybrid mode."
+        )
+    if not isinstance(model_cache_key, str) or not model_cache_key.strip():
+        raise SmokeValidationError("Ask smoke did not return a model_cache_key.")
+    if expected_model_cache_key is not None and model_cache_key != expected_model_cache_key:
+        raise SmokeValidationError("Ask smoke model_cache_key did not match warmup.")
     if follow_up_detected is True and retrieval_question_prepared is False:
         raise SmokeValidationError(
             "Ask smoke detected a follow-up question but did not prepare a retrieval question."
@@ -157,6 +244,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--response-file", required=True, type=Path)
     parser.add_argument("--http-status", required=True)
+    parser.add_argument("--expected-model-cache-key")
     return parser.parse_args()
 
 
@@ -172,7 +260,11 @@ def main() -> int:
         raise SystemExit("Ask smoke response was not JSON.") from exc
 
     try:
-        lines = validate_response_payload(payload, http_status=args.http_status)
+        lines = validate_response_payload(
+            payload,
+            http_status=args.http_status,
+            expected_model_cache_key=args.expected_model_cache_key,
+        )
     except SmokeValidationError as exc:
         raise SystemExit(str(exc)) from exc
 
