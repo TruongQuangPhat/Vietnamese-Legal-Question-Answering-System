@@ -187,17 +187,26 @@ async def warmup_legal_qa(
             )
     except TimeoutError:
         elapsed_ms = int((perf_counter() - started_at) * 1000)
+        model_status_after = _warmup_model_status(service)
+        cache_hit_before = bool(model_status.get("embedding_model_cache_hit", False))
         return {
             "warmed": False,
             "elapsed_ms": elapsed_ms,
             "exception_class": "TimeoutError",
-            **model_status,
-            "model_load_started": True,
-            "model_load_completed": False,
-            "model_load_timeout": True,
-            "encode_started": False,
+            "model_path_configured": bool(model_status.get("model_path_configured", False)),
+            "model_path_exists": bool(model_status.get("model_path_exists", False)),
+            "required_files_present": bool(model_status.get("required_files_present", False)),
+            "model_load_started": not cache_hit_before,
+            "model_load_completed": cache_hit_before,
+            "model_load_timeout": not cache_hit_before,
+            "encode_started": cache_hit_before,
             "encode_completed": False,
-            "encode_timeout": False,
+            "encode_timeout": cache_hit_before,
+            "cache_hit_before": cache_hit_before,
+            "cache_hit_after": bool(model_status_after.get("embedding_model_cache_hit", False)),
+            "model_cache_key": _safe_model_cache_key(
+                model_status_after.get("model_cache_key") or model_status.get("model_cache_key")
+            ),
         }
     return {
         "warmed": result.warmed,
@@ -212,6 +221,9 @@ async def warmup_legal_qa(
         "encode_started": bool(getattr(result, "encode_started", False)),
         "encode_completed": bool(getattr(result, "encode_completed", False)),
         "encode_timeout": bool(getattr(result, "encode_timeout", False)),
+        "cache_hit_before": bool(getattr(result, "cache_hit_before", False)),
+        "cache_hit_after": bool(getattr(result, "cache_hit_after", False)),
+        "model_cache_key": _safe_model_cache_key(getattr(result, "model_cache_key", None)),
     }
 
 
@@ -232,19 +244,23 @@ def _request_settings(request: Request) -> AppSettings:
     return get_settings()
 
 
-def _warmup_model_status(service: Any) -> dict[str, bool]:
+def _warmup_model_status(service: Any) -> dict[str, object]:
     status = getattr(service, "embedding_model_status", None)
     if status is None or not callable(status):
         return {
             "model_path_configured": False,
             "model_path_exists": False,
             "required_files_present": False,
+            "embedding_model_cache_hit": False,
+            "model_cache_key": None,
         }
     raw_status = status()
     return {
         "model_path_configured": bool(raw_status.get("model_path_configured", False)),
         "model_path_exists": bool(raw_status.get("model_path_exists", False)),
         "required_files_present": bool(raw_status.get("required_files_present", False)),
+        "embedding_model_cache_hit": bool(raw_status.get("embedding_model_cache_hit", False)),
+        "model_cache_key": _safe_model_cache_key(raw_status.get("model_cache_key")),
     }
 
 
@@ -320,6 +336,11 @@ def _log_request_completed(response: LegalQAResponse) -> None:
             "dense_retrieval_fallback_used": response.metadata.dense_retrieval_fallback_used,
             "fallback_used": response.metadata.fallback_used,
             "retriever_stage_failed": response.metadata.retriever_stage_failed,
+            "embedding_model_cache_hit": response.metadata.embedding_model_cache_hit,
+            "embedding_model_loaded_before_request": (
+                response.metadata.embedding_model_loaded_before_request
+            ),
+            "model_cache_key": response.metadata.model_cache_key,
         },
     )
 
@@ -404,3 +425,14 @@ def _safe_optional_int(value: Any) -> int | None:
     if isinstance(value, int) and value > 0:
         return value
     return None
+
+
+def _safe_model_cache_key(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if not all(character.isalnum() or character in {":", "_", "-"} for character in stripped):
+        return None
+    return stripped

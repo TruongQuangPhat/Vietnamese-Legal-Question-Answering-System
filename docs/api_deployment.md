@@ -194,7 +194,7 @@ controlled JSON before Azure emits `502` or `504`:
 LEGAL_QA_ASK_TIMEOUT_SECONDS=90
 LEGAL_QA_RETRIEVAL_MODE=hybrid
 LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60
-LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=60
+LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=120
 LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45
 LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30
 LEGAL_QA_LLM_TIMEOUT_SECONDS=30
@@ -235,15 +235,20 @@ not that BGE-M3 model loading or query embedding timed out.
 `GET /api/v1/legal-qa/warmup` is explicit and separate from `/health` and
 `/api/v1/readiness`. Warmup reports sanitized local model-path status, model
 load status, encode status, elapsed time, and exception class. After the model
-is packaged in the image, expected production warmup is `warmed=true` before
-running the single controlled `/ask` smoke.
+is packaged in the image, expected production warmup is `warmed=true`,
+`model_load_completed=true`, `encode_completed=true`, and
+`cache_hit_after=true` before running the single controlled `/ask` smoke.
+Warmup populates the same process-local BGE-M3 cache used by `/ask`; a normal
+post-warmup ask should report `metadata.embedding_model_cache_hit=true` and
+`metadata.embedding_model_loaded_before_request=true`.
 
 Production Ask Smoke validates the canonical hybrid production path. For a
 standalone legal question, `metadata.retrieval_question_prepared=false` is
 diagnostic only and is not a failure by itself. The primary pass criteria are
 HTTP 200, `decision=answered`, model presence, a non-empty answer, at least one
 citation, `metadata.dense_retrieval_used=true`, `metadata.fallback_used=false`,
-and no timeout/internal-error or degraded dense-retrieval warnings. A false
+`metadata.embedding_model_cache_hit=true`, and no timeout/internal-error or
+degraded dense-retrieval warnings. A false
 `retrieval_question_prepared` value remains a hard failure only when
 `metadata.follow_up_detected=true`, because that smoke path is explicitly
 testing follow-up question rewriting.
@@ -251,6 +256,9 @@ testing follow-up question rewriting.
 or `metadata.dense_retrieval_used=false` in hybrid mode means production is
 answering through degraded retrieval and must be investigated rather than
 accepted as a final production-quality pass.
+`embedding_model_load_timeout` means the model was not loaded or warmed within
+the configured model-load budget. `qdrant_retrieval_error` should mean an
+actual Qdrant failure only, not model loading or query encoding.
 
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the

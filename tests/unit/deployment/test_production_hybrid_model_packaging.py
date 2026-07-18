@@ -37,7 +37,8 @@ def test_production_deploy_preserves_hybrid_retrieval_and_model_path() -> None:
     assert "LEGAL_QA_RETRIEVAL_MODE=sparse" not in workflow
     assert "LEGAL_QA_RERANKING_ENABLED=false" in workflow
     assert "LEGAL_QA_MAX_TOP_K=5" in workflow
-    assert "LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=60" in workflow
+    assert "LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=120" in workflow
+    assert "LEGAL_QA_WARMUP_TIMEOUT_SECONDS=180" in workflow
     assert "LEGAL_QA_WARMUP_ENDPOINT_ENABLED=true" in workflow
     assert 'EMBEDDING_MODEL_PATH="$EMBEDDING_MODEL_PATH"' in workflow
     assert "HF_HUB_OFFLINE=1" in workflow
@@ -72,6 +73,7 @@ def test_production_ask_smoke_requires_packaged_model_warmup() -> None:
     assert '"required_files_present"' in workflow
     assert '"model_load_completed"' in workflow
     assert '"encode_completed"' in workflow
+    assert '"cache_hit_after"' in workflow
 
 
 def test_sparse_mode_is_documented_as_emergency_degraded_only() -> None:

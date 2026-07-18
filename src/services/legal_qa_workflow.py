@@ -264,20 +264,30 @@ class RealLegalQAWorkflow:
             return
         _run_async(warmup())
 
-    def embedding_model_status(self) -> dict[str, bool]:
+    def embedding_model_status(self) -> dict[str, object]:
         """Return shallow embedding model path status without loading the model."""
         status = self._embedding_model_path_status
+        retriever_status = self._retriever_embedding_status()
         if status is None:
             return {
                 "model_path_configured": False,
                 "model_path_exists": False,
                 "required_files_present": False,
+                **retriever_status,
             }
         return {
             "model_path_configured": status.configured,
             "model_path_exists": status.exists,
             "required_files_present": status.required_files_present,
+            **retriever_status,
         }
+
+    def _retriever_embedding_status(self) -> dict[str, object]:
+        status = getattr(self._retriever, "embedding_model_status", None)
+        if status is None or not callable(status):
+            return {}
+        raw_status = status()
+        return raw_status if isinstance(raw_status, dict) else {}
 
 
 class _RetrievalQuestionOverride:
@@ -605,6 +615,13 @@ def map_rag_answer_to_workflow_result(
         retriever_stage_failed=_safe_metadata_string(
             result.retrieval_metadata.get("retriever_stage_failed")
         ),
+        embedding_model_cache_hit=bool(
+            result.retrieval_metadata.get("embedding_model_cache_hit", False)
+        ),
+        embedding_model_loaded_before_request=bool(
+            result.retrieval_metadata.get("embedding_model_loaded_before_request", False)
+        ),
+        model_cache_key=_safe_metadata_string(result.retrieval_metadata.get("model_cache_key")),
     )
     warnings = [
         *result.fallback_reasons,
@@ -726,7 +743,9 @@ def _safe_metadata_string(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     stripped = value.strip()
-    if not stripped or not stripped.replace("_", "").isalnum():
+    if not stripped:
+        return None
+    if not all(character.isalnum() or character in {":", "_", "-"} for character in stripped):
         return None
     return stripped
 

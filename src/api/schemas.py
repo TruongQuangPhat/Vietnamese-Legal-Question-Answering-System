@@ -248,6 +248,9 @@ class ResponseMetadataDTO(BaseModel):
     dense_retrieval_fallback_used: bool = False
     fallback_used: bool = False
     retriever_stage_failed: str | None = None
+    embedding_model_cache_hit: bool = False
+    embedding_model_loaded_before_request: bool = False
+    model_cache_key: str | None = None
 
 
 class LegalQAResponse(BaseModel):

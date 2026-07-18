@@ -164,6 +164,9 @@ jobs:
           print(f"Warmup required_files_present: {payload.get('required_files_present')}")
           print(f"Warmup model_load_completed: {payload.get('model_load_completed')}")
           print(f"Warmup encode_completed: {payload.get('encode_completed')}")
+          print(f"Warmup cache_hit_before: {payload.get('cache_hit_before')}")
+          print(f"Warmup cache_hit_after: {payload.get('cache_hit_after')}")
+          print(f"Warmup model_cache_key: {payload.get('model_cache_key')}")
           exception_class = payload.get("exception_class")
           if exception_class is not None:
               print(f"Warmup exception_class: {exception_class}")
@@ -175,6 +178,7 @@ jobs:
               "required_files_present",
               "model_load_completed",
               "encode_completed",
+              "cache_hit_after",
           ]
           missing = [name for name in required_true if payload.get(name) is not True]
           if missing:

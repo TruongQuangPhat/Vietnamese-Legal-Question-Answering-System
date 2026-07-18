@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import builtins
 import math
+import time
+from collections.abc import Iterator
 from pathlib import Path
+from threading import Thread
 from typing import Any
 
 import pytest
@@ -14,6 +17,7 @@ from src.indexing.embedding_model import (
     BgeM3EmbeddingModel,
     EmbeddingModelError,
     _load_flag_embedding_factory,
+    clear_embedding_model_cache,
     inspect_embedding_model_path,
 )
 from src.indexing.indexing_models import DenseEmbedding, EmbeddingInput
@@ -43,6 +47,27 @@ class RecordingFactory:
         """Record construction and return the configured encoder."""
         self.calls.append((model_name, kwargs))
         return self.encoder
+
+
+class SlowRecordingFactory(RecordingFactory):
+    """Fake factory that makes concurrent loading observable."""
+
+    def __init__(self, encoder: FakeEncoder, *, delay_seconds: float) -> None:
+        super().__init__(encoder)
+        self.delay_seconds = delay_seconds
+
+    def __call__(self, model_name: str, **kwargs: Any) -> FakeEncoder:
+        """Delay construction while recording exactly one expected call."""
+        time.sleep(self.delay_seconds)
+        return super().__call__(model_name, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def clear_model_cache() -> Iterator[None]:
+    """Keep process-global embedding cache isolated between tests."""
+    clear_embedding_model_cache()
+    yield
+    clear_embedding_model_cache()
 
 
 def _input(chunk_id: str, text: str = "Nội dung pháp luật") -> EmbeddingInput:
@@ -150,6 +175,65 @@ class TestBgeM3EmbeddingModel:
                 },
             )
         ]
+        assert model.is_loaded is True
+        assert model.model_cache_key.startswith("bge-m3:")
+
+    def test_same_local_model_configuration_shares_process_cache(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        _write_minimal_model_files(tmp_path)
+        factory = RecordingFactory(FakeEncoder([[1.0, 0.0]]))
+        first = BgeM3EmbeddingModel(
+            model_name=str(tmp_path),
+            device="cpu",
+            model_factory=factory,
+            require_local_files=True,
+        )
+        second = BgeM3EmbeddingModel(
+            model_name=str(tmp_path),
+            device="cpu",
+            model_factory=factory,
+            require_local_files=True,
+        )
+
+        first.ensure_loaded()
+        second.ensure_loaded()
+
+        assert len(factory.calls) == 1
+        assert first.is_loaded is True
+        assert second.is_loaded is True
+        assert first.model_cache_key == second.model_cache_key
+
+    def test_concurrent_model_load_waits_on_same_cache_entry(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        _write_minimal_model_files(tmp_path)
+        factory = SlowRecordingFactory(FakeEncoder([[1.0, 0.0]]), delay_seconds=0.02)
+        model = BgeM3EmbeddingModel(
+            model_name=str(tmp_path),
+            device="cpu",
+            model_factory=factory,
+            require_local_files=True,
+        )
+        errors: list[BaseException] = []
+
+        def load_model() -> None:
+            try:
+                model.ensure_loaded()
+            except BaseException as exc:
+                errors.append(exc)
+
+        threads = [Thread(target=load_model) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert errors == []
+        assert len(factory.calls) == 1
+        assert model.is_loaded is True
 
     def test_required_local_model_path_fails_before_factory_call(
         self,

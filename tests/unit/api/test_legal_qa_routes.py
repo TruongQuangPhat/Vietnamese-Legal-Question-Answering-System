@@ -350,6 +350,9 @@ async def test_ask_route_returns_safe_error_when_service_fails() -> None:
         "dense_retrieval_fallback_used": False,
         "fallback_used": False,
         "retriever_stage_failed": None,
+        "embedding_model_cache_hit": False,
+        "embedding_model_loaded_before_request": False,
+        "model_cache_key": None,
     }
     assert "secret traceback details" not in response.text
 
@@ -678,6 +681,8 @@ async def test_warmup_endpoint_returns_sanitized_status_when_enabled() -> None:
                 "model_path_configured": True,
                 "model_path_exists": True,
                 "required_files_present": True,
+                "embedding_model_cache_hit": False,
+                "model_cache_key": "bge-m3:test-cache",
             }
 
         def warmup_embedding(self):
@@ -697,6 +702,9 @@ async def test_warmup_endpoint_returns_sanitized_status_when_enabled() -> None:
                     "encode_started": True,
                     "encode_completed": True,
                     "encode_timeout": False,
+                    "cache_hit_before": False,
+                    "cache_hit_after": True,
+                    "model_cache_key": "bge-m3:test-cache",
                 },
             )()
 
@@ -723,6 +731,9 @@ async def test_warmup_endpoint_returns_sanitized_status_when_enabled() -> None:
         "encode_started": True,
         "encode_completed": True,
         "encode_timeout": False,
+        "cache_hit_before": False,
+        "cache_hit_after": True,
+        "model_cache_key": "bge-m3:test-cache",
     }
 
 
