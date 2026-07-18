@@ -97,6 +97,17 @@ def test_session_token_storage_failure_falls_back_or_is_omitted_without_blocking
 def test_production_api_base_url_still_cannot_fall_back_to_localhost() -> None:
     source = API_CONFIG.read_text(encoding="utf-8")
 
-    assert "NEXT_PUBLIC_API_BASE_URL must be set for production frontend builds." in source
     assert 'if (nodeEnv !== "production")' in source
+    assert "return ACCEPTED_PRODUCTION_API_BASE_URL;" in source
+    assert "https://vnlaw-backend-prod-phat.azurewebsites.net" in source
     assert "http://localhost:8000" not in source
+
+
+def test_transient_assistant_errors_are_not_persisted_as_durable_history() -> None:
+    source = (REPO_ROOT / "apps/frontend/src/components/legal-qa/chat-storage.ts").read_text(
+        encoding="utf-8",
+    )
+
+    assert "stripTransientAssistantFailures" in source
+    assert "conversations.map(stripTransientAssistantFailures)" in source
+    assert 'message.role === "user" || message.status === "complete"' in source

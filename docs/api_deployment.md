@@ -391,7 +391,7 @@ connectivity, or real multi-turn quality.
 | Health | `/health` is liveness; `/api/v1/readiness` validates config and optionally reads Qdrant collection metadata | Readiness deliberately does not validate LLM availability or load the embedding model |
 | Version | Static API name/version is exposed | It has no build or revision identity |
 | CORS | JSON-array origins are supported; legacy comma-separated values remain compatible | Deployed frontend origins must be supplied explicitly |
-| Frontend API URL | One public base URL is used by both clients | It is embedded during `next build`; localhost fallback is unsafe for an omitted production setting |
+| Frontend API URL | One public base URL is used by both clients | It is embedded during `next build`; production falls back only to the accepted Azure backend if the public variable is omitted |
 | Containers | Fake-mode images and Compose stack build the MVP | Committed stack does not package or configure real mode |
 | Conversation storage | Memory store is the default; PostgreSQL store is available when explicitly configured | Auth/user ownership remains future work; PostgreSQL schema must be applied before durable use |
 | API security | Input bounds, sanitized errors, and optional in-process `/api/v1/legal-qa/ask` rate limiting exist | Authentication, authorization, trusted proxy policy, and distributed abuse controls are not implemented |
@@ -844,9 +844,12 @@ container environment value does not reliably replace the already compiled
 client value.
 
 The frontend allows `http://localhost:8000` only outside production when
-`NEXT_PUBLIC_API_BASE_URL` is missing. Production builds fail clearly if the
-value is missing or blank so a stale Vercel environment cannot silently compile
-a localhost backend URL into the browser bundle.
+`NEXT_PUBLIC_API_BASE_URL` is missing. Production builds must set the accepted
+Azure backend explicitly. If the public variable is absent from a production
+bundle, the frontend uses
+`https://vnlaw-backend-prod-phat.azurewebsites.net` as the production-safe
+default rather than failing before the `/api/v1/legal-qa/ask` fetch or silently
+targeting localhost.
 
 ## Fake mode and real mode
 
