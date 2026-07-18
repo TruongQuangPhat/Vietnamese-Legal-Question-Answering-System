@@ -37,11 +37,15 @@ export function saveConversations(conversations: Conversation[]) {
     return;
   }
 
-  const storedState: StoredChatState = {
-    version: 1,
-    conversations: sortConversations(conversations),
-  };
-  window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(storedState));
+  try {
+    const storedState: StoredChatState = {
+      version: 1,
+      conversations: sortConversations(conversations),
+    };
+    window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(storedState));
+  } catch {
+    console.warn("Conversation local persistence failed.");
+  }
 }
 
 export function sortConversations(conversations: Conversation[]): Conversation[] {
