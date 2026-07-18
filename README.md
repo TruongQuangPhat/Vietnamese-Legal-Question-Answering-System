@@ -59,8 +59,9 @@ Main source modules:
 | `src/services/`   | Existing orchestration services where a service boundary is already used.                                                                                                                                                 |
 | `scripts/`        | Thin CLI wrappers for corpus, indexing, retrieval, and evaluation workflows.                                                                                                                                              |
 
-Production API deployment, GraphRAG, fine-tuning, production MLOps, and
-time-aware filtering are not part of the adopted evaluated pipeline.
+GraphRAG, fine-tuning, and time-aware filtering are not part of the adopted
+evaluated pipeline. Production API deployment is implemented separately as the
+Azure App Service container backend described below.
 
 The local Legal QA product MVP includes a FastAPI backend under `src/api`, a
 Next.js frontend under `apps/frontend`, backend/frontend Dockerfiles, and a
@@ -76,10 +77,17 @@ Accepted production backend: Azure App Service at
 `https://vnlaw-backend-prod-phat.azurewebsites.net`, with images served from
 `vnlawacrphat.azurecr.io`.
 
-Azure production is accepted for the real hybrid Legal QA path:
+Current production backend image:
+
+```text
+vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f
+```
+
+The production backend phase is completed for the real hybrid Legal QA path:
 
 - `GET /health` passes.
 - `GET /api/v1/readiness` passes with `ready=true`.
+- Qdrant readiness reports `collection_available`.
 - `GET /api/v1/legal-qa/warmup` passes with `warmed=true`,
   `model_path_configured=true`, `model_path_exists=true`,
   `required_files_present=true`, `model_load_completed=true`, and
@@ -89,6 +97,7 @@ Azure production is accepted for the real hybrid Legal QA path:
   `cache_hit_before=true`, `cache_hit_after=true`, and the same
   `model_cache_key`, proving reuse of the process-local BGE-M3 cache used by
   `/api/v1/legal-qa/ask`.
+- Repeated production ask smoke passed 10/10 after warmup.
 - Production Ask Smoke passes with HTTP 200, `decision=answered`,
   `metadata.model` present, at least one citation, and no
   timeout/internal-error warnings or dense retrieval fallback. The ask metadata
@@ -106,6 +115,10 @@ download model files at request time.
 `embedding_model_load_timeout` means the model was not loaded or warmed within
 the configured model-load budget. `qdrant_retrieval_error` should mean an
 actual Qdrant call failure only.
+The production startup regression, Qdrant response handling failure, and
+intermittent Qdrant dense-retrieval fallback have been fixed with lightweight
+startup boundaries, safe response parsing/classification, and bounded
+Qdrant-query retry with client recreation.
 
 Canonical production pipeline:
 

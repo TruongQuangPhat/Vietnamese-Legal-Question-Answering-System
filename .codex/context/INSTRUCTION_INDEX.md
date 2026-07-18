@@ -79,8 +79,12 @@ Current durable status:
   `/models/embedding/bge-m3` with `EMBEDDING_MODEL_PATH`,
   `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, and
   `HF_DATASETS_OFFLINE=1`; production health, readiness, warmup, and the
-  controlled Production Ask Smoke have passed; Vercel production is
-  `https://vnlaw-qa.vercel.app` and calls the accepted Azure backend;
+  controlled Production Ask Smoke have passed; Qdrant readiness reports
+  `collection_available`; repeated production ask smoke has passed 10/10; the
+  current accepted image is
+  `vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f`;
+  Vercel production is `https://vnlaw-qa.vercel.app` and calls the accepted
+  Azure backend;
 * production validation must preserve the canonical hybrid path
   BGE-M3 / FlagEmbedding -> DenseRetriever -> Qdrant dense retrieval ->
   coverage-aware hybrid retrieval -> evidence selection -> LLM generation, and
@@ -99,8 +103,16 @@ Current durable status:
   smoke, while evidence caution warnings such as `caution_evidence_selected`,
   `auxiliary_parent_context_included`, and `all_selected_evidence_caution` may
   appear without indicating deployment/runtime failure;
-* GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part
-  of the adopted evaluated pipeline.
+* the production startup regression, Qdrant response handling failure, and
+  intermittent Qdrant dense retrieval fallback have been fixed without a
+  sparse-only switch or weakened smoke checks. `/health` must remain
+  lightweight. After large Azure container image changes, prefer stop/start
+  plus wait before health/readiness/warmup validation when restart alone is not
+  reliable;
+* GraphRAG, time-aware filtering, automated rollback/alerting, richer
+  production observability, and fine-tuning are not part of the adopted
+  evaluated pipeline. CI gates, protected-path checks, container deployment,
+  warmup, and production smoke are implemented operational controls.
 
 Read `PROJECT_CONTEXT.md` for the complete current state.
 
