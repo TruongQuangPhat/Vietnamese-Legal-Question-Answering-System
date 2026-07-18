@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -84,6 +86,19 @@ def test_production_ask_smoke_requires_packaged_model_warmup() -> None:
     assert "--expected-model-cache-key" in workflow
 
 
+def test_production_ask_smoke_inline_python_imports_used_modules() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/production-ask-smoke.yml").read_text(
+        encoding="utf-8"
+    )
+
+    for index, source in enumerate(_python_heredocs(workflow), start=1):
+        tree = ast.parse(source)
+        imported = _imported_names(tree)
+        used = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+        missing = sorted((used & {"json", "os", "sys", "Path"}) - imported)
+        assert missing == [], f"inline Python heredoc {index} missing imports: {missing}"
+
+
 def test_sparse_mode_is_documented_as_emergency_degraded_only() -> None:
     docs = "\n".join(
         [
@@ -96,3 +111,34 @@ def test_sparse_mode_is_documented_as_emergency_degraded_only() -> None:
     assert "hybrid is the canonical project pipeline" in docs
     assert "sparse is a degraded emergency mode only" in docs
     assert "Sparse mode must not be used to validate final production quality" in docs
+
+
+def _python_heredocs(workflow: str) -> list[str]:
+    scripts: list[str] = []
+    lines = workflow.splitlines()
+    index = 0
+    while index < len(lines):
+        if "python - <<'PY'" not in lines[index]:
+            index += 1
+            continue
+        index += 1
+        block: list[str] = []
+        while index < len(lines) and lines[index].strip() != "PY":
+            line = lines[index]
+            block.append(line[10:] if line.startswith(" " * 10) else line)
+            index += 1
+        scripts.append(textwrap.dedent("\n".join(block)))
+        index += 1
+    return scripts
+
+
+def _imported_names(tree: ast.AST) -> set[str]:
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(
+                alias.asname or alias.name.split(".", maxsplit=1)[0] for alias in node.names
+            )
+        elif isinstance(node, ast.ImportFrom):
+            imported.update(alias.asname or alias.name for alias in node.names)
+    return imported

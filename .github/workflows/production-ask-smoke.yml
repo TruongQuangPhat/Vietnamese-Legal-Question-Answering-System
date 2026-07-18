@@ -144,6 +144,7 @@ jobs:
 
           import json
           import os
+          import sys
           from pathlib import Path
 
           from scripts.deployment.validate_production_ask_smoke_response import (
