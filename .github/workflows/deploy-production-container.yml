@@ -220,6 +220,8 @@ jobs:
           done
 
           printf 'Local fake-mode container health smoke did not pass in time.\n'
+          docker ps -a --filter name=vnlaw-production-backend-smoke
+          docker logs vnlaw-production-backend-smoke
           exit 1
 
       - name: Stop local smoke container
@@ -362,6 +364,22 @@ jobs:
 
           if [ "$health_passed" != "true" ]; then
             printf 'Production health smoke did not pass in time.\n'
+            printf 'Safe App Service container config snapshot:\n'
+            az webapp config show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
+              --query "{linuxFxVersion:linuxFxVersion,appCommandLine:appCommandLine,alwaysOn:alwaysOn}" \
+              --output json || true
+            printf 'Safe production app settings snapshot:\n'
+            az webapp config appsettings list \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_PRODUCTION_WEBAPP_NAME" \
+              --query "[?name=='WEBSITES_PORT' || name=='PORT' || name=='APP_ENV' || name=='LEGAL_QA_SERVICE_MODE' || name=='LEGAL_QA_RETRIEVAL_MODE' || name=='LEGAL_QA_CHUNKS_PATH' || name=='EMBEDDING_MODEL_PATH' || name=='HF_HUB_OFFLINE' || name=='TRANSFORMERS_OFFLINE' || name=='HF_DATASETS_OFFLINE' || name=='LEGAL_QA_WARMUP_ENDPOINT_ENABLED' || name=='LEGAL_QA_EMBEDDING_WARMUP_ENABLED'].{name:name,value:value}" \
+              --output table || true
+            printf 'Recent production container logs:\n'
+            timeout 45 az webapp log tail \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_PRODUCTION_WEBAPP_NAME" || true
             exit 1
           fi
 

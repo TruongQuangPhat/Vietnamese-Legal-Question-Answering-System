@@ -48,6 +48,30 @@ def test_production_deploy_preserves_hybrid_retrieval_and_model_path() -> None:
     assert "HF_DATASETS_OFFLINE=1" in workflow
 
 
+def test_production_deploy_health_failure_prints_safe_startup_diagnostics() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/deploy-production-container.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Local fake-mode container health smoke did not pass in time." in workflow
+    assert "docker logs vnlaw-production-backend-smoke" in workflow
+    assert "Production health smoke did not pass in time." in workflow
+    assert "Safe App Service container config snapshot:" in workflow
+    assert "linuxFxVersion:linuxFxVersion" in workflow
+    assert "appCommandLine:appCommandLine" in workflow
+    assert "Safe production app settings snapshot:" in workflow
+    assert "Recent production container logs:" in workflow
+    assert "az webapp log tail" in workflow
+    for secret_name in (
+        "QDRANT_API_KEY",
+        "LEGAL_QA_QDRANT_API_KEY",
+        "OPENROUTER_API_KEY",
+        "LEGAL_QA_DATABASE_URL",
+        "LEGAL_QA_SESSION_SECRET",
+    ):
+        assert f"name=='{secret_name}'" not in workflow
+
+
 def test_production_ask_smoke_does_not_force_sparse_retrieval() -> None:
     workflow = (REPO_ROOT / ".github/workflows/production-ask-smoke.yml").read_text(
         encoding="utf-8"
