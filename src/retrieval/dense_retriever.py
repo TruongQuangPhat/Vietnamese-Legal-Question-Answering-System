@@ -714,9 +714,6 @@ def _optional_bool(value: Any) -> bool | None:
 def _qdrant_exception_is_timeout(exc: BaseException) -> bool:
     if isinstance(exc, TimeoutError):
         return True
-    source = getattr(exc, "source", None)
-    if isinstance(source, TimeoutError):
-        return True
     timeout_class_names = {
         "ConnectTimeout",
         "PoolTimeout",
@@ -724,13 +721,17 @@ def _qdrant_exception_is_timeout(exc: BaseException) -> bool:
         "TimeoutException",
         "WriteTimeout",
     }
-    return type(exc).__name__ in timeout_class_names or type(source).__name__ in timeout_class_names
+    if type(exc).__name__ in timeout_class_names:
+        return True
+    return any(
+        isinstance(wrapped, TimeoutError) or type(wrapped).__name__ in timeout_class_names
+        for wrapped in _wrapped_qdrant_exception_sources(exc)
+    )
 
 
 def _safe_qdrant_exception_summary(exc: BaseException) -> str:
     exception_class = type(exc).__name__
-    source = getattr(exc, "source", None)
-    source_class = type(source).__name__ if source is not None else None
+    source_class = _wrapped_qdrant_exception_source_class(exc)
     if _qdrant_exception_is_timeout(exc):
         return (
             f"qdrant response handling timed out: source={source_class}"
@@ -747,6 +748,22 @@ def _safe_qdrant_exception_summary(exc: BaseException) -> str:
     if message.startswith("invalid retrieved chunk at rank"):
         return "qdrant result payload validation failed"
     return f"qdrant retrieval failed: exception={exception_class}"
+
+
+def _wrapped_qdrant_exception_sources(exc: BaseException) -> tuple[BaseException, ...]:
+    sources: list[BaseException] = []
+    for attribute_name in ("source", "__cause__", "__context__"):
+        wrapped = getattr(exc, attribute_name, None)
+        if isinstance(wrapped, BaseException) and wrapped not in sources:
+            sources.append(wrapped)
+    return tuple(sources)
+
+
+def _wrapped_qdrant_exception_source_class(exc: BaseException) -> str | None:
+    sources = _wrapped_qdrant_exception_sources(exc)
+    if not sources:
+        return None
+    return type(sources[0]).__name__
 
 
 def _issue(

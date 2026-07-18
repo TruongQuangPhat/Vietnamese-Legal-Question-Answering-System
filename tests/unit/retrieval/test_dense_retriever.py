@@ -167,6 +167,19 @@ class FakeQdrantClient:
         raise AssertionError("retrieval must not delete collections")
 
 
+class ResponseHandlingException(Exception):  # noqa: N818
+    """Local qdrant-client-shaped response handling exception for unit tests."""
+
+    def __init__(self, source: Exception) -> None:
+        super().__init__("response handling failed")
+        self.source = source
+        self.__cause__ = source
+
+
+class CauseOnlyResponseHandlingError(Exception):
+    """Wrapper shaped like response handling errors that expose only __cause__."""
+
+
 @pytest.fixture(autouse=True)
 def fake_qdrant_models(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Keep filter construction independent from qdrant-client."""
@@ -424,6 +437,23 @@ async def test_qdrant_timeout_fails_fast() -> None:
 async def test_qdrant_response_handling_timeout_is_reported_as_timeout() -> None:
     """Qdrant client response handling timeout keeps timeout classification."""
     response_handling_error = make_response_handling_exception(TimeoutError("read timed out"))
+    retriever = make_retriever(
+        client=FakeQdrantClient(query_error=response_handling_error),
+        qdrant_timeout_seconds=1.0,
+    )
+
+    with pytest.raises(QdrantRetrievalTimeoutError) as error:
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert error.value.failure_stage == "qdrant_retrieval_timeout"
+    assert error.value.warning_code == "qdrant_retrieval_timeout"
+
+
+@pytest.mark.asyncio
+async def test_qdrant_response_handling_timeout_can_use_wrapped_cause() -> None:
+    """Timeout classification does not require importing qdrant-client."""
+    response_handling_error = CauseOnlyResponseHandlingError("response handling failed")
+    response_handling_error.__cause__ = TimeoutError("read timed out")
     retriever = make_retriever(
         client=FakeQdrantClient(query_error=response_handling_error),
         qdrant_timeout_seconds=1.0,
@@ -697,7 +727,5 @@ async def test_qdrant_response_handling_timing_logs_safe_source_summary() -> Non
 
 
 def make_response_handling_exception(source: Exception) -> Exception:
-    """Build the installed qdrant-client response handling exception."""
-    from qdrant_client.http.exceptions import ResponseHandlingException
-
+    """Build a qdrant-client-shaped response handling exception."""
     return ResponseHandlingException(source)
