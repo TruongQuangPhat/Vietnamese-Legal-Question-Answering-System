@@ -178,6 +178,7 @@ async def warmup_legal_qa(
     if not settings.legal_qa_warmup_endpoint_enabled:
         raise HTTPException(status_code=404, detail="not_found")
     started_at = perf_counter()
+    model_status = _warmup_model_status(service)
     try:
         with anyio.fail_after(settings.legal_qa_warmup_timeout_seconds):
             result = await anyio.to_thread.run_sync(
@@ -190,11 +191,27 @@ async def warmup_legal_qa(
             "warmed": False,
             "elapsed_ms": elapsed_ms,
             "exception_class": "TimeoutError",
+            **model_status,
+            "model_load_started": True,
+            "model_load_completed": False,
+            "model_load_timeout": True,
+            "encode_started": False,
+            "encode_completed": False,
+            "encode_timeout": False,
         }
     return {
         "warmed": result.warmed,
         "elapsed_ms": result.elapsed_ms,
         "exception_class": result.exception_class,
+        "model_path_configured": bool(getattr(result, "model_path_configured", False)),
+        "model_path_exists": bool(getattr(result, "model_path_exists", False)),
+        "required_files_present": bool(getattr(result, "required_files_present", False)),
+        "model_load_started": bool(getattr(result, "model_load_started", False)),
+        "model_load_completed": bool(getattr(result, "model_load_completed", False)),
+        "model_load_timeout": bool(getattr(result, "model_load_timeout", False)),
+        "encode_started": bool(getattr(result, "encode_started", False)),
+        "encode_completed": bool(getattr(result, "encode_completed", False)),
+        "encode_timeout": bool(getattr(result, "encode_timeout", False)),
     }
 
 
@@ -213,6 +230,22 @@ def _request_settings(request: Request) -> AppSettings:
     if isinstance(settings, AppSettings):
         return settings
     return get_settings()
+
+
+def _warmup_model_status(service: Any) -> dict[str, bool]:
+    status = getattr(service, "embedding_model_status", None)
+    if status is None or not callable(status):
+        return {
+            "model_path_configured": False,
+            "model_path_exists": False,
+            "required_files_present": False,
+        }
+    raw_status = status()
+    return {
+        "model_path_configured": bool(raw_status.get("model_path_configured", False)),
+        "model_path_exists": bool(raw_status.get("model_path_exists", False)),
+        "required_files_present": bool(raw_status.get("required_files_present", False)),
+    }
 
 
 def _cap_request_top_k(request: LegalQARequest, settings: AppSettings) -> LegalQARequest:

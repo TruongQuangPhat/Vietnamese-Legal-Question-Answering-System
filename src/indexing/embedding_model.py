@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from pydantic import ValidationError
@@ -19,6 +21,15 @@ class EmbeddingModelError(RuntimeError):
     """Failure while loading or invoking the optional embedding model."""
 
 
+@dataclass(frozen=True)
+class EmbeddingModelPathStatus:
+    """Shallow local model-path status safe for readiness and warmup responses."""
+
+    configured: bool
+    exists: bool
+    required_files_present: bool
+
+
 class DenseEncoder(Protocol):
     """Minimal protocol implemented by the FlagEmbedding BGE-M3 encoder."""
 
@@ -28,6 +39,9 @@ class DenseEncoder(Protocol):
 
 
 ModelFactory = Callable[..., DenseEncoder]
+MODEL_CONFIG_FILES = ("config.json",)
+MODEL_WEIGHT_FILES = ("model.safetensors", "pytorch_model.bin")
+MODEL_TOKENIZER_FILES = ("tokenizer.json", "sentencepiece.bpe.model")
 
 
 class BgeM3EmbeddingModel:
@@ -59,6 +73,7 @@ class BgeM3EmbeddingModel:
         dense_vector_name: str = "dense",
         encoder: DenseEncoder | None = None,
         model_factory: ModelFactory | None = None,
+        require_local_files: bool = False,
     ) -> None:
         if not model_name.strip():
             raise ValueError("model_name must not be blank")
@@ -77,6 +92,7 @@ class BgeM3EmbeddingModel:
         self.normalize_embeddings = normalize_embeddings
         self.max_length = max_length
         self.dense_vector_name = dense_vector_name
+        self.require_local_files = require_local_files
         self._encoder = encoder
         self._model_factory = model_factory
         self._device_effective: str | None = None
@@ -218,12 +234,18 @@ class BgeM3EmbeddingModel:
 
         factory = self._model_factory or _load_flag_embedding_factory()
         device = _resolve_device(self.device_requested)
+        if self.require_local_files:
+            status = inspect_embedding_model_path(self.model_name)
+            if not status.exists:
+                raise EmbeddingModelError("local BGE-M3 model path is not available")
+            if not status.required_files_present:
+                raise EmbeddingModelError("local BGE-M3 model path is incomplete")
         kwargs: dict[str, object] = {
             "normalize_embeddings": self.normalize_embeddings,
             "use_fp16": device == "cuda",
             "devices": [device],
         }
-        if self.model_revision is not None:
+        if self.model_revision is not None and not self.require_local_files:
             kwargs["revision"] = self.model_revision
 
         try:
@@ -246,6 +268,34 @@ def _load_flag_embedding_factory() -> ModelFactory:
             "Install the project embedding extra with: uv sync --extra embedding"
         ) from exc
     return BGEM3FlagModel
+
+
+def inspect_embedding_model_path(path: str | Path | None) -> EmbeddingModelPathStatus:
+    """Return a shallow, non-secret status for a local embedding model path.
+
+    The check intentionally avoids model loading. It verifies only that the
+    configured directory exists and contains the minimum Hugging Face files
+    needed to attempt a local BGE-M3 load.
+    """
+    if path is None or not str(path).strip():
+        return EmbeddingModelPathStatus(
+            configured=False,
+            exists=False,
+            required_files_present=False,
+        )
+    model_path = Path(path)
+    exists = model_path.is_dir()
+    required_files_present = (
+        exists
+        and all((model_path / filename).is_file() for filename in MODEL_CONFIG_FILES)
+        and any((model_path / filename).is_file() for filename in MODEL_WEIGHT_FILES)
+        and any((model_path / filename).is_file() for filename in MODEL_TOKENIZER_FILES)
+    )
+    return EmbeddingModelPathStatus(
+        configured=True,
+        exists=exists,
+        required_files_present=required_files_present,
+    )
 
 
 def _resolve_device(requested: str) -> str:

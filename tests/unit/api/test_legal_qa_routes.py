@@ -668,11 +668,31 @@ async def test_warmup_endpoint_returns_sanitized_status_when_enabled() -> None:
     )
 
     class WarmableService:
+        def embedding_model_status(self):
+            return {
+                "model_path_configured": True,
+                "model_path_exists": True,
+                "required_files_present": True,
+            }
+
         def warmup_embedding(self):
             return type(
                 "WarmupResult",
                 (),
-                {"warmed": True, "elapsed_ms": 7, "exception_class": None},
+                {
+                    "warmed": True,
+                    "elapsed_ms": 7,
+                    "exception_class": None,
+                    "model_path_configured": True,
+                    "model_path_exists": True,
+                    "required_files_present": True,
+                    "model_load_started": True,
+                    "model_load_completed": True,
+                    "model_load_timeout": False,
+                    "encode_started": True,
+                    "encode_completed": True,
+                    "encode_timeout": False,
+                },
             )()
 
     async def get_warmable_service() -> WarmableService:
@@ -685,7 +705,20 @@ async def test_warmup_endpoint_returns_sanitized_status_when_enabled() -> None:
         response = await client.get("/api/v1/legal-qa/warmup")
 
     assert response.status_code == 200
-    assert response.json() == {"warmed": True, "elapsed_ms": 7, "exception_class": None}
+    assert response.json() == {
+        "warmed": True,
+        "elapsed_ms": 7,
+        "exception_class": None,
+        "model_path_configured": True,
+        "model_path_exists": True,
+        "required_files_present": True,
+        "model_load_started": True,
+        "model_load_completed": True,
+        "model_load_timeout": False,
+        "encode_started": True,
+        "encode_completed": True,
+        "encode_timeout": False,
+    }
 
 
 @pytest.mark.asyncio

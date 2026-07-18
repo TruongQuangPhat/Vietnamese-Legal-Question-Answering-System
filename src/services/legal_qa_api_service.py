@@ -137,6 +137,15 @@ class LegalQAWarmupResult:
     warmed: bool
     elapsed_ms: int
     exception_class: str | None = None
+    model_path_configured: bool = False
+    model_path_exists: bool = False
+    required_files_present: bool = False
+    model_load_started: bool = False
+    model_load_completed: bool = False
+    model_load_timeout: bool = False
+    encode_started: bool = False
+    encode_completed: bool = False
+    encode_timeout: bool = False
 
 
 class LegalQAServiceError(RuntimeError):
@@ -371,21 +380,48 @@ class LegalQAService:
             retrieved evidence, generated answers, secrets, or raw exception text.
         """
         started_at = perf_counter()
+        model_status = self.embedding_model_status()
         warmup = getattr(self._workflow, "warmup_embedding", None)
         if warmup is None or not callable(warmup):
-            return LegalQAWarmupResult(warmed=False, elapsed_ms=0)
+            return LegalQAWarmupResult(warmed=False, elapsed_ms=0, **model_status)
         try:
             warmup()
         except Exception as exc:
+            exception_class = _root_exception_class(exc)
             return LegalQAWarmupResult(
                 warmed=False,
                 elapsed_ms=int((perf_counter() - started_at) * 1000),
-                exception_class=_root_exception_class(exc),
+                exception_class=exception_class,
+                model_load_started=True,
+                model_load_timeout=exception_class == "TimeoutError",
+                encode_timeout=False,
+                **model_status,
             )
         return LegalQAWarmupResult(
             warmed=True,
             elapsed_ms=int((perf_counter() - started_at) * 1000),
+            model_load_started=True,
+            model_load_completed=True,
+            encode_started=True,
+            encode_completed=True,
+            **model_status,
         )
+
+    def embedding_model_status(self) -> dict[str, bool]:
+        """Return shallow embedding model status without loading model weights."""
+        status = getattr(self._workflow, "embedding_model_status", None)
+        if status is None or not callable(status):
+            return {
+                "model_path_configured": False,
+                "model_path_exists": False,
+                "required_files_present": False,
+            }
+        raw_status = status()
+        return {
+            "model_path_configured": bool(raw_status.get("model_path_configured", False)),
+            "model_path_exists": bool(raw_status.get("model_path_exists", False)),
+            "required_files_present": bool(raw_status.get("required_files_present", False)),
+        }
 
 
 def map_workflow_result_to_response(

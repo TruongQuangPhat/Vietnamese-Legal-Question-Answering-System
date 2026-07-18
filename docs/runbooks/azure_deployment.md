@@ -564,10 +564,13 @@ If `/api/v1/legal-qa/ask` times out:
 - A timeout before `qdrant_retrieval` completes usually points to BGE-M3 or
   retrieval cold-start cost on CPU. A timeout after `llm_generation_provider_call`
   starts points to provider latency or egress.
-- Scale from B1 to B2 or P1v3 when model cold loading, CPU query embedding, or
-  memory pressure remains above the bounded smoke timeout.
-- Bake the model cache into the image only after confirming the bottleneck is
-  repeated model download or initialization, and keep the image private.
+- Production images now bake the pinned public `BAAI/bge-m3` snapshot into
+  `/models/embedding/bge-m3` during Docker build and set
+  `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, so runtime `/warmup` and
+  `/ask` should not download model files.
+- Scale from B1 to B2 or P1v3 when local model loading, CPU query embedding, or
+  memory pressure remains above the bounded smoke timeout after image-packaged
+  model files are confirmed.
 - Keep Vercel Production unchanged until production ask smoke passes.
 
 ## Production Ask Smoke Runbook
@@ -586,17 +589,23 @@ The workflow calls exactly:
 ```text
 GET /health
 GET /api/v1/readiness
-GET /api/v1/legal-qa/warmup  # optional best-effort when enabled
+GET /api/v1/legal-qa/warmup  # hard preflight gate before ask
 POST /api/v1/legal-qa/ask
 ```
 
-Warmup is non-blocking. The workflow uses a bounded 60-second curl timeout,
-prints the warmup HTTP status and response body, and continues to the exactly
-one `/ask` request if warmup is disabled, times out, returns non-200, or
-returns `warmed=false`. Local BGE-M3 / FlagEmbedding model loading can exceed
-the current App Service request limits, so production validation relies on
-`/ask` fail-fast dense query embedding plus sparse BM25 fallback rather than a
-mandatory warmup pass.
+Warmup is explicit and separate from health/readiness. It should run once after
+deployment to verify the image-packaged local BGE-M3 path, model load, and one
+fixed non-sensitive encode. Expected production warmup after this packaging
+change is HTTP 200 with `warmed=true`, `model_path_exists=true`,
+`required_files_present=true`, `model_load_completed=true`, and
+`encode_completed=true`. If warmup times out or returns `warmed=false`, inspect
+logs before running the single `/ask` smoke.
+
+Production App Service settings keep the original hybrid path:
+`LEGAL_QA_RETRIEVAL_MODE=hybrid`, `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`,
+Qdrant dense retrieval enabled, reranking disabled, and `LEGAL_QA_MAX_TOP_K=5`.
+Sparse BM25 fallback is an emergency fallback only, not the primary production
+retrieval mode.
 
 It sends one `/ask` request only. `timeout_seconds` is configurable up to 600
 seconds for production ML cold start. It fails if the ask HTTP status is not
