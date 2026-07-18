@@ -586,17 +586,26 @@ The workflow calls exactly:
 ```text
 GET /health
 GET /api/v1/readiness
+GET /api/v1/legal-qa/warmup  # optional best-effort when enabled
 POST /api/v1/legal-qa/ask
 ```
 
-It sends one request only. `timeout_seconds` is configurable up to 600 seconds
-for production ML cold start. It fails if the response reports
-`decision=error`, contains `internal_error`, has `metadata.model=null`, has
-`metadata.retrieval_question_prepared=false`, or returns the generic internal
-error answer. It prints only safe summary fields: HTTP status, response keys,
-answer length, citation/evidence counts, model-present status,
-retrieval-question-prepared status, sanitized warnings, and latency when
-present.
+Warmup is non-blocking. The workflow uses a bounded 60-second curl timeout,
+prints the warmup HTTP status and response body, and continues to the exactly
+one `/ask` request if warmup is disabled, times out, returns non-200, or
+returns `warmed=false`. Local BGE-M3 / FlagEmbedding model loading can exceed
+the current App Service request limits, so production validation relies on
+`/ask` fail-fast dense query embedding plus sparse BM25 fallback rather than a
+mandatory warmup pass.
+
+It sends one `/ask` request only. `timeout_seconds` is configurable up to 600
+seconds for production ML cold start. It fails if the ask HTTP status is not
+`200`, the response reports `decision=error`, contains `ask_timeout`, has
+`metadata.model=null`, has `metadata.retrieval_question_prepared=false`, or
+returns the generic internal error answer. It prints only safe summary fields:
+HTTP status, response keys, answer length, citation/evidence counts,
+model-present status, retrieval-question-prepared status, sanitized warnings,
+and latency when present.
 
 ## Vercel Production Cutover
 

@@ -196,6 +196,15 @@ These settings do not make real QA quality acceptable by themselves. They are
 runtime guardrails for diagnosing whether the bottleneck is model loading,
 query embedding, Qdrant retrieval, provider generation, or memory pressure.
 
+The production ask smoke may attempt `GET /api/v1/legal-qa/warmup`, but warmup
+is best-effort only. Local BGE-M3 / FlagEmbedding model loading can exceed the
+current Azure App Service request limits, so warmup timeout, `warmed=false`,
+non-200, or disabled endpoint status must not block the single controlled
+`/ask` request. The production strategy is to keep `/health` and
+`/api/v1/readiness` lightweight, keep dense query embedding bounded, and allow
+the normal `/ask` path to use sparse BM25 fallback if dense embedding times
+out.
+
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the
 default only allows `http://localhost:3000`. For Preview, add the exact Vercel

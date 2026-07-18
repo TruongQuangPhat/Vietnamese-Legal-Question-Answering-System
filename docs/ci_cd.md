@@ -926,14 +926,24 @@ It calls only:
 ```text
 GET /health
 GET /api/v1/readiness
+GET /api/v1/legal-qa/warmup  # optional best-effort when enabled
 POST /api/v1/legal-qa/ask
 ```
 
+Warmup is best-effort only. The workflow calls the warmup endpoint with a
+bounded 60-second curl timeout when the endpoint is available, logs the
+sanitized HTTP status/body, and continues to the single `/ask` request even if
+warmup times out, returns `warmed=false`, returns non-200, or is disabled.
+Local BGE-M3 / FlagEmbedding model loading can exceed App Service request
+limits on the current production plan, so warmup success is not a production
+ask smoke prerequisite.
+
 It sends exactly one `/ask` request with a configurable timeout up to 600
-seconds for production ML cold start and `top_k=5`, prints only safe summary fields, and fails
-if `decision == "error"`, `warnings` contains `internal_error`,
-`metadata.model` is null, `metadata.retrieval_question_prepared` is false, or
-the answer is the generic internal-error answer.
+seconds for production ML cold start and `top_k=5`, prints only safe summary
+fields, and fails if HTTP status is not `200`, `decision == "error"`,
+`warnings` contains `ask_timeout`, `metadata.model` is null,
+`metadata.retrieval_question_prepared` is false, or the answer is the generic
+internal-error answer.
 
 Production `/ask` timeout diagnostics come from sanitized
 `legal_qa_request_timing` logs. The logs record stage names and elapsed
