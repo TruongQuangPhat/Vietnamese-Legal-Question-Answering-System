@@ -10,6 +10,21 @@ generation behavior.
 
 ## Current Status
 
+Azure App Service is the current accepted production backend:
+
+```text
+Web App: vnlaw-backend-prod-phat
+URL: https://vnlaw-backend-prod-phat.azurewebsites.net
+ACR: vnlawacrphat.azurecr.io
+Retrieval mode: LEGAL_QA_RETRIEVAL_MODE=hybrid
+BGE-M3 model path: /models/embedding/bge-m3
+```
+
+Production `/health`, `/api/v1/readiness`, `/api/v1/legal-qa/warmup`, and
+Production Ask Smoke pass. The production backend keeps the canonical hybrid
+pipeline: BGE-M3 / FlagEmbedding -> DenseRetriever -> Qdrant dense retrieval ->
+coverage-aware hybrid retrieval -> evidence selection -> LLM generation.
+
 Stage 1 CI quality gates exist for backend checks, frontend checks, protected
 path guarding, and lightweight secret scanning. Stage 2 backend fake-mode
 container smoke exists and validates packaging with `LEGAL_QA_SERVICE_MODE=fake`
@@ -350,15 +365,15 @@ For Vercel Preview or staging validation, set:
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
 ```
 
-Do not change Vercel Production until a Preview deployment has passed UI smoke.
-If production currently points to Render, the production migration step is to
-change Vercel Production `NEXT_PUBLIC_API_BASE_URL` from:
+Vercel Production should point to the accepted Azure backend origin:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-prod-phat.azurewebsites.net
 ```
 
-to the accepted Azure backend origin and redeploy Vercel.
+If production browser requests still go to `onrender.com`, the Vercel
+environment is stale; update the production variable to Azure and redeploy
+after confirming Azure CORS.
 
 Azure backend CORS must include the exact Vercel browser origin. The backend
 default only allows local development. For Preview, add the exact Preview URL
@@ -383,10 +398,10 @@ Migration checklist:
 3. Redeploy Vercel Preview.
 4. Run UI smoke against Azure. Do not run `/api/v1/legal-qa/ask` loops,
    benchmarks, load tests, or concurrent request tests.
-5. If Preview passes, schedule the Vercel Production backend URL switch.
-6. Keep the Render backend URL as the rollback value until Azure production
-   traffic is accepted.
-7. Plan Render decommission separately after Azure acceptance: remove
+5. Confirm Vercel Production uses the Azure backend URL.
+6. Keep the Render backend URL as a rollback reference only until decommission
+   is reviewed.
+7. Plan Render decommission separately: remove
    Render-only secrets, disable Render traffic, preserve safe logs, and record
    the final rollback boundary.
 
@@ -452,8 +467,10 @@ Fail and rollback notes:
 - If the UI cannot render a response, stop and preserve safe browser/Azure logs
   without full answer text, prompts, headers, session identifiers, provider
   keys, database URLs, or environment dumps.
-- Do not switch Vercel Production in Stage 9.
-- Render remains the rollback backend until a later production migration passes.
+- Stage 9 is historical staging/preview guidance; current Vercel Production
+  should use the accepted Azure backend.
+- Render remains only a legacy rollback reference until decommission is
+  reviewed.
 
 ## Future Production Deploy Flow
 
@@ -571,7 +588,8 @@ If `/api/v1/legal-qa/ask` times out:
 - Scale from B1 to B2 or P1v3 when local model loading, CPU query embedding, or
   memory pressure remains above the bounded smoke timeout after image-packaged
   model files are confirmed.
-- Keep Vercel Production unchanged until production ask smoke passes.
+- Production Ask Smoke has passed. Keep future ask validation to one controlled
+  workflow run per reviewed deployment or failure investigation.
 
 ## Production Ask Smoke Runbook
 
@@ -604,6 +622,8 @@ logs before running the single `/ask` smoke.
 Production App Service settings keep the original hybrid path:
 `LEGAL_QA_RETRIEVAL_MODE=hybrid`, `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`,
 Qdrant dense retrieval enabled, reranking disabled, and `LEGAL_QA_MAX_TOP_K=5`.
+Runtime sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, and
+`HF_DATASETS_OFFLINE=1`.
 The rule is: hybrid is the canonical project pipeline; sparse is a degraded
 emergency mode only for local troubleshooting or constrained-host recovery, not
 the primary production retrieval mode. Sparse mode must not be used to validate final production quality.
@@ -628,31 +648,34 @@ status, follow-up-detected status, sanitized warnings, and latency when present.
 
 ## Vercel Production Cutover
 
-Do not change Vercel Production until the Azure production container backend
-has passed deploy smoke and one controlled production ask smoke.
+Azure production backend acceptance has passed. Current verification sequence:
 
-Cutover sequence:
-
-1. Deploy Azure production container backend.
-2. Confirm `/health` returns HTTP 200.
-3. Confirm `/api/v1/readiness` returns HTTP 200 and `ready=true`.
-4. Run one controlled production `/ask` smoke.
-5. Confirm Azure `CORS_ALLOWED_ORIGINS` includes exactly:
+1. Deploy Production Container Backend when releasing a new backend image.
+2. Verify the image tag in Azure App Service.
+3. Verify production app settings include the local BGE-M3 model path, hybrid
+   retrieval mode, and offline Hugging Face flags.
+4. Confirm `/health` returns HTTP 200.
+5. Confirm `/api/v1/readiness` returns HTTP 200 and `ready=true`.
+6. Confirm `/api/v1/legal-qa/warmup` returns HTTP 200 and `warmed=true`.
+7. Run Production Ask Smoke exactly once for the reviewed deployment.
+8. Confirm Azure `CORS_ALLOWED_ORIGINS` includes exactly:
 
    ```text
    https://vnlaw-qa.vercel.app
    ```
 
-6. Set Vercel Production:
+9. Set or verify Vercel Production:
 
    ```env
-   NEXT_PUBLIC_API_BASE_URL=<Azure production container backend URL>
+   NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-prod-phat.azurewebsites.net
    ```
 
-7. Redeploy Vercel Production.
-8. Run one browser UI smoke against Vercel Production.
-9. Keep Render as rollback until Azure production is stable.
-10. Decommission Render only after a separate reviewed cleanup plan removes
+10. Redeploy Vercel Production when the environment changes.
+11. Run one browser UI smoke against Vercel Production and confirm Network
+    requests go to `vnlaw-backend-prod-phat.azurewebsites.net`.
+12. Keep Render only as a legacy rollback reference until decommission is
+    reviewed.
+13. Decommission Render only after a separate reviewed cleanup plan removes
     Render-only secrets, disables Render traffic, preserves safe logs, and
     records the rollback boundary.
 

@@ -18,6 +18,10 @@ build/
 venv/
 env/
 
+# --- Frontend dependencies/build ---
+node_modules/
+.next/
+
 # --- Data (large files, crawled HTML) ---
 data
 data/raw/
@@ -79,6 +83,10 @@ docker-compose.override.yml
 # --- Logs ---
 *.log
 /logs/
+prod-*.zip
+prod-*/
+azure-log-*.zip
+azure-logs-*/
 
 # --- Pytest ---
 .pytest_cache/

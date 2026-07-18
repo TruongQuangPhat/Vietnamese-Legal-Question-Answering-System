@@ -416,13 +416,10 @@ script requires `LEGAL_QA_ALLOW_DB_TESTS=1` and `LEGAL_QA_DATABASE_URL` before
 connecting to a database; the pytest integration test also requires the
 repository-wide `LEGAL_QA_ALLOW_REAL_TESTS=1` gate. Neon managed PostgreSQL
 validation completed on 2026-07-09: schema application passed, the standalone
-smoke script passed, and the real DB integration test passed. Production Render
-PostgreSQL conversation storage was enabled and verified on 2026-07-09:
-`LEGAL_QA_CONVERSATION_STORE=postgres`, `LEGAL_QA_DATABASE_URL` stored as a
-secret, `LEGAL_QA_AUTH_ENABLED=false`, rate limiting still enabled,
-`GET /health` and `GET /api/v1/readiness` passing, and conversation create,
-read, append message, list, rename, delete, and delete verification passing.
-Production `/api/v1/legal-qa/ask` was not called for this storage validation.
+smoke script passed, and the real DB integration test passed. Historical Render
+PostgreSQL conversation storage validation also passed in July 2026, but Render
+is now legacy/rollback-only and is not the current production backend.
+Production `/api/v1/legal-qa/ask` was not called for storage validation.
 Rollback remains `LEGAL_QA_CONVERSATION_STORE=memory` plus backend redeploy.
 Full login/user accounts remain future work; nullable ownership fields support
 session ownership without requiring account records.
@@ -443,46 +440,63 @@ did not expose Session A data, and temporary smoke records were cleaned up.
 
 ### Production deployment handoff
 
-The API and deployment infrastructure work is complete with known runtime
-limitations:
+Azure App Service is the current accepted production backend:
 
 ```text
-backend: https://vnlaw-qa-backend.onrender.com
+backend: https://vnlaw-backend-prod-phat.azurewebsites.net
 frontend: https://vnlaw-qa.vercel.app
 backend mode: LEGAL_QA_SERVICE_MODE=real
 Qdrant: Qdrant Cloud / vnlaw_chunks_bgem3_v1_full
+retrieval mode: LEGAL_QA_RETRIEVAL_MODE=hybrid
+BGE-M3 model path: /models/embedding/bge-m3
 ```
 
-Render `GET /health` and `GET /api/v1/readiness` pass. Readiness reports
-`ready=true`, `service_mode=real`, valid configuration, and Qdrant
-`collection_available`. These checks establish infrastructure readiness only;
-they do not load BGE-M3 or prove request-time QA capacity.
-
-Render fetches the processed chunks artifact from:
+Azure production validation is accepted:
 
 ```text
-https://huggingface.co/datasets/phattruong1802/vnlaw-qa/resolve/main/legal_chunks/v1/legal_chunks.jsonl
+GET /health -> HTTP 200
+GET /api/v1/readiness -> HTTP 200 and ready true
+GET /api/v1/legal-qa/warmup -> HTTP 200 with warmed=true
+Production Ask Smoke -> HTTP 200, decision=answered, metadata.model present,
+citations >= 1, and no timeout/internal_error warnings
 ```
 
-The build verifies SHA256:
+The production container packages public `BAAI/bge-m3` under
+`/models/embedding/bge-m3`. Runtime uses
+`EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, `HF_HUB_OFFLINE=1`,
+`TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1`, so warmup and ask do
+not download model files at request time.
+
+The canonical production pipeline remains:
 
 ```text
-95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
+Question
+-> BGE-M3 / FlagEmbedding
+-> DenseRetriever
+-> Qdrant dense retrieval
+-> coverage-aware / hybrid retrieval
+-> evidence selection
+-> LLM generation
+-> answer
 ```
+
+Sparse retrieval may remain as a degraded emergency mode or fallback, but it is
+not the production default and must not replace the canonical hybrid path for
+production quality validation.
+
+Render is deprecated as a production backend and retained only as historical
+context or rollback reference. Render Free previously passed liveness/readiness
+but could not reliably serve real `/api/v1/legal-qa/ask` because BGE-M3, Torch,
+and Transformers exceeded the 512 MB memory limit. Do not use Render Free for
+production `/ask` validation.
 
 The deployed app does not require local Docker or local Qdrant. Those remain
 tools for separately approved local indexing, migration, snapshot/restore, or
 retrieval debugging.
 
-Render Free has 512 MB RAM. Real `POST /api/v1/legal-qa/ask` previously
-terminated out of memory when BGE-M3, Torch, and Transformers loaded. The API
-dependency path now keeps real Legal QA workflow construction lazy until the
-first `/ask` dependency resolution, caches the initialized service for reuse,
-and keeps `GET /health` plus `GET /api/v1/readiness` from loading BGE-M3 model
-weights. This reduces startup/readiness memory pressure but does not prove that
-Render Free can serve real QA. Do not repeatedly call `/ask`; run only one
-controlled production smoke after optimized code is deployed and health,
-readiness, and session ownership gates pass.
+Do not repeatedly call real production `/ask`; use the controlled GitHub
+Production Ask Smoke workflow and inspect sanitized logs before rerunning after
+any failure.
 
 `POST /api/v1/legal-qa/ask` supports optional in-process fixed-window rate
 limiting via `LEGAL_QA_RATE_LIMIT_ENABLED`,

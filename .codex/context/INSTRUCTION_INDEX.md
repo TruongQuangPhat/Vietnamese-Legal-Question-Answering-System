@@ -62,24 +62,28 @@ Current durable status:
 * evaluation runners support authenticated Qdrant Cloud through private
   `QDRANT_API_KEY` environment configuration;
 * workflow-level integration tests exist for corpus, retrieval, and evaluation;
-* Render backend and Vercel frontend infrastructure are deployed; read
-  `docs/api_deployment.md` for URLs, runbook, and the Render Free memory
-  limitation;
+* Azure App Service is the current accepted production backend at
+  `https://vnlaw-backend-prod-phat.azurewebsites.net`; Vercel production
+  should point to this Azure backend, and Render is legacy/rollback-only;
 * conversation storage remains memory by default, with optional PostgreSQL
   storage guarded by `LEGAL_QA_CONVERSATION_STORE=postgres`,
   `LEGAL_QA_DATABASE_URL`, schema file
   `scripts/database/postgres_conversation_store.sql`, and real-DB validation
   opt-in `LEGAL_QA_ALLOW_DB_TESTS=1`; Neon managed PostgreSQL validation
-  completed on 2026-07-09, and production Render PostgreSQL conversation
-  storage was enabled and conversation-CRUD verified on 2026-07-09; production
-  anonymous session ownership is enabled with `LEGAL_QA_AUTH_ENABLED=true`,
-  `LEGAL_QA_SESSION_SECRET` stored as a Render secret, and
-  `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`; ownership-only smoke
-  verification passed on 2026-07-09, and rate limiting remains enabled;
-* deployed backend mode remains `real`; liveness/readiness pass and stay
-  lightweight; real `/ask` workflow construction is lazy on first `/ask`, but
-  Render Free remains memory-risky and a single controlled production `/ask`
-  smoke is pending deploy confirmation;
+  completed on 2026-07-09, and historical Render conversation storage plus
+  anonymous session ownership validation passed in July 2026; production
+  anonymous session ownership remains implemented, but Render-specific notes
+  are historical;
+* deployed Azure backend mode remains `real`; liveness/readiness stay
+  lightweight; BGE-M3 is packaged in the production image at
+  `/models/embedding/bge-m3` with `EMBEDDING_MODEL_PATH`,
+  `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, and
+  `HF_DATASETS_OFFLINE=1`; production health, readiness, warmup, and the
+  controlled Production Ask Smoke have passed;
+* production validation must preserve the canonical hybrid path
+  BGE-M3 / FlagEmbedding -> DenseRetriever -> Qdrant dense retrieval ->
+  coverage-aware hybrid retrieval -> evidence selection -> LLM generation, and
+  real production `/ask` must not be called repeatedly;
 * GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part
   of the adopted evaluated pipeline.
 

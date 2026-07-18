@@ -312,8 +312,9 @@ fake-mode `GET /health`. Stage 3 added manual-only Azure deployment skeleton
 workflows. Stage 4A decides the staging resource plan before implementing any
 real Azure deployment.
 
-The current production Render backend and Vercel frontend remain unchanged by
-this planning stage.
+Historical note: at this planning stage, the then-current Render backend and
+Vercel frontend were unchanged. Current production now uses Azure App Service as
+the accepted backend; Render is legacy/rollback-only.
 
 ### Decision Summary
 
@@ -909,6 +910,9 @@ Required production resources and settings:
 - `LEGAL_QA_RERANKING_ENABLED=false`;
 - `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
 - `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`;
+- `HF_HUB_OFFLINE=1`;
+- `TRANSFORMERS_OFFLINE=1`;
+- `HF_DATASETS_OFFLINE=1`;
 - Qdrant URL/API key through `QDRANT_URL` and `QDRANT_API_KEY`;
 - `OPENROUTER_API_KEY`;
 - `LEGAL_QA_DATABASE_URL`;
@@ -991,12 +995,11 @@ The Next.js client reads this value in `apps/frontend/src/lib/api-config.ts`.
 It is browser-visible and embedded during `next build`; changing it requires a
 new Vercel deployment. Do not put secrets in any `NEXT_PUBLIC_*` value.
 
-Current frontend code does not hardcode the Render backend URL. Render backend
-references remain in deployment documentation and frontend setup guidance as
-the current production value:
+Current frontend code does not hardcode a backend URL. Vercel Production should
+use the accepted Azure backend value:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-prod-phat.azurewebsites.net
 ```
 
 For Vercel Preview or staging validation against Azure App Service, set:
@@ -1005,10 +1008,9 @@ For Vercel Preview or staging validation against Azure App Service, set:
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
 ```
 
-Do not change Vercel Production until a Preview deployment passes UI smoke.
-The later Production migration step is to change Vercel Production
-`NEXT_PUBLIC_API_BASE_URL` from the Render backend origin to the accepted Azure
-backend origin and redeploy the frontend.
+If Vercel Production requests still go to `onrender.com`, its environment is
+stale. Redeploy with the accepted Azure backend origin after confirming the
+Azure App Service CORS settings.
 
 Backend CORS is controlled by `CORS_ALLOWED_ORIGINS`. The backend default only
 allows `http://localhost:3000`; deployed browser traffic requires exact Vercel
@@ -1035,11 +1037,11 @@ Migration checklist:
 - [ ] Redeploy Vercel Preview and run UI smoke against Azure.
 - [ ] Confirm no `/api/v1/legal-qa/ask` loop, benchmark, or load test is run
       from the UI smoke.
-- [ ] Switch Vercel Production `NEXT_PUBLIC_API_BASE_URL` from Render to the
-      accepted Azure backend origin only after Preview passes.
-- [ ] Keep the previous Render backend URL as the rollback value until Azure
-      production traffic is accepted.
-- [ ] After Azure production is accepted, plan Render decommission separately:
+- [ ] Confirm Vercel Production `NEXT_PUBLIC_API_BASE_URL` uses the accepted
+      Azure backend origin.
+- [ ] Keep the previous Render backend URL as a rollback reference only until
+      decommission is reviewed.
+- [ ] Plan Render decommission separately:
       remove Render-specific secrets, disable Render traffic, preserve safe
       logs, and document final rollback limits.
 
