@@ -14,8 +14,12 @@ required local services and secrets are available.
 ## Configuration
 
 Runtime settings are read from environment variables by `src/api/settings.py`.
-`.env.example` contains both existing project-level variables and backend API
-runtime variables. It must contain placeholders only.
+`.env.example` is a local-safe template for project-level and backend API
+runtime variables. It uses valid dotenv `KEY=value` syntax, blank placeholders
+for secrets, memory conversation storage, auth disabled, DB tests disabled, and
+a blank local `EMBEDDING_MODEL_PATH`. Azure production values are documented as
+comments and must be supplied through App Service settings or GitHub
+Environments, not copied into Git.
 
 `AppSettings.from_env()` loads the project `.env` first and overlays process
 environment values. Exported or container-injected values therefore take
@@ -28,24 +32,33 @@ those config files, override local endpoints/service mode, and provide secrets
 when real mode is used. Do not put provider API keys or tokens in
 `configs/*.yml`.
 
-Backend API settings:
+Local backend API settings:
 
 ```env
 APP_ENV=local
 LOG_LEVEL=INFO
 LOG_FORMAT=json
-CORS_ALLOWED_ORIGINS='["http://localhost:3000"]'
+CORS_ALLOWED_ORIGINS='["http://localhost:3000","https://vnlaw-qa.vercel.app"]'
 
-LEGAL_QA_SERVICE_MODE=fake
+LEGAL_QA_SERVICE_MODE=real
 LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
 LEGAL_QA_CHUNKS_PATH=data/processed/legal_chunks.jsonl
 LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
 LEGAL_QA_COLLECTION_NAME=vnlaw_chunks_bgem3_v1_full
-LEGAL_QA_QDRANT_URL=http://localhost:6333
+LEGAL_QA_QDRANT_URL=https://your-qdrant-cloud-endpoint
+LEGAL_QA_QDRANT_API_KEY=
 LEGAL_QA_DEVICE=cpu
 LEGAL_QA_MODEL=google/gemini-2.5-flash
+LEGAL_QA_CONVERSATION_STORE=memory
+LEGAL_QA_DATABASE_URL=
+LEGAL_QA_ALLOW_DB_TESTS=0
+LEGAL_QA_AUTH_ENABLED=false
+LEGAL_QA_SESSION_SECRET=
+LEGAL_QA_RETRIEVAL_MODE=hybrid
+LEGAL_QA_CHUNKS_OVERWRITE=
+EMBEDDING_MODEL_PATH=
 
-QDRANT_URL=http://localhost:6333
+QDRANT_URL=https://your-qdrant-cloud-endpoint
 QDRANT_COLLECTION=vnlaw_chunks_bgem3_v1_full
 QDRANT_API_KEY=
 
@@ -80,10 +93,10 @@ Provider keys such as `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, and
 `ANTHROPIC_API_KEY` are not required for fake mode. When needed for manual real
 mode checks, set secrets outside version control.
 
-`CORS_ALLOWED_ORIGINS` should be a JSON array string on Render, for example
-`'["https://your-vercel-app.vercel.app"]'`. Legacy comma-separated values
-remain accepted for local compatibility. Invalid JSON arrays are rejected so a
-deployment cannot silently use malformed origins.
+`CORS_ALLOWED_ORIGINS` should be a JSON array string in deployed
+environments, for example `'["https://vnlaw-qa.vercel.app"]'`. Legacy
+comma-separated values remain accepted for local compatibility. Invalid JSON
+arrays are rejected so a deployment cannot silently use malformed origins.
 
 `LOG_FORMAT=json` documents the intended production convention. The current
 FastAPI bootstrap does not yet apply this variable through a production
@@ -91,7 +104,7 @@ logging initializer.
 
 ## Fake Mode
 
-Fake mode is the default:
+Fake mode is the safest local demo setting:
 
 ```env
 LEGAL_QA_SERVICE_MODE=fake
