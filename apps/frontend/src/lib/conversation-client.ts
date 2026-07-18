@@ -204,6 +204,14 @@ export function getConversationSessionToken(): string {
   }
 }
 
+export function getOptionalConversationSessionToken(): string | null {
+  try {
+    return getConversationSessionToken();
+  } catch {
+    return null;
+  }
+}
+
 function createSessionToken(cryptoApi: Crypto | undefined): string {
   if (cryptoApi?.randomUUID) {
     return cryptoApi.randomUUID();

@@ -1,7 +1,7 @@
 import { getApiBaseUrl, joinApiPath, normalizeApiBaseUrl } from "./api-config";
 import {
   CONVERSATION_SESSION_HEADER,
-  getConversationSessionToken,
+  getOptionalConversationSessionToken,
 } from "./conversation-client";
 import type { LegalQARequest, LegalQAResponse } from "@/types/legal-qa";
 
@@ -31,15 +31,19 @@ export async function askLegalQuestion(
     ? normalizeApiBaseUrl(options.apiBaseUrl)
     : getApiBaseUrl();
   const fetcher = options.fetcher ?? fetch;
+  const sessionToken = getOptionalConversationSessionToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (sessionToken) {
+    headers[CONVERSATION_SESSION_HEADER] = sessionToken;
+  }
 
   let response: Response;
   try {
     response = await fetcher(joinApiPath(apiBaseUrl, LEGAL_QA_ASK_PATH), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        [CONVERSATION_SESSION_HEADER]: getConversationSessionToken(),
-      },
+      headers,
       body: JSON.stringify({
         question: request.question,
         conversation_id: request.conversation_id,
