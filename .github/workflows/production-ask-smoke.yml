@@ -73,6 +73,9 @@ jobs:
 
           printf 'Expected production retrieval mode: %s\n' "$EXPECTED_RETRIEVAL_MODE"
 
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Check production health and readiness
         run: |
           set -euo pipefail
@@ -230,64 +233,7 @@ jobs:
 
           printf 'Ask HTTP status: %s\n' "$ask_status"
           printf 'Ask request duration seconds: %s\n' "$duration_seconds"
-          if [ "$ask_status" != "200" ]; then
-            rm -f "$response_file"
-            printf 'Ask smoke failed.\n'
-            exit 1
-          fi
-
-          RESPONSE_FILE="$response_file" python - <<'PY'
-          from __future__ import annotations
-
-          import json
-          import os
-          from pathlib import Path
-
-          payload = json.loads(Path(os.environ["RESPONSE_FILE"]).read_text(encoding="utf-8"))
-          keys = sorted(payload.keys())
-          answer = payload.get("answer")
-          citations = payload.get("citations")
-          evidence = payload.get("evidence")
-          warnings = payload.get("warnings")
-          decision = payload.get("decision")
-          metadata = payload.get("metadata")
-          generic_error_answer = "Không thể xử lý yêu cầu lúc này. Vui lòng thử lại sau."
-
-          print("Response JSON keys: " + ", ".join(keys))
-          print(f"Decision: {decision}")
-          if isinstance(answer, str):
-              print(f"Answer length: {len(answer)}")
-          if isinstance(citations, list):
-              print(f"Citation count: {len(citations)}")
-          if isinstance(evidence, list):
-              print(f"Evidence count: {len(evidence)}")
-          if isinstance(metadata, dict):
-              latency_ms = metadata.get("latency_ms")
-              if latency_ms is not None:
-                  print(f"Response latency_ms: {latency_ms}")
-              model_exists = metadata.get("model") is not None
-              retrieval_question_prepared = metadata.get("retrieval_question_prepared")
-              print(f"Metadata model exists: {model_exists}")
-              print(f"Retrieval question prepared: {retrieval_question_prepared}")
-              if model_exists is False:
-                  raise SystemExit("Ask smoke returned null metadata.model.")
-              if retrieval_question_prepared is False:
-                  raise SystemExit("Ask smoke did not prepare a retrieval question.")
-          else:
-              raise SystemExit("Ask smoke response metadata was missing or invalid.")
-
-          if isinstance(warnings, list):
-              print("Warnings: " + ", ".join(str(item) for item in warnings))
-          if decision == "error":
-              raise SystemExit("Ask smoke returned decision=error.")
-          if isinstance(warnings, list) and "internal_error" in warnings:
-              raise SystemExit("Ask smoke returned internal_error warning.")
-          if isinstance(warnings, list) and "ask_timeout" in warnings:
-              raise SystemExit("Ask smoke returned ask_timeout warning.")
-          if isinstance(warnings, list) and "query_embedding_timeout" in warnings:
-              if decision not in {"answered", "answered_with_caution"}:
-                  raise SystemExit("Ask smoke returned query_embedding_timeout without a valid answer.")
-          if answer == generic_error_answer:
-              raise SystemExit("Ask smoke returned the generic internal-error answer.")
-          PY
+          python scripts/deployment/validate_production_ask_smoke_response.py \
+            --http-status "$ask_status" \
+            --response-file "$response_file"
           rm -f "$response_file"

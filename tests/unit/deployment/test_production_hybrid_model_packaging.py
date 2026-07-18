@@ -49,6 +49,9 @@ def test_production_ask_smoke_does_not_force_sparse_retrieval() -> None:
     assert "Expected production retrieval mode:" in workflow
     assert "LEGAL_QA_RETRIEVAL_MODE=sparse" not in workflow
     assert "/api/v1/legal-qa/ask" in workflow
+    assert workflow.count("$base_url/api/v1/legal-qa/ask") == 1
+    assert "validate_production_ask_smoke_response.py" in workflow
+    assert "Ask smoke did not prepare a retrieval question." not in workflow
 
 
 def test_production_ask_smoke_requires_packaged_model_warmup() -> None:

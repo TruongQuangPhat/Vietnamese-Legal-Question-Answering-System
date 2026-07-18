@@ -215,6 +215,15 @@ load status, encode status, elapsed time, and exception class. After the model
 is packaged in the image, expected production warmup is `warmed=true` before
 running the single controlled `/ask` smoke.
 
+Production Ask Smoke validates the canonical hybrid production path. For a
+standalone legal question, `metadata.retrieval_question_prepared=false` is
+diagnostic only and is not a failure by itself. The primary pass criteria are
+HTTP 200, `decision=answered`, model presence, a non-empty answer, at least one
+citation, and no timeout/internal-error warnings. A false
+`retrieval_question_prepared` value remains a hard failure only when
+`metadata.follow_up_detected=true`, because that smoke path is explicitly
+testing follow-up question rewriting.
+
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the
 default only allows `http://localhost:3000`. For Preview, add the exact Vercel
