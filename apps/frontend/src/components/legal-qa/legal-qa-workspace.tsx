@@ -104,23 +104,24 @@ export function LegalQAWorkspace() {
         timestamp,
       ),
     );
+    const answerRequest = askLegalQuestion({
+      question: trimmedQuestion,
+      conversation_id: backendConversationId,
+      conversation_context:
+        conversationContext.length > 0 ? conversationContext : undefined,
+      top_k: topK,
+      include_evidence: includeEvidence,
+      include_debug: false,
+    });
+    startBestEffortMessageSync(
+      conversationId,
+      conversationTitle,
+      backendConversationId,
+      "user",
+      userMessage.content,
+    );
+
     try {
-      const answerRequest = askLegalQuestion({
-        question: trimmedQuestion,
-        conversation_id: backendConversationId,
-        conversation_context:
-          conversationContext.length > 0 ? conversationContext : undefined,
-        top_k: topK,
-        include_evidence: includeEvidence,
-        include_debug: false,
-      });
-      queueMessageSync(
-        conversationId,
-        conversationTitle,
-        backendConversationId,
-        "user",
-        userMessage.content,
-      );
       const answer = await answerRequest;
       setConversations((currentConversations) =>
         updateConversationMessage(
@@ -134,7 +135,7 @@ export function LegalQAWorkspace() {
           },
         ),
       );
-      queueMessageSync(
+      startBestEffortMessageSync(
         conversationId,
         conversationTitle,
         backendConversationIdsRef.current.get(conversationId) ??
@@ -156,6 +157,26 @@ export function LegalQAWorkspace() {
           },
         ),
       );
+    }
+  }
+
+  function startBestEffortMessageSync(
+    conversationId: string,
+    title: string,
+    existingBackendConversationId: string | undefined,
+    role: BackendConversationRole,
+    content: string,
+  ): void {
+    try {
+      queueMessageSync(
+        conversationId,
+        title,
+        existingBackendConversationId,
+        role,
+        content,
+      );
+    } catch {
+      warnBackendSyncFailure("message");
     }
   }
 
