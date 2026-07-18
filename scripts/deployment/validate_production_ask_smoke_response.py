@@ -141,6 +141,7 @@ def validate_response_payload(
     citation_count = len(citations) if isinstance(citations, list) else 0
     evidence_count = len(evidence) if isinstance(evidence, list) else 0
     warning_names = [str(item) for item in warnings] if isinstance(warnings, list) else []
+    severe_found = sorted(set(warning_names).intersection(SEVERE_WARNINGS))
 
     if not isinstance(metadata, dict):
         raise SmokeValidationError("Ask smoke response metadata was missing or invalid.")
@@ -160,6 +161,7 @@ def validate_response_payload(
     model_cache_key = metadata.get("model_cache_key")
 
     lines = [
+        f"Request ID: {payload.get('request_id')}",
         "Response JSON keys: " + ", ".join(keys),
         f"Decision: {decision}",
         f"Answer length: {answer_length}",
@@ -182,6 +184,7 @@ def validate_response_payload(
             f"Retrieval question prepared: {retrieval_question_prepared}",
             f"Follow-up detected: {follow_up_detected}",
             "Warnings: " + ", ".join(warning_names),
+            "Severe warnings: " + ", ".join(severe_found),
             (
                 "retrieval_question_prepared is diagnostic for standalone questions; "
                 "citations, model presence, decision, answer length, and severe warnings "
@@ -199,7 +202,6 @@ def validate_response_payload(
     if not model_exists:
         raise SmokeValidationError("Ask smoke returned null or empty metadata.model.")
 
-    severe_found = sorted(set(warning_names).intersection(SEVERE_WARNINGS))
     if severe_found:
         raise SmokeValidationError(
             "Ask smoke returned severe warning(s): " + ", ".join(severe_found)
