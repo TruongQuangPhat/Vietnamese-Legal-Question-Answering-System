@@ -23,17 +23,22 @@ import { ChatSidebar } from "./chat-sidebar";
 import type { ChatMessage, Conversation } from "./chat-types";
 
 const MAX_QUESTION_LENGTH = 4000;
-const DEFAULT_TOP_K = 10;
+const DEFAULT_TOP_K = 5;
+const DEFAULT_INCLUDE_EVIDENCE = true;
 const DEFAULT_CONVERSATION_TITLE = "Cuộc trò chuyện mới";
 const TITLE_MAX_LENGTH = 56;
 const MAX_ASK_CONTEXT_MESSAGES = 6;
 const MAX_ASK_CONTEXT_MESSAGE_LENGTH = 2000;
 const CHAT_CONTENT_CONTAINER = "mx-auto w-full max-w-[760px]";
 
+type ActiveAskRequest = {
+  controller: AbortController;
+  conversationId: string;
+  assistantMessageId: string;
+};
+
 export function LegalQAWorkspace() {
   const [question, setQuestion] = useState("");
-  const [topK, setTopK] = useState(DEFAULT_TOP_K);
-  const [includeEvidence, setIncludeEvidence] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -45,6 +50,7 @@ export function LegalQAWorkspace() {
   );
   const backendMessageQueuesRef = useRef(new Map<string, Promise<void>>());
   const deletedConversationIdsRef = useRef(new Set<string>());
+  const activeAskRequestRef = useRef<ActiveAskRequest | null>(null);
 
   useEffect(() => {
     const storedConversations = loadConversations();
@@ -77,7 +83,7 @@ export function LegalQAWorkspace() {
 
   async function submitQuestion() {
     const trimmedQuestion = question.trim();
-    const validationMessage = validateQuestion(trimmedQuestion, question.length, topK);
+    const validationMessage = validateQuestion(trimmedQuestion, question.length);
     if (validationMessage) {
       setValidationError(validationMessage);
       return;
@@ -94,6 +100,7 @@ export function LegalQAWorkspace() {
     const backendConversationId = activeConversation?.backendConversationId;
     const conversationContext = prepareRecentConversationContext(activeMessages);
     const timestamp = new Date().toISOString();
+    const askController = new AbortController();
 
     setActiveConversationId(conversationId);
     setConversations((currentConversations) =>
@@ -104,14 +111,21 @@ export function LegalQAWorkspace() {
         timestamp,
       ),
     );
+    activeAskRequestRef.current = {
+      controller: askController,
+      conversationId,
+      assistantMessageId: assistantMessage.id,
+    };
     const answerRequest = askLegalQuestion({
       question: trimmedQuestion,
       conversation_id: backendConversationId,
       conversation_context:
         conversationContext.length > 0 ? conversationContext : undefined,
-      top_k: topK,
-      include_evidence: includeEvidence,
+      top_k: DEFAULT_TOP_K,
+      include_evidence: DEFAULT_INCLUDE_EVIDENCE,
       include_debug: false,
+    }, {
+      signal: askController.signal,
     });
     startBestEffortMessageSync(
       conversationId,
@@ -144,6 +158,16 @@ export function LegalQAWorkspace() {
         answer.answer,
       );
     } catch (error) {
+      if (isAbortError(error)) {
+        setConversations((currentConversations) =>
+          removeConversationMessage(
+            currentConversations,
+            conversationId,
+            assistantMessage.id,
+          ),
+        );
+        return;
+      }
       const errorMessage = toUserFacingError(error);
       setConversations((currentConversations) =>
         updateConversationMessage(
@@ -157,7 +181,31 @@ export function LegalQAWorkspace() {
           },
         ),
       );
+    } finally {
+      if (
+        activeAskRequestRef.current?.conversationId === conversationId &&
+        activeAskRequestRef.current.assistantMessageId === assistantMessage.id
+      ) {
+        activeAskRequestRef.current = null;
+      }
     }
+  }
+
+  function cancelActiveQuestion() {
+    const activeAskRequest = activeAskRequestRef.current;
+    if (!activeAskRequest) {
+      return;
+    }
+
+    activeAskRequest.controller.abort();
+    activeAskRequestRef.current = null;
+    setConversations((currentConversations) =>
+      removeConversationMessage(
+        currentConversations,
+        activeAskRequest.conversationId,
+        activeAskRequest.assistantMessageId,
+      ),
+    );
   }
 
   function startBestEffortMessageSync(
@@ -453,9 +501,8 @@ export function LegalQAWorkspace() {
           <div className="shrink-0 overflow-y-auto border-t border-border bg-surface px-4 py-2.5 [scrollbar-gutter:stable] md:px-6">
             <div className={CHAT_CONTENT_CONTAINER}>
               <AskForm
-                includeEvidence={includeEvidence}
                 isLoading={isLoading}
-                onIncludeEvidenceChange={setIncludeEvidence}
+                onCancel={cancelActiveQuestion}
                 onQuestionChange={(value) => {
                   setQuestion(value);
                   if (validationError) {
@@ -463,9 +510,7 @@ export function LegalQAWorkspace() {
                   }
                 }}
                 onSubmit={submitQuestion}
-                onTopKChange={setTopK}
                 question={question}
-                topK={topK}
                 validationError={validationError}
               />
             </div>
@@ -571,6 +616,26 @@ function removeBackendConversationId(
   });
 }
 
+function removeConversationMessage(
+  conversations: Conversation[],
+  conversationId: string,
+  messageId: string,
+): Conversation[] {
+  return sortConversations(
+    conversations.map((conversation) => {
+      if (conversation.id !== conversationId) {
+        return conversation;
+      }
+
+      return {
+        ...conversation,
+        updatedAt: new Date().toISOString(),
+        messages: conversation.messages.filter((message) => message.id !== messageId),
+      };
+    }),
+  );
+}
+
 function createUserMessage(content: string): ChatMessage {
   return {
     id: createMessageId(),
@@ -663,16 +728,12 @@ function createMessageId(): string {
 function validateQuestion(
   trimmedQuestion: string,
   questionLength: number,
-  topK: number,
 ): string | null {
   if (!trimmedQuestion) {
     return "Vui lòng nhập câu hỏi pháp luật.";
   }
   if (questionLength > MAX_QUESTION_LENGTH) {
     return "Câu hỏi vượt quá giới hạn 4000 ký tự.";
-  }
-  if (!Number.isInteger(topK) || topK < 1 || topK > 20) {
-    return "Số bằng chứng tối đa phải nằm trong khoảng 1-20.";
   }
   return null;
 }
@@ -700,4 +761,8 @@ function warnBackendSyncFailure(
 
 function isMissingBackendConversation(error: unknown): boolean {
   return error instanceof ConversationApiError && error.status === 404;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }

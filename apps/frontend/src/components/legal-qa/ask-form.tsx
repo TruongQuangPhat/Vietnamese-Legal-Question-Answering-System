@@ -2,35 +2,30 @@ const MAX_QUESTION_LENGTH = 4000;
 
 type AskFormProps = {
   question: string;
-  topK: number;
-  includeEvidence: boolean;
   isLoading: boolean;
   validationError: string | null;
   onQuestionChange: (value: string) => void;
-  onTopKChange: (value: number) => void;
-  onIncludeEvidenceChange: (value: boolean) => void;
+  onCancel: () => void;
   onSubmit: () => void;
 };
 
 export function AskForm({
   question,
-  topK,
-  includeEvidence,
   isLoading,
   validationError,
   onQuestionChange,
-  onTopKChange,
-  onIncludeEvidenceChange,
+  onCancel,
   onSubmit,
 }: AskFormProps) {
-  const characterCount = question.length;
-  const isOverLimit = characterCount > MAX_QUESTION_LENGTH;
-
   return (
     <form
       className="rounded-md border border-border bg-surface p-2 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
+        if (isLoading) {
+          onCancel();
+          return;
+        }
         onSubmit();
       }}
     >
@@ -66,49 +61,17 @@ export function AskForm({
         ) : null}
       </div>
 
-      <div className="mt-1.5 flex flex-col gap-1.5 border-t border-border pt-1.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`text-xs ${isOverLimit ? "text-[#a93434]" : "text-muted"}`}
-          >
-            {characterCount}/{MAX_QUESTION_LENGTH}
-          </span>
-
-          <label
-            className="flex items-center gap-2 text-xs font-medium text-muted"
-            htmlFor="top-k"
-          >
-            Bằng chứng
-            <input
-              id="top-k"
-              className="h-7 w-14 rounded-md border-border px-2 py-1 text-sm focus:border-primary focus:ring-primary"
-              disabled={isLoading}
-              max={20}
-              min={1}
-              onChange={(event) => onTopKChange(Number(event.target.value))}
-              type="number"
-              value={topK}
-            />
-          </label>
-
-          <label className="flex items-center gap-2 text-xs font-medium text-muted">
-            <input
-              checked={includeEvidence}
-              className="rounded border-border text-primary focus:ring-primary"
-              disabled={isLoading}
-              onChange={(event) => onIncludeEvidenceChange(event.target.checked)}
-              type="checkbox"
-            />
-            Hiển thị bằng chứng
-          </label>
-        </div>
-
+      <div className="mt-1.5 flex justify-end border-t border-border pt-1.5">
         <button
-          className="rounded-md bg-primary px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#0c625b] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isLoading}
+          aria-label={isLoading ? "Dừng tạo câu trả lời" : "Gửi câu hỏi"}
+          className={`rounded-md px-4 py-1.5 text-sm font-semibold text-white transition ${
+            isLoading
+              ? "bg-[#8a3b3b] hover:bg-[#743232]"
+              : "bg-primary hover:bg-[#0c625b]"
+          }`}
           type="submit"
         >
-          {isLoading ? "Đang gửi..." : "Gửi"}
+          {isLoading ? "Dừng" : "Gửi"}
         </button>
       </div>
     </form>

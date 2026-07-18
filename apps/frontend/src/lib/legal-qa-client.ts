@@ -10,6 +10,7 @@ const LEGAL_QA_ASK_PATH = "/api/v1/legal-qa/ask";
 type LegalQAClientOptions = {
   apiBaseUrl?: string;
   fetcher?: typeof fetch;
+  signal?: AbortSignal;
 };
 
 export class ApiRequestError extends Error {
@@ -44,6 +45,7 @@ export async function askLegalQuestion(
     response = await fetcher(joinApiPath(apiBaseUrl, LEGAL_QA_ASK_PATH), {
       method: "POST",
       headers,
+      signal: options.signal,
       body: JSON.stringify({
         question: request.question,
         conversation_id: request.conversation_id,
@@ -53,7 +55,10 @@ export async function askLegalQuestion(
         include_debug: request.include_debug,
       }),
     });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
     throw new ApiRequestError(
       "Unable to reach the Legal QA API.",
       undefined,
@@ -78,4 +83,8 @@ export async function askLegalQuestion(
       "invalid_json",
     );
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }

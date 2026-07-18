@@ -38,6 +38,14 @@ The frontend `.env.example` is local-only by default and contains no secrets.
 `NEXT_PUBLIC_API_BASE_URL` is public and embedded into the browser bundle at
 build time.
 
+The normal composer intentionally hides technical retrieval controls such as
+`top_k` and evidence toggles. User submissions use the product defaults
+internally and request evidence content for the answer drawer. While an answer
+is being generated, the composer action changes to `Dừng`; this aborts the
+frontend request and unlocks the UI. Server-side work may already be in
+progress, so stop/cancel should be treated as a browser-side abort rather than
+a backend cancellation guarantee.
+
 ## Answer, Evidence, and Warnings UX
 
 Normal users see legal basis information, not backend retrieval/debug

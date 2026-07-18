@@ -7,6 +7,44 @@ const ANSWER = "Câu trả lời kiểm thử.";
 const UX_ANSWER =
   "Hợp đồng dân sự có thể vô hiệu khi vi phạm điều kiện có hiệu lực [E1] hoặc do giả tạo [E2].";
 
+test("composer hides technical controls and keeps legal ask defaults internal", async ({
+  page,
+}) => {
+  let askPayload: Record<string, unknown> | null = null;
+
+  await mockConversationFailure(page);
+  await page.route(ASK_URL, async (route) => {
+    expect(route.request().method()).toBe("POST");
+    askPayload = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      contentType: "application/json",
+      status: 200,
+      body: JSON.stringify(successResponse()),
+    });
+  });
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  const composer = page.locator("form").filter({
+    has: page.getByLabel("Câu hỏi pháp lý"),
+  });
+  await expect(page.getByLabel("Câu hỏi pháp lý")).toBeVisible();
+  await expect(composer.getByRole("button", { name: "Gửi" })).toBeVisible();
+  await expect(composer.getByText("0/4000")).toHaveCount(0);
+  await expect(composer.getByText("Bằng chứng")).toHaveCount(0);
+  await expect(composer.getByText("Hiển thị bằng chứng")).toHaveCount(0);
+  await expect(composer.getByRole("spinbutton")).toHaveCount(0);
+
+  await submitQuestion(page);
+
+  expect(askPayload?.top_k).toBe(5);
+  expect(askPayload?.include_evidence).toBe(true);
+});
+
 test("submit sends ask and renders answer when conversation sync fails", async ({
   page,
 }) => {
@@ -236,6 +274,111 @@ test("loading answer shows spinner and current safe process stage", async ({
   );
 });
 
+test("stop aborts pending ask without showing send error and next submit works", async ({
+  page,
+}) => {
+  let askRequests = 0;
+  let releaseFirstRequest: (() => void) | null = null;
+
+  await mockConversationFailure(page);
+  await page.route(ASK_URL, async (route) => {
+    expect(route.request().method()).toBe("POST");
+    askRequests += 1;
+
+    if (askRequests === 1) {
+      await new Promise<void>((resolve) => {
+        releaseFirstRequest = resolve;
+      });
+      await route.fulfill({
+        contentType: "application/json",
+        status: 200,
+        body: JSON.stringify(successResponse({ answer: "Không nên hiển thị." })),
+      }).catch(() => {
+        // The browser may already have aborted the fetch. That is the expected path.
+      });
+      return;
+    }
+
+    await route.fulfill({
+      contentType: "application/json",
+      status: 200,
+      body: JSON.stringify(successResponse()),
+    });
+  });
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.getByRole("button", { name: "+ Cuộc trò chuyện mới" }).click();
+  await page.getByLabel("Câu hỏi pháp lý").fill(QUESTION);
+  await page.getByRole("button", { name: "Gửi" }).click();
+
+  await expect(page.getByRole("button", { name: "Dừng" })).toBeVisible();
+  await expect(page.getByTestId("process-spinner")).toBeVisible();
+
+  await page.getByRole("button", { name: "Dừng" }).click();
+  releaseFirstRequest?.();
+
+  await expect(page.getByText("Không gửi được yêu cầu")).toHaveCount(0);
+  await expect(page.getByText("AbortError")).toHaveCount(0);
+  await expect(page.getByTestId("process-spinner")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Gửi" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("legal-qa-chat-conversations") ?? "",
+      ),
+    )
+    .not.toContain('"status":"loading"');
+
+  await page.getByLabel("Câu hỏi pháp lý").fill(QUESTION);
+  await page.getByRole("button", { name: "Gửi" }).click();
+
+  await expect(page.getByText(ANSWER)).toBeVisible();
+  await expect(page.getByText("Không gửi được yêu cầu")).toHaveCount(0);
+  expect(askRequests).toBe(2);
+});
+
+test("enter key does not double-submit while ask is loading", async ({
+  page,
+}) => {
+  let askRequests = 0;
+  let releaseRequest: (() => void) | null = null;
+
+  await mockConversationFailure(page);
+  await page.route(ASK_URL, async (route) => {
+    expect(route.request().method()).toBe("POST");
+    askRequests += 1;
+    await new Promise<void>((resolve) => {
+      releaseRequest = resolve;
+    });
+    await route.fulfill({
+      contentType: "application/json",
+      status: 200,
+      body: JSON.stringify(successResponse()),
+    });
+  });
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.getByRole("button", { name: "+ Cuộc trò chuyện mới" }).click();
+  await page.getByLabel("Câu hỏi pháp lý").fill(QUESTION);
+  await page.getByLabel("Câu hỏi pháp lý").press("Enter");
+
+  await expect(page.getByRole("button", { name: "Dừng" })).toBeVisible();
+  await page.getByLabel("Câu hỏi pháp lý").press("Enter");
+  expect(askRequests).toBe(1);
+
+  releaseRequest?.();
+  await expect(page.getByText(ANSWER)).toBeVisible();
+  expect(askRequests).toBe(1);
+});
+
 test("answer shows user-friendly legal basis drawer without technical metadata", async ({
   page,
 }) => {
@@ -413,34 +556,7 @@ async function mockAskSuccess(
     await route.fulfill({
       contentType: "application/json",
       status: 200,
-      body: JSON.stringify({
-        request_id: "test-request-id",
-        decision: "answered",
-        answer: ANSWER,
-        citations: [
-          {
-            evidence_id: "E1",
-            chunk_id: "test-chunk",
-            law_id: "BLDS_2015",
-            law_name: "Bộ luật Dân sự 2015",
-            citation: "Bộ luật Dân sự 2015, Điều 1",
-            source_url: "https://example.test",
-            hierarchy_path: "Điều 1",
-          },
-        ],
-        evidence: [],
-        warnings: [],
-        metadata: {
-          retrieval_strategy: "coverage_aware_quota",
-          model: "google/gemini-2.5-flash",
-          reranking_used: false,
-          latency_ms: 1234,
-          conversation_context_used: false,
-          conversation_context_message_count: 0,
-          follow_up_detected: false,
-          retrieval_question_prepared: false,
-        },
-      }),
+      body: JSON.stringify(successResponse()),
     });
   });
 }
@@ -599,4 +715,43 @@ function diagnosticMessage(observedRequests: string[]): string {
     "Expected exactly one ask request.",
     `Observed requests: ${observedRequests.join(", ")}`,
   ].join(" ");
+}
+
+function successResponse(override: Record<string, unknown> = {}) {
+  return {
+    request_id: "test-request-id",
+    decision: "answered",
+    answer: ANSWER,
+    citations: [
+      {
+        evidence_id: "E1",
+        chunk_id: "test-chunk",
+        law_id: "BLDS_2015",
+        law_name: "Bộ luật Dân sự 2015",
+        citation: "Bộ luật Dân sự 2015, Điều 1",
+        source_url: "https://example.test",
+        hierarchy_path: "Điều 1",
+      },
+    ],
+    evidence: [],
+    warnings: [],
+    metadata: {
+      retrieval_strategy: "coverage_aware_quota",
+      retrieval_mode: "hybrid",
+      model: "google/gemini-2.5-flash",
+      reranking_used: false,
+      latency_ms: 1234,
+      conversation_context_used: false,
+      conversation_context_message_count: 0,
+      follow_up_detected: false,
+      retrieval_question_prepared: false,
+      dense_retrieval_used: true,
+      dense_retrieval_fallback_used: false,
+      fallback_used: false,
+      embedding_model_cache_hit: true,
+      embedding_model_loaded_before_request: true,
+      model_cache_key: "bge-m3:test",
+    },
+    ...override,
+  };
 }
