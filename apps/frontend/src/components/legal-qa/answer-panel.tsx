@@ -2,8 +2,11 @@
 
 import type { LegalQAResponse } from "@/types/legal-qa";
 import { useState } from "react";
+import { AnswerProcessPanel } from "./answer-process-panel";
+import { EvidenceDrawer, getLegalBasisCount } from "./evidence-drawer";
 import { InlineCitations } from "./inline-citations";
 import { StatusBadge } from "./status-badge";
+import { WarningNotice } from "./warning-notice";
 
 type AnswerPanelProps = {
   response: LegalQAResponse | null;
@@ -19,17 +22,14 @@ export function AnswerPanel({
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">(
     "idle",
   );
+  const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
+  const [highlightedEvidenceKey, setHighlightedEvidenceKey] = useState<
+    string | undefined
+  >();
 
   if (isLoading) {
     return (
-      <section className="rounded-md border border-border bg-surface p-5 shadow-sm">
-        <p className="text-sm font-medium text-ink">
-          Đang tra cứu căn cứ pháp lý...
-        </p>
-        <p className="mt-2 text-sm text-muted">
-          Yêu cầu đang được gửi tới Legal QA API.
-        </p>
-      </section>
+      <AnswerProcessPanel isLoading />
     );
   }
 
@@ -55,6 +55,15 @@ export function AnswerPanel({
   }
 
   const isDemoMode = response.metadata.model === "stub";
+  const legalBasisCount = getLegalBasisCount(
+    response.citations,
+    response.evidence,
+  );
+
+  function openEvidenceDrawer(evidenceKey?: string) {
+    setHighlightedEvidenceKey(evidenceKey);
+    setIsEvidenceDrawerOpen(true);
+  }
 
   async function copyAnswer() {
     if (!response) {
@@ -98,20 +107,37 @@ export function AnswerPanel({
           answer={response.answer}
           citations={response.citations}
           evidence={response.evidence}
+          onSelectEvidence={openEvidenceDrawer}
         />
+        <div className="mt-5 border-t border-border pt-4">
+          {legalBasisCount > 0 ? (
+            <button
+              className="text-sm font-semibold text-primary underline-offset-4 transition hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30"
+              onClick={() => openEvidenceDrawer()}
+              type="button"
+            >
+              Đã sử dụng {legalBasisCount} căn cứ pháp lý
+            </button>
+          ) : (
+            <p className="text-sm text-muted">
+              Không có căn cứ pháp lý để hiển thị.
+            </p>
+          )}
+        </div>
       </div>
 
-      {response.warnings.length > 0 ? (
-        <div className="rounded-md border border-[#f0d58a] bg-[#fff8df] p-4">
-          <h3 className="text-sm font-semibold text-[#806100]">Cảnh báo</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[#806100]">
-            {response.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
+      <WarningNotice warnings={response.warnings} />
+      <AnswerProcessPanel
+        metadata={response.metadata}
+        warnings={response.warnings}
+      />
+      <EvidenceDrawer
+        citations={response.citations}
+        evidence={response.evidence}
+        highlightedEvidenceKey={highlightedEvidenceKey}
+        isOpen={isEvidenceDrawerOpen}
+        onClose={() => setIsEvidenceDrawerOpen(false)}
+      />
     </section>
   );
 }

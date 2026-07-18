@@ -38,6 +38,38 @@ The frontend `.env.example` is local-only by default and contains no secrets.
 `NEXT_PUBLIC_API_BASE_URL` is public and embedded into the browser bundle at
 build time.
 
+## Answer, Evidence, and Warnings UX
+
+Normal users see legal basis information, not backend retrieval/debug
+metadata. Assistant answers keep inline citation anchors such as `[E1]`, but
+those anchors only open the legal-basis drawer. The UI does not show scores,
+chunk IDs, evidence IDs, vector IDs, raw metadata, or JSON payloads in the
+normal answer surface.
+
+Each completed assistant answer shows a footer action such as:
+
+```text
+Đã sử dụng 2 căn cứ pháp lý
+```
+
+Clicking it opens a right-side drawer on desktop or a bottom sheet on smaller
+screens. The drawer displays source names, legal positions such as article or
+clause labels, readable evidence text when present, and an optional source
+link. If citations are present but evidence text was not included in the API
+response, the drawer shows a friendly message instead of falling back to
+technical identifiers.
+
+The answer also includes a compact "Quá trình xử lý" panel. It summarizes safe
+system stages such as receiving the question, finding legal basis, selecting
+relevant basis, and drafting the answer. It must not display hidden
+chain-of-thought, private model reasoning, prompts, raw evidence payloads, or
+secret values.
+
+Backend warning names are mapped to user-friendly notes and deduplicated.
+Evidence caution warnings are shown as caution notes, not system failures.
+Severe retrieval/infrastructure warnings use stronger wording, but raw warning
+codes remain hidden from the normal UI.
+
 ## Vercel Production
 
 Current production frontend:
