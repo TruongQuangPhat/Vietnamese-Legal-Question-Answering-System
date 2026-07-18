@@ -10,6 +10,8 @@ const LOCAL_DEV_HOST = String.fromCharCode(
   116,
 );
 const LOCAL_DEV_API_BASE_URL = `http://${LOCAL_DEV_HOST}:8000`;
+export const ACCEPTED_PRODUCTION_API_BASE_URL =
+  "https://vnlaw-backend-prod-phat.azurewebsites.net";
 
 type ApiBaseUrlResolutionOptions = {
   configuredValue?: string;
@@ -36,9 +38,7 @@ export function resolveApiBaseUrl({
     return LOCAL_DEV_API_BASE_URL;
   }
 
-  throw new Error(
-    "NEXT_PUBLIC_API_BASE_URL must be set for production frontend builds.",
-  );
+  return ACCEPTED_PRODUCTION_API_BASE_URL;
 }
 
 export function normalizeApiBaseUrl(value: string): string {

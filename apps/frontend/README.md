@@ -66,11 +66,17 @@ requests should go to:
 https://vnlaw-backend-prod-phat.azurewebsites.net/api/v1/legal-qa/ask
 ```
 
+If the production bundle is missing this environment variable, the frontend
+uses the accepted Azure backend as a production-safe default so a valid submit
+still starts `/api/v1/legal-qa/ask`. Keep the Vercel environment set anyway;
+the explicit environment value remains the primary deployment configuration and
+prevents ambiguity when backend URLs change.
+
 If production Network requests show localhost, for example
-`http://localhost:8000/api/v1/legal-qa/ask`, `NEXT_PUBLIC_API_BASE_URL` was not
-injected at build time or the deployed bundle is stale. If requests go to
-`onrender.com`, the Vercel environment is stale. In both cases, redeploy Vercel
-Production with the Azure backend URL.
+`http://localhost:8000/api/v1/legal-qa/ask`, the deployed bundle is stale or
+was built before the production-safe guard. If requests go to `onrender.com`,
+the Vercel environment is stale. In both cases, redeploy Vercel Production with
+the Azure backend URL.
 
 For Azure backend UI smoke before any future frontend production change, first
 set a Vercel Preview deployment to:

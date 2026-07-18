@@ -8,16 +8,16 @@ LEGAL_QA_CLIENT = REPO_ROOT / "apps/frontend/src/lib/legal-qa-client.ts"
 FRONTEND_README = REPO_ROOT / "apps/frontend/README.md"
 
 
-def test_frontend_api_config_requires_env_for_production() -> None:
+def test_frontend_api_config_uses_accepted_azure_when_production_env_is_missing() -> None:
     source = API_CONFIG.read_text(encoding="utf-8")
 
     assert "const trimmedValue = configuredValue?.trim();" in source
     assert "if (trimmedValue)" in source
     assert "return normalizeApiBaseUrl(trimmedValue);" in source
     assert 'nodeEnv !== "production"' in source
-    assert "NEXT_PUBLIC_API_BASE_URL must be set for production frontend builds." in source
+    assert "ACCEPTED_PRODUCTION_API_BASE_URL" in source
+    assert "https://vnlaw-backend-prod-phat.azurewebsites.net" in source
     assert "process.env.NEXT_PUBLIC_API_BASE_URL ??" not in source
-    assert "vnlaw-backend-prod-phat.azurewebsites.net" not in source
 
 
 def test_frontend_api_config_allows_localhost_only_outside_production() -> None:
@@ -47,4 +47,4 @@ def test_frontend_readme_documents_azure_production_network_target() -> None:
     assert "NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-prod-phat.azurewebsites.net" in readme
     assert "http://localhost:8000/api/v1/legal-qa/ask" in readme
     assert "https://vnlaw-backend-prod-phat.azurewebsites.net/api/v1/legal-qa/ask" in readme
-    assert "If production Network requests show localhost" in readme
+    assert "If the production bundle is missing this environment variable" in readme

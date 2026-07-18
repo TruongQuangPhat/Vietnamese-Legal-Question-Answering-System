@@ -2,8 +2,6 @@ import type { ChatMessage, Conversation } from "./chat-types";
 import type { LegalQAResponse } from "@/types/legal-qa";
 
 export const CHAT_STORAGE_KEY = "legal-qa-chat-conversations";
-const STALE_LOADING_ERROR =
-  "Không thể nhận câu trả lời lúc này. Vui lòng thử lại.";
 
 type StoredChatState = {
   version: 1;
@@ -40,7 +38,9 @@ export function saveConversations(conversations: Conversation[]) {
   try {
     const storedState: StoredChatState = {
       version: 1,
-      conversations: sortConversations(conversations),
+      conversations: sortConversations(
+        conversations.map(stripTransientAssistantFailures),
+      ),
     };
     window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(storedState));
   } catch {
@@ -119,19 +119,19 @@ function isChatMessage(value: unknown): value is ChatMessage {
 function sanitizeConversation(conversation: Conversation): Conversation {
   return {
     ...conversation,
-    messages: conversation.messages.map((message) => {
-      if (message.role !== "assistant" || message.status !== "loading") {
-        return message;
-      }
-
-      return {
-        ...message,
-        content: STALE_LOADING_ERROR,
-        status: "error",
-        errorMessage: STALE_LOADING_ERROR,
-      };
-    }),
+    messages: conversation.messages.filter(isDurableMessage),
   };
+}
+
+function stripTransientAssistantFailures(conversation: Conversation): Conversation {
+  return {
+    ...conversation,
+    messages: conversation.messages.filter(isDurableMessage),
+  };
+}
+
+function isDurableMessage(message: ChatMessage): boolean {
+  return message.role === "user" || message.status === "complete";
 }
 
 function isLegalQAResponse(value: unknown): value is LegalQAResponse {
