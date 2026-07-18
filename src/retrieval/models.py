@@ -266,6 +266,7 @@ class RetrievalResult(BaseModel):
     filters: RetrievalFilters = Field(default_factory=RetrievalFilters)
     results: list[RetrievedChunk] = Field(default_factory=list)
     issues: list[RetrievalIssue] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class RetrievalEmbeddingConfig(BaseModel):

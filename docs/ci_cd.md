@@ -903,6 +903,7 @@ Required production resources and settings:
 - `LEGAL_QA_RETRIEVAL_MODE=hybrid`;
 - `LEGAL_QA_ASK_TIMEOUT_SECONDS=90`;
 - `LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60`;
+- `LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=60`;
 - `LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45`;
 - `LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30`;
 - `LEGAL_QA_LLM_TIMEOUT_SECONDS=30`;
@@ -964,7 +965,10 @@ fields, and fails if HTTP status is not `200`, `decision == "error"`,
 `metadata.model` is null or empty, the answer is missing or too short, citations
 are missing, severe warnings are present, or the answer is the generic
 internal-error answer. Severe warnings include `ask_timeout`,
-`query_embedding_timeout`, `qdrant_retrieval_timeout`, `internal_error`,
+`embedding_model_load_timeout`, `embedding_model_load_error`,
+`query_embedding_timeout`, `query_embedding_error`,
+`qdrant_retrieval_timeout`, `qdrant_retrieval_error`,
+`dense_retrieval_fallback_used`, `dense_retriever_error`, `internal_error`,
 `retrieval_error`, and `llm_timeout`.
 
 Production Ask Smoke validates the canonical hybrid production path. For
@@ -973,7 +977,10 @@ diagnostic only and is not a failure by itself: HTTP 200, `decision=answered`,
 model presence, a non-empty answer, citations, and no timeout/internal-error
 warnings are the primary success criteria. `retrieval_question_prepared=false`
 remains a hard failure when `metadata.follow_up_detected=true`, because a
-follow-up smoke should normally be rewritten into a retrieval-ready question.
+follow-up smoke should have a prepared retrieval question. In hybrid production
+mode, `metadata.dense_retrieval_used=true` and `metadata.fallback_used=false`
+are also required; dense fallback is degraded retrieval and must not silently
+pass final production validation.
 
 Production `/ask` timeout diagnostics come from sanitized
 `legal_qa_request_timing` logs. The logs record stage names and elapsed

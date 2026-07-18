@@ -315,6 +315,11 @@ def _log_request_completed(response: LegalQAResponse) -> None:
             "warning_count": len(response.warnings),
             "citation_count": len(response.citations),
             "evidence_count": len(response.evidence),
+            "retrieval_mode": response.metadata.retrieval_mode,
+            "dense_retrieval_used": response.metadata.dense_retrieval_used,
+            "dense_retrieval_fallback_used": response.metadata.dense_retrieval_fallback_used,
+            "fallback_used": response.metadata.fallback_used,
+            "retriever_stage_failed": response.metadata.retriever_stage_failed,
         },
     )
 

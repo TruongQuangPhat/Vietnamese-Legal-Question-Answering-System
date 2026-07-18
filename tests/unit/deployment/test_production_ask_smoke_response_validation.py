@@ -90,6 +90,33 @@ def test_smoke_validation_fails_for_severe_warnings(warning: str) -> None:
         validate_response_payload(payload)
 
 
+def test_smoke_validation_fails_for_hybrid_fallback_metadata() -> None:
+    payload = _valid_payload(
+        metadata_overrides={
+            "dense_retrieval_used": False,
+            "dense_retrieval_fallback_used": True,
+            "fallback_used": True,
+            "retriever_stage_failed": "embedding_model_load_timeout",
+        }
+    )
+
+    with pytest.raises(SmokeValidationError, match="degraded dense retrieval fallback"):
+        validate_response_payload(payload)
+
+
+def test_smoke_validation_fails_when_hybrid_dense_was_not_used() -> None:
+    payload = _valid_payload(metadata_overrides={"dense_retrieval_used": False})
+
+    with pytest.raises(SmokeValidationError, match="did not use dense retrieval"):
+        validate_response_payload(payload)
+
+
+def test_smoke_validation_passes_with_evidence_caution_warning() -> None:
+    lines = validate_response_payload(_valid_payload(warnings=["all_selected_evidence_caution"]))
+
+    assert "Warnings: all_selected_evidence_caution" in lines
+
+
 def test_smoke_validation_fails_when_follow_up_was_not_prepared() -> None:
     payload = _valid_payload(
         follow_up_detected=True,
@@ -109,6 +136,11 @@ def test_smoke_validation_logs_sanitized_summary_fields() -> None:
     assert "Evidence count: 0" in lines
     assert "Response latency_ms: 25257" in lines
     assert "Metadata model exists: True" in lines
+    assert "Retrieval mode: hybrid" in lines
+    assert "Dense retrieval used: True" in lines
+    assert "Dense retrieval fallback used: False" in lines
+    assert "Fallback used: False" in lines
+    assert "Retriever stage failed: None" in lines
     assert "Retrieval question prepared: False" in lines
     assert "Follow-up detected: False" in lines
     assert "Warnings: " in lines
@@ -122,18 +154,27 @@ def _valid_payload(
     follow_up_detected: bool | None = False,
     retrieval_question_prepared: bool = False,
     warnings: list[str] | None = None,
+    metadata_overrides: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "latency_ms": 25257,
+        "model": "google/gemini-2.5-flash",
+        "retrieval_mode": "hybrid",
+        "dense_retrieval_used": True,
+        "dense_retrieval_fallback_used": False,
+        "fallback_used": False,
+        "retriever_stage_failed": None,
+        "follow_up_detected": follow_up_detected,
+        "retrieval_question_prepared": retrieval_question_prepared,
+    }
+    if metadata_overrides:
+        metadata.update(metadata_overrides)
     return {
         "answer": answer,
         "citations": [{"id": "E1"}] if citations is DEFAULT_CITATIONS else citations,
         "decision": decision,
         "evidence": [],
-        "metadata": {
-            "latency_ms": 25257,
-            "model": "google/gemini-2.5-flash",
-            "follow_up_detected": follow_up_detected,
-            "retrieval_question_prepared": retrieval_question_prepared,
-        },
+        "metadata": metadata,
         "request_id": "test-request",
         "warnings": [] if warnings is None else warnings,
     }

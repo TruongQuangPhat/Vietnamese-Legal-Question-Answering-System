@@ -243,6 +243,11 @@ class ResponseMetadataDTO(BaseModel):
     conversation_context_message_count: int = Field(default=0, ge=0)
     follow_up_detected: bool = False
     retrieval_question_prepared: bool = False
+    retrieval_mode: str = "hybrid"
+    dense_retrieval_used: bool = False
+    dense_retrieval_fallback_used: bool = False
+    fallback_used: bool = False
+    retriever_stage_failed: str | None = None
 
 
 class LegalQAResponse(BaseModel):

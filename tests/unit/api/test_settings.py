@@ -59,6 +59,7 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.legal_qa_session_header == "X-Legal-QA-Session"
     assert settings.legal_qa_ask_timeout_seconds == 90.0
     assert settings.legal_qa_retrieval_timeout_seconds == 60.0
+    assert settings.legal_qa_embedding_model_load_timeout_seconds == 60.0
     assert settings.legal_qa_query_embedding_timeout_seconds == 45.0
     assert settings.legal_qa_qdrant_timeout_seconds == 30.0
     assert settings.legal_qa_llm_timeout_seconds == 30.0
@@ -127,6 +128,7 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
             "LEGAL_QA_ASK_TIMEOUT_SECONDS": "75.5",
             "LEGAL_QA_RETRIEVAL_MODE": "hybrid",
             "LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS": "50",
+            "LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS": "40",
             "LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS": "25",
             "LEGAL_QA_QDRANT_TIMEOUT_SECONDS": "10",
             "LEGAL_QA_LLM_TIMEOUT_SECONDS": "20",
@@ -144,6 +146,7 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
     assert settings.legal_qa_ask_timeout_seconds == 75.5
     assert settings.legal_qa_retrieval_mode == LegalQARetrievalMode.HYBRID
     assert settings.legal_qa_retrieval_timeout_seconds == 50.0
+    assert settings.legal_qa_embedding_model_load_timeout_seconds == 40.0
     assert settings.legal_qa_query_embedding_timeout_seconds == 25.0
     assert settings.legal_qa_qdrant_timeout_seconds == 10.0
     assert settings.legal_qa_llm_timeout_seconds == 20.0
@@ -398,6 +401,7 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
     assert runtime_settings.device == "cpu"
     assert runtime_settings.model == "google/gemini-2.5-flash"
     assert runtime_settings.embedding_model_path == Path("models/embedding/bge-m3")
+    assert runtime_settings.embedding_model_load_timeout_seconds == 60.0
 
 
 def test_settings_load_dotenv_with_process_environment_precedence(

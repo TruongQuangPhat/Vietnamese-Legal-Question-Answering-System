@@ -96,6 +96,11 @@ class LegalQAWorkflowMetadata:
     conversation_context_message_count: int = 0
     follow_up_detected: bool = False
     retrieval_question_prepared: bool = False
+    retrieval_mode: str = "hybrid"
+    dense_retrieval_used: bool = False
+    dense_retrieval_fallback_used: bool = False
+    fallback_used: bool = False
+    retriever_stage_failed: str | None = None
 
 
 @dataclass(frozen=True)
@@ -597,4 +602,9 @@ def _map_metadata(metadata: LegalQAWorkflowMetadata) -> ResponseMetadataDTO:
         conversation_context_message_count=(metadata.conversation_context_message_count),
         follow_up_detected=metadata.follow_up_detected,
         retrieval_question_prepared=metadata.retrieval_question_prepared,
+        retrieval_mode=metadata.retrieval_mode,
+        dense_retrieval_used=metadata.dense_retrieval_used,
+        dense_retrieval_fallback_used=metadata.dense_retrieval_fallback_used,
+        fallback_used=metadata.fallback_used,
+        retriever_stage_failed=metadata.retriever_stage_failed,
     )

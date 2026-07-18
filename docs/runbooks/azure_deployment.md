@@ -526,6 +526,7 @@ PORT=8000
 LEGAL_QA_SERVICE_MODE=real
 LEGAL_QA_ASK_TIMEOUT_SECONDS=90
 LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60
+LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=60
 LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45
 LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30
 LEGAL_QA_LLM_TIMEOUT_SECONDS=30
@@ -575,12 +576,15 @@ If `/api/v1/legal-qa/ask` times out:
   stage: request validation, context loading, retrieval-question preparation,
   embedding/model loading, query embedding, Qdrant retrieval, provider call,
   response mapping, completion, or failure.
-- The embedding/model-loading and query-embedding entries are coarse markers:
-  BGE-M3 model loading and query embedding occur inside the retrieval adapter,
-  so the following retrieval timing may include both embedding and Qdrant work.
-- A timeout before `qdrant_retrieval` completes usually points to BGE-M3 or
-  retrieval cold-start cost on CPU. A timeout after `llm_generation_provider_call`
-  starts points to provider latency or egress.
+- `embedding_model_load_timeout`, `query_embedding_timeout`, and
+  `qdrant_retrieval_timeout` are separate failure stages. A
+  `qdrant_retrieval_error` should mean the Qdrant call itself failed; it should
+  not be used for BGE-M3 model loading or query embedding failures.
+- If `fallback_used=true` or `dense_retrieval_fallback_used=true`, production is
+  answering through degraded retrieval. Inspect the precise failed stage before
+  rerunning smoke.
+- A timeout after `llm_generation_provider_call` starts points to provider
+  latency or egress.
 - Production images now bake the pinned public `BAAI/bge-m3` snapshot into
   `/models/embedding/bge-m3` during Docker build and set
   `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, so runtime `/warmup` and
@@ -633,13 +637,18 @@ seconds for production ML cold start. It fails if the ask HTTP status is not
 `200`, the response reports `decision=error`, has `metadata.model=null` or an
 empty model, returns a missing or too-short answer, has no citations, contains a
 severe warning, or returns the generic internal error answer. Severe warnings
-include `ask_timeout`, `query_embedding_timeout`, `qdrant_retrieval_timeout`,
-`internal_error`, `retrieval_error`, and `llm_timeout`.
+include `ask_timeout`, `embedding_model_load_timeout`,
+`embedding_model_load_error`, `query_embedding_timeout`,
+`query_embedding_error`, `qdrant_retrieval_timeout`, `qdrant_retrieval_error`,
+`dense_retrieval_fallback_used`, `dense_retriever_error`, `internal_error`,
+`retrieval_error`, and `llm_timeout`.
 
 For standalone legal questions, `metadata.retrieval_question_prepared=false` is
 diagnostic only and is not a failure by itself. The primary pass criteria are
 HTTP 200, `decision=answered`, model presence, a non-empty answer, citations,
-and no timeout/internal-error warnings. `retrieval_question_prepared=false`
+`metadata.dense_retrieval_used=true`, `metadata.fallback_used=false`, and no
+timeout/internal-error or degraded dense-retrieval warnings.
+`retrieval_question_prepared=false`
 remains a hard failure when `metadata.follow_up_detected=true`, because that
 smoke path is explicitly testing follow-up question rewriting. The workflow
 prints only safe summary fields: HTTP status, response keys, answer length,

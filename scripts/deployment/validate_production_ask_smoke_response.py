@@ -16,8 +16,14 @@ GENERIC_ERROR_ANSWERS = frozenset(
 SEVERE_WARNINGS = frozenset(
     {
         "ask_timeout",
+        "embedding_model_load_timeout",
+        "embedding_model_load_error",
         "query_embedding_timeout",
+        "query_embedding_error",
         "qdrant_retrieval_timeout",
+        "qdrant_retrieval_error",
+        "dense_retrieval_fallback_used",
+        "dense_retriever_error",
         "internal_error",
         "retrieval_error",
         "llm_timeout",
@@ -66,6 +72,11 @@ def validate_response_payload(payload: dict[str, Any], *, http_status: str = "20
     retrieval_question_prepared = metadata.get("retrieval_question_prepared")
     follow_up_detected = metadata.get("follow_up_detected")
     latency_ms = metadata.get("latency_ms")
+    retrieval_mode = metadata.get("retrieval_mode")
+    dense_retrieval_used = metadata.get("dense_retrieval_used")
+    dense_retrieval_fallback_used = metadata.get("dense_retrieval_fallback_used")
+    fallback_used = metadata.get("fallback_used")
+    retriever_stage_failed = metadata.get("retriever_stage_failed")
 
     lines = [
         "Response JSON keys: " + ", ".join(keys),
@@ -79,6 +90,11 @@ def validate_response_payload(payload: dict[str, Any], *, http_status: str = "20
     lines.extend(
         [
             f"Metadata model exists: {model_exists}",
+            f"Retrieval mode: {retrieval_mode}",
+            f"Dense retrieval used: {dense_retrieval_used}",
+            f"Dense retrieval fallback used: {dense_retrieval_fallback_used}",
+            f"Fallback used: {fallback_used}",
+            f"Retriever stage failed: {retriever_stage_failed}",
             f"Retrieval question prepared: {retrieval_question_prepared}",
             f"Follow-up detected: {follow_up_detected}",
             "Warnings: " + ", ".join(warning_names),
@@ -106,6 +122,13 @@ def validate_response_payload(payload: dict[str, Any], *, http_status: str = "20
         )
     if citation_count < 1:
         raise SmokeValidationError("Ask smoke returned no citations.")
+    if retrieval_mode in {None, "hybrid"}:
+        if fallback_used is True or dense_retrieval_fallback_used is True:
+            raise SmokeValidationError(
+                "Ask smoke used degraded dense retrieval fallback in hybrid mode."
+            )
+        if dense_retrieval_used is not True:
+            raise SmokeValidationError("Ask smoke did not use dense retrieval in hybrid mode.")
     if follow_up_detected is True and retrieval_question_prepared is False:
         raise SmokeValidationError(
             "Ask smoke detected a follow-up question but did not prepare a retrieval question."

@@ -134,10 +134,13 @@ Current durable state:
 - Azure production `/health`, `/api/v1/readiness`,
   `/api/v1/legal-qa/warmup`, and the controlled Production Ask Smoke pass.
   Future validation must use the controlled GitHub smoke workflows and must not
-  repeatedly call real production `/api/v1/legal-qa/ask`. Render Free is legacy
-  and should not be used for production `/ask` validation. Preserve the hybrid
-  pipeline; do not switch production to sparse-only unless explicitly scoped as
-  a degraded emergency mode.
+  repeatedly call real production `/api/v1/legal-qa/ask`. Hybrid production
+  smoke must treat dense fallback as degraded retrieval: `fallback_used=true`,
+  `dense_retrieval_fallback_used=true`, or `dense_retrieval_used=false` is not a
+  final production-quality pass. Render Free is legacy and should not be used
+  for production `/ask` validation. Preserve the hybrid pipeline; do not switch
+  production to sparse-only unless explicitly scoped as a degraded emergency
+  mode.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.

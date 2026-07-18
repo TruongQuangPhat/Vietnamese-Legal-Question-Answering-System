@@ -74,6 +74,7 @@ async def run_naive_rag(
         "retrieval_issue_codes": list(
             dict.fromkeys(issue.code for issue in retrieval_result.issues)
         ),
+        **retrieval_result.metadata,
     }
     evidence_bundle = build_evidence_bundle(retrieval_result, evidence_config)
     selection_result = select_evidence_for_answer(
