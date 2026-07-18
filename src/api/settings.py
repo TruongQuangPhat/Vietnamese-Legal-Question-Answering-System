@@ -13,10 +13,12 @@ from dotenv import dotenv_values
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.indexing.embedding_model import inspect_embedding_model_path
 from src.services.legal_qa_workflow import (
     DEFAULT_CHUNKS_PATH,
     DEFAULT_LLM_CONFIG_PATH,
     DEFAULT_RETRIEVAL_CONFIG_PATH,
+    LegalQARetrievalMode,
     LegalQARuntimeSettings,
     LegalQAServiceMode,
 )
@@ -31,6 +33,7 @@ DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
 DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_TOP_K = 10
+DEFAULT_RETRIEVAL_MODE = LegalQARetrievalMode.HYBRID
 DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED = True
 DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE = "sparse"
 DEFAULT_DENSE_RETRIEVAL_FALLBACK_TIMEOUT_SECONDS = 10.0
@@ -79,6 +82,7 @@ class AppSettings(BaseSettings):
         default_factory=lambda: list(DEFAULT_CORS_ALLOWED_ORIGINS)
     )
     legal_qa_service_mode: LegalQAServiceMode = LegalQAServiceMode.FAKE
+    legal_qa_retrieval_mode: LegalQARetrievalMode = DEFAULT_RETRIEVAL_MODE
     legal_qa_retrieval_config: Path = DEFAULT_RETRIEVAL_CONFIG_PATH
     legal_qa_chunks_path: Path = DEFAULT_CHUNKS_PATH
     legal_qa_llm_config: Path = DEFAULT_LLM_CONFIG_PATH
@@ -88,6 +92,7 @@ class AppSettings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(default=None, repr=False)
     legal_qa_device: str | None = None
     legal_qa_model: str | None = None
+    embedding_model_path: Path | None = None
     legal_qa_rate_limit_enabled: bool = False
     legal_qa_rate_limit_requests: int = Field(DEFAULT_RATE_LIMIT_REQUESTS, gt=0)
     legal_qa_rate_limit_window_seconds: int = Field(DEFAULT_RATE_LIMIT_WINDOW_SECONDS, gt=0)
@@ -147,6 +152,7 @@ class AppSettings(BaseSettings):
                 default=DEFAULT_CORS_ALLOWED_ORIGINS,
             ),
             legal_qa_service_mode=_service_mode(env.get("LEGAL_QA_SERVICE_MODE")),
+            legal_qa_retrieval_mode=_retrieval_mode(env.get("LEGAL_QA_RETRIEVAL_MODE")),
             legal_qa_retrieval_config=Path(
                 env.get("LEGAL_QA_RETRIEVAL_CONFIG", str(DEFAULT_RETRIEVAL_CONFIG_PATH))
             ),
@@ -173,6 +179,13 @@ class AppSettings(BaseSettings):
                 env,
                 "LEGAL_QA_MODEL",
                 "OPENROUTER_MODEL",
+            ),
+            embedding_model_path=_optional_path(
+                _first_non_blank(
+                    env,
+                    "EMBEDDING_MODEL_PATH",
+                    "LEGAL_QA_EMBEDDING_MODEL_PATH",
+                )
             ),
             legal_qa_rate_limit_enabled=_parse_bool(
                 env.get("LEGAL_QA_RATE_LIMIT_ENABLED"),
@@ -328,6 +341,12 @@ class AppSettings(BaseSettings):
             issues.append("missing_qdrant_url")
         if self.legal_qa_collection_name is None:
             issues.append("missing_qdrant_collection")
+        if self.embedding_model_path is not None:
+            model_path_status = inspect_embedding_model_path(self.embedding_model_path)
+            if not model_path_status.exists:
+                issues.append("missing_embedding_model_path")
+            elif not model_path_status.required_files_present:
+                issues.append("invalid_embedding_model_files")
         if self.openrouter_api_key is None:
             issues.append("missing_openrouter_api_key")
         if not self.legal_qa_retrieval_config.is_file():
@@ -355,6 +374,7 @@ class AppSettings(BaseSettings):
         """Convert API settings to the Legal QA service runtime contract."""
         return LegalQARuntimeSettings(
             service_mode=self.legal_qa_service_mode,
+            retrieval_mode=self.legal_qa_retrieval_mode,
             retrieval_config_path=self.legal_qa_retrieval_config,
             chunks_path=self.legal_qa_chunks_path,
             llm_config_path=self.legal_qa_llm_config,
@@ -365,6 +385,7 @@ class AppSettings(BaseSettings):
             ),
             device=self.legal_qa_device,
             model=self.legal_qa_model,
+            embedding_model_path=self.embedding_model_path,
             retrieval_timeout_seconds=self.legal_qa_retrieval_timeout_seconds,
             query_embedding_timeout_seconds=self.legal_qa_query_embedding_timeout_seconds,
             qdrant_timeout_seconds=self.legal_qa_qdrant_timeout_seconds,
@@ -413,6 +434,17 @@ def _service_mode(raw_value: str | None) -> LegalQAServiceMode:
     except ValueError as exc:
         allowed = ", ".join(item.value for item in LegalQAServiceMode)
         raise ValueError(f"LEGAL_QA_SERVICE_MODE must be one of: {allowed}") from exc
+
+
+def _retrieval_mode(raw_value: str | None) -> LegalQARetrievalMode:
+    value = _non_blank(raw_value)
+    if value is None:
+        return DEFAULT_RETRIEVAL_MODE
+    try:
+        return LegalQARetrievalMode(value)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in LegalQARetrievalMode)
+        raise ValueError(f"LEGAL_QA_RETRIEVAL_MODE must be one of: {allowed}") from exc
 
 
 def _conversation_store_mode(raw_value: str | None) -> ConversationStoreMode:
@@ -487,6 +519,11 @@ def _non_blank(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _optional_path(value: str | None) -> Path | None:
+    stripped = _non_blank(value)
+    return Path(stripped) if stripped is not None else None
 
 
 def _runtime_environment(

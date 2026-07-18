@@ -11,6 +11,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
+from src.indexing.embedding_model import EmbeddingModelPathStatus
 from src.retrieval.coverage_aware import CoverageAwareFusionConfig
 from src.retrieval.generation import FALLBACK_ANSWER_VI, RagAnswerResult, RagGenerationConfig
 from src.retrieval.llm_client import LLMClientProtocol, LLMRequest, LLMResponse
@@ -57,6 +58,13 @@ class LegalQAServiceMode(StrEnum):
     REAL = "real"
 
 
+class LegalQARetrievalMode(StrEnum):
+    """Real-mode retrieval strategy supported by the production API."""
+
+    HYBRID = "hybrid"
+    SPARSE = "sparse"
+
+
 @dataclass(frozen=True)
 class LegalQARuntimeSettings:
     """Runtime settings used by the Legal QA API dependency factory.
@@ -66,6 +74,7 @@ class LegalQARuntimeSettings:
     """
 
     service_mode: LegalQAServiceMode = LegalQAServiceMode.FAKE
+    retrieval_mode: LegalQARetrievalMode = LegalQARetrievalMode.HYBRID
     retrieval_config_path: Path = DEFAULT_RETRIEVAL_CONFIG_PATH
     chunks_path: Path = DEFAULT_CHUNKS_PATH
     llm_config_path: Path = DEFAULT_LLM_CONFIG_PATH
@@ -74,6 +83,7 @@ class LegalQARuntimeSettings:
     qdrant_api_key: str | None = field(default=None, repr=False)
     device: str | None = None
     model: str | None = None
+    embedding_model_path: Path | None = None
     retrieval_timeout_seconds: float = DEFAULT_RETRIEVAL_TIMEOUT_SECONDS
     query_embedding_timeout_seconds: float = DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS
     qdrant_timeout_seconds: float = DEFAULT_QDRANT_TIMEOUT_SECONDS
@@ -101,6 +111,7 @@ class LegalQARuntimeSettings:
         env = os.environ if environ is None else environ
         return cls(
             service_mode=_service_mode(env.get("LEGAL_QA_SERVICE_MODE")),
+            retrieval_mode=_retrieval_mode(env.get("LEGAL_QA_RETRIEVAL_MODE")),
             retrieval_config_path=Path(
                 env.get("LEGAL_QA_RETRIEVAL_CONFIG", str(DEFAULT_RETRIEVAL_CONFIG_PATH))
             ),
@@ -115,6 +126,9 @@ class LegalQARuntimeSettings:
             ),
             device=_non_blank(env.get("LEGAL_QA_DEVICE")),
             model=_non_blank(env.get("LEGAL_QA_MODEL") or env.get("OPENROUTER_MODEL")),
+            embedding_model_path=_optional_path(
+                env.get("EMBEDDING_MODEL_PATH") or env.get("LEGAL_QA_EMBEDDING_MODEL_PATH")
+            ),
             retrieval_timeout_seconds=_positive_float(
                 env.get("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS"),
                 default=DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
@@ -176,6 +190,7 @@ class RealLegalQAWorkflow:
         runner: Callable[..., Awaitable[RagAnswerResult]] = run_naive_rag,
         retrieval_timeout_seconds: float = DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
         llm_timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS,
+        embedding_model_path_status: EmbeddingModelPathStatus | None = None,
     ) -> None:
         """Initialize the real workflow adapter with injected dependencies."""
         self._retriever = retriever
@@ -189,6 +204,7 @@ class RealLegalQAWorkflow:
         self._runner = runner
         self._retrieval_timeout_seconds = retrieval_timeout_seconds
         self._llm_timeout_seconds = llm_timeout_seconds
+        self._embedding_model_path_status = embedding_model_path_status
 
     def run(self, request: LegalQAWorkflowRequest) -> LegalQAWorkflowResult:
         """Run RAG with an enriched retrieval query and original answer question.
@@ -240,6 +256,21 @@ class RealLegalQAWorkflow:
         if warmup is None or not callable(warmup):
             return
         _run_async(warmup())
+
+    def embedding_model_status(self) -> dict[str, bool]:
+        """Return shallow embedding model path status without loading the model."""
+        status = self._embedding_model_path_status
+        if status is None:
+            return {
+                "model_path_configured": False,
+                "model_path_exists": False,
+                "required_files_present": False,
+            }
+        return {
+            "model_path_configured": status.configured,
+            "model_path_exists": status.exists,
+            "required_files_present": status.required_files_present,
+        }
 
 
 class _RetrievalQuestionOverride:
@@ -448,7 +479,7 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
     query, call OpenRouter, run embedding inference, mutate Qdrant, or write
     evaluation artifacts at import time.
     """
-    from src.indexing.embedding_model import BgeM3EmbeddingModel
+    from src.indexing.embedding_model import BgeM3EmbeddingModel, inspect_embedding_model_path
     from src.indexing.qdrant_collection import build_qdrant_client
     from src.retrieval.coverage_aware import CoverageAwareQuotaRetriever
     from src.retrieval.dense_retriever import DenseRetriever
@@ -463,6 +494,17 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
     collection_name = settings.collection_name or retrieval_config.qdrant.collection_name
     qdrant_url = settings.qdrant_url or retrieval_config.qdrant.url
     device = settings.device or retrieval_config.embedding.device
+    embedding_model_path_status = inspect_embedding_model_path(settings.embedding_model_path)
+    embedding_model_name = (
+        str(settings.embedding_model_path)
+        if settings.embedding_model_path is not None
+        else retrieval_config.embedding.model_name
+    )
+    embedding_model_revision = (
+        None
+        if settings.embedding_model_path is not None
+        else retrieval_config.embedding.model_revision
+    )
 
     qdrant_client = build_qdrant_client(
         url=qdrant_url,
@@ -470,12 +512,13 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         api_key=settings.qdrant_api_key,
     )
     embedding_model = BgeM3EmbeddingModel(
-        model_name=retrieval_config.embedding.model_name,
-        model_revision=retrieval_config.embedding.model_revision,
+        model_name=embedding_model_name,
+        model_revision=embedding_model_revision,
         device=device,
         normalize_embeddings=retrieval_config.embedding.normalize_embeddings,
         max_length=retrieval_config.embedding.max_length,
         dense_vector_name=retrieval_config.dense_retrieval.vector_name,
+        require_local_files=settings.embedding_model_path is not None,
     )
     dense_retriever = DenseRetriever(
         qdrant_client=qdrant_client,
@@ -529,6 +572,7 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         selection_config=selection_config,
         retrieval_timeout_seconds=settings.retrieval_timeout_seconds,
         llm_timeout_seconds=settings.llm_timeout_seconds,
+        embedding_model_path_status=embedding_model_path_status,
     )
 
 
@@ -705,6 +749,17 @@ def _service_mode(raw_value: str | None) -> LegalQAServiceMode:
         raise ValueError(f"LEGAL_QA_SERVICE_MODE must be one of: {allowed}") from exc
 
 
+def _retrieval_mode(raw_value: str | None) -> LegalQARetrievalMode:
+    value = _non_blank(raw_value)
+    if value is None:
+        return LegalQARetrievalMode.HYBRID
+    try:
+        return LegalQARetrievalMode(value)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in LegalQARetrievalMode)
+        raise ValueError(f"LEGAL_QA_RETRIEVAL_MODE must be one of: {allowed}") from exc
+
+
 def _safe_failure_stage(exc: BaseException, *, default: str) -> str:
     stage = getattr(exc, "failure_stage", None)
     if isinstance(stage, str) and stage.replace("_", "").isalnum():
@@ -717,6 +772,11 @@ def _non_blank(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _optional_path(value: str | None) -> Path | None:
+    stripped = _non_blank(value)
+    return Path(stripped) if stripped is not None else None
 
 
 def _positive_float(raw_value: str | None, *, default: float, name: str) -> float:

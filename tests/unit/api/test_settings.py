@@ -16,6 +16,7 @@ from src.api.settings import (
 from src.services.legal_qa_workflow import (
     DEFAULT_LLM_CONFIG_PATH,
     DEFAULT_RETRIEVAL_CONFIG_PATH,
+    LegalQARetrievalMode,
     LegalQAServiceMode,
 )
 
@@ -28,11 +29,14 @@ REAL_SERVICE_TEST_ENV_VARS = (
     "QDRANT_API_KEY",
     "OPENROUTER_API_KEY",
     "OPENROUTER_MODEL",
+    "EMBEDDING_MODEL_PATH",
+    "LEGAL_QA_EMBEDDING_MODEL_PATH",
     "LEGAL_QA_CONVERSATION_STORE",
     "LEGAL_QA_DATABASE_URL",
     "LEGAL_QA_AUTH_ENABLED",
     "LEGAL_QA_SESSION_SECRET",
     "LEGAL_QA_SESSION_HEADER",
+    "LEGAL_QA_RETRIEVAL_MODE",
 )
 VALID_SESSION_SECRET = "unit-test-session-secret-with-enough-entropy"
 
@@ -44,6 +48,7 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.log_level == "INFO"
     assert settings.cors_allowed_origins == ["http://localhost:3000"]
     assert settings.legal_qa_service_mode == LegalQAServiceMode.FAKE
+    assert settings.legal_qa_retrieval_mode == LegalQARetrievalMode.HYBRID
     assert settings.legal_qa_rate_limit_enabled is False
     assert settings.legal_qa_rate_limit_requests == 10
     assert settings.legal_qa_rate_limit_window_seconds == 60
@@ -120,6 +125,7 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
     settings = AppSettings.from_env(
         {
             "LEGAL_QA_ASK_TIMEOUT_SECONDS": "75.5",
+            "LEGAL_QA_RETRIEVAL_MODE": "hybrid",
             "LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS": "50",
             "LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS": "25",
             "LEGAL_QA_QDRANT_TIMEOUT_SECONDS": "10",
@@ -136,6 +142,7 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
     )
 
     assert settings.legal_qa_ask_timeout_seconds == 75.5
+    assert settings.legal_qa_retrieval_mode == LegalQARetrievalMode.HYBRID
     assert settings.legal_qa_retrieval_timeout_seconds == 50.0
     assert settings.legal_qa_query_embedding_timeout_seconds == 25.0
     assert settings.legal_qa_qdrant_timeout_seconds == 10.0
@@ -197,6 +204,7 @@ def test_settings_reject_invalid_rate_limit_configuration(
     ("name", "value"),
     [
         ("LEGAL_QA_ASK_TIMEOUT_SECONDS", "0"),
+        ("LEGAL_QA_RETRIEVAL_MODE", "dense"),
         ("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS", "-1"),
         ("LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS", "not-a-number"),
         ("LEGAL_QA_QDRANT_TIMEOUT_SECONDS", "0"),
@@ -216,6 +224,12 @@ def test_settings_reject_invalid_ask_runtime_safety_configuration(
 ) -> None:
     with pytest.raises(ValueError, match=name):
         AppSettings.from_env({name: value})
+
+
+def test_settings_accept_sparse_retrieval_mode_as_degraded_fallback() -> None:
+    settings = AppSettings.from_env({"LEGAL_QA_RETRIEVAL_MODE": "sparse"})
+
+    assert settings.legal_qa_retrieval_mode == LegalQARetrievalMode.SPARSE
 
 
 def test_settings_parse_postgres_conversation_store_configuration() -> None:
@@ -357,6 +371,7 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
     settings = AppSettings.from_env(
         {
             "LEGAL_QA_SERVICE_MODE": "real",
+            "LEGAL_QA_RETRIEVAL_MODE": "hybrid",
             "LEGAL_QA_RETRIEVAL_CONFIG": "configs/retrieval/custom.yml",
             "LEGAL_QA_CHUNKS_PATH": "tmp/chunks.jsonl",
             "LEGAL_QA_LLM_CONFIG": "configs/llm/custom.yml",
@@ -366,12 +381,14 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
             "OPENROUTER_API_KEY": "openrouter-test-secret",
             "LEGAL_QA_DEVICE": "cpu",
             "LEGAL_QA_MODEL": "google/gemini-2.5-flash",
+            "EMBEDDING_MODEL_PATH": "models/embedding/bge-m3",
         }
     )
 
     runtime_settings = settings.to_legal_qa_runtime_settings()
 
     assert runtime_settings.service_mode == LegalQAServiceMode.REAL
+    assert runtime_settings.retrieval_mode == LegalQARetrievalMode.HYBRID
     assert runtime_settings.retrieval_config_path == Path("configs/retrieval/custom.yml")
     assert runtime_settings.chunks_path == Path("tmp/chunks.jsonl")
     assert runtime_settings.llm_config_path == Path("configs/llm/custom.yml")
@@ -380,6 +397,7 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
     assert runtime_settings.qdrant_api_key == "qdrant-test-secret"
     assert runtime_settings.device == "cpu"
     assert runtime_settings.model == "google/gemini-2.5-flash"
+    assert runtime_settings.embedding_model_path == Path("models/embedding/bge-m3")
 
 
 def test_settings_load_dotenv_with_process_environment_precedence(
@@ -442,6 +460,53 @@ def test_real_mode_reports_safe_missing_configuration_codes(tmp_path: Path) -> N
     assert "secret" not in message
 
 
+def test_real_mode_reports_missing_configured_embedding_model_path(tmp_path: Path) -> None:
+    retrieval_config = tmp_path / "retrieval.yml"
+    chunks = tmp_path / "chunks.jsonl"
+    llm_config = tmp_path / "llm.yml"
+    for path in (retrieval_config, chunks, llm_config):
+        path.touch()
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "real",
+            "QDRANT_URL": "http://qdrant:6333",
+            "QDRANT_COLLECTION": "legal_chunks",
+            "OPENROUTER_API_KEY": "openrouter-secret-value",
+            "EMBEDDING_MODEL_PATH": str(tmp_path / "missing-model"),
+            "LEGAL_QA_RETRIEVAL_CONFIG": str(retrieval_config),
+            "LEGAL_QA_CHUNKS_PATH": str(chunks),
+            "LEGAL_QA_LLM_CONFIG": str(llm_config),
+        }
+    )
+
+    assert settings.runtime_configuration_issues() == ("missing_embedding_model_path",)
+
+
+def test_real_mode_accepts_configured_embedding_model_path(tmp_path: Path) -> None:
+    retrieval_config = tmp_path / "retrieval.yml"
+    chunks = tmp_path / "chunks.jsonl"
+    llm_config = tmp_path / "llm.yml"
+    model_path = tmp_path / "models" / "bge-m3"
+    for path in (retrieval_config, chunks, llm_config):
+        path.touch()
+    _write_minimal_model_files(model_path)
+    settings = AppSettings.from_env(
+        {
+            "LEGAL_QA_SERVICE_MODE": "real",
+            "QDRANT_URL": "http://qdrant:6333",
+            "QDRANT_COLLECTION": "legal_chunks",
+            "OPENROUTER_API_KEY": "openrouter-secret-value",
+            "EMBEDDING_MODEL_PATH": str(model_path),
+            "LEGAL_QA_RETRIEVAL_CONFIG": str(retrieval_config),
+            "LEGAL_QA_CHUNKS_PATH": str(chunks),
+            "LEGAL_QA_LLM_CONFIG": str(llm_config),
+        }
+    )
+
+    assert settings.runtime_configuration_issues() == ()
+    assert settings.to_legal_qa_runtime_settings().embedding_model_path == model_path
+
+
 def test_real_mode_accepts_required_configuration_without_external_calls(
     tmp_path: Path,
 ) -> None:
@@ -468,6 +533,13 @@ def test_real_mode_accepts_required_configuration_without_external_calls(
     assert settings.runtime_configuration_issues() == ()
     assert "qdrant-secret-value" not in repr(settings)
     assert "openrouter-secret-value" not in repr(settings)
+
+
+def _write_minimal_model_files(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "config.json").write_text("{}", encoding="utf-8")
+    (path / "pytorch_model.bin").write_bytes(b"placeholder")
+    (path / "tokenizer.json").write_text("{}", encoding="utf-8")
 
 
 async def test_dependency_provider_uses_settings_default_fake_mode(

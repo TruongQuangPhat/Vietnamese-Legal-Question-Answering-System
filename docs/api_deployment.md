@@ -184,26 +184,36 @@ controlled JSON before Azure emits `502` or `504`:
 
 ```env
 LEGAL_QA_ASK_TIMEOUT_SECONDS=90
+LEGAL_QA_RETRIEVAL_MODE=hybrid
 LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60
 LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45
 LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30
 LEGAL_QA_LLM_TIMEOUT_SECONDS=30
 LEGAL_QA_MAX_TOP_K=5
 LEGAL_QA_RERANKING_ENABLED=false
+EMBEDDING_MODEL_PATH=/models/embedding/bge-m3
 ```
 
 These settings do not make real QA quality acceptable by themselves. They are
 runtime guardrails for diagnosing whether the bottleneck is model loading,
 query embedding, Qdrant retrieval, provider generation, or memory pressure.
 
-The production ask smoke may attempt `GET /api/v1/legal-qa/warmup`, but warmup
-is best-effort only. Local BGE-M3 / FlagEmbedding model loading can exceed the
-current Azure App Service request limits, so warmup timeout, `warmed=false`,
-non-200, or disabled endpoint status must not block the single controlled
-`/ask` request. The production strategy is to keep `/health` and
-`/api/v1/readiness` lightweight, keep dense query embedding bounded, and allow
-the normal `/ask` path to use sparse BM25 fallback if dense embedding times
-out.
+The production container packages the pinned public `BAAI/bge-m3` Hugging Face
+snapshot into `/models/embedding/bge-m3` during Docker build. In production,
+`EMBEDDING_MODEL_PATH` points to that local directory so FlagEmbedding loads
+from the image instead of downloading model files during `/warmup` or `/ask`.
+The target production retrieval path remains BGE-M3 query embedding, Qdrant
+dense retrieval, coverage-aware hybrid retrieval, evidence selection, and LLM
+generation. The rule is: hybrid is the canonical project pipeline; sparse is a degraded
+emergency mode only for local troubleshooting or constrained-host recovery, and
+production Azure deployment targets `LEGAL_QA_RETRIEVAL_MODE=hybrid`. Sparse
+mode must not be used to validate final production quality.
+
+`GET /api/v1/legal-qa/warmup` is explicit and separate from `/health` and
+`/api/v1/readiness`. Warmup reports sanitized local model-path status, model
+load status, encode status, elapsed time, and exception class. After the model
+is packaged in the image, expected production warmup is `warmed=true` before
+running the single controlled `/ask` smoke.
 
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the
@@ -346,7 +356,7 @@ connectivity, or real multi-turn quality.
 | --- | --- | --- |
 | Service mode | Fake is safe by default; real config is validated before workflow construction | Real startup and one request still need controlled validation |
 | Qdrant | URL, collection, optional API key, timeout, and vector contract exist | TLS/custom CA policy and deployed connectivity remain to be validated |
-| Embedding and sparse retrieval | Real mode constructs BGE-M3 and loads the complete chunks JSONL | Model cache and processed chunks are absent from committed deployment sources |
+| Embedding and sparse retrieval | Real mode constructs BGE-M3, uses local BM25, and loads the complete chunks JSONL | Production container images package BGE-M3 under `/models/embedding/bge-m3` and chunks under `/home/data/legal_chunks.jsonl`; neither artifact is committed to Git |
 | LLM provider | OpenRouter URL/model config and `OPENROUTER_API_KEY` lookup exist | Provider credential, egress, timeout/error behavior, and real response remain unverified |
 | Health | `/health` is liveness; `/api/v1/readiness` validates config and optionally reads Qdrant collection metadata | Readiness deliberately does not validate LLM availability or load the embedding model |
 | Version | Static API name/version is exposed | It has no build or revision identity |

@@ -14,6 +14,7 @@ from src.indexing.embedding_model import (
     BgeM3EmbeddingModel,
     EmbeddingModelError,
     _load_flag_embedding_factory,
+    inspect_embedding_model_path,
 )
 from src.indexing.indexing_models import DenseEmbedding, EmbeddingInput
 
@@ -122,6 +123,66 @@ class TestBgeM3EmbeddingModel:
                 },
             )
         ]
+
+    def test_local_model_path_is_passed_to_factory_without_revision(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        _write_minimal_model_files(tmp_path)
+        factory = RecordingFactory(FakeEncoder([[1.0, 0.0]]))
+        model = BgeM3EmbeddingModel(
+            model_name=str(tmp_path),
+            model_revision="revision-ignored-for-local-path",
+            device="cpu",
+            model_factory=factory,
+            require_local_files=True,
+        )
+
+        model.ensure_loaded()
+
+        assert factory.calls == [
+            (
+                str(tmp_path),
+                {
+                    "normalize_embeddings": True,
+                    "use_fp16": False,
+                    "devices": ["cpu"],
+                },
+            )
+        ]
+
+    def test_required_local_model_path_fails_before_factory_call(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        factory = RecordingFactory(FakeEncoder([[1.0, 0.0]]))
+        model = BgeM3EmbeddingModel(
+            model_name=str(tmp_path / "missing-model"),
+            device="cpu",
+            model_factory=factory,
+            require_local_files=True,
+        )
+
+        with pytest.raises(EmbeddingModelError, match="local BGE-M3 model path"):
+            model.ensure_loaded()
+
+        assert factory.calls == []
+
+    def test_inspect_embedding_model_path_reports_required_files(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        missing_status = inspect_embedding_model_path(tmp_path / "missing")
+        assert missing_status.configured is True
+        assert missing_status.exists is False
+        assert missing_status.required_files_present is False
+
+        _write_minimal_model_files(tmp_path)
+        ready_status = inspect_embedding_model_path(tmp_path)
+
+        assert ready_status.configured is True
+        assert ready_status.exists is True
+        assert ready_status.required_files_present is True
 
     def test_rejects_output_count_mismatch(self) -> None:
         model = BgeM3EmbeddingModel(
@@ -240,3 +301,10 @@ class TestPilotHelpers:
         assert diagnostics["norm_max"] == 2.0
         assert diagnostics["norm_mean"] == 1.5
         assert math.isclose(diagnostics["norm_p95"], 1.95)
+
+
+def _write_minimal_model_files(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "config.json").write_text("{}", encoding="utf-8")
+    (path / "pytorch_model.bin").write_bytes(b"placeholder")
+    (path / "tokenizer.json").write_text("{}", encoding="utf-8")

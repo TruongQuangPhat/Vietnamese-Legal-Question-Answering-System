@@ -35,6 +35,7 @@ jobs:
     env:
       AZURE_PRODUCTION_BACKEND_URL: ${{ secrets.AZURE_PRODUCTION_BACKEND_URL }}
       CONFIRM_REAL_PRODUCTION_ASK: ${{ inputs.confirm_real_production_ask }}
+      EXPECTED_RETRIEVAL_MODE: hybrid
       SMOKE_QUESTION: ${{ inputs.question }}
       TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
 
@@ -69,6 +70,8 @@ jobs:
             printf 'timeout_seconds must be between 1 and 600.\n'
             exit 1
           fi
+
+          printf 'Expected production retrieval mode: %s\n' "$EXPECTED_RETRIEVAL_MODE"
 
       - name: Check production health and readiness
         run: |
@@ -113,27 +116,22 @@ jobs:
           PY
           rm -f "$readiness_file"
 
-      - name: Attempt best-effort production embedding warmup
+      - name: Verify production embedding warmup
         run: |
           set -euo pipefail
 
           base_url="${AZURE_PRODUCTION_BACKEND_URL%/}"
           response_file="$(mktemp)"
-          warmup_status="000"
-
-          set +e
           warmup_status="$(
-            curl -sS --max-time 60 -o "$response_file" -w '%{http_code}' \
+            curl -sS --max-time 220 -o "$response_file" -w '%{http_code}' \
               "$base_url/api/v1/legal-qa/warmup"
           )"
-          curl_exit="$?"
-          set -e
 
           printf 'Warmup HTTP status: %s\n' "$warmup_status"
-          printf 'Warmup curl exit code: %s\n' "$curl_exit"
-
-          if [ "$curl_exit" != "0" ]; then
-            printf 'Warmup did not complete within the bounded preflight window; continuing to ask smoke.\n'
+          if [ "$warmup_status" != "200" ]; then
+            rm -f "$response_file"
+            printf 'Warmup failed; ask smoke was not sent.\n'
+            exit 1
           fi
 
           RESPONSE_FILE="$response_file" WARMUP_STATUS="$warmup_status" python - <<'PY'
@@ -151,27 +149,33 @@ jobs:
           else:
               print("Warmup response body: <empty>")
 
-          status = os.environ["WARMUP_STATUS"]
-          if status == "404":
-              print("Warmup endpoint is disabled; continuing to ask smoke.")
-              raise SystemExit(0)
-          if status != "200":
-              print("Warmup endpoint did not return 200; continuing to ask smoke.")
-              raise SystemExit(0)
-
           try:
               payload = json.loads(raw_body)
           except json.JSONDecodeError:
-              print("Warmup response was not JSON; continuing to ask smoke.")
-              raise SystemExit(0)
+              raise SystemExit("Warmup response was not JSON; ask smoke was not sent.")
 
           print(f"Warmup warmed: {payload.get('warmed')}")
           print(f"Warmup elapsed_ms: {payload.get('elapsed_ms')}")
+          print(f"Warmup model_path_configured: {payload.get('model_path_configured')}")
+          print(f"Warmup model_path_exists: {payload.get('model_path_exists')}")
+          print(f"Warmup required_files_present: {payload.get('required_files_present')}")
+          print(f"Warmup model_load_completed: {payload.get('model_load_completed')}")
+          print(f"Warmup encode_completed: {payload.get('encode_completed')}")
           exception_class = payload.get("exception_class")
           if exception_class is not None:
               print(f"Warmup exception_class: {exception_class}")
           if payload.get("warmed") is not True:
-              print("Warmup did not complete successfully; continuing to ask smoke.")
+              raise SystemExit("Warmup did not complete successfully; ask smoke was not sent.")
+          required_true = [
+              "model_path_configured",
+              "model_path_exists",
+              "required_files_present",
+              "model_load_completed",
+              "encode_completed",
+          ]
+          missing = [name for name in required_true if payload.get(name) is not True]
+          if missing:
+              raise SystemExit("Warmup missing required true fields: " + ", ".join(missing))
           PY
           rm -f "$response_file"
 

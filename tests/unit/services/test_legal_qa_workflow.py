@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Any
 
@@ -26,11 +27,19 @@ from src.services.legal_qa_api_service import (
 )
 from src.services.legal_qa_context import LegalQAContextPreparer
 from src.services.legal_qa_workflow import (
+    LegalQARetrievalMode,
     LegalQARuntimeSettings,
     LegalQAServiceMode,
     RealLegalQAWorkflow,
     build_legal_qa_service,
+    build_real_legal_qa_workflow,
 )
+
+
+def test_runtime_settings_accept_sparse_retrieval_mode_as_degraded_fallback() -> None:
+    settings = LegalQARuntimeSettings.from_env({"LEGAL_QA_RETRIEVAL_MODE": "sparse"})
+
+    assert settings.retrieval_mode == LegalQARetrievalMode.SPARSE
 
 
 class StaticRetriever:
@@ -480,6 +489,86 @@ def test_route_contract_remains_stable_with_workflow_service() -> None:
     }
 
 
+def test_real_workflow_builder_preserves_hybrid_dense_path_with_local_model(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    chunks_path = tmp_path / "chunks.jsonl"
+    model_path = tmp_path / "models" / "bge-m3"
+    _write_chunks(chunks_path, [_chunk_record()])
+    _write_minimal_model_files(model_path)
+    calls: dict[str, Any] = {}
+
+    class FakeEmbeddingModel:
+        def __init__(self, **kwargs: Any) -> None:
+            calls["embedding_model"] = kwargs
+
+    class FakeDenseRetriever:
+        def __init__(self, **kwargs: Any) -> None:
+            calls["dense_retriever"] = kwargs
+
+    class FakeSparseRetriever:
+        @classmethod
+        def from_jsonl(cls, path: Path, *, default_top_k: int) -> FakeSparseRetriever:
+            calls["sparse_retriever"] = {"path": path, "default_top_k": default_top_k}
+            return cls()
+
+    class FakeCoverageRetriever:
+        def __init__(self, **kwargs: Any) -> None:
+            calls["coverage_retriever"] = kwargs
+
+    class FakeOpenRouterClient:
+        def __init__(self, **kwargs: Any) -> None:
+            calls["llm_client"] = kwargs
+
+    monkeypatch.setattr(
+        "src.indexing.embedding_model.BgeM3EmbeddingModel",
+        FakeEmbeddingModel,
+    )
+
+    def fake_qdrant_client(**kwargs: Any) -> object:
+        calls["qdrant_client"] = kwargs
+        return object()
+
+    monkeypatch.setattr(
+        "src.indexing.qdrant_collection.build_qdrant_client",
+        fake_qdrant_client,
+    )
+    monkeypatch.setattr("src.retrieval.dense_retriever.DenseRetriever", FakeDenseRetriever)
+    monkeypatch.setattr("src.retrieval.sparse_retriever.SparseBM25Retriever", FakeSparseRetriever)
+    monkeypatch.setattr(
+        "src.retrieval.coverage_aware.CoverageAwareQuotaRetriever",
+        FakeCoverageRetriever,
+    )
+    monkeypatch.setattr("src.retrieval.llm_client.OpenRouterLLMClient", FakeOpenRouterClient)
+
+    workflow = build_real_legal_qa_workflow(
+        LegalQARuntimeSettings(
+            service_mode=LegalQAServiceMode.REAL,
+            chunks_path=chunks_path,
+            collection_name="legal_chunks",
+            qdrant_url="http://qdrant:6333",
+            embedding_model_path=model_path,
+            model="google/gemini-2.5-flash",
+        )
+    )
+
+    assert isinstance(workflow, RealLegalQAWorkflow)
+    assert calls["embedding_model"]["model_name"] == str(model_path)
+    assert calls["embedding_model"]["model_revision"] is None
+    assert calls["embedding_model"]["require_local_files"] is True
+    assert isinstance(calls["dense_retriever"]["embedding_model"], FakeEmbeddingModel)
+    assert isinstance(calls["coverage_retriever"]["dense_retriever"], FakeDenseRetriever)
+    assert isinstance(calls["coverage_retriever"]["sparse_retriever"], FakeSparseRetriever)
+    assert "dense_retriever" in calls["coverage_retriever"]
+    assert "sparse_retriever" in calls["coverage_retriever"]
+    assert workflow.embedding_model_status() == {
+        "model_path_configured": True,
+        "model_path_exists": True,
+        "required_files_present": True,
+    }
+
+
 def _retrieval_result(chunks: list[RetrievedChunk]) -> RetrievalResult:
     return RetrievalResult(
         query="Câu hỏi hợp lệ?",
@@ -509,3 +598,40 @@ def _retrieved_chunk() -> RetrievedChunk:
         source_url="https://thuvienphapluat.vn/van-ban/lao-dong/",
         source_domain="thuvienphapluat.vn",
     )
+
+
+def _write_chunks(path: Path, records: list[dict[str, object]]) -> None:
+    path.write_text(
+        "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records),
+        encoding="utf-8",
+    )
+
+
+def _chunk_record() -> dict[str, object]:
+    return {
+        "chunk_id": "chunk-001",
+        "law_id": "BLLD_2019",
+        "law_name": "Bộ luật Lao động 2019",
+        "level": "clause",
+        "chunk_kind": "clause",
+        "article_number": "35",
+        "clause_number": "1",
+        "citation": "Khoản 1 Điều 35 Bộ luật Lao động 2019",
+        "hierarchy_path": "Bộ luật Lao động 2019 / Điều 35 / Khoản 1",
+        "text": "Người lao động có quyền đơn phương chấm dứt hợp đồng lao động.",
+        "parent_text": "Điều 35. Quyền đơn phương chấm dứt hợp đồng lao động.",
+        "source_url": "https://thuvienphapluat.vn/van-ban/lao-dong/",
+        "source_domain": "thuvienphapluat.vn",
+        "metadata": {
+            "is_empty_or_repealed": False,
+            "is_source_unit_repealed": False,
+        },
+        "warnings": [],
+    }
+
+
+def _write_minimal_model_files(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "config.json").write_text("{}", encoding="utf-8")
+    (path / "pytorch_model.bin").write_bytes(b"placeholder")
+    (path / "tokenizer.json").write_text("{}", encoding="utf-8")

@@ -869,16 +869,21 @@ The workflow:
 2. downloads `legal_chunks.jsonl` from `LEGAL_QA_CHUNKS_URL` into the GitHub
    runner temp directory;
 3. verifies `LEGAL_QA_CHUNKS_SHA256`;
-4. builds `docker/backend/Dockerfile` target `production-with-chunks`;
-5. runs local fake-mode container `GET /health`;
-6. pushes the image to Azure Container Registry only after local smoke passes;
-7. configures a separate production App Service for Containers Web App;
-8. restarts the production backend;
-9. runs bounded `GET /health` and `GET /api/v1/readiness`.
+4. downloads the pinned public `BAAI/bge-m3` Hugging Face snapshot during
+   Docker build and copies it to `/models/embedding/bge-m3`;
+5. builds `docker/backend/Dockerfile` target `production-with-chunks`;
+6. asserts the image contains legal chunks, BGE-M3 key files, and no `.env`
+   file under app/home/model paths;
+7. runs local fake-mode container `GET /health`;
+8. pushes the image to Azure Container Registry only after local smoke passes;
+9. configures a separate production App Service for Containers Web App;
+10. restarts the production backend;
+11. runs bounded `GET /health` and `GET /api/v1/readiness`.
 
 The deploy workflow does not call `/api/v1/legal-qa/ask`. It does not crawl,
-index, re-embed, rerank, run benchmarks, mutate Qdrant, or modify protected
-paths.
+index, re-embed the corpus, rerank, run benchmarks, mutate Qdrant, or modify
+protected paths. It does download the query-embedding model snapshot for image
+packaging.
 
 Required production resources and settings:
 
@@ -894,6 +899,7 @@ Required production resources and settings:
 - `alwaysOn=true`;
 - Docker container logging set to `filesystem`;
 - `LEGAL_QA_SERVICE_MODE=real`;
+- `LEGAL_QA_RETRIEVAL_MODE=hybrid`;
 - `LEGAL_QA_ASK_TIMEOUT_SECONDS=90`;
 - `LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60`;
 - `LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45`;
@@ -902,11 +908,21 @@ Required production resources and settings:
 - `LEGAL_QA_MAX_TOP_K=5`;
 - `LEGAL_QA_RERANKING_ENABLED=false`;
 - `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
+- `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`;
 - Qdrant URL/API key through `QDRANT_URL` and `QDRANT_API_KEY`;
 - `OPENROUTER_API_KEY`;
 - `LEGAL_QA_DATABASE_URL`;
 - `LEGAL_QA_SESSION_SECRET`;
 - `CORS_ALLOWED_ORIGINS` including `https://vnlaw-qa.vercel.app`.
+
+The production target path remains hybrid: BGE-M3 / FlagEmbedding query
+embedding loaded from the baked local model path, Qdrant dense retrieval, local
+BM25 sparse retrieval, coverage-aware fusion/quota retrieval, evidence
+selection, and LLM generation. The rule is: hybrid is the canonical project
+pipeline; sparse is a degraded emergency mode only for local troubleshooting or constrained-host
+recovery, and production Azure deployment targets
+`LEGAL_QA_RETRIEVAL_MODE=hybrid`. Sparse mode must not be used to validate final
+production quality.
 
 `.github/workflows/deploy-production.yml` remains planning-only and is not the
 container deployment path.
@@ -926,17 +942,17 @@ It calls only:
 ```text
 GET /health
 GET /api/v1/readiness
-GET /api/v1/legal-qa/warmup  # optional best-effort when enabled
+GET /api/v1/legal-qa/warmup  # hard preflight gate before ask
 POST /api/v1/legal-qa/ask
 ```
 
-Warmup is best-effort only. The workflow calls the warmup endpoint with a
-bounded 60-second curl timeout when the endpoint is available, logs the
-sanitized HTTP status/body, and continues to the single `/ask` request even if
-warmup times out, returns `warmed=false`, returns non-200, or is disabled.
-Local BGE-M3 / FlagEmbedding model loading can exceed App Service request
-limits on the current production plan, so warmup success is not a production
-ask smoke prerequisite.
+Warmup is a hard preflight gate. The workflow calls the warmup endpoint with a
+bounded 220-second curl timeout, logs only sanitized status fields, and sends
+the single `/ask` request only if warmup returns HTTP 200 with `warmed=true`,
+`model_path_configured=true`, `model_path_exists=true`,
+`required_files_present=true`, `model_load_completed=true`, and
+`encode_completed=true`. If warmup fails, the workflow exits before sending
+the production `/ask` request.
 
 It sends exactly one `/ask` request with a configurable timeout up to 600
 seconds for production ML cold start and `top_k=5`, prints only safe summary
