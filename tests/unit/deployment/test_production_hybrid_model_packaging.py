@@ -20,6 +20,7 @@ def test_backend_dockerfile_packages_bge_m3_model_snapshot() -> None:
     assert "EMBEDDING_MODEL_PATH=/models/embedding/bge-m3" in dockerfile
     assert "HF_HUB_OFFLINE=1" in dockerfile
     assert "TRANSFORMERS_OFFLINE=1" in dockerfile
+    assert "HF_DATASETS_OFFLINE=1" in dockerfile
 
 
 def test_production_deploy_preserves_hybrid_retrieval_and_model_path() -> None:
@@ -38,6 +39,9 @@ def test_production_deploy_preserves_hybrid_retrieval_and_model_path() -> None:
     assert "LEGAL_QA_MAX_TOP_K=5" in workflow
     assert "LEGAL_QA_WARMUP_ENDPOINT_ENABLED=true" in workflow
     assert 'EMBEDDING_MODEL_PATH="$EMBEDDING_MODEL_PATH"' in workflow
+    assert "HF_HUB_OFFLINE=1" in workflow
+    assert "TRANSFORMERS_OFFLINE=1" in workflow
+    assert "HF_DATASETS_OFFLINE=1" in workflow
 
 
 def test_production_ask_smoke_does_not_force_sparse_retrieval() -> None:

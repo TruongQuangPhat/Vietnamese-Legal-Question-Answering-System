@@ -5,23 +5,19 @@
 VnLaw-QA is a Vietnamese legal research assistant, not legal advice. The
 current product includes a fake-mode Legal QA chat MVP and a real-workflow
 adapter. The Qdrant collection has been restored to Qdrant Cloud and validated,
-and the backend and frontend are deployed. Infrastructure readiness passes,
-but real QA requests exceed the Render Free memory limit; the system is not
-production-ready.
+the Vercel frontend is deployed, and Azure App Service is the accepted
+production backend for the real hybrid pipeline.
 
-The deployed backend remains in real mode. Do not describe the system as
-production-ready until the runtime memory blocker, deployment/security review,
-and a controlled real-mode QA smoke have been completed.
-
-The API and deployment infrastructure work is closed with this memory
-limitation documented. Follow-up quality work must not loosen fallback,
+The deployed Azure backend remains in real mode. Production `/health`,
+`/api/v1/readiness`, `/api/v1/legal-qa/warmup`, and the controlled Production
+Ask Smoke pass. Follow-up quality work must not loosen fallback,
 evidence-selection, or citation gates merely to make deployment smoke pass.
 
 This document records the repository state as audited without calling Qdrant,
 OpenRouter, embedding inference, or evaluation workflows.
 
 For future GitHub Actions and deployment gate design, see `docs/ci_cd.md`.
-For the Azure deployment skeleton and future manual rollout checklist, see
+For the Azure deployment workflow and production runbook, see
 `docs/runbooks/azure_deployment.md`.
 
 ## Production deployment runbook
@@ -29,18 +25,30 @@ For the Azure deployment skeleton and future manual rollout checklist, see
 ### Current services
 
 ```text
-Backend (Render): https://vnlaw-qa-backend.onrender.com
+Backend (Azure App Service): https://vnlaw-backend-prod-phat.azurewebsites.net
 Frontend (Vercel): https://vnlaw-qa.vercel.app
 Backend mode: LEGAL_QA_SERVICE_MODE=real
+Retrieval mode: LEGAL_QA_RETRIEVAL_MODE=hybrid
 Qdrant collection: vnlaw_chunks_bgem3_v1_full
+BGE-M3 model path: /models/embedding/bge-m3
 ```
 
-Keep the backend in real mode. Do not switch production to fake mode to conceal
-the Render Free memory limitation.
+Keep the backend in real mode and preserve the canonical hybrid pipeline:
+BGE-M3 / FlagEmbedding -> DenseRetriever -> Qdrant dense retrieval ->
+coverage-aware hybrid retrieval -> evidence selection -> LLM generation. Do
+not switch production to sparse-only. Sparse may remain only as a degraded
+emergency fallback mode.
 
-### Render backend
+### Legacy Render backend
 
-Create a native Python Web Service from the repository root.
+Render is deprecated as a production backend and retained only as historical or
+rollback context. Render Free passed liveness/readiness historically but was
+not suitable for real `/api/v1/legal-qa/ask` because BGE-M3, Torch, and
+Transformers exceeded memory/runtime limits. Do not use Render as the normal
+production backend or as production `/ask` validation.
+
+Historical Render setup used a native Python Web Service from the repository
+root.
 
 Build command:
 
@@ -59,7 +67,7 @@ uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
 Render supplies `PORT`. Configure `/health` as the service health-check path.
 Use one Uvicorn worker while conversation storage remains process-local.
 
-Required Render environment values:
+Historical Render environment values:
 
 ```env
 LEGAL_QA_SERVICE_MODE=real
@@ -98,7 +106,7 @@ CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
 HF_TOKEN=
 ```
 
-`HF_TOKEN` is not required for the current public chunks artifact. If the
+`HF_TOKEN` was not required for the public chunks artifact. If the
 dataset becomes private, store the token as a Render secret. Never put Qdrant,
 OpenRouter, or Hugging Face credentials in Git, build commands, frontend
 variables, or logs.
@@ -116,7 +124,7 @@ Production URL: https://vnlaw-qa.vercel.app
 Set this production environment variable before building:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-prod-phat.azurewebsites.net
 ```
 
 `NEXT_PUBLIC_API_BASE_URL` is browser-visible and must contain only the public
@@ -129,14 +137,16 @@ CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
 
 ### Frontend to Azure backend migration audit
 
-Render remains the current rollback backend value, but Render Free has OOM
-limitations for real `/api/v1/legal-qa/ask` serving and should not be the
-long-term production backend. Azure App Service staging has passed:
+Azure App Service production is accepted. Render remains only a legacy rollback
+reference until a separate decommission checklist removes it. Production
+validation has passed:
 
 ```text
 GET /health -> HTTP 200
 GET /api/v1/readiness -> HTTP 200 and ready true
-POST /api/v1/legal-qa/ask -> HTTP 200 in one controlled smoke
+GET /api/v1/legal-qa/warmup -> HTTP 200 and warmed true
+POST /api/v1/legal-qa/ask -> HTTP 200, decision=answered, citations >= 1,
+metadata.model present, and no timeout/internal_error warnings
 ```
 
 The frontend does not need code changes to target Azure. It reads the backend
@@ -152,17 +162,16 @@ For Vercel Preview or staging validation, set:
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
 ```
 
-Do not change Vercel Production blindly. The current production value is still:
+Vercel Production should use the accepted Azure production backend:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-prod-phat.azurewebsites.net
 ```
 
-After Azure production container backend deploy, readiness, and one controlled
-production ask smoke pass, switch Vercel Production by changing
-`NEXT_PUBLIC_API_BASE_URL` to the accepted Azure production backend origin and
-redeploying the frontend. Keep the Render origin as the rollback value until
-Azure production traffic is accepted.
+If browser Network requests still go to `onrender.com`, Vercel production has a
+stale environment value and must be redeployed with the Azure backend origin.
+Keep the Render origin only as a rollback reference until Render decommission is
+reviewed separately.
 
 Azure production container backend status:
 
@@ -172,12 +181,11 @@ GET /health -> HTTP 200
 GET /api/v1/readiness -> HTTP 200 and ready true
 ```
 
-Vercel Production must not be switched until the controlled production `/ask`
-smoke passes. If `/ask` times out, use sanitized Azure
-`legal_qa_request_timing` logs to identify whether the slow stage is model
-loading/query embedding, Qdrant retrieval, provider generation, or response
-mapping. Do not print prompts, retrieved text, answers, headers, cookies, or
-secret values while diagnosing.
+The controlled production `/ask` smoke has passed. If a future `/ask` smoke
+times out, use sanitized Azure `legal_qa_request_timing` logs to identify
+whether the slow stage is model loading/query embedding, Qdrant retrieval,
+provider generation, or response mapping. Do not print prompts, retrieved text,
+answers, headers, cookies, or secret values while diagnosing.
 
 Production `/ask` has internal fail-fast settings so the API can return
 controlled JSON before Azure emits `502` or `504`:
@@ -192,6 +200,9 @@ LEGAL_QA_LLM_TIMEOUT_SECONDS=30
 LEGAL_QA_MAX_TOP_K=5
 LEGAL_QA_RERANKING_ENABLED=false
 EMBEDDING_MODEL_PATH=/models/embedding/bge-m3
+HF_HUB_OFFLINE=1
+TRANSFORMERS_OFFLINE=1
+HF_DATASETS_OFFLINE=1
 ```
 
 These settings do not make real QA quality acceptable by themselves. They are
@@ -249,13 +260,12 @@ Migration checklist:
 4. Deploy the Azure production container backend.
 5. Confirm production `/health` and `/api/v1/readiness`.
 6. Run one controlled production `/ask` smoke.
-7. Switch Vercel Production `NEXT_PUBLIC_API_BASE_URL` from Render to Azure only
-   after the Azure production backend passes those checks.
-8. Roll back by restoring the Render `NEXT_PUBLIC_API_BASE_URL` value and
-   redeploying Vercel if Azure UI traffic fails.
-9. Decommission Render only after Azure production traffic is accepted and a
-   separate decommission checklist removes Render secrets, disables Render
-   traffic, and preserves safe logs.
+7. Confirm Vercel Production `NEXT_PUBLIC_API_BASE_URL` uses the Azure
+   production backend.
+8. Keep the Render URL only as a legacy rollback reference until decommission is
+   reviewed.
+9. Decommission Render only after a separate decommission checklist removes
+   Render secrets, disables Render traffic, and preserves safe logs.
 
 ### Vercel Preview to Azure UI smoke
 
@@ -292,8 +302,8 @@ Manual browser checklist:
 6. Verify no browser CORS error appears.
 
 This is a smoke test, not a benchmark or load test. Do not run repeated
-`/api/v1/legal-qa/ask` calls from the UI. Render remains the rollback backend
-value until a later production migration passes.
+`/api/v1/legal-qa/ask` calls from the UI. Render remains only a legacy rollback
+reference until decommission is reviewed.
 
 ### Qdrant Cloud and chunks artifact
 
@@ -301,9 +311,10 @@ Normal deployed serving uses Qdrant Cloud directly and expects collection
 `vnlaw_chunks_bgem3_v1_full`. The collection has 40,389 indexed points with
 named vector `dense`, dimension 1024, and cosine distance.
 
-Render fetches `legal_chunks/v1/legal_chunks.jsonl` from the public
-`phattruong1802/vnlaw-qa` Hugging Face Dataset during build. The fetch script
-must verify this pinned SHA256 before installing the file:
+The Azure production image copies `legal_chunks.jsonl` into
+`/home/data/legal_chunks.jsonl` during container build. Historical Render
+builds fetched `legal_chunks/v1/legal_chunks.jsonl` from the public
+`phattruong1802/vnlaw-qa` Hugging Face Dataset and verified this pinned SHA256:
 
 ```text
 95ff0129915ad4e77306fbdaa2c6eb8c7a7c58730cd21050aec429541416b30c
@@ -319,8 +330,8 @@ These read-only commands verify deployed infrastructure without invoking real
 QA generation:
 
 ```bash
-curl -fsS https://vnlaw-qa-backend.onrender.com/health
-curl -fsS https://vnlaw-qa-backend.onrender.com/api/v1/readiness
+curl -fsS https://vnlaw-backend-prod-phat.azurewebsites.net/health
+curl -fsS https://vnlaw-backend-prod-phat.azurewebsites.net/api/v1/readiness
 ```
 
 Expected status:
@@ -329,9 +340,12 @@ Expected status:
 - `/api/v1/readiness` returns `ready=true`, `service_mode=real`, valid
   configuration, and Qdrant `collection_available`.
 
-Do not treat readiness as proof that BGE-M3 can fit in memory. Do not call
-`POST /api/v1/legal-qa/ask` on Render Free: BGE-M3, Torch, and Transformers
-exceed the 512 MB memory limit and real QA serving is not reliable there.
+Readiness remains lightweight. Use `/api/v1/legal-qa/warmup` to verify packaged
+BGE-M3 model loading and one fixed non-sensitive encode before a controlled ask
+smoke. Do not call real production `/ask` repeatedly. Do not call
+`POST /api/v1/legal-qa/ask` on legacy Render Free: BGE-M3, Torch, and
+Transformers exceed the 512 MB memory limit and real QA serving is not reliable
+there.
 
 ## What already exists
 
@@ -462,17 +476,17 @@ Do not commit database URLs, dumps, or generated local database files.
 
 ### PostgreSQL conversation storage runbook
 
-Current production should remain on memory storage until a dedicated managed
-PostgreSQL database has passed smoke validation. Do not change Render
-environment values automatically, do not enable auth/session ownership in this
-stage, and do not validate this work by repeatedly calling production
-`/api/v1/legal-qa/ask`.
+Production conversation storage changes must remain separately reviewed. Do not
+change deployed environment values automatically, do not enable auth/session
+ownership as part of storage validation, and do not validate this work by
+repeatedly calling production `/api/v1/legal-qa/ask`.
 
 Validation status on 2026-07-09: Neon managed PostgreSQL validation completed
 for conversation storage. Schema application through the guarded smoke script
 passed, the standalone smoke script passed, and the real DB integration test
-passed. Production Render was not switched to PostgreSQL in this branch, and
-memory remains the default until production environment values are changed.
+passed. Historical Render was not switched to PostgreSQL in that branch, and
+memory remains the default unless production environment values are explicitly
+changed.
 
 Use a dedicated development or staging PostgreSQL database first. Install the
 optional dependency extra in the environment that will run validation:
@@ -542,8 +556,8 @@ If the test should apply the schema before executing, add:
 LEGAL_QA_APPLY_DB_SCHEMA=1
 ```
 
-After validation, the future Render backend change is limited to the backend
-dependency installation and secret env values:
+After validation, any backend environment change is limited to dependency
+installation and secret env values:
 
 ```env
 LEGAL_QA_CONVERSATION_STORE=postgres
@@ -1430,12 +1444,13 @@ URL must be browser-reachable; Docker service names are not valid public
 browser destinations. HTTPS frontend deployments should use an HTTPS API to
 avoid mixed-content failures.
 
-## Render backend preparation
+## Legacy Render backend preparation
 
 ### Chosen strategy
 
-Use a **native Render Python Web Service**, configured manually in the Render
-dashboard. Do not apply a Blueprint or deploy yet.
+Historical Render deployments used a native Render Python Web Service
+configured manually in the Render dashboard. Render is no longer the current
+production backend; keep this section only for rollback/decommission context.
 
 This is the smallest auditable path because Render can install the locked
 `qdrant` and `embedding` dependency groups directly and can expand its `PORT`
@@ -1445,7 +1460,7 @@ image would not solve the current real-mode artifact blocker:
 `SparseBM25Retriever` requires the complete processed chunks JSONL, which is
 ignored by Git and excluded from the Docker build context.
 
-Render service settings:
+Historical Render service settings:
 
 ```text
 Service type: Web Service
@@ -1577,9 +1592,9 @@ corpus generation, evaluation, model preloading, real retrieval smoke, or an
 OpenRouter request. Normal serving uses Qdrant Cloud and does not require a
 local Qdrant process.
 
-### Stage 5 post-deploy smoke and runtime decision
+### Historical Render post-deploy smoke and runtime decision
 
-Current production endpoints:
+Historical Render endpoints:
 
 ```text
 Backend: https://vnlaw-qa-backend.onrender.com
@@ -1587,7 +1602,7 @@ Frontend: https://vnlaw-qa.vercel.app
 CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
 ```
 
-Infrastructure smoke passes on Render:
+Infrastructure smoke previously passed on Render:
 
 - `GET /health` responds successfully.
 - `GET /api/v1/readiness` responds with `ready=true`,
@@ -1604,11 +1619,10 @@ real workflow construction until the first `/ask`, but request-time BGE-M3,
 Torch, local BM25, and generation dependencies may still exceed the 512 MB
 instance memory limit. Do not repeat `/ask` smoke requests on this instance.
 
-Runtime decision: keep `LEGAL_QA_SERVICE_MODE=real` and document the resource
-limitation. Do not switch production to fake mode to make the smoke appear to
-pass. A controlled one-request real QA smoke remains pending until this
-optimization is deployed and health, readiness, and session ownership gates
-pass.
+Historical runtime decision: keep `LEGAL_QA_SERVICE_MODE=real` and document the
+resource limitation. Do not switch any production backend to fake mode to make a
+smoke appear to pass. Azure App Service has replaced Render as the accepted
+production backend for controlled real QA smoke validation.
 
 ## Container and Compose status
 

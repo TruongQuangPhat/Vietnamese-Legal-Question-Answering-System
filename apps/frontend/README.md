@@ -52,11 +52,22 @@ Root Directory: apps/frontend
 Set the production build environment:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://vnlaw-qa-backend.onrender.com
+NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-prod-phat.azurewebsites.net
 ```
 
-For Stage 9 Azure backend UI smoke, do not change production blindly. First set
-a Vercel Preview deployment to:
+Production frontend should use the accepted Azure production backend. Render
+should not be used as the normal backend. In browser DevTools Network, Legal QA
+requests should go to:
+
+```text
+vnlaw-backend-prod-phat.azurewebsites.net
+```
+
+If requests go to `onrender.com`, the Vercel environment is stale and must be
+redeployed with the Azure backend URL.
+
+For Azure backend UI smoke before any future frontend production change, first
+set a Vercel Preview deployment to:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://vnlaw-backend-staging-phat-feg8eabzgxhuafc3.japaneast-01.azurewebsites.net
@@ -85,10 +96,10 @@ Manual Preview smoke:
 8. Verify the request URL goes to the Azure backend, not Render.
 9. Verify the UI displays a response and no browser CORS error appears.
 
-After the preview UI smoke passes, switch Vercel Production by changing the
-Production `NEXT_PUBLIC_API_BASE_URL` from the Render backend origin to the
-Azure backend origin and redeploying. Keep the Render URL available as the
-rollback value until Azure production traffic is accepted.
+After the preview UI smoke passes, keep Vercel Production pointed at the
+accepted Azure production backend and redeploy if the environment changed.
+Render may be kept only as a legacy rollback value until decommission is
+reviewed separately.
 
 The backend must allow the deployed frontend origin:
 
@@ -100,10 +111,11 @@ CORS_ALLOWED_ORIGINS=["https://vnlaw-qa.vercel.app"]
 it requires a new Vercel deployment. Do not place provider or database secrets
 in any `NEXT_PUBLIC_*` variable.
 
-The Render backend remains in real mode. Its liveness and readiness endpoints
-pass, but Render Free cannot reliably serve real `/api/v1/legal-qa/ask`
-requests because BGE-M3, Torch, and Transformers exceed the 512 MB memory
-limit. Do not switch the backend to fake mode to mask this limitation.
+The legacy Render backend may still exist for rollback context, but Render Free
+cannot reliably serve real `/api/v1/legal-qa/ask` requests because BGE-M3,
+Torch, and Transformers exceed the 512 MB memory limit. Do not use Render as
+the normal backend and do not switch any backend to fake mode to mask this
+limitation.
 
 ## Container
 

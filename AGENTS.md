@@ -116,24 +116,28 @@ Current durable state:
   `LEGAL_QA_DATABASE_URL`, with schema at
   `scripts/database/postgres_conversation_store.sql` and guarded real-DB
   validation through `scripts/database/smoke_postgres_conversation_store.py`.
-  Neon managed PostgreSQL validation for this store completed on 2026-07-09,
-  and production Render PostgreSQL conversation storage was enabled and
-  conversation-CRUD verified on 2026-07-09. Render stores
-  `LEGAL_QA_DATABASE_URL` as a secret, uses
-  `LEGAL_QA_CONVERSATION_STORE=postgres`, keeps `LEGAL_QA_AUTH_ENABLED=false`,
-  and keeps rate limiting enabled. Do not use production
-  `/api/v1/legal-qa/ask` for conversation storage validation.
-- Production anonymous session ownership is enabled and verified. Render uses
-  `LEGAL_QA_AUTH_ENABLED=true`, stores `LEGAL_QA_SESSION_SECRET` as a secret,
-  uses `LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session`, and conversation-ownership
-  smoke verification passed on 2026-07-09. This is anonymous session ownership,
-  not OAuth/login.
-- Real production `/api/v1/legal-qa/ask` remains resource-risky on Render Free.
-  FastAPI startup, `/health`, and `/api/v1/readiness` must stay lightweight and
-  must not load BGE-M3 model weights. The real Legal QA workflow is constructed
-  lazily on first `/ask` and cached for reuse. Run only one controlled
-  production `/ask` smoke after deploy confirmation; never use repeated `/ask`
-  calls as validation on Render Free.
+  Neon managed PostgreSQL validation for this store completed on 2026-07-09.
+  Historical Render conversation-storage validation also passed in July 2026,
+  but Render is now legacy/rollback-only and is not the current production
+  backend. Do not use production `/api/v1/legal-qa/ask` for conversation
+  storage validation.
+- Production anonymous session ownership is implemented and was historically
+  verified on Render. This is anonymous session ownership, not OAuth/login.
+- Azure App Service is the current accepted production backend:
+  `https://vnlaw-backend-prod-phat.azurewebsites.net`. Production uses the
+  canonical hybrid pipeline: BGE-M3 / FlagEmbedding query embedding,
+  `DenseRetriever`, Qdrant dense retrieval, coverage-aware hybrid retrieval,
+  evidence selection, and LLM generation. The production container packages
+  BGE-M3 under `/models/embedding/bge-m3` and runs with
+  `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, `HF_HUB_OFFLINE=1`,
+  `TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1`.
+- Azure production `/health`, `/api/v1/readiness`,
+  `/api/v1/legal-qa/warmup`, and the controlled Production Ask Smoke pass.
+  Future validation must use the controlled GitHub smoke workflows and must not
+  repeatedly call real production `/api/v1/legal-qa/ask`. Render Free is legacy
+  and should not be used for production `/ask` validation. Preserve the hybrid
+  pipeline; do not switch production to sparse-only unless explicitly scoped as
+  a degraded emergency mode.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.

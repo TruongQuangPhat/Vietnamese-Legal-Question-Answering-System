@@ -91,6 +91,7 @@ COPY --from=embedding-model /models/embedding/bge-m3 /models/embedding/bge-m3
 
 ENV EMBEDDING_MODEL_PATH=/models/embedding/bge-m3 \
     HF_HUB_OFFLINE=1 \
-    TRANSFORMERS_OFFLINE=1
+    TRANSFORMERS_OFFLINE=1 \
+    HF_DATASETS_OFFLINE=1
 
 FROM runtime AS final

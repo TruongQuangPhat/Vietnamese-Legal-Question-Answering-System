@@ -68,6 +68,50 @@ fake-mode `docker-compose.yml` stack. Fake mode is the default local demo path
 and does not require Qdrant, OpenRouter, embedding models, rerankers, or legal
 corpus data. Real mode remains manual-only.
 
+## Current Production Status
+
+Production frontend: Vercel at `https://vnlaw-qa.vercel.app`.
+
+Accepted production backend: Azure App Service at
+`https://vnlaw-backend-prod-phat.azurewebsites.net`, with images served from
+`vnlawacrphat.azurecr.io`.
+
+Azure production is accepted for the real hybrid Legal QA path:
+
+- `GET /health` passes.
+- `GET /api/v1/readiness` passes with `ready=true`.
+- `GET /api/v1/legal-qa/warmup` passes with `warmed=true`,
+  `model_path_configured=true`, `model_path_exists=true`,
+  `required_files_present=true`, `model_load_completed=true`, and
+  `encode_completed=true`.
+- Production Ask Smoke passes with HTTP 200, `decision=answered`,
+  `metadata.model` present, at least one citation, and no
+  timeout/internal-error warnings.
+
+The production backend packages public `BAAI/bge-m3` into the Docker image at
+`/models/embedding/bge-m3`. Runtime uses
+`EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, `HF_HUB_OFFLINE=1`,
+`TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1` so warmup and ask do not
+download model files at request time.
+
+Canonical production pipeline:
+
+```text
+BGE-M3 / FlagEmbedding
+-> DenseRetriever
+-> Qdrant dense retrieval
+-> coverage-aware / hybrid retrieval
+-> evidence selection
+-> LLM generation
+```
+
+Render is deprecated as a production backend and retained only as legacy or
+rollback context. Render Free is not suitable for real `/api/v1/legal-qa/ask`
+because of memory/runtime limits. Sparse retrieval is only a degraded emergency
+mode or fallback; it is not the production default and must not replace the
+canonical hybrid path for production-quality validation. Do not repeatedly call
+real production `/ask`; use the controlled smoke workflow and inspect sanitized
+logs before rerunning after any failure.
 
 ## Current Results
 
@@ -394,7 +438,9 @@ as engineering evidence, not a legal-quality certification.
 - Provider output may be nondeterministic.
 - Time-aware filtering is not adopted yet.
 - Cross-encoder reranking was evaluated but not adopted.
-- API deployment is not part of the current evaluated pipeline.
+- Production API deployment is accepted on Azure, but broad public production
+  quality still depends on the documented legal, security, and monitoring
+  limitations.
 
 ## License / Acknowledgments
 
