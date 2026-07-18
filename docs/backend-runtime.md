@@ -40,7 +40,7 @@ LOG_LEVEL=INFO
 LOG_FORMAT=json
 CORS_ALLOWED_ORIGINS='["http://localhost:3000","https://vnlaw-qa.vercel.app"]'
 
-LEGAL_QA_SERVICE_MODE=real
+LEGAL_QA_SERVICE_MODE=fake
 LEGAL_QA_RETRIEVAL_CONFIG=configs/retrieval/retrieval.yml
 LEGAL_QA_CHUNKS_PATH=data/processed/legal_chunks.jsonl
 LEGAL_QA_LLM_CONFIG=configs/llm/openrouter.yml
@@ -139,13 +139,14 @@ and local files. Invalid configuration fails with safe issue codes and does
 not construct Qdrant, embedding, or LLM clients.
 
 Do not use real mode in routine unit tests or default validation commands.
-The committed backend image and Compose stack are fake-mode packaging
-foundations, not real-mode deployment artifacts: the image does not install
-the `qdrant` and `embedding` optional dependency groups or include the
-processed chunks/model artifacts. See `docs/api_deployment.md` for the complete
-readiness audit and blockers.
+The local Compose stack remains fake-mode packaging for developer checks. The
+accepted production backend is the Azure App Service production container,
+which packages the processed chunks artifact and public BGE-M3 model as
+documented in `docs/api_deployment.md` and
+`docs/runbooks/azure_deployment.md`.
 
-For the planned native Render Web Service, install runtime dependencies with:
+Historical native Render Web Service deployments installed runtime
+dependencies with:
 
 ```bash
 python -m pip install --no-cache-dir uv && \
@@ -153,7 +154,7 @@ python -m pip install --no-cache-dir uv && \
   python scripts/deployment/fetch_processed_chunks.py
 ```
 
-Start one worker with Render's assigned port:
+Historical Render deployments started one worker with Render's assigned port:
 
 ```bash
 uv run python -m uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
@@ -303,16 +304,18 @@ Expected response:
 {"status":"ok"}
 ```
 
-The backend Dockerfile defaults `LEGAL_QA_SERVICE_MODE` to `fake` and starts the
-API with:
+For local fake-mode use, run the backend Dockerfile with
+`LEGAL_QA_SERVICE_MODE=fake`. The API starts with:
 
 ```bash
 python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000
 ```
 
 Fake-mode containers do not require Qdrant, OpenRouter, embedding models,
-rerankers, or legal corpus data. Real mode requires additional runtime setup and
-is not part of this container packaging workflow.
+rerankers, or legal corpus data. Production real mode is handled by the Azure
+production container workflow, which keeps `LEGAL_QA_RETRIEVAL_MODE=hybrid`,
+packages BGE-M3 at `/models/embedding/bge-m3`, and runs offline Hugging Face
+mode.
 
 ## Fake-Mode Compose Stack
 

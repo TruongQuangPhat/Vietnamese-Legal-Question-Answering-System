@@ -148,8 +148,8 @@ from the environment and pass it to the shared Qdrant client factory. The value
 must never be echoed, checked into Git, included in command-line arguments, or
 written to reports.
 
-Do not use the deployed Render `/api/v1/legal-qa/ask` endpoint for benchmark
-evaluation.
+Do not use legacy Render or production Azure `/api/v1/legal-qa/ask` endpoints
+for benchmark evaluation.
 
 ## Preflight Checklist
 

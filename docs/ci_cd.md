@@ -972,6 +972,11 @@ internal-error answer. Severe warnings include `ask_timeout`,
 `qdrant_retrieval_timeout`, `qdrant_retrieval_error`,
 `dense_retrieval_fallback_used`, `dense_retriever_error`, `internal_error`,
 `retrieval_error`, and `llm_timeout`.
+Evidence caution warnings such as `caution_evidence_selected`,
+`auxiliary_parent_context_included`, and `all_selected_evidence_caution` may
+appear and do not fail deployment smoke by themselves because they describe
+evidence quality/selection caution, not infrastructure or dense retrieval
+failure.
 
 Production Ask Smoke validates the canonical hybrid production path. For
 standalone legal questions, `metadata.retrieval_question_prepared=false` is
@@ -981,8 +986,10 @@ warnings are the primary success criteria. `retrieval_question_prepared=false`
 remains a hard failure when `metadata.follow_up_detected=true`, because a
 follow-up smoke should have a prepared retrieval question. In hybrid production
 mode, `metadata.dense_retrieval_used=true`, `metadata.fallback_used=false`, and
-`metadata.embedding_model_cache_hit=true` are also required; dense fallback is
-degraded retrieval and must not silently pass final production validation.
+`metadata.embedding_model_cache_hit=true` are also required. The ask
+`metadata.model_cache_key` should match the warmup `model_cache_key`; dense
+fallback is degraded retrieval and must not silently pass final production
+validation.
 
 Production `/ask` timeout diagnostics come from sanitized
 `legal_qa_request_timing` logs. The logs record stage names and elapsed
@@ -1123,15 +1130,17 @@ Fail criteria:
 - The UI cannot render a response.
 - Multiple `/api/v1/legal-qa/ask` requests are sent unintentionally.
 
-Rollback and production hold:
+Historical rollback note:
 
-- Do not switch Vercel Production in Stage 9.
-- Keep Render as the rollback backend value until the later production migration
-  passes.
-- If Preview fails, restore the Preview `NEXT_PUBLIC_API_BASE_URL` to the prior
-  value or delete the Preview override, then redeploy Preview.
-- Do not decommission Render until Azure production traffic is accepted and a
-  separate Render decommission checklist is executed.
+- Stage 9 originally held Vercel Production unchanged until Azure traffic was
+  accepted.
+- Azure production traffic is now accepted, and Vercel Production should remain
+  pointed at `https://vnlaw-backend-prod-phat.azurewebsites.net`.
+- If a future Preview fails, restore only the Preview
+  `NEXT_PUBLIC_API_BASE_URL` or delete the Preview override, then redeploy
+  Preview.
+- Do not decommission Render until a separate Render decommission checklist is
+  executed.
 
 ## Rollback and Incident Notes
 

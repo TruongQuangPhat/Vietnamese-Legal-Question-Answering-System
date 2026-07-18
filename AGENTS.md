@@ -139,7 +139,15 @@ Current durable state:
   `dense_retrieval_fallback_used=true`, or `dense_retrieval_used=false` is not a
   final production-quality pass. Warmup must populate the same process-local
   BGE-M3 cache used by `/ask`; after warmup, `embedding_model_cache_hit=true`
-  and `fallback_used=false` are expected for normal hybrid smoke. Render Free is
+  and `fallback_used=false` are expected for normal hybrid smoke. A second
+  warmup should report `cache_hit_before=true`, `cache_hit_after=true`, and the
+  same `model_cache_key`; ask metadata should report
+  `model_cache_key` matching warmup. Severe infra/retrieval warnings such as
+  `embedding_model_load_timeout`, `query_embedding_timeout`,
+  `qdrant_retrieval_error`, `qdrant_retrieval_timeout`,
+  `dense_retrieval_fallback_used`, and `ask_timeout` fail hybrid production
+  smoke. Evidence caution warnings may appear and are not deployment/runtime
+  failures by themselves. Render Free is
   legacy and should not be used for production `/ask` validation. Preserve the
   hybrid pipeline; do not switch production to sparse-only unless explicitly
   scoped as a degraded emergency mode.

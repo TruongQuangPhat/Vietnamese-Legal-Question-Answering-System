@@ -83,12 +83,20 @@ Azure production is accepted for the real hybrid Legal QA path:
 - `GET /api/v1/legal-qa/warmup` passes with `warmed=true`,
   `model_path_configured=true`, `model_path_exists=true`,
   `required_files_present=true`, `model_load_completed=true`, and
-  `encode_completed=true`. Warmup must populate the same process-local BGE-M3
-  cache used by `/api/v1/legal-qa/ask`; `cache_hit_after=true` confirms that
-  the ask path should not reload the model.
+  `model_load_timeout=false`, `encode_completed=true`,
+  `encode_timeout=false`, `cache_hit_after=true`, and a
+  `model_cache_key`. A second warmup should report
+  `cache_hit_before=true`, `cache_hit_after=true`, and the same
+  `model_cache_key`, proving reuse of the process-local BGE-M3 cache used by
+  `/api/v1/legal-qa/ask`.
 - Production Ask Smoke passes with HTTP 200, `decision=answered`,
   `metadata.model` present, at least one citation, and no
-  timeout/internal-error warnings or dense retrieval fallback.
+  timeout/internal-error warnings or dense retrieval fallback. The ask metadata
+  should report `retrieval_mode=hybrid`, `dense_retrieval_used=true`,
+  `dense_retrieval_fallback_used=false`, `fallback_used=false`,
+  `embedding_model_cache_hit=true`,
+  `embedding_model_loaded_before_request=true`, and a `model_cache_key`
+  matching warmup.
 
 The production backend packages public `BAAI/bge-m3` into the Docker image at
 `/models/embedding/bge-m3`. Runtime uses
@@ -117,6 +125,14 @@ mode or fallback; it is not the production default and must not replace the
 canonical hybrid path for production-quality validation. In hybrid production
 smoke, `fallback_used=true`, `dense_retrieval_fallback_used=true`, or
 `dense_retrieval_used=false` is degraded retrieval and must be investigated.
+Severe infrastructure/retrieval warnings such as
+`embedding_model_load_timeout`, `query_embedding_timeout`,
+`qdrant_retrieval_error`, `qdrant_retrieval_timeout`,
+`dense_retrieval_fallback_used`, and `ask_timeout` fail production hybrid
+smoke. Evidence caution warnings such as `caution_evidence_selected`,
+`auxiliary_parent_context_included`, and `all_selected_evidence_caution` may
+appear and do not by themselves indicate deployment or retrieval
+infrastructure failure.
 Do not repeatedly call real production `/ask`; use the controlled smoke workflow
 and inspect sanitized logs before rerunning after any failure.
 

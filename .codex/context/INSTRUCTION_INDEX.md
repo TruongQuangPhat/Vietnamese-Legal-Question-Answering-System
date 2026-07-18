@@ -79,7 +79,8 @@ Current durable status:
   `/models/embedding/bge-m3` with `EMBEDDING_MODEL_PATH`,
   `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, and
   `HF_DATASETS_OFFLINE=1`; production health, readiness, warmup, and the
-  controlled Production Ask Smoke have passed;
+  controlled Production Ask Smoke have passed; Vercel production is
+  `https://vnlaw-qa.vercel.app` and calls the accepted Azure backend;
 * production validation must preserve the canonical hybrid path
   BGE-M3 / FlagEmbedding -> DenseRetriever -> Qdrant dense retrieval ->
   coverage-aware hybrid retrieval -> evidence selection -> LLM generation, and
@@ -88,7 +89,16 @@ Current durable status:
   `fallback_used=true`, `dense_retrieval_fallback_used=true`, or
   `dense_retrieval_used=false`; warmup must populate the same process-local
   BGE-M3 cache used by ask, and normal post-warmup smoke should report
-  `embedding_model_cache_hit=true`;
+  `embedding_model_cache_hit=true`, `embedding_model_loaded_before_request=true`,
+  `fallback_used=false`, and a `model_cache_key` matching warmup; a second
+  warmup should report `cache_hit_before=true`, `cache_hit_after=true`, and the
+  same `model_cache_key`; severe infra/retrieval warnings
+  `embedding_model_load_timeout`, `query_embedding_timeout`,
+  `qdrant_retrieval_error`, `qdrant_retrieval_timeout`,
+  `dense_retrieval_fallback_used`, and `ask_timeout` fail production hybrid
+  smoke, while evidence caution warnings such as `caution_evidence_selected`,
+  `auxiliary_parent_context_included`, and `all_selected_evidence_caution` may
+  appear without indicating deployment/runtime failure;
 * GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part
   of the adopted evaluated pipeline.
 

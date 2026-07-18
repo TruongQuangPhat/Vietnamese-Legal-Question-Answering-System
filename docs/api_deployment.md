@@ -144,9 +144,15 @@ validation has passed:
 ```text
 GET /health -> HTTP 200
 GET /api/v1/readiness -> HTTP 200 and ready true
-GET /api/v1/legal-qa/warmup -> HTTP 200 and warmed true
+GET /api/v1/legal-qa/warmup -> HTTP 200, warmed=true,
+model_load_completed=true, model_load_timeout=false, encode_completed=true,
+encode_timeout=false, cache_hit_after=true, and model_cache_key present
+Second warmup -> cache_hit_before=true, cache_hit_after=true, same model_cache_key
 POST /api/v1/legal-qa/ask -> HTTP 200, decision=answered, citations >= 1,
-metadata.model present, and no timeout/internal_error warnings
+metadata.model present, retrieval_mode=hybrid, dense_retrieval_used=true,
+dense_retrieval_fallback_used=false, fallback_used=false,
+embedding_model_cache_hit=true, embedding_model_loaded_before_request=true,
+model_cache_key matching warmup, and no severe infra/retrieval warnings
 ```
 
 The frontend does not need code changes to target Azure. It reads the backend
@@ -236,11 +242,15 @@ not that BGE-M3 model loading or query embedding timed out.
 `/api/v1/readiness`. Warmup reports sanitized local model-path status, model
 load status, encode status, elapsed time, and exception class. After the model
 is packaged in the image, expected production warmup is `warmed=true`,
-`model_load_completed=true`, `encode_completed=true`, and
-`cache_hit_after=true` before running the single controlled `/ask` smoke.
+`model_load_completed=true`, `model_load_timeout=false`,
+`encode_completed=true`, `encode_timeout=false`, and `cache_hit_after=true`
+before running the single controlled `/ask` smoke. A second warmup should
+report `cache_hit_before=true`, `cache_hit_after=true`, and the same
+`model_cache_key`; this proves process-local encoder cache reuse.
 Warmup populates the same process-local BGE-M3 cache used by `/ask`; a normal
 post-warmup ask should report `metadata.embedding_model_cache_hit=true` and
-`metadata.embedding_model_loaded_before_request=true`.
+`metadata.embedding_model_loaded_before_request=true` with a
+`metadata.model_cache_key` matching warmup.
 
 Production Ask Smoke validates the canonical hybrid production path. For a
 standalone legal question, `metadata.retrieval_question_prepared=false` is
@@ -259,6 +269,13 @@ accepted as a final production-quality pass.
 `embedding_model_load_timeout` means the model was not loaded or warmed within
 the configured model-load budget. `qdrant_retrieval_error` should mean an
 actual Qdrant failure only, not model loading or query encoding.
+Severe infrastructure/retrieval warnings are `embedding_model_load_timeout`,
+`query_embedding_timeout`, `qdrant_retrieval_error`,
+`qdrant_retrieval_timeout`, `dense_retrieval_fallback_used`, and `ask_timeout`;
+they fail production hybrid smoke. Evidence caution warnings such as
+`caution_evidence_selected`, `auxiliary_parent_context_included`, and
+`all_selected_evidence_caution` may appear and are not deployment/runtime
+failures by themselves.
 
 Azure backend CORS must include the exact browser origins. `AppSettings`
 parses `CORS_ALLOWED_ORIGINS` as a JSON array or comma-separated list, and the
@@ -474,9 +491,9 @@ number of allowed requests per client key, and
 `LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS` sets the window size. Exceeded requests
 return HTTP 429 with a `Retry-After` header and do not call the Legal QA
 workflow. `/health` and `/api/v1/readiness` are not rate limited. This is
-appropriate for the current single-process Render deployment; a future
-multi-instance deployment should use shared infrastructure such as an API
-gateway, WAF, or Redis-backed limiter.
+a lightweight in-process abuse control; any future multi-instance deployment
+should use shared infrastructure such as an API gateway, WAF, or Redis-backed
+limiter.
 
 `LEGAL_QA_CONVERSATION_STORE=memory` uses the default process-local
 conversation repository for tests and simple local usage. It is not durable and
@@ -486,7 +503,7 @@ and requires `LEGAL_QA_DATABASE_URL` from a secret environment variable plus the
 optional `postgres` dependency extra. Apply
 `scripts/database/postgres_conversation_store.sql` to the target database before
 serving traffic in PostgreSQL mode. Managed PostgreSQL is the intended durable
-store for future Render, AWS, or Azure deployments. The schema is repeatable,
+store for separately reviewed hosted deployments. The schema is repeatable,
 uses text primary keys, cascades message deletion through the conversation
 foreign key, and includes nullable `owner_id` fields plus owner indexes for
 future session ownership. Default tests do not require local Docker or
@@ -589,7 +606,8 @@ LEGAL_QA_CONVERSATION_STORE=postgres
 LEGAL_QA_DATABASE_URL=<secret managed PostgreSQL URL>
 ```
 
-Keep these current production values until that validation is complete:
+For local or staging validation, keep these values until a reviewed deployment
+change explicitly enables a durable store:
 
 ```env
 LEGAL_QA_RATE_LIMIT_ENABLED=true
@@ -611,17 +629,17 @@ Redeploy the backend after the rollback env change. Existing PostgreSQL
 conversation rows remain in the database, but the app returns to the process
 local memory repository.
 
-### Production PostgreSQL conversation storage enablement
+### Historical Render PostgreSQL conversation storage enablement
 
-Production PostgreSQL conversation storage is enabled on Render. The Neon
-managed PostgreSQL schema was already applied and validated on 2026-07-09, and
-production conversation CRUD verification passed on 2026-07-09. If a different
-database is selected later, apply
-`scripts/database/postgres_conversation_store.sql` to that database before the
-Render switch.
+Historical PostgreSQL conversation storage was enabled and validated on the
+former Render backend. Render is no longer the current production backend; keep
+this section only for audit, rollback, or decommission context. The Neon
+managed PostgreSQL schema was applied and validated on 2026-07-09, and
+conversation CRUD verification passed on 2026-07-09. Azure production
+conversation-store changes must be reviewed separately and must store database
+URLs only as secret app settings.
 
-Before changing production, confirm the Render build installs the PostgreSQL
-optional extra:
+Historical Render builds installed the PostgreSQL optional extra with:
 
 ```bash
 python -m pip install --no-cache-dir uv && \
@@ -629,7 +647,7 @@ python -m pip install --no-cache-dir uv && \
   python scripts/deployment/fetch_processed_chunks.py
 ```
 
-The Render dashboard uses these conversation-storage values:
+The historical Render dashboard used these conversation-storage values:
 
 ```env
 LEGAL_QA_CONVERSATION_STORE=postgres
@@ -652,9 +670,9 @@ LEGAL_QA_RATE_LIMIT_REQUESTS=10
 LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
-Do not paste the database URL into chat, logs, docs, shell history, or Git.
-Store it only as a Render secret environment value. After saving the Render
-settings, redeploy the backend before verification.
+Do not paste database URLs into chat, logs, docs, shell history, or Git. Store
+them only in the target platform's secret settings. After saving the historical
+Render settings, a backend redeploy was required before verification.
 
 Production verification on 2026-07-09 did not call
 `POST /api/v1/legal-qa/ask`. It used only:
@@ -733,14 +751,15 @@ localStorage and sends it only on conversation API calls; clearing localStorage
 or switching browsers/devices creates a different anonymous session. Production
 should serve it only over HTTPS and should use managed secret storage.
 
-### Production anonymous session ownership
+### Anonymous session ownership
 
-Production anonymous session ownership is enabled and verified for conversation
-APIs. It is not OAuth/login and does not create user accounts. It only scopes
-conversation list, read, rename, delete, and message append operations to an
-opaque owner id derived from a client session token.
+Anonymous session ownership is implemented for conversation APIs. It is not
+OAuth/login and does not create user accounts. It only scopes conversation
+list, read, rename, delete, and message append operations to an opaque owner id
+derived from a client session token.
 
-Render uses:
+Azure production may enable it with secret-managed app settings. Historical
+Render validation used:
 
 ```env
 LEGAL_QA_AUTH_ENABLED=true
@@ -748,7 +767,8 @@ LEGAL_QA_SESSION_SECRET=<strong random secret>
 LEGAL_QA_SESSION_HEADER=X-Legal-QA-Session
 ```
 
-Keep the existing PostgreSQL storage values:
+Use durable conversation storage only when it has been separately reviewed and
+configured with secret-managed database settings:
 
 ```env
 LEGAL_QA_CONVERSATION_STORE=postgres
@@ -771,8 +791,8 @@ openssl rand -hex 32
 ```
 
 Do not paste the generated value into chat, logs, docs, shell history, or Git.
-Store it only as a Render secret environment value. Redeploy the backend after
-saving the Render settings.
+Store it only as a secret environment value on the target platform. Redeploy or
+restart the backend after changing auth/session settings.
 
 Production verification on 2026-07-09 confirmed:
 
@@ -836,9 +856,9 @@ Rollback is configuration-only:
 LEGAL_QA_AUTH_ENABLED=false
 ```
 
-Redeploy the backend after rollback. PostgreSQL conversation storage remains
-enabled, but conversation APIs return to the legacy unauthenticated ownership
-mode.
+Redeploy or restart the backend after rollback. If PostgreSQL conversation
+storage remains enabled, conversation APIs return to the legacy unauthenticated
+ownership mode.
 
 `AppSettings.from_env()` loads the project `.env` and then overlays process
 environment values, so an exported/container value has precedence. Tests can

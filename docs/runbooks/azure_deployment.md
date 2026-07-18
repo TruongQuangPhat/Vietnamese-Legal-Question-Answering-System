@@ -624,8 +624,12 @@ deployment to verify the image-packaged local BGE-M3 path, model load, and one
 fixed non-sensitive encode. Expected production warmup after this packaging
 change is HTTP 200 with `warmed=true`, `model_path_exists=true`,
 `required_files_present=true`, `model_load_completed=true`, and
-`encode_completed=true`, and `cache_hit_after=true`. If warmup times out or
-returns `warmed=false`, inspect logs before running the single `/ask` smoke.
+`model_load_timeout=false`, `encode_completed=true`, `encode_timeout=false`,
+`cache_hit_after=true`, and `model_cache_key` present. A second warmup should
+report `cache_hit_before=true`, `cache_hit_after=true`, and the same
+`model_cache_key`, proving process-local BGE-M3 cache reuse. If warmup times
+out or returns `warmed=false`, inspect logs before running the single `/ask`
+smoke.
 
 Production App Service settings keep the original hybrid path:
 `LEGAL_QA_RETRIEVAL_MODE=hybrid`, `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`,
@@ -651,14 +655,20 @@ For standalone legal questions, `metadata.retrieval_question_prepared=false` is
 diagnostic only and is not a failure by itself. The primary pass criteria are
 HTTP 200, `decision=answered`, model presence, a non-empty answer, citations,
 `metadata.dense_retrieval_used=true`, `metadata.fallback_used=false`,
-`metadata.embedding_model_cache_hit=true`, and no timeout/internal-error or
-degraded dense-retrieval warnings.
+`metadata.dense_retrieval_fallback_used=false`,
+`metadata.embedding_model_cache_hit=true`,
+`metadata.embedding_model_loaded_before_request=true`, `metadata.model_cache_key`
+matching warmup, and no timeout/internal-error or degraded dense-retrieval
+warnings.
 `retrieval_question_prepared=false`
 remains a hard failure when `metadata.follow_up_detected=true`, because that
 smoke path is explicitly testing follow-up question rewriting. The workflow
 prints only safe summary fields: HTTP status, response keys, answer length,
 citation/evidence counts, model-present status, retrieval-question-prepared
 status, follow-up-detected status, sanitized warnings, and latency when present.
+Evidence caution warnings such as `caution_evidence_selected`,
+`auxiliary_parent_context_included`, and `all_selected_evidence_caution` may
+appear and do not indicate deployment/runtime failure by themselves.
 
 ## Vercel Production Cutover
 

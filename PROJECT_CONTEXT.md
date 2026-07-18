@@ -407,7 +407,7 @@ Conversation storage defaults to process-local memory for tests and simple
 local use. PostgreSQL-backed durable conversation storage is available through
 `LEGAL_QA_CONVERSATION_STORE=postgres` and `LEGAL_QA_DATABASE_URL` after
 applying `scripts/database/postgres_conversation_store.sql`. Managed
-PostgreSQL is the intended durable store for future Render, AWS, or Azure
+PostgreSQL is the intended durable store for separately reviewed hosted
 deployments. A guarded smoke script exists at
 `scripts/database/smoke_postgres_conversation_store.py`, and optional real-DB
 integration coverage exists at
@@ -456,10 +456,15 @@ Azure production validation is accepted:
 ```text
 GET /health -> HTTP 200
 GET /api/v1/readiness -> HTTP 200 and ready true
-GET /api/v1/legal-qa/warmup -> HTTP 200 with warmed=true
+GET /api/v1/legal-qa/warmup -> HTTP 200 with warmed=true,
+model_load_completed=true, model_load_timeout=false, encode_completed=true,
+encode_timeout=false, cache_hit_after=true, and model_cache_key present
+Second warmup -> cache_hit_before=true, cache_hit_after=true, same model_cache_key
 Production Ask Smoke -> HTTP 200, decision=answered, metadata.model present,
-citations >= 1, dense_retrieval_used=true, fallback_used=false, and no
-timeout/internal_error warnings
+citations >= 1, retrieval_mode=hybrid, dense_retrieval_used=true,
+dense_retrieval_fallback_used=false, fallback_used=false,
+embedding_model_cache_hit=true, embedding_model_loaded_before_request=true,
+model_cache_key matching warmup, and no severe infra/retrieval warnings
 ```
 
 The production container packages public `BAAI/bge-m3` under
@@ -496,6 +501,13 @@ In hybrid production smoke, `fallback_used=true`,
 `dense_retrieval_fallback_used=true`, or `dense_retrieval_used=false` is
 degraded retrieval and must be investigated rather than accepted as final
 production quality.
+Severe infrastructure/retrieval warnings are
+`embedding_model_load_timeout`, `query_embedding_timeout`,
+`qdrant_retrieval_error`, `qdrant_retrieval_timeout`,
+`dense_retrieval_fallback_used`, and `ask_timeout`; these fail production
+hybrid smoke. Evidence caution warnings such as `caution_evidence_selected`,
+`auxiliary_parent_context_included`, and `all_selected_evidence_caution` may
+appear and do not by themselves indicate deployment/runtime failure.
 
 Render is deprecated as a production backend and retained only as historical
 context or rollback reference. Render Free previously passed liveness/readiness
@@ -572,8 +584,9 @@ When real retrieval/evaluation is explicitly scoped, keep Qdrant read-only unles
 - `docs/naive_rag.md` — baseline dense RAG reference.
 - `docs/parent_child_chunking.md` and `docs/processed_jsonl.md` — chunk and
   processed JSONL contracts.
-- `docs/api_deployment.md` — production URLs, Render/Vercel runbook,
-  infrastructure smoke status, resource limitation, and deployment follow-up.
+- `docs/api_deployment.md` — Azure production URLs, Vercel frontend settings,
+  hybrid smoke status, legacy Render/rollback context, resource limitations,
+  and deployment follow-up.
 
 Historical roadmap/journal docs are not authoritative when they conflict with
 this file.
