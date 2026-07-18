@@ -18,7 +18,10 @@ Dense indexing is complete in Qdrant collection
 `vnlaw_chunks_bgem3_v1_full`. The Naive RAG baseline remains a baseline with
 known limitations. The final adopted retrieval strategy is
 `coverage_aware_quota`; reranking was evaluated but not adopted; time-aware
-filtering, GraphRAG, API deployment, and MLOps remain future/separately scoped.
+filtering and GraphRAG remain future/separately scoped. API deployment is now
+implemented through the Azure App Service production container backend, and
+MLOps/maintenance controls are partially implemented through CI gates,
+container deployment, warmup, and production smoke workflows.
 
 Current benchmark status:
 
@@ -623,64 +626,76 @@ evidence for strict generation.
   - Retrieval time, generation time
   - Regression detection: compared to baseline
 
-**Output**: `data/eval/report.json`, `data/eval/detailed_metrics.csv`.
+**Output**: frozen benchmark reports, strict generation evaluation reports,
+production smoke results, and diagnostics under the documented evaluation and
+deployment report locations.
 
 **Validation Criteria**:
-- Parser accuracy > 99%
-- Clause recall > 95%
-- Faithfulness > 0.9 (RAGAS)
-- Unsupported claim rate < 0.05
-- All CI gates pass before merge
+- Frozen benchmark schema and splits remain reproducible.
+- Retrieval and strict generation evaluations complete without runtime errors.
+- Citation ID validity and answerability fallback policy are enforced.
+- Production smoke validates runtime health, warmup/cache, and hybrid dense
+  retrieval separately from benchmark quality.
+- All CI gates pass before merge.
 
-**Status**: Future extension
+**Status**: Implemented for frozen benchmark, strict generation evaluation,
+and production smoke validation.
 
 **Detailed documentation**: `docs/evaluation.md`
 
 ---
 
-### Phase 13 — API & Deployment
+### Phase 13 — API & Production Deployment
 
-**Goal**: Package system as REST API, deploy production-ready with Docker, logging, security.
+**Goal**: Package the system as a product API and run it in the accepted
+production Vercel + Azure App Service container deployment.
 
 **Input**: All components (retrieval, generation, validation).
 
 **Pipeline Summary**:
-- FastAPI application:
-  - `POST /api/v1/qa`: receives query, returns answer + citations + metadata
-  - `GET /health`: health check
-  - `GET /metrics`: Prometheus metrics (latency, throughput, error rate)
-- Request schema:
-  ```json
-  {
-    "query": "...",
-    "max_chunks": 10,
-    "confidence_threshold": 0.75
-  }
-  ```
-- Response schema:
-  ```json
-  {
-    "answer": "...",
-    "citations": [...],
-    "confidence": 0.92,
-    "retrieved_chunks": [...],
-    "fallback": false
-  }
-  ```
-- Error handling: structured error responses, no raw stack traces, no secret leakage
-- Logging: structured JSON logs with request_id, timestamp, latency
-- Security: rate limiting, CORS, no sensitive data in logs (PII stripping)
-- Deployment: Docker Compose (Qdrant, Neo4j, API, vLLM), environment variables via `.env`
+- FastAPI backend:
+  - `POST /api/v1/legal-qa/ask` returns answer, citations, evidence, warnings,
+    request metadata, and request ID.
+  - `GET /health` is a lightweight process liveness check.
+  - `GET /api/v1/readiness` checks shallow production readiness, including
+    Qdrant collection availability.
+  - `GET /api/v1/legal-qa/warmup` loads and verifies the packaged BGE-M3 model
+    and process-local encoder cache.
+- Frontend:
+  - Vercel production: `https://vnlaw-qa.vercel.app`.
+  - Production API base URL points to the Azure backend.
+- Backend production:
+  - Azure App Service container:
+    `https://vnlaw-backend-prod-phat.azurewebsites.net`.
+  - ACR: `vnlawacrphat.azurecr.io`.
+  - Current verified image:
+    `vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f`.
+- Retrieval runtime:
+  - production mode is hybrid;
+  - BGE-M3 is packaged at `/models/embedding/bge-m3`;
+  - runtime uses offline Hugging Face settings;
+  - dense retrieval uses BGE-M3 query embedding, `DenseRetriever`, and Qdrant;
+  - sparse fallback is emergency/degraded resilience only.
+- Error handling and logging: structured responses and sanitized timing logs;
+  no raw stack traces, secrets, prompts, raw evidence text, or provider payloads
+  in normal logs.
 
-**Output**: Docker images, a future deployment Compose file, running API service.
+**Output**: FastAPI product API, Next.js product UI, production container
+images in ACR, Azure App Service production backend, Vercel frontend, warmup
+and Production Ask Smoke workflows.
 
 **Validation Criteria**:
-- Health endpoint returns 200
-- API responses < SLA (e.g., 2s p95)
-- Security scan clean (no secrets, no vulnerabilities)
-- Load test pass (100 concurrent queries)
+- `/health` returns 200.
+- `/api/v1/readiness` returns ready with Qdrant collection available.
+- Warmup passes and reports `cache_hit_after=true`; a second warmup reports
+  cache reuse with `cache_hit_before=true`.
+- Controlled ask/repeated ask smoke returns `decision=answered`, citations,
+  `retrieval_mode=hybrid`, `dense_retrieval_used=true`, and `fallback_used=false`.
+- Production Ask Smoke passes and remains strict on severe infrastructure or
+  degraded retrieval warnings.
+- Secret and protected-path checks remain clean.
 
-**Status**: Future extension
+**Status**: Implemented and production verified.
 
 **Detailed documentation**: `docs/api_deployment.md`
 
@@ -709,15 +724,24 @@ evidence for strict generation.
   - Error rate alerts
 - Maintenance tasks: re-normalize old artifacts, re-embed with new model, graph updates
 
-**Output**: Automated pipelines, monitoring dashboards, alerts.
+**Output**: CI quality gates, protected-path guard, lightweight secret scan,
+container deployment workflow, production warmup/cache validation, Production
+Ask Smoke workflow, Azure runbook, and corpus/index maintenance design notes.
 
 **Validation Criteria**:
-- All CI stages pass before deploy
-- No regression in key metrics (>5% drop triggers rollback)
-- Alerts are configured and testable
-- Corpus update process is documented and dry-run tested
+- CI stages pass before merge/deploy.
+- Protected paths and secrets remain clean.
+- Production deploys verify image, health, readiness, warmup/cache, and strict
+  ask smoke.
+- Dense fallback or severe retrieval warnings fail hybrid production smoke.
+- Corpus/index refreshes remain separately scoped and must be run through
+  controlled maintenance workflows.
 
-**Status**: Future extension
+**Status**: Partially implemented / ongoing. CI gates, container deployment,
+runbooks, protected-path checks, secret scanning, warmup validation, repeated
+ask validation, and Production Ask Smoke are implemented. Monitoring, alerts,
+automated rollback, richer dashboards, and corpus/index refresh automation
+remain future work.
 
 **Detailed documentation**: Integrated into `docs/api_deployment.md`,
 `docs/mlops_maintenance.md`, and future runbooks.
@@ -833,8 +857,8 @@ Each phase must pass its gate before proceeding to the next.
 | `docs/advanced_rag.md` | Implemented and evaluated | Coverage-aware hybrid retrieval and strict generation |
 | `docs/graphrag_agents.md` | Future extension | Legal graph schema, traversal, agent orchestration |
 | `docs/evaluation.md` | Implemented | Benchmark metrics, strict generation evaluation, diagnostics |
-| `docs/api_deployment.md` | Future/separately scoped | FastAPI endpoints, Docker deployment, security |
-| `docs/mlops_maintenance.md` | Future extension | Corpus updates, index refresh, monitoring, runbooks |
+| `docs/api_deployment.md` | Implemented production backend | FastAPI endpoints, Azure container deployment, Vercel integration, security notes |
+| `docs/mlops_maintenance.md` | Partially implemented / ongoing | Corpus updates, index refresh, monitoring, runbooks |
 
 **Legend**: future/separately scoped means design notes exist, but the feature
 is not part of the adopted evaluated pipeline.
@@ -897,17 +921,51 @@ All 40,389 validated chunks are indexed in Qdrant collection
 dimension 1024, cosine distance, and deterministic UUIDv5 point IDs. Full
 schema, payload, vector, filter, and retrieval sanity validation passed.
 
-### Phase 9 — Retrieval / Naive RAG — Closed with known limitations
+### Phase 9 — Retrieval / Naive RAG — Closed
 
-### Phase 10 — Advanced RAG — Implemented and evaluated
+The Naive RAG baseline was implemented, evaluated, and closed with known
+limitations. It remains a historical comparator and is not the current
+production retrieval path.
 
-Final adopted retrieval is `coverage_aware_quota`. Reranking was evaluated but
-not adopted. Time-aware filtering is not adopted.
+### Phase 10 — Advanced RAG — Implemented and productionized
+
+Final adopted retrieval is `coverage_aware_quota`. Production retrieval mode is
+hybrid: BGE-M3 query embedding, `DenseRetriever`, Qdrant dense retrieval, local
+BM25 sparse retrieval, fixed RRF fusion, coverage-aware quota retrieval,
+evidence selection, and strict generation. Reranking was evaluated but not
+adopted in current production. Time-aware filtering is not adopted. Sparse-only
+is not production mode; sparse remains emergency/degraded fallback only.
 
 ### Phase 11 — GraphRAG & Agents — Future extension
 
-### Phase 12 — Evaluation — Implemented for frozen benchmark and strict generation
+GraphRAG and multi-agent retrieval are future extensions and are not in the
+current production path.
 
-### Phase 13 — API & Deployment — Future/separately scoped
+### Phase 12 — Evaluation — Implemented
 
-### Phase 14 — MLOps & Maintenance — Future/separately scoped
+Frozen benchmark evaluation and strict generation checks are implemented.
+Production smoke checks are also implemented for deployment/runtime validation.
+Benchmark evaluation and production smoke have different purposes: benchmark
+results measure retrieval/generation quality, while production smoke validates
+health, readiness, BGE-M3 warmup/cache, dense retrieval, fallback absence, and
+safe runtime behavior.
+
+### Phase 13 — API & Production Deployment — Implemented
+
+The FastAPI backend is productionized as an Azure App Service Linux container
+served from Azure Container Registry. Vercel production is integrated with the
+accepted Azure backend at
+`https://vnlaw-backend-prod-phat.azurewebsites.net`. Production health,
+readiness, warmup, repeated ask smoke, and GitHub Production Ask Smoke pass.
+The current verified production image is
+`vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f`.
+Render is legacy/deprecated/rollback-only context, not current production.
+
+### Phase 14 — MLOps & Maintenance — Partially implemented / ongoing
+
+CI quality gates, protected-path checks, lightweight secret scanning, fake-mode
+container health smoke, production container deployment, warmup validation, and
+Production Ask Smoke are implemented. The Azure runbook documents rollback and
+the observed reliable stop/start procedure for large backend image recycle.
+Remaining future work includes richer production monitoring, alerts, automated
+rollback, dashboards, and long-term corpus/index maintenance automation.

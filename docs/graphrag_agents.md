@@ -350,5 +350,5 @@ All errors structured with `query_id` for tracing.
 | `docs/naive_rag.md` | Implemented baseline | Baseline RAG implementation |
 | `docs/advanced_rag.md` | Implemented/evaluated | Coverage-aware hybrid retrieval and strict generation |
 | `docs/evaluation.md` | Implemented | Benchmark metrics, strict generation evaluation, diagnostics |
-| `docs/api_deployment.md` | Future extension | FastAPI endpoints, Docker deployment, security |
-| `docs/mlops_maintenance.md` | Future extension | Corpus updates, index refresh, monitoring, runbooks |
+| `docs/api_deployment.md` | Implemented production backend | FastAPI endpoints, Azure container deployment, Vercel integration, security notes |
+| `docs/mlops_maintenance.md` | Partially implemented / ongoing | Corpus updates, index refresh design, CI/CD gates, production runbooks |

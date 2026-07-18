@@ -4,7 +4,12 @@
 
 The MLOps & Corpus Maintenance phase defines how VnLaw-QA keeps its legal corpus, processed data, retrieval indexes, evaluation baselines, and production services reliable over time. Unlike a static RAG demo, a legal QA system must assume that laws can be amended, consolidated, replaced, expired, or reinterpreted through newer legal documents. Therefore, maintenance is not a secondary task; it is part of the core reliability model of the system.
 
-This phase is implemented after the data pipeline, retrieval pipeline, evaluation suite, and API deployment are stable. Its role is to make corpus updates reproducible, measurable, reversible, and safe.
+The production API deployment is now stable on Azure App Service for
+Containers, and several operational controls are implemented: CI quality gates,
+protected-path checks, lightweight secret scanning, container deployment,
+warmup/cache validation, repeated production ask smoke, and GitHub Production
+Ask Smoke. Broader MLOps work remains ongoing. Its role is to make corpus
+updates reproducible, measurable, reversible, and safe.
 
 The main objectives are:
 
@@ -17,9 +22,27 @@ The main objectives are:
 
 MLOps for VnLaw-QA is not only about model deployment. It is also about **legal corpus governance**.
 
+## Current Operations Checkpoint
+
+Production backend phase is completed:
+
+- frontend production: `https://vnlaw-qa.vercel.app`;
+- backend production: `https://vnlaw-backend-prod-phat.azurewebsites.net`;
+- backend runtime: Azure App Service Linux container;
+- current verified backend image:
+  `vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f`;
+- production health, readiness, BGE-M3 warmup/cache, repeated ask smoke 10/10,
+  and GitHub Production Ask Smoke pass;
+- hybrid dense retrieval is production mode;
+- sparse fallback is emergency/degraded resilience only;
+- Render is legacy/deprecated/rollback-only context.
+
+Remaining future work includes production metrics/alerts, automated rollback,
+dashboards, and controlled corpus/index refresh automation.
+
 ## Quick Start
 
-**Intended maintenance workflow** (design phase, not yet implemented):
+**Intended corpus maintenance workflow** (design phase, not yet implemented):
 
 ```bash
 # 1. Update the corpus registry after reviewing legal source changes
@@ -812,4 +835,4 @@ All maintenance actions should write structured logs with `maintenance_id`, `cor
 | `docs/advanced_rag.md` | Implemented/evaluated | Coverage-aware hybrid retrieval and strict generation |
 | `docs/graphrag_agents.md` | Future extension | GraphRAG and agent orchestration |
 | `docs/evaluation.md` | Implemented | Benchmark metrics, strict generation evaluation, diagnostics |
-| `docs/api_deployment.md` | Future extension | FastAPI service and deployment strategy |
+| `docs/api_deployment.md` | Implemented production backend | FastAPI service, Azure container deployment, Vercel integration |

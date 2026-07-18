@@ -2,8 +2,9 @@
 
 ## Purpose
 
-This runbook prepares future Azure deployment for VnLaw-QA while preserving
-legal QA safety, secret hygiene, and controlled real-service validation.
+This runbook documents the accepted Azure production backend deployment for
+VnLaw-QA while preserving legal QA safety, secret hygiene, and controlled
+real-service validation.
 VnLaw-QA is a Vietnamese legal research assistant, not legal advice. Deployment
 work must not weaken citation, fallback, evidence-selection, retrieval, or
 generation behavior.
@@ -24,6 +25,22 @@ Production `/health`, `/api/v1/readiness`, `/api/v1/legal-qa/warmup`, and
 Production Ask Smoke pass. The production backend keeps the canonical hybrid
 pipeline: BGE-M3 / FlagEmbedding -> DenseRetriever -> Qdrant dense retrieval ->
 coverage-aware hybrid retrieval -> evidence selection -> LLM generation.
+The current verified production image is:
+
+```text
+vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f
+```
+
+Production backend phase checkpoint:
+
+- production startup regression fixed;
+- Qdrant response handling fixed;
+- intermittent Qdrant dense fallback fixed with bounded retry/client recreate;
+- warmup/cache validation passes;
+- repeated production ask smoke passed 10/10;
+- GitHub Production Ask Smoke passes;
+- Production Ask Smoke strictness remains preserved;
+- no sparse-only switch was made.
 
 Stage 1 CI quality gates exist for backend checks, frontend checks, protected
 path guarding, and lightweight secret scanning. Stage 2 backend fake-mode
@@ -60,6 +77,118 @@ CI, Frontend CI, Protected Path Guard, Secret Scan, and Backend Container.
 For the consolidated Azure staging resource plan, Stage 6 workflow behavior,
 and preflight checklist, see
 `docs/ci_cd.md`.
+
+## Production Backend Runbook
+
+Use these names for operator shells. Do not print secret app setting values.
+
+```bash
+RG=rg-vnlaw-staging
+APP=vnlaw-backend-prod-phat
+PROD_URL=https://vnlaw-backend-prod-phat.azurewebsites.net
+ACR=vnlawacrphat.azurecr.io
+```
+
+Check the current image:
+
+```bash
+az webapp config show \
+  --resource-group "$RG" \
+  --name "$APP" \
+  --query "linuxFxVersion" \
+  -o tsv
+```
+
+Deploy a reviewed image tag:
+
+```bash
+az webapp config set \
+  --resource-group "$RG" \
+  --name "$APP" \
+  --linux-fx-version "DOCKER|vnlawacrphat.azurecr.io/vnlaw-backend:<commit-sha>"
+```
+
+Reliable recycle after large backend image changes:
+
+```bash
+az webapp stop \
+  --resource-group "$RG" \
+  --name "$APP"
+
+sleep 60
+
+az webapp start \
+  --resource-group "$RG" \
+  --name "$APP"
+
+sleep 300
+```
+
+Plain App Service restart was not always sufficient after large container
+image changes. The reliable observed procedure was: set `linuxFxVersion`, stop
+the Web App, wait, start the Web App, wait for the large image recycle, then
+validate health, readiness, warmup twice, repeated ask smoke, and Production
+Ask Smoke.
+
+Verify liveness and readiness:
+
+```bash
+curl -i --max-time 180 "$PROD_URL/health"
+curl -i --max-time 180 "$PROD_URL/api/v1/readiness"
+```
+
+Expected:
+
+- `/health` returns HTTP 200;
+- `/api/v1/readiness` returns HTTP 200, `ready=true`, and Qdrant
+  `collection_available`.
+
+Warm BGE-M3 twice before ask smoke:
+
+```bash
+curl -sS --max-time 240 "$PROD_URL/api/v1/legal-qa/warmup" | python3 -m json.tool
+curl -sS --max-time 240 "$PROD_URL/api/v1/legal-qa/warmup" | python3 -m json.tool
+```
+
+Expected warmup:
+
+- `warmed=true`;
+- `model_load_timeout=false`;
+- `encode_timeout=false`;
+- `cache_hit_after=true`;
+- second warmup reports `cache_hit_before=true`;
+- both warmups report the same `model_cache_key`.
+
+Manual repeated ask validation is allowed only as an explicitly scoped
+post-deploy production smoke, not as routine development validation. Use a
+small bounded count such as 10 and stop on failure. Expected ask metadata:
+
+- `decision=answered`;
+- `retrieval_mode=hybrid`;
+- `dense_retrieval_used=true`;
+- `dense_retrieval_fallback_used=false`;
+- `fallback_used=false`;
+- `retriever_stage_failed=null`;
+- `embedding_model_cache_hit=true`;
+- `embedding_model_loaded_before_request=true`;
+- no severe warnings;
+- citations count is at least 1.
+
+Production Ask Smoke should run after manual validation or as part of the
+reviewed deployment path. It must remain strict and fail if dense fallback or
+severe retrieval warnings appear in hybrid mode.
+
+Rollback to a previously reviewed healthy image when needed:
+
+```bash
+az webapp config set \
+  --resource-group "$RG" \
+  --name "$APP" \
+  --linux-fx-version "DOCKER|vnlawacrphat.azurecr.io/vnlaw-backend:<last-known-healthy-sha>"
+```
+
+Do not hardcode one permanent rollback tag. Check reviewed ACR tags and recent
+deployment history to choose the last known healthy SHA.
 
 ## Recommended Architecture
 
@@ -472,16 +601,23 @@ Fail and rollback notes:
 - Render remains only a legacy rollback reference until decommission is
   reviewed.
 
-## Future Production Deploy Flow
+## Current Production Deploy Flow
 
-1. Staging passes.
-2. Manual production approval is granted through the GitHub Environment.
-3. Deploy production.
-4. Run safe smoke checks.
-5. Optionally run exactly one controlled `POST /api/v1/legal-qa/ask` smoke only
-   after explicit approval and reviewed environment readiness.
-6. Stop if timeout, out-of-memory, or `5xx` symptoms occur. Do not retry
-   production ask requests repeatedly.
+1. PR validation passes.
+2. Merge to `main`.
+3. Dispatch `Deploy Production Container Backend` with production approval.
+4. Confirm the pushed ACR image is configured on `vnlaw-backend-prod-phat`.
+5. Use the reliable stop/start recycle when the image is large or restart does
+   not clearly pick up the new container.
+6. Verify `/health`.
+7. Verify `/api/v1/readiness`.
+8. Run warmup twice and confirm cache reuse.
+9. Run the bounded repeated ask smoke only when explicitly scoped for
+   post-deploy validation.
+10. Run GitHub Production Ask Smoke and keep its severe-warning/fallback gates
+    strict.
+11. Stop if timeout, out-of-memory, fallback, or `5xx` symptoms occur. Inspect
+    sanitized logs before any rerun.
 
 ## Production Container Backend Runbook
 
@@ -734,15 +870,13 @@ Rollback must be explicit and environment-aware:
 
 ## Remaining Limitations
 
-The workflow and documentation do not prove the following until the staging
-workflow is manually configured and executed:
+Production runtime deployment is accepted, but this does not mean legal answer
+quality is fully solved. Remaining non-runtime work includes:
 
-- Azure resource availability;
-- registry publishing;
-- Azure identity or secret access;
-- real Qdrant connectivity;
-- real LLM credentials;
-- model memory behavior;
-- chunks artifact availability;
-- real `/api/v1/legal-qa/ask` behavior;
-- production readiness.
+- retrieval/evidence ranking quality improvements;
+- handling adjacent or indirect legal provisions more precisely;
+- richer production metrics, tracing, and alerts;
+- automated rollback;
+- long-term corpus/index maintenance automation;
+- GraphRAG, time-aware filtering, fine-tuning, and agentic retrieval if a
+  future task explicitly scopes and evaluates them.

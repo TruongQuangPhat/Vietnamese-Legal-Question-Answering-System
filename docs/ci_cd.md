@@ -27,6 +27,24 @@ Remote Oryx source builds with the embedding extra timed out, and prebuilt zip
 source deployment was too large for reliable Kudu deployment. Production real
 embedding dependencies must be deployed as a container image.
 
+Current production backend deployment is accepted on Azure App Service for
+Containers:
+
+```text
+frontend: https://vnlaw-qa.vercel.app
+backend: https://vnlaw-backend-prod-phat.azurewebsites.net
+backend app: vnlaw-backend-prod-phat
+ACR: vnlawacrphat.azurecr.io
+current image: vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f
+retrieval mode: hybrid
+```
+
+Production health, readiness, BGE-M3 warmup/cache, repeated ask smoke 10/10,
+and GitHub Production Ask Smoke pass. The startup regression, Qdrant response
+handling failure, and intermittent dense fallback have been fixed. Production
+Ask Smoke remains strict and must fail on dense fallback or severe
+retrieval/infrastructure warnings.
+
 ## CI Principles
 
 - CI is offline-safe by default.
@@ -210,18 +228,26 @@ Deployment should follow this path:
 
 1. PR CI passes.
 2. Merge to `main`.
-3. Deploy staging.
+3. Deploy staging or preview when the change requires it.
 4. Run safe staging smoke with `/health` and `/api/v1/readiness`.
-5. Run exactly one controlled staging `/api/v1/legal-qa/ask` smoke only after
-   real-readiness passes and the operator confirms real-service usage.
-6. Run conversation CRUD smoke where appropriate.
-7. Require manual approval.
-8. Deploy production.
-9. Run safe production smoke with `/health` and `/api/v1/readiness`.
+5. Require production manual approval.
+6. Deploy the production container image.
+7. Verify the Azure Web App uses the intended ACR image tag.
+8. Use stop/start plus wait for large image recycle when restart alone is not
+   reliable.
+9. Run production `/health`.
+10. Run production `/api/v1/readiness`.
+11. Run warmup twice and confirm BGE-M3 cache reuse.
+12. Run bounded repeated ask smoke only when explicitly scoped for post-deploy
+    production validation.
+13. Run GitHub Production Ask Smoke.
 
-A controlled `POST /api/v1/legal-qa/ask` smoke is manual, exactly one request,
-and only after explicit approval and reviewed environment readiness. Do not use
-repeated production `/ask` calls as validation.
+Production Ask Smoke is intentionally strict. It must fail if hybrid dense
+retrieval falls back, `dense_retrieval_used=false`, `fallback_used=true`,
+`dense_retrieval_fallback_used=true`, or severe warnings such as
+`embedding_model_load_timeout`, `query_embedding_timeout`,
+`qdrant_retrieval_error`, `qdrant_retrieval_timeout`, or `ask_timeout` appear.
+Do not weaken smoke conditions to pass deployment.
 
 ## Evaluation Refresh Policy
 

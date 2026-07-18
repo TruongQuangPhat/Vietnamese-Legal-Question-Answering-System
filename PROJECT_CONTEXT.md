@@ -445,26 +445,32 @@ Azure App Service is the current accepted production backend:
 ```text
 backend: https://vnlaw-backend-prod-phat.azurewebsites.net
 frontend: https://vnlaw-qa.vercel.app
+backend app: vnlaw-backend-prod-phat
+container registry: vnlawacrphat.azurecr.io
+current backend image: vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f
 backend mode: LEGAL_QA_SERVICE_MODE=real
 Qdrant: Qdrant Cloud / vnlaw_chunks_bgem3_v1_full
 retrieval mode: LEGAL_QA_RETRIEVAL_MODE=hybrid
 BGE-M3 model path: /models/embedding/bge-m3
 ```
 
-Azure production validation is accepted:
+The production backend phase is completed and validated:
 
 ```text
 GET /health -> HTTP 200
 GET /api/v1/readiness -> HTTP 200 and ready true
+Readiness Qdrant check -> collection_available
 GET /api/v1/legal-qa/warmup -> HTTP 200 with warmed=true,
 model_load_completed=true, model_load_timeout=false, encode_completed=true,
 encode_timeout=false, cache_hit_after=true, and model_cache_key present
 Second warmup -> cache_hit_before=true, cache_hit_after=true, same model_cache_key
+Repeated production ask smoke -> 10/10 pass
 Production Ask Smoke -> HTTP 200, decision=answered, metadata.model present,
 citations >= 1, retrieval_mode=hybrid, dense_retrieval_used=true,
 dense_retrieval_fallback_used=false, fallback_used=false,
 embedding_model_cache_hit=true, embedding_model_loaded_before_request=true,
-model_cache_key matching warmup, and no severe infra/retrieval warnings
+model_cache_key matching warmup, retriever_stage_failed=null, and no severe
+infra/retrieval warnings
 ```
 
 The production container packages public `BAAI/bge-m3` under
@@ -480,6 +486,11 @@ ask should report `embedding_model_cache_hit=true`,
 `fallback_used=false`. `embedding_model_load_timeout` means BGE-M3 was not
 loaded or warmed within the configured model-load budget; `qdrant_retrieval_error`
 should mean the Qdrant call itself failed.
+The production startup regression has been fixed. Qdrant
+`ResponseHandlingException` handling has been fixed. Intermittent Qdrant dense
+retrieval fallback has been fixed with bounded retry and safe Qdrant client
+recreation; Production Ask Smoke strictness was preserved and production was
+not switched to sparse-only.
 
 The canonical production pipeline remains:
 
@@ -522,6 +533,25 @@ retrieval debugging.
 Do not repeatedly call real production `/ask`; use the controlled GitHub
 Production Ask Smoke workflow and inspect sanitized logs before rerunning after
 any failure.
+
+Observed reliable Azure container recycle procedure after changing large
+backend images:
+
+```text
+1. set linuxFxVersion to the new ACR image
+2. az webapp stop
+3. sleep 60
+4. az webapp start
+5. sleep 300
+6. verify /health
+7. verify /api/v1/readiness
+8. run warmup twice
+9. run repeated ask smoke
+10. run Production Ask Smoke
+```
+
+Plain restart was not always enough after large image changes. Do not print
+secret App Service settings while following this procedure.
 
 `POST /api/v1/legal-qa/ask` supports optional in-process fixed-window rate
 limiting via `LEGAL_QA_RATE_LIMIT_ENABLED`,

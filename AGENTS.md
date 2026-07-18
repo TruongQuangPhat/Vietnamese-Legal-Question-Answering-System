@@ -130,9 +130,16 @@ Current durable state:
   evidence selection, and LLM generation. The production container packages
   BGE-M3 under `/models/embedding/bge-m3` and runs with
   `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, `HF_HUB_OFFLINE=1`,
-  `TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1`.
+  `TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1`. The current accepted
+  backend image is
+  `vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f`.
 - Azure production `/health`, `/api/v1/readiness`,
   `/api/v1/legal-qa/warmup`, and the controlled Production Ask Smoke pass.
+  Qdrant readiness reports `collection_available`, repeated production ask
+  smoke has passed 10/10, and hybrid dense retrieval now passes with
+  `dense_retrieval_used=true`, `dense_retrieval_fallback_used=false`,
+  `fallback_used=false`, `retriever_stage_failed=null`,
+  `embedding_model_cache_hit=true`, and no severe warnings.
   Future validation must use the controlled GitHub smoke workflows and must not
   repeatedly call real production `/api/v1/legal-qa/ask`. Hybrid production
   smoke must treat dense fallback as degraded retrieval: `fallback_used=true`,
@@ -151,6 +158,14 @@ Current durable state:
   legacy and should not be used for production `/ask` validation. Preserve the
   hybrid pipeline; do not switch production to sparse-only unless explicitly
   scoped as a degraded emergency mode.
+- The production startup regression, Qdrant response handling failure, and
+  intermittent Qdrant dense fallback have been fixed. `/health` must remain
+  lightweight and must not load BGE-M3, Qdrant retrieval, chunks, or the LLM;
+  `/api/v1/readiness` may check configuration and Qdrant. After a large Azure
+  container image change, use stop/start with wait time before validation when
+  restart alone does not recycle reliably. Post-deploy validation order is:
+  health, readiness, warmup twice, repeated ask smoke when explicitly scoped,
+  then Production Ask Smoke.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.

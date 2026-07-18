@@ -27,6 +27,9 @@ For the Azure deployment workflow and production runbook, see
 ```text
 Backend (Azure App Service): https://vnlaw-backend-prod-phat.azurewebsites.net
 Frontend (Vercel): https://vnlaw-qa.vercel.app
+Backend app: vnlaw-backend-prod-phat
+ACR: vnlawacrphat.azurecr.io
+Current backend image: vnlawacrphat.azurecr.io/vnlaw-backend:84880a47e7a84eafcb064a5d03613b5350e86d4f
 Backend mode: LEGAL_QA_SERVICE_MODE=real
 Retrieval mode: LEGAL_QA_RETRIEVAL_MODE=hybrid
 Qdrant collection: vnlaw_chunks_bgem3_v1_full
@@ -144,16 +147,24 @@ validation has passed:
 ```text
 GET /health -> HTTP 200
 GET /api/v1/readiness -> HTTP 200 and ready true
+Readiness Qdrant check -> collection_available
 GET /api/v1/legal-qa/warmup -> HTTP 200, warmed=true,
 model_load_completed=true, model_load_timeout=false, encode_completed=true,
 encode_timeout=false, cache_hit_after=true, and model_cache_key present
 Second warmup -> cache_hit_before=true, cache_hit_after=true, same model_cache_key
+Repeated production ask smoke -> 10/10 pass
 POST /api/v1/legal-qa/ask -> HTTP 200, decision=answered, citations >= 1,
 metadata.model present, retrieval_mode=hybrid, dense_retrieval_used=true,
 dense_retrieval_fallback_used=false, fallback_used=false,
 embedding_model_cache_hit=true, embedding_model_loaded_before_request=true,
-model_cache_key matching warmup, and no severe infra/retrieval warnings
+model_cache_key matching warmup, retriever_stage_failed=null, and no severe
+infra/retrieval warnings
 ```
+
+The production startup regression, Qdrant `ResponseHandlingException` handling,
+and intermittent dense-retrieval fallback have been fixed. Dense retrieval now
+uses bounded Qdrant retry/client recreation for transient transport or response
+handling failures without weakening smoke validation or switching to sparse-only.
 
 The frontend does not need code changes to target Azure. It reads the backend
 origin from:
@@ -203,6 +214,8 @@ LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60
 LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=120
 LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45
 LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30
+LEGAL_QA_QDRANT_RETRY_ATTEMPTS=2
+LEGAL_QA_QDRANT_RETRY_BACKOFF_SECONDS=0.15
 LEGAL_QA_LLM_TIMEOUT_SECONDS=30
 LEGAL_QA_MAX_TOP_K=5
 LEGAL_QA_RERANKING_ENABLED=false
@@ -419,10 +432,10 @@ connectivity, or real multi-turn quality.
 
 | Area | Current state | Deployment consequence |
 | --- | --- | --- |
-| Service mode | Fake is safe by default; real config is validated before workflow construction | Real startup and one request still need controlled validation |
-| Qdrant | URL, collection, optional API key, timeout, and vector contract exist | TLS/custom CA policy and deployed connectivity remain to be validated |
+| Service mode | Fake is safe by default; production real mode is validated on Azure | Real mode still requires controlled smoke after each deploy |
+| Qdrant | URL, collection, optional API key, timeout, retry, and vector contract exist | Production readiness reports `collection_available`; fallback or `qdrant_retrieval_error` in hybrid smoke remains a failure |
 | Embedding and sparse retrieval | Real mode constructs BGE-M3, uses local BM25, and loads the complete chunks JSONL | Production container images package BGE-M3 under `/models/embedding/bge-m3` and chunks under `/home/data/legal_chunks.jsonl`; neither artifact is committed to Git |
-| LLM provider | OpenRouter URL/model config and `OPENROUTER_API_KEY` lookup exist | Provider credential, egress, timeout/error behavior, and real response remain unverified |
+| LLM provider | OpenRouter URL/model config and `OPENROUTER_API_KEY` lookup exist | Production ask smoke verifies provider call returns a model-backed answer; credentials remain secret environment values |
 | Health | `/health` is liveness; `/api/v1/readiness` validates config and optionally reads Qdrant collection metadata | Readiness deliberately does not validate LLM availability or load the embedding model |
 | Version | Static API name/version is exposed | It has no build or revision identity |
 | CORS | JSON-array origins are supported; legacy comma-separated values remain compatible | Deployed frontend origins must be supplied explicitly |
