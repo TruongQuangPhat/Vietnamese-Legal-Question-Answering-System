@@ -120,9 +120,9 @@ class QdrantRetrievalTimeoutError(DenseRetrieverError, TimeoutError):
 class QdrantRetrievalError(DenseRetrieverError):
     """Raised when Qdrant search fails after the call has started."""
 
-    def __init__(self, *, cause_class: str) -> None:
+    def __init__(self, *, cause_class: str, safe_message: str | None = None) -> None:
         super().__init__(
-            "Qdrant dense retrieval failed",
+            safe_message or "Qdrant dense retrieval failed",
             failure_stage="qdrant_retrieval_error",
             warning_code="qdrant_retrieval_error",
             cause_class=cause_class,
@@ -252,6 +252,7 @@ class DenseRetriever:
         except RetrievalFilterError as exc:
             raise DenseRetrieverError(str(exc)) from exc
 
+        qdrant_method = "query_points"
         search_kwargs: dict[str, Any] = {
             "collection_name": retrieval_query.collection_name,
             "query": vector,
@@ -260,6 +261,8 @@ class DenseRetriever:
             "with_payload": True,
             "with_vectors": False,
         }
+        if self.qdrant_timeout_seconds is not None:
+            search_kwargs["timeout"] = max(1, math.ceil(self.qdrant_timeout_seconds))
         if query_filter is not None:
             search_kwargs["query_filter"] = query_filter
 
@@ -269,6 +272,10 @@ class DenseRetriever:
                 stage="qdrant_retrieval_started",
                 top_k=retrieval_query.top_k,
                 timeout_seconds=self.qdrant_timeout_seconds,
+                collection_name=retrieval_query.collection_name,
+                vector_name=self.dense_vector_name,
+                vector_dimension=len(vector),
+                qdrant_method=qdrant_method,
             )
             qdrant_call = self._qdrant_client.query_points(**search_kwargs)
             if self.qdrant_timeout_seconds is None:
@@ -285,37 +292,86 @@ class DenseRetriever:
                 exception_class="TimeoutError",
                 timeout_seconds=self.qdrant_timeout_seconds,
                 top_k=retrieval_query.top_k,
+                collection_name=retrieval_query.collection_name,
+                vector_name=self.dense_vector_name,
+                vector_dimension=len(vector),
+                qdrant_method=qdrant_method,
+                sanitized_exception_message="qdrant request timed out",
             )
             raise QdrantRetrievalTimeoutError(
                 timeout_seconds=self.qdrant_timeout_seconds or 0.0
             ) from exc
         except Exception as exc:
+            if _qdrant_exception_is_timeout(exc):
+                emit_retrieval_timing(
+                    stage="qdrant_retrieval_timeout",
+                    stage_started_at=qdrant_started,
+                    exception_class=safe_exception_class(exc),
+                    timeout_seconds=self.qdrant_timeout_seconds,
+                    top_k=retrieval_query.top_k,
+                    collection_name=retrieval_query.collection_name,
+                    vector_name=self.dense_vector_name,
+                    vector_dimension=len(vector),
+                    qdrant_method=qdrant_method,
+                    sanitized_exception_message=_safe_qdrant_exception_summary(exc),
+                )
+                raise QdrantRetrievalTimeoutError(
+                    timeout_seconds=self.qdrant_timeout_seconds or 0.0
+                ) from exc
             emit_retrieval_timing(
-                stage="dense_retriever_failed",
+                stage="qdrant_retrieval_error",
                 stage_started_at=qdrant_started,
                 exception_class=safe_exception_class(exc),
                 timeout_seconds=self.qdrant_timeout_seconds,
                 top_k=retrieval_query.top_k,
+                collection_name=retrieval_query.collection_name,
+                vector_name=self.dense_vector_name,
+                vector_dimension=len(vector),
+                qdrant_method=qdrant_method,
+                sanitized_exception_message=_safe_qdrant_exception_summary(exc),
             )
-            raise QdrantRetrievalError(cause_class=safe_exception_class(exc)) from exc
-        emit_retrieval_timing(
-            stage="qdrant_retrieval_completed",
-            stage_started_at=qdrant_started,
-            top_k=retrieval_query.top_k,
-        )
+            raise QdrantRetrievalError(
+                cause_class=safe_exception_class(exc),
+                safe_message=_safe_qdrant_exception_summary(exc),
+            ) from exc
+        try:
+            points = _extract_qdrant_points(response)
+            emit_retrieval_timing(
+                stage="qdrant_retrieval_completed",
+                stage_started_at=qdrant_started,
+                top_k=retrieval_query.top_k,
+                collection_name=retrieval_query.collection_name,
+                vector_name=self.dense_vector_name,
+                vector_dimension=len(vector),
+                qdrant_method=qdrant_method,
+                response_type=type(response).__name__,
+                returned_points=len(points),
+            )
 
-        points = getattr(response, "points", None)
-        if points is None:
-            raise DenseRetrieverError("Qdrant response does not expose points")
-        if not isinstance(points, Sequence):
-            raise DenseRetrieverError("Qdrant response points must be a sequence")
-
-        result_issues: list[RetrievalIssue] = []
-        chunks: list[RetrievedChunk] = []
-        for rank, point in enumerate(points, start=1):
-            chunk = _map_qdrant_point(point, rank=rank)
-            chunks.append(chunk)
-            result_issues.extend(chunk.issues)
+            result_issues: list[RetrievalIssue] = []
+            chunks: list[RetrievedChunk] = []
+            for rank, point in enumerate(points, start=1):
+                chunk = _map_qdrant_point(point, rank=rank)
+                chunks.append(chunk)
+                result_issues.extend(chunk.issues)
+        except DenseRetrieverError as exc:
+            emit_retrieval_timing(
+                stage="qdrant_retrieval_error",
+                stage_started_at=qdrant_started,
+                exception_class=safe_exception_class(exc),
+                timeout_seconds=self.qdrant_timeout_seconds,
+                top_k=retrieval_query.top_k,
+                collection_name=retrieval_query.collection_name,
+                vector_name=self.dense_vector_name,
+                vector_dimension=len(vector),
+                qdrant_method=qdrant_method,
+                response_type=type(response).__name__,
+                sanitized_exception_message=_safe_qdrant_exception_summary(exc),
+            )
+            raise QdrantRetrievalError(
+                cause_class=safe_exception_class(exc),
+                safe_message=_safe_qdrant_exception_summary(exc),
+            ) from exc
 
         result = RetrievalResult(
             query=retrieval_query.query,
@@ -563,6 +619,24 @@ def _map_qdrant_point(point: Any, *, rank: int) -> RetrievedChunk:
         raise DenseRetrieverError(f"invalid retrieved chunk at rank {rank}: {exc}") from exc
 
 
+def _extract_qdrant_points(response: Any) -> Sequence[Any]:
+    """Return points from supported Qdrant response wrappers without payload logging."""
+    points = getattr(response, "points", None)
+    if points is None and isinstance(response, Mapping):
+        points = response.get("points")
+    if points is None:
+        if isinstance(response, Sequence) and not isinstance(response, str | bytes | bytearray):
+            return response
+        raise DenseRetrieverError(
+            f"query_points response wrapper unsupported: {type(response).__name__}"
+        )
+    if not isinstance(points, Sequence) or isinstance(points, str | bytes | bytearray):
+        raise DenseRetrieverError(
+            f"query_points response points unsupported: {type(points).__name__}"
+        )
+    return points
+
+
 def _score_from_point(point: Any, *, rank: int) -> float:
     raw_score = getattr(point, "score", None)
     if not isinstance(raw_score, int | float) or not math.isfinite(float(raw_score)):
@@ -635,6 +709,44 @@ def _optional_string(value: Any) -> str | None:
 
 def _optional_bool(value: Any) -> bool | None:
     return value if isinstance(value, bool) else None
+
+
+def _qdrant_exception_is_timeout(exc: BaseException) -> bool:
+    if isinstance(exc, TimeoutError):
+        return True
+    source = getattr(exc, "source", None)
+    if isinstance(source, TimeoutError):
+        return True
+    timeout_class_names = {
+        "ConnectTimeout",
+        "PoolTimeout",
+        "ReadTimeout",
+        "TimeoutException",
+        "WriteTimeout",
+    }
+    return type(exc).__name__ in timeout_class_names or type(source).__name__ in timeout_class_names
+
+
+def _safe_qdrant_exception_summary(exc: BaseException) -> str:
+    exception_class = type(exc).__name__
+    source = getattr(exc, "source", None)
+    source_class = type(source).__name__ if source is not None else None
+    if _qdrant_exception_is_timeout(exc):
+        return (
+            f"qdrant response handling timed out: source={source_class}"
+            if source_class
+            else "qdrant request timed out"
+        )
+    if exception_class == "ResponseHandlingException" and source_class:
+        return f"qdrant response handling failed: source={source_class}"
+    message = str(exc)
+    if message.startswith("query_points response"):
+        return message
+    if message.startswith("Qdrant result at rank") and "invalid score" in message:
+        return "qdrant result score invalid"
+    if message.startswith("invalid retrieved chunk at rank"):
+        return "qdrant result payload validation failed"
+    return f"qdrant retrieval failed: exception={exception_class}"
 
 
 def _issue(

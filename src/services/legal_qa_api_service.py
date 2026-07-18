@@ -26,7 +26,7 @@ from src.services.legal_qa_context import (
 
 _HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 
-LegalQATimingLogger = Callable[[str, str | None, int, int, str | None], None]
+LegalQATimingLogger = Callable[..., None]
 
 
 class LegalQAWorkflowDecision(StrEnum):
