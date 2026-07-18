@@ -1,7 +1,7 @@
-import { getApiBaseUrl, normalizeApiBaseUrl } from "./api-config";
+import { getApiBaseUrl, joinApiPath, normalizeApiBaseUrl } from "./api-config";
 
 const CONVERSATIONS_PATH = "/api/v1/conversations";
-const SESSION_HEADER = "X-Legal-QA-Session";
+export const CONVERSATION_SESSION_HEADER = "X-Legal-QA-Session";
 const SESSION_STORAGE_KEY = "legal-qa-chat-session";
 let serverSessionToken: string | null = null;
 
@@ -154,11 +154,11 @@ async function request(
 
   let response: Response;
   try {
-    response = await fetcher(`${apiBaseUrl}${path}`, {
+    response = await fetcher(joinApiPath(apiBaseUrl, path), {
       ...init,
       headers: {
         "Content-Type": "application/json",
-        [SESSION_HEADER]: getConversationSessionToken(),
+        [CONVERSATION_SESSION_HEADER]: getConversationSessionToken(),
         ...init.headers,
       },
     });
@@ -184,18 +184,24 @@ function conversationPath(conversationId: string): string {
   return `${CONVERSATIONS_PATH}/${encodeURIComponent(conversationId)}`;
 }
 
-function getConversationSessionToken(): string {
+export function getConversationSessionToken(): string {
   if (typeof window === "undefined") {
     serverSessionToken ??= createSessionToken(globalThis.crypto);
     return serverSessionToken;
   }
-  const existingToken = window.localStorage.getItem(SESSION_STORAGE_KEY);
-  if (existingToken) {
-    return existingToken;
+
+  try {
+    const existingToken = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (existingToken) {
+      return existingToken;
+    }
+    const token = createSessionToken(window.crypto);
+    window.localStorage.setItem(SESSION_STORAGE_KEY, token);
+    return token;
+  } catch {
+    serverSessionToken ??= createSessionToken(window.crypto);
+    return serverSessionToken;
   }
-  const token = createSessionToken(window.crypto);
-  window.localStorage.setItem(SESSION_STORAGE_KEY, token);
-  return token;
 }
 
 function createSessionToken(cryptoApi: Crypto | undefined): string {

@@ -1,4 +1,8 @@
 import { getApiBaseUrl, joinApiPath, normalizeApiBaseUrl } from "./api-config";
+import {
+  CONVERSATION_SESSION_HEADER,
+  getConversationSessionToken,
+} from "./conversation-client";
 import type { LegalQARequest, LegalQAResponse } from "@/types/legal-qa";
 
 const LEGAL_QA_ASK_PATH = "/api/v1/legal-qa/ask";
@@ -34,6 +38,7 @@ export async function askLegalQuestion(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        [CONVERSATION_SESSION_HEADER]: getConversationSessionToken(),
       },
       body: JSON.stringify({
         question: request.question,

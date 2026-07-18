@@ -91,6 +91,7 @@ export function LegalQAWorkspace() {
     const conversationId = activeConversationId ?? createMessageId();
     const conversationTitle =
       activeConversation?.title ?? createConversationTitle(trimmedQuestion);
+    const backendConversationId = activeConversation?.backendConversationId;
     const conversationContext = prepareRecentConversationContext(activeMessages);
     const timestamp = new Date().toISOString();
 
@@ -103,24 +104,24 @@ export function LegalQAWorkspace() {
         timestamp,
       ),
     );
-    queueMessageSync(
-      conversationId,
-      conversationTitle,
-      activeConversation?.backendConversationId,
-      "user",
-      userMessage.content,
-    );
-
     try {
-      const answer = await askLegalQuestion({
+      const answerRequest = askLegalQuestion({
         question: trimmedQuestion,
-        conversation_id: activeConversation?.backendConversationId,
+        conversation_id: backendConversationId,
         conversation_context:
           conversationContext.length > 0 ? conversationContext : undefined,
         top_k: topK,
         include_evidence: includeEvidence,
         include_debug: false,
       });
+      queueMessageSync(
+        conversationId,
+        conversationTitle,
+        backendConversationId,
+        "user",
+        userMessage.content,
+      );
+      const answer = await answerRequest;
       setConversations((currentConversations) =>
         updateConversationMessage(
           currentConversations,
@@ -136,7 +137,8 @@ export function LegalQAWorkspace() {
       queueMessageSync(
         conversationId,
         conversationTitle,
-        activeConversation?.backendConversationId,
+        backendConversationIdsRef.current.get(conversationId) ??
+          backendConversationId,
         "assistant",
         answer.answer,
       );
@@ -236,17 +238,24 @@ export function LegalQAWorkspace() {
   ): void {
     const previousSync =
       backendMessageQueuesRef.current.get(conversationId) ?? Promise.resolve();
-    const nextSync = previousSync.then(() =>
-      syncMessageToBackend(
-        conversationId,
-        title,
-        existingBackendConversationId,
-        role,
-        content,
-      ),
-    );
+    const nextSync = previousSync
+      .catch(() => {
+        warnBackendSyncFailure("message");
+      })
+      .then(() =>
+        syncMessageToBackend(
+          conversationId,
+          title,
+          existingBackendConversationId,
+          role,
+          content,
+        ),
+      )
+      .catch(() => {
+        warnBackendSyncFailure("message");
+      });
     backendMessageQueuesRef.current.set(conversationId, nextSync);
-    void nextSync.then(() => {
+    void nextSync.finally(() => {
       if (backendMessageQueuesRef.current.get(conversationId) === nextSync) {
         backendMessageQueuesRef.current.delete(conversationId);
       }
