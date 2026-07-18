@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import math
 import time
+from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from src.indexing.embedding_model import BgeM3EmbeddingModel, clear_embedding_model_cache
 from src.retrieval.dense_retriever import (
     DenseRetriever,
     DenseRetrieverError,
@@ -91,6 +93,31 @@ class FakeEmbedder:
         return self.vector
 
 
+class FakeBgeEncoder:
+    """Small encoder compatible with BgeM3EmbeddingModel query encoding."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def encode(self, sentences: list[str], **kwargs: Any) -> list[list[float]]:
+        self.calls.append(sentences)
+        return [[1.0, 0.0, 0.0] for _ in sentences]
+
+
+class SlowBgeFactory:
+    """Factory that makes shared model construction observable."""
+
+    def __init__(self, *, delay_seconds: float = 0.02) -> None:
+        self.delay_seconds = delay_seconds
+        self.calls: list[tuple[str, dict[str, object]]] = []
+        self.encoder = FakeBgeEncoder()
+
+    def __call__(self, model_name: str, **kwargs: Any) -> FakeBgeEncoder:
+        time.sleep(self.delay_seconds)
+        self.calls.append((model_name, kwargs))
+        return self.encoder
+
+
 class FakeQdrantClient:
     """Read-only Qdrant fake with mutation traps."""
 
@@ -133,9 +160,12 @@ class FakeQdrantClient:
 
 
 @pytest.fixture(autouse=True)
-def fake_qdrant_models(monkeypatch: pytest.MonkeyPatch) -> None:
+def fake_qdrant_models(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Keep filter construction independent from qdrant-client."""
     monkeypatch.setattr("src.retrieval.filters._load_qdrant_models", lambda: FakeQdrantModels)
+    clear_embedding_model_cache()
+    yield
+    clear_embedding_model_cache()
 
 
 def make_payload(**overrides: Any) -> dict[str, Any]:
@@ -310,6 +340,8 @@ async def test_successful_dense_retrieval_marks_dense_used_without_fallback() ->
     assert result.metadata["dense_retrieval_used"] is True
     assert result.metadata["dense_retrieval_fallback_used"] is False
     assert result.metadata["fallback_used"] is False
+    assert result.metadata["embedding_model_cache_hit"] is False
+    assert result.metadata["embedding_model_loaded_before_request"] is False
 
 
 @pytest.mark.asyncio
@@ -322,6 +354,39 @@ async def test_warmup_loads_model_once_and_retrieve_reuses_loaded_model() -> Non
 
     assert embedder.load_calls == 1
     assert embedder.calls == [("legal qa warmup", 1), ("Câu hỏi hợp lệ?", 1)]
+
+
+@pytest.mark.asyncio
+async def test_ask_after_warmup_reports_embedding_cache_hit() -> None:
+    embedder = FakeEmbedder()
+    retriever = make_retriever(embedder=embedder)
+
+    await retriever.warmup_embedding()
+    result = await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert result.metadata["embedding_model_cache_hit"] is True
+    assert result.metadata["embedding_model_loaded_before_request"] is True
+    assert retriever.embedding_model_status()["embedding_model_cache_hit"] is True
+    assert embedder.load_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_retrieval_during_model_load_reuses_loaded_model() -> None:
+    factory = SlowBgeFactory()
+    embedder = BgeM3EmbeddingModel(
+        model_name="BAAI/bge-m3",
+        device="cpu",
+        model_factory=factory,
+    )
+    retriever = make_retriever(embedder=embedder)
+
+    results = await asyncio.gather(
+        retriever.retrieve("Câu hỏi thứ nhất?"),
+        retriever.retrieve("Câu hỏi thứ hai?"),
+    )
+
+    assert [result.metadata["dense_retrieval_used"] for result in results] == [True, True]
+    assert len(factory.calls) == 1
 
 
 @pytest.mark.asyncio

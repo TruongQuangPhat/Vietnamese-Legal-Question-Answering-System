@@ -526,10 +526,11 @@ PORT=8000
 LEGAL_QA_SERVICE_MODE=real
 LEGAL_QA_ASK_TIMEOUT_SECONDS=90
 LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60
-LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=60
+LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=120
 LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45
 LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30
 LEGAL_QA_LLM_TIMEOUT_SECONDS=30
+LEGAL_QA_WARMUP_TIMEOUT_SECONDS=180
 LEGAL_QA_MAX_TOP_K=5
 LEGAL_QA_RERANKING_ENABLED=false
 LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl
@@ -589,6 +590,9 @@ If `/api/v1/legal-qa/ask` times out:
   `/models/embedding/bge-m3` during Docker build and set
   `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, so runtime `/warmup` and
   `/ask` should not download model files.
+- Warmup and ask share one process-local BGE-M3 cache. After a successful
+  warmup, a normal ask should report `metadata.embedding_model_cache_hit=true`
+  and should not enter the model-load timeout path.
 - Scale from B1 to B2 or P1v3 when local model loading, CPU query embedding, or
   memory pressure remains above the bounded smoke timeout after image-packaged
   model files are confirmed.
@@ -620,8 +624,8 @@ deployment to verify the image-packaged local BGE-M3 path, model load, and one
 fixed non-sensitive encode. Expected production warmup after this packaging
 change is HTTP 200 with `warmed=true`, `model_path_exists=true`,
 `required_files_present=true`, `model_load_completed=true`, and
-`encode_completed=true`. If warmup times out or returns `warmed=false`, inspect
-logs before running the single `/ask` smoke.
+`encode_completed=true`, and `cache_hit_after=true`. If warmup times out or
+returns `warmed=false`, inspect logs before running the single `/ask` smoke.
 
 Production App Service settings keep the original hybrid path:
 `LEGAL_QA_RETRIEVAL_MODE=hybrid`, `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`,
@@ -646,8 +650,9 @@ include `ask_timeout`, `embedding_model_load_timeout`,
 For standalone legal questions, `metadata.retrieval_question_prepared=false` is
 diagnostic only and is not a failure by itself. The primary pass criteria are
 HTTP 200, `decision=answered`, model presence, a non-empty answer, citations,
-`metadata.dense_retrieval_used=true`, `metadata.fallback_used=false`, and no
-timeout/internal-error or degraded dense-retrieval warnings.
+`metadata.dense_retrieval_used=true`, `metadata.fallback_used=false`,
+`metadata.embedding_model_cache_hit=true`, and no timeout/internal-error or
+degraded dense-retrieval warnings.
 `retrieval_question_prepared=false`
 remains a hard failure when `metadata.follow_up_detected=true`, because that
 smoke path is explicitly testing follow-up question rewriting. The workflow

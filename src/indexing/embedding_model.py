@@ -6,10 +6,12 @@ encoder for unit tests and never connects to Qdrant or persists vectors.
 
 from __future__ import annotations
 
+import hashlib
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Any, Protocol
 
 from pydantic import ValidationError
@@ -42,6 +44,19 @@ ModelFactory = Callable[..., DenseEncoder]
 MODEL_CONFIG_FILES = ("config.json",)
 MODEL_WEIGHT_FILES = ("model.safetensors", "pytorch_model.bin")
 MODEL_TOKENIZER_FILES = ("tokenizer.json", "sentencepiece.bpe.model")
+
+
+@dataclass
+class _SharedEncoderState:
+    """Process-local state for one BGE-M3 model configuration."""
+
+    lock: Lock
+    encoder: DenseEncoder | None = None
+    device_effective: str | None = None
+
+
+_MODEL_CACHE_LOCK = Lock()
+_MODEL_CACHE: dict[tuple[object, ...], _SharedEncoderState] = {}
 
 
 class BgeM3EmbeddingModel:
@@ -93,19 +108,40 @@ class BgeM3EmbeddingModel:
         self.max_length = max_length
         self.dense_vector_name = dense_vector_name
         self.require_local_files = require_local_files
-        self._encoder = encoder
+        self._local_encoder = encoder
         self._model_factory = model_factory
-        self._device_effective: str | None = None
+        self._local_device_effective: str | None = None
+        self._cache_key = _cache_key(
+            model_name=model_name,
+            model_revision=model_revision,
+            device=device,
+            normalize_embeddings=normalize_embeddings,
+            require_local_files=require_local_files,
+            model_factory=model_factory,
+        )
+        self._shared_state = (
+            None if encoder is not None else _get_or_create_shared_state(self._cache_key)
+        )
 
     @property
     def device_effective(self) -> str | None:
         """Return the resolved device after model loading, if known."""
-        return self._device_effective
+        if self._shared_state is not None:
+            return self._shared_state.device_effective
+        return self._local_device_effective
 
     @property
     def is_loaded(self) -> bool:
         """Return whether the heavy encoder has already been constructed."""
-        return self._encoder is not None
+        if self._shared_state is not None:
+            return self._shared_state.encoder is not None
+        return self._local_encoder is not None
+
+    @property
+    def model_cache_key(self) -> str:
+        """Return a safe opaque cache key marker for diagnostics."""
+        digest = hashlib.sha256(repr(self._cache_key).encode("utf-8")).hexdigest()[:12]
+        return f"bge-m3:{digest}"
 
     def ensure_loaded(self) -> None:
         """Load the heavy encoder without embedding user text."""
@@ -225,13 +261,28 @@ class BgeM3EmbeddingModel:
 
     def _get_encoder(self) -> DenseEncoder:
         """Return an injected encoder or lazily construct BGE-M3."""
-        if self._encoder is not None:
-            if self._device_effective is None:
-                self._device_effective = (
+        if self._local_encoder is not None:
+            if self._local_device_effective is None:
+                self._local_device_effective = (
                     "injected" if self.device_requested == "auto" else self.device_requested
                 )
-            return self._encoder
+            return self._local_encoder
 
+        if self._shared_state is None:
+            raise EmbeddingModelError("embedding model cache is not initialized")
+        if self._shared_state.encoder is not None:
+            return self._shared_state.encoder
+
+        with self._shared_state.lock:
+            if self._shared_state.encoder is not None:
+                return self._shared_state.encoder
+            encoder, device = self._construct_encoder()
+            self._shared_state.encoder = encoder
+            self._shared_state.device_effective = device
+            return encoder
+
+    def _construct_encoder(self) -> tuple[DenseEncoder, str]:
+        """Construct one BGE-M3 encoder for this model configuration."""
         factory = self._model_factory or _load_flag_embedding_factory()
         device = _resolve_device(self.device_requested)
         if self.require_local_files:
@@ -249,13 +300,12 @@ class BgeM3EmbeddingModel:
             kwargs["revision"] = self.model_revision
 
         try:
-            self._encoder = factory(self.model_name, **kwargs)
+            encoder = factory(self.model_name, **kwargs)
         except Exception as exc:
             raise EmbeddingModelError(
                 f"failed to load BGE-M3 model {self.model_name!r} on {device}: {exc}"
             ) from exc
-        self._device_effective = device
-        return self._encoder
+        return encoder, device
 
 
 def _load_flag_embedding_factory() -> ModelFactory:
@@ -295,6 +345,41 @@ def inspect_embedding_model_path(path: str | Path | None) -> EmbeddingModelPathS
         configured=True,
         exists=exists,
         required_files_present=required_files_present,
+    )
+
+
+def clear_embedding_model_cache() -> None:
+    """Clear process-local BGE-M3 encoder cache for tests and reconfiguration."""
+    with _MODEL_CACHE_LOCK:
+        _MODEL_CACHE.clear()
+
+
+def _get_or_create_shared_state(cache_key: tuple[object, ...]) -> _SharedEncoderState:
+    with _MODEL_CACHE_LOCK:
+        state = _MODEL_CACHE.get(cache_key)
+        if state is None:
+            state = _SharedEncoderState(lock=Lock())
+            _MODEL_CACHE[cache_key] = state
+        return state
+
+
+def _cache_key(
+    *,
+    model_name: str,
+    model_revision: str | None,
+    device: str,
+    normalize_embeddings: bool,
+    require_local_files: bool,
+    model_factory: ModelFactory | None,
+) -> tuple[object, ...]:
+    factory_key = "default" if model_factory is None else ("factory", id(model_factory))
+    return (
+        str(Path(model_name).resolve()) if require_local_files else model_name,
+        model_revision if not require_local_files else None,
+        device,
+        normalize_embeddings,
+        require_local_files,
+        factory_key,
     )
 
 

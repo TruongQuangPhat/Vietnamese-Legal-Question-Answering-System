@@ -86,7 +86,9 @@ Current durable status:
   real production `/ask` must not be called repeatedly; in hybrid production
   smoke, dense fallback is degraded retrieval and must fail validation when
   `fallback_used=true`, `dense_retrieval_fallback_used=true`, or
-  `dense_retrieval_used=false`;
+  `dense_retrieval_used=false`; warmup must populate the same process-local
+  BGE-M3 cache used by ask, and normal post-warmup smoke should report
+  `embedding_model_cache_hit=true`;
 * GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part
   of the adopted evaluated pipeline.
 

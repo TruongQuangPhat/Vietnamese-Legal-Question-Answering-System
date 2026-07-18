@@ -77,6 +77,9 @@ def validate_response_payload(payload: dict[str, Any], *, http_status: str = "20
     dense_retrieval_fallback_used = metadata.get("dense_retrieval_fallback_used")
     fallback_used = metadata.get("fallback_used")
     retriever_stage_failed = metadata.get("retriever_stage_failed")
+    embedding_model_cache_hit = metadata.get("embedding_model_cache_hit")
+    embedding_model_loaded_before_request = metadata.get("embedding_model_loaded_before_request")
+    model_cache_key = metadata.get("model_cache_key")
 
     lines = [
         "Response JSON keys: " + ", ".join(keys),
@@ -95,6 +98,9 @@ def validate_response_payload(payload: dict[str, Any], *, http_status: str = "20
             f"Dense retrieval fallback used: {dense_retrieval_fallback_used}",
             f"Fallback used: {fallback_used}",
             f"Retriever stage failed: {retriever_stage_failed}",
+            f"Embedding model cache hit: {embedding_model_cache_hit}",
+            f"Embedding model loaded before request: {embedding_model_loaded_before_request}",
+            f"Model cache key: {model_cache_key}",
             f"Retrieval question prepared: {retrieval_question_prepared}",
             f"Follow-up detected: {follow_up_detected}",
             "Warnings: " + ", ".join(warning_names),
@@ -129,6 +135,10 @@ def validate_response_payload(payload: dict[str, Any], *, http_status: str = "20
             )
         if dense_retrieval_used is not True:
             raise SmokeValidationError("Ask smoke did not use dense retrieval in hybrid mode.")
+        if embedding_model_cache_hit is not True:
+            raise SmokeValidationError(
+                "Ask smoke did not start from the warmed embedding model cache in hybrid mode."
+            )
     if follow_up_detected is True and retrieval_question_prepared is False:
         raise SmokeValidationError(
             "Ask smoke detected a follow-up question but did not prepare a retrieval question."

@@ -83,7 +83,9 @@ Azure production is accepted for the real hybrid Legal QA path:
 - `GET /api/v1/legal-qa/warmup` passes with `warmed=true`,
   `model_path_configured=true`, `model_path_exists=true`,
   `required_files_present=true`, `model_load_completed=true`, and
-  `encode_completed=true`.
+  `encode_completed=true`. Warmup must populate the same process-local BGE-M3
+  cache used by `/api/v1/legal-qa/ask`; `cache_hit_after=true` confirms that
+  the ask path should not reload the model.
 - Production Ask Smoke passes with HTTP 200, `decision=answered`,
   `metadata.model` present, at least one citation, and no
   timeout/internal-error warnings or dense retrieval fallback.
@@ -93,6 +95,9 @@ The production backend packages public `BAAI/bge-m3` into the Docker image at
 `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, `HF_HUB_OFFLINE=1`,
 `TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1` so warmup and ask do not
 download model files at request time.
+`embedding_model_load_timeout` means the model was not loaded or warmed within
+the configured model-load budget. `qdrant_retrieval_error` should mean an
+actual Qdrant call failure only.
 
 Canonical production pipeline:
 

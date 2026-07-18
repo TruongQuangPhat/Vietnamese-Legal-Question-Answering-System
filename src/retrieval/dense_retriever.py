@@ -243,6 +243,7 @@ class DenseRetriever:
             stage="dense_retriever_started",
             top_k=retrieval_query.top_k,
         )
+        loaded_before_request = self._embedding_model_is_loaded()
         vector = await self._embed_query(retrieval_query.query)
         self._validate_query_vector(vector)
 
@@ -331,6 +332,9 @@ class DenseRetriever:
                 "dense_retrieval_used": True,
                 "dense_retrieval_fallback_used": False,
                 "fallback_used": False,
+                "embedding_model_cache_hit": loaded_before_request,
+                "embedding_model_loaded_before_request": loaded_before_request,
+                "model_cache_key": self._embedding_model_cache_key(),
             },
         )
         emit_retrieval_timing(
@@ -406,11 +410,10 @@ class DenseRetriever:
         return vector
 
     async def _load_embedding_model_if_supported(self) -> None:
-        is_loaded = getattr(self._embedding_model, "is_loaded", None)
         ensure_loaded = getattr(self._embedding_model, "ensure_loaded", None)
         if ensure_loaded is None or not callable(ensure_loaded):
             return
-        if isinstance(is_loaded, bool) and is_loaded:
+        if self._embedding_model_is_loaded():
             return
         started = time.perf_counter()
         emit_retrieval_timing(
@@ -451,6 +454,22 @@ class DenseRetriever:
         await self._load_embedding_model_if_supported()
         vector = await self._embed_query("legal qa warmup")
         self._validate_query_vector(vector)
+
+    def embedding_model_status(self) -> dict[str, object]:
+        """Return safe process-local embedding cache status."""
+        return {
+            "embedding_model_cache_hit": self._embedding_model_is_loaded(),
+            "embedding_model_loaded_before_request": self._embedding_model_is_loaded(),
+            "model_cache_key": self._embedding_model_cache_key(),
+        }
+
+    def _embedding_model_is_loaded(self) -> bool:
+        is_loaded = getattr(self._embedding_model, "is_loaded", None)
+        return bool(is_loaded) if isinstance(is_loaded, bool) else False
+
+    def _embedding_model_cache_key(self) -> str | None:
+        cache_key = getattr(self._embedding_model, "model_cache_key", None)
+        return cache_key if isinstance(cache_key, str) and cache_key.strip() else None
 
     def _validate_query_vector(self, vector: Sequence[Any]) -> None:
         if not vector:

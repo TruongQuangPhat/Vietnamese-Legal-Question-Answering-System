@@ -101,6 +101,9 @@ class LegalQAWorkflowMetadata:
     dense_retrieval_fallback_used: bool = False
     fallback_used: bool = False
     retriever_stage_failed: str | None = None
+    embedding_model_cache_hit: bool = False
+    embedding_model_loaded_before_request: bool = False
+    model_cache_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -151,6 +154,9 @@ class LegalQAWarmupResult:
     encode_started: bool = False
     encode_completed: bool = False
     encode_timeout: bool = False
+    cache_hit_before: bool = False
+    cache_hit_after: bool = False
+    model_cache_key: str | None = None
 
 
 class LegalQAServiceError(RuntimeError):
@@ -385,34 +391,64 @@ class LegalQAService:
             retrieved evidence, generated answers, secrets, or raw exception text.
         """
         started_at = perf_counter()
-        model_status = self.embedding_model_status()
+        model_status_before = self.embedding_model_status()
         warmup = getattr(self._workflow, "warmup_embedding", None)
         if warmup is None or not callable(warmup):
-            return LegalQAWarmupResult(warmed=False, elapsed_ms=0, **model_status)
+            cache_hit = bool(model_status_before.get("embedding_model_cache_hit", False))
+            return LegalQAWarmupResult(
+                warmed=False,
+                elapsed_ms=0,
+                cache_hit_before=cache_hit,
+                cache_hit_after=cache_hit,
+                model_cache_key=_safe_metadata_string(model_status_before.get("model_cache_key")),
+                **_path_status_kwargs(model_status_before),
+            )
         try:
             warmup()
         except Exception as exc:
             exception_class = _root_exception_class(exc)
+            failure_stage = _safe_failure_stage(exc, default="")
+            model_status_after = self.embedding_model_status()
+            cache_hit_before = bool(model_status_before.get("embedding_model_cache_hit", False))
+            cache_hit_after = bool(model_status_after.get("embedding_model_cache_hit", False))
             return LegalQAWarmupResult(
                 warmed=False,
                 elapsed_ms=int((perf_counter() - started_at) * 1000),
                 exception_class=exception_class,
-                model_load_started=True,
-                model_load_timeout=exception_class == "TimeoutError",
-                encode_timeout=False,
-                **model_status,
+                model_load_started=not cache_hit_before,
+                model_load_completed=cache_hit_after,
+                model_load_timeout=failure_stage == "embedding_model_load_timeout",
+                encode_started=cache_hit_after,
+                encode_completed=False,
+                encode_timeout=failure_stage == "query_embedding_timeout",
+                cache_hit_before=cache_hit_before,
+                cache_hit_after=cache_hit_after,
+                model_cache_key=_safe_metadata_string(
+                    model_status_after.get("model_cache_key")
+                    or model_status_before.get("model_cache_key")
+                ),
+                **_path_status_kwargs(model_status_before),
             )
+        model_status_after = self.embedding_model_status()
+        cache_hit_before = bool(model_status_before.get("embedding_model_cache_hit", False))
+        cache_hit_after = bool(model_status_after.get("embedding_model_cache_hit", False))
         return LegalQAWarmupResult(
             warmed=True,
             elapsed_ms=int((perf_counter() - started_at) * 1000),
-            model_load_started=True,
-            model_load_completed=True,
+            model_load_started=not cache_hit_before,
+            model_load_completed=cache_hit_after,
             encode_started=True,
             encode_completed=True,
-            **model_status,
+            cache_hit_before=cache_hit_before,
+            cache_hit_after=cache_hit_after,
+            model_cache_key=_safe_metadata_string(
+                model_status_after.get("model_cache_key")
+                or model_status_before.get("model_cache_key")
+            ),
+            **_path_status_kwargs(model_status_before),
         )
 
-    def embedding_model_status(self) -> dict[str, bool]:
+    def embedding_model_status(self) -> dict[str, object]:
         """Return shallow embedding model status without loading model weights."""
         status = getattr(self._workflow, "embedding_model_status", None)
         if status is None or not callable(status):
@@ -422,10 +458,14 @@ class LegalQAService:
                 "required_files_present": False,
             }
         raw_status = status()
+        if not isinstance(raw_status, dict):
+            raw_status = {}
         return {
             "model_path_configured": bool(raw_status.get("model_path_configured", False)),
             "model_path_exists": bool(raw_status.get("model_path_exists", False)),
             "required_files_present": bool(raw_status.get("required_files_present", False)),
+            "embedding_model_cache_hit": bool(raw_status.get("embedding_model_cache_hit", False)),
+            "model_cache_key": _safe_metadata_string(raw_status.get("model_cache_key")),
         }
 
 
@@ -574,6 +614,17 @@ def _safe_failure_stage(exc: BaseException, *, default: str) -> str:
     return default
 
 
+def _safe_metadata_string(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if not all(character.isalnum() or character in {":", "_", "-"} for character in stripped):
+        return None
+    return stripped
+
+
 def _emit_timing(
     *,
     timing_logger: LegalQATimingLogger | None,
@@ -607,4 +658,15 @@ def _map_metadata(metadata: LegalQAWorkflowMetadata) -> ResponseMetadataDTO:
         dense_retrieval_fallback_used=metadata.dense_retrieval_fallback_used,
         fallback_used=metadata.fallback_used,
         retriever_stage_failed=metadata.retriever_stage_failed,
+        embedding_model_cache_hit=metadata.embedding_model_cache_hit,
+        embedding_model_loaded_before_request=metadata.embedding_model_loaded_before_request,
+        model_cache_key=metadata.model_cache_key,
     )
+
+
+def _path_status_kwargs(status: dict[str, object]) -> dict[str, bool]:
+    return {
+        "model_path_configured": bool(status.get("model_path_configured", False)),
+        "model_path_exists": bool(status.get("model_path_exists", False)),
+        "required_files_present": bool(status.get("required_files_present", False)),
+    }

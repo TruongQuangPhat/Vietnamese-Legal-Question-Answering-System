@@ -137,10 +137,12 @@ Current durable state:
   repeatedly call real production `/api/v1/legal-qa/ask`. Hybrid production
   smoke must treat dense fallback as degraded retrieval: `fallback_used=true`,
   `dense_retrieval_fallback_used=true`, or `dense_retrieval_used=false` is not a
-  final production-quality pass. Render Free is legacy and should not be used
-  for production `/ask` validation. Preserve the hybrid pipeline; do not switch
-  production to sparse-only unless explicitly scoped as a degraded emergency
-  mode.
+  final production-quality pass. Warmup must populate the same process-local
+  BGE-M3 cache used by `/ask`; after warmup, `embedding_model_cache_hit=true`
+  and `fallback_used=false` are expected for normal hybrid smoke. Render Free is
+  legacy and should not be used for production `/ask` validation. Preserve the
+  hybrid pipeline; do not switch production to sparse-only unless explicitly
+  scoped as a degraded emergency mode.
 - Fake mode is the default local/demo path. It does not require Qdrant,
   OpenRouter, embedding models, rerankers, or legal corpus data. Real mode is
   manual and must not be used in routine validation.

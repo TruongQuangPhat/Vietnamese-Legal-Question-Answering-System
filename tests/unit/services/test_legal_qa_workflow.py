@@ -24,6 +24,7 @@ from src.services.legal_qa_api_service import (
     LegalQAService,
     LegalQAServiceError,
     LegalQAWorkflowRequest,
+    LegalQAWorkflowResult,
 )
 from src.services.legal_qa_context import LegalQAContextPreparer
 from src.services.legal_qa_workflow import (
@@ -124,6 +125,9 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     assert response.metadata.dense_retrieval_fallback_used is False
     assert response.metadata.fallback_used is False
     assert response.metadata.retriever_stage_failed is None
+    assert response.metadata.embedding_model_cache_hit is True
+    assert response.metadata.embedding_model_loaded_before_request is True
+    assert response.metadata.model_cache_key == "bge-m3:test-cache"
     assert retriever.calls[0]["query"] == (
         "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào? "
         "Vậy hợp đồng xác định thời hạn thì sao?"
@@ -461,6 +465,45 @@ def test_service_factory_can_select_real_workflow_with_mocked_dependencies() -> 
     assert response.metadata.model == "stub"
 
 
+def test_service_warmup_reports_cache_transition() -> None:
+    class WarmupWorkflow:
+        def __init__(self) -> None:
+            self.loaded = False
+
+        def run(self, request: LegalQAWorkflowRequest) -> LegalQAWorkflowResult:
+            return FakeLegalQAWorkflow().run(request)
+
+        def warmup_embedding(self) -> None:
+            self.loaded = True
+
+        def embedding_model_status(self) -> dict[str, object]:
+            return {
+                "model_path_configured": True,
+                "model_path_exists": True,
+                "required_files_present": True,
+                "embedding_model_cache_hit": self.loaded,
+                "model_cache_key": "bge-m3:test-cache",
+            }
+
+    service = LegalQAService(workflow=WarmupWorkflow())
+
+    result = service.warmup_embedding()
+
+    assert result.warmed is True
+    assert result.cache_hit_before is False
+    assert result.cache_hit_after is True
+    assert result.model_load_started is True
+    assert result.model_load_completed is True
+    assert result.model_cache_key == "bge-m3:test-cache"
+
+    second = service.warmup_embedding()
+
+    assert second.cache_hit_before is True
+    assert second.cache_hit_after is True
+    assert second.model_load_started is False
+    assert second.model_load_completed is True
+
+
 def test_route_contract_remains_stable_with_workflow_service() -> None:
     retriever = StaticRetriever(_retrieval_result([_retrieved_chunk()]))
     llm_client = MockLLMClient(
@@ -522,6 +565,12 @@ def test_real_workflow_builder_preserves_hybrid_dense_path_with_local_model(
         def __init__(self, **kwargs: Any) -> None:
             calls["coverage_retriever"] = kwargs
 
+        def embedding_model_status(self) -> dict[str, object]:
+            return {
+                "embedding_model_cache_hit": False,
+                "model_cache_key": None,
+            }
+
     class FakeOpenRouterClient:
         def __init__(self, **kwargs: Any) -> None:
             calls["llm_client"] = kwargs
@@ -578,6 +627,8 @@ def test_real_workflow_builder_preserves_hybrid_dense_path_with_local_model(
         "model_path_configured": True,
         "model_path_exists": True,
         "required_files_present": True,
+        "embedding_model_cache_hit": False,
+        "model_cache_key": None,
     }
 
 
@@ -596,6 +647,9 @@ def _retrieval_result(chunks: list[RetrievedChunk]) -> RetrievalResult:
             "dense_retrieval_used": True,
             "dense_retrieval_fallback_used": False,
             "fallback_used": False,
+            "embedding_model_cache_hit": True,
+            "embedding_model_loaded_before_request": True,
+            "model_cache_key": "bge-m3:test-cache",
         },
     )
 

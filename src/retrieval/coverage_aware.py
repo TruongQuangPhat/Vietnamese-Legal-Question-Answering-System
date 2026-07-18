@@ -213,6 +213,7 @@ class CoverageAwareQuotaRetriever:
                 "dense_retrieval_used": True,
                 "dense_retrieval_fallback_used": False,
                 "fallback_used": False,
+                **_safe_dense_metadata(dense_result.metadata),
             },
         )
 
@@ -283,6 +284,7 @@ class CoverageAwareQuotaRetriever:
                 "retriever_stage_failed": dense_issue.details.get("failure_stage")
                 if dense_issue is not None
                 else "dense_retriever_error",
+                **_safe_dense_metadata(self.embedding_model_status()),
             },
         )
 
@@ -292,6 +294,14 @@ class CoverageAwareQuotaRetriever:
         if warmup is None or not callable(warmup):
             return
         await warmup()
+
+    def embedding_model_status(self) -> dict[str, object]:
+        """Return safe dense embedding cache status when available."""
+        status = getattr(self._dense_retriever, "embedding_model_status", None)
+        if status is None or not callable(status):
+            return {}
+        raw_status = status()
+        return raw_status if isinstance(raw_status, dict) else {}
 
 
 def _dense_fallback_issue(exc: DenseRetrieverError) -> RetrievalIssue:
@@ -305,6 +315,19 @@ def _dense_fallback_issue(exc: DenseRetrieverError) -> RetrievalIssue:
             "fallback_used": True,
         },
     )
+
+
+def _safe_dense_metadata(metadata: dict[str, object]) -> dict[str, object]:
+    """Copy only sanitized dense-cache metadata into fused retrieval results."""
+    return {
+        key: metadata[key]
+        for key in (
+            "embedding_model_cache_hit",
+            "embedding_model_loaded_before_request",
+            "model_cache_key",
+        )
+        if key in metadata
+    }
 
 
 def coverage_aware_config_from_payload(payload: dict[str, Any]) -> CoverageAwareFusionConfig:

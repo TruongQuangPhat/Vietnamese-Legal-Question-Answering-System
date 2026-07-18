@@ -903,10 +903,11 @@ Required production resources and settings:
 - `LEGAL_QA_RETRIEVAL_MODE=hybrid`;
 - `LEGAL_QA_ASK_TIMEOUT_SECONDS=90`;
 - `LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS=60`;
-- `LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=60`;
+- `LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS=120`;
 - `LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS=45`;
 - `LEGAL_QA_QDRANT_TIMEOUT_SECONDS=30`;
 - `LEGAL_QA_LLM_TIMEOUT_SECONDS=30`;
+- `LEGAL_QA_WARMUP_TIMEOUT_SECONDS=180`;
 - `LEGAL_QA_MAX_TOP_K=5`;
 - `LEGAL_QA_RERANKING_ENABLED=false`;
 - `LEGAL_QA_CHUNKS_PATH=/home/data/legal_chunks.jsonl`;
@@ -956,8 +957,9 @@ bounded 220-second curl timeout, logs only sanitized status fields, and sends
 the single `/ask` request only if warmup returns HTTP 200 with `warmed=true`,
 `model_path_configured=true`, `model_path_exists=true`,
 `required_files_present=true`, `model_load_completed=true`, and
-`encode_completed=true`. If warmup fails, the workflow exits before sending
-the production `/ask` request.
+`encode_completed=true`, and `cache_hit_after=true`. Warmup populates the same
+process-local BGE-M3 cache used by `/ask`; if warmup fails, the workflow exits
+before sending the production `/ask` request.
 
 It sends exactly one `/ask` request with a configurable timeout up to 600
 seconds for production ML cold start and `top_k=5`, prints only safe summary
@@ -978,9 +980,9 @@ model presence, a non-empty answer, citations, and no timeout/internal-error
 warnings are the primary success criteria. `retrieval_question_prepared=false`
 remains a hard failure when `metadata.follow_up_detected=true`, because a
 follow-up smoke should have a prepared retrieval question. In hybrid production
-mode, `metadata.dense_retrieval_used=true` and `metadata.fallback_used=false`
-are also required; dense fallback is degraded retrieval and must not silently
-pass final production validation.
+mode, `metadata.dense_retrieval_used=true`, `metadata.fallback_used=false`, and
+`metadata.embedding_model_cache_hit=true` are also required; dense fallback is
+degraded retrieval and must not silently pass final production validation.
 
 Production `/ask` timeout diagnostics come from sanitized
 `legal_qa_request_timing` logs. The logs record stage names and elapsed

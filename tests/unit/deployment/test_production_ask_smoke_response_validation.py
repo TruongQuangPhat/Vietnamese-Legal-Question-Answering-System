@@ -111,6 +111,13 @@ def test_smoke_validation_fails_when_hybrid_dense_was_not_used() -> None:
         validate_response_payload(payload)
 
 
+def test_smoke_validation_fails_when_hybrid_ask_misses_embedding_cache() -> None:
+    payload = _valid_payload(metadata_overrides={"embedding_model_cache_hit": False})
+
+    with pytest.raises(SmokeValidationError, match="warmed embedding model cache"):
+        validate_response_payload(payload)
+
+
 def test_smoke_validation_passes_with_evidence_caution_warning() -> None:
     lines = validate_response_payload(_valid_payload(warnings=["all_selected_evidence_caution"]))
 
@@ -141,6 +148,9 @@ def test_smoke_validation_logs_sanitized_summary_fields() -> None:
     assert "Dense retrieval fallback used: False" in lines
     assert "Fallback used: False" in lines
     assert "Retriever stage failed: None" in lines
+    assert "Embedding model cache hit: True" in lines
+    assert "Embedding model loaded before request: True" in lines
+    assert "Model cache key: bge-m3:test-cache" in lines
     assert "Retrieval question prepared: False" in lines
     assert "Follow-up detected: False" in lines
     assert "Warnings: " in lines
@@ -164,6 +174,9 @@ def _valid_payload(
         "dense_retrieval_fallback_used": False,
         "fallback_used": False,
         "retriever_stage_failed": None,
+        "embedding_model_cache_hit": True,
+        "embedding_model_loaded_before_request": True,
+        "model_cache_key": "bge-m3:test-cache",
         "follow_up_detected": follow_up_detected,
         "retrieval_question_prepared": retrieval_question_prepared,
     }

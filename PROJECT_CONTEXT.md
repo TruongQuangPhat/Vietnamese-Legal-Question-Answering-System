@@ -469,6 +469,12 @@ The production container packages public `BAAI/bge-m3` under
 not download model files at request time.
 `LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS` bounds BGE-M3 initialization
 separately from query embedding and Qdrant retrieval.
+Warmup and ask share the same process-local BGE-M3 cache. A normal post-warmup
+ask should report `embedding_model_cache_hit=true`,
+`embedding_model_loaded_before_request=true`, `dense_retrieval_used=true`, and
+`fallback_used=false`. `embedding_model_load_timeout` means BGE-M3 was not
+loaded or warmed within the configured model-load budget; `qdrant_retrieval_error`
+should mean the Qdrant call itself failed.
 
 The canonical production pipeline remains:
 
