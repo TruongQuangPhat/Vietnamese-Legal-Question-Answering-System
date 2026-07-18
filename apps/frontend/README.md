@@ -59,16 +59,18 @@ link. If citations are present but evidence text was not included in the API
 response, the drawer shows a friendly message instead of falling back to
 technical identifiers.
 
-The answer also includes a compact "Quá trình xử lý" panel. It summarizes safe
-system stages such as receiving the question, finding legal basis, selecting
-relevant basis, and drafting the answer. It must not display hidden
-chain-of-thought, private model reasoning, prompts, raw evidence payloads, or
-secret values.
+While a request is pending, the answer area shows a compact progress card with
+a spinner and a safe current stage such as receiving the question, finding
+legal basis, or creating the answer. After completion, the process display is
+collapsed by default and can be expanded with `Xem quá trình` to show a
+timeline-style summary. It must not display hidden chain-of-thought, private
+model reasoning, prompts, raw evidence payloads, raw metadata fields, or secret
+values.
 
-Backend warning names are mapped to user-friendly notes and deduplicated.
-Evidence caution warnings are shown as caution notes, not system failures.
-Severe retrieval/infrastructure warnings use stronger wording, but raw warning
-codes remain hidden from the normal UI.
+Backend warning names are never shown raw in the normal UI. Evidence caution
+warnings are not shown as top-level answer warnings; they may appear only as
+subtle context in expanded details. Severe retrieval/infrastructure warnings
+use concise user-friendly wording and are deduplicated.
 
 ## Vercel Production
 

@@ -214,6 +214,28 @@ test("suggested prompt path sends ask", async ({ page }) => {
   expect(askRequests, diagnosticMessage(observedRequests)).toBe(1);
 });
 
+test("loading answer shows spinner and current safe process stage", async ({
+  page,
+}) => {
+  await mockConversationFailure(page);
+  await mockAskDelayedSuccess(page);
+
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.getByRole("button", { name: "+ Cuộc trò chuyện mới" }).click();
+  await page.getByLabel("Câu hỏi pháp lý").fill(QUESTION);
+  await page.getByRole("button", { name: "Gửi" }).click();
+
+  await expect(page.getByText("Đang xử lý câu hỏi")).toBeVisible();
+  await expect(page.getByTestId("process-spinner")).toBeVisible();
+  await expect(page.locator("[data-active-stage='true']")).toContainText(
+    /Đang .+\.\.\./,
+  );
+});
+
 test("answer shows user-friendly legal basis drawer without technical metadata", async ({
   page,
 }) => {
@@ -235,10 +257,11 @@ test("answer shows user-friendly legal basis drawer without technical metadata",
   await expect(page.getByText("auxiliary_parent_context_included")).toHaveCount(0);
   await expect(
     page.getByText("Một số căn cứ cần được xem xét thận trọng."),
-  ).toHaveCount(1);
+  ).toHaveCount(0);
   await expect(
     page.getByText("Một số ngữ cảnh bổ trợ đã được dùng để hiểu căn cứ."),
-  ).toHaveCount(1);
+  ).toHaveCount(0);
+  await expect(page.getByText("Lưu ý")).toHaveCount(0);
 
   await page
     .getByRole("button", { name: "Đã sử dụng 2 căn cứ pháp lý" })
@@ -303,7 +326,9 @@ test("severe retrieval warning uses friendly wording without raw warning code", 
 
   await expect(page.getByText("dense_retrieval_fallback_used")).toHaveCount(0);
   await expect(
-    page.getByText("Hệ thống phải dùng chế độ dự phòng khi tìm căn cứ."),
+    page.getByText(
+      "Quá trình tìm căn cứ gặp vấn đề, câu trả lời có thể cần kiểm tra lại.",
+    ),
   ).toBeVisible();
 });
 
@@ -320,17 +345,20 @@ test("process panel expands to safe system summary only", async ({ page }) => {
 
   await expect(page.getByText("Đã tìm căn cứ pháp lý và tạo câu trả lời.")).toBeVisible();
   await expect(page.getByText("Tiếp nhận câu hỏi")).toHaveCount(0);
+  await expect(page.getByText("1. Tiếp nhận câu hỏi")).toHaveCount(0);
 
-  await page.getByRole("button", { name: /Quá trình xử lý/ }).click();
+  await page.getByRole("button", { name: /Xem quá trình/ }).click();
 
   await expect(page.getByText("Tiếp nhận câu hỏi")).toBeVisible();
   await expect(page.getByText("Đã dùng chế độ tìm kiếm kết hợp.")).toBeVisible();
-  await expect(
-    page.getByText("Không cần dùng chế độ dự phòng khi tìm căn cứ."),
-  ).toBeVisible();
+  await expect(page.getByText("Không dùng chế độ dự phòng.")).toBeVisible();
   await expect(page.getByText("dense_retrieval_used")).toHaveCount(0);
+  await expect(page.getByText("fallback_used")).toHaveCount(0);
+  await expect(page.getByText("embedding_model_cache_hit")).toHaveCount(0);
+  await expect(page.getByText("model_cache_key")).toHaveCount(0);
   await expect(page.getByText("Chain of Thought")).toHaveCount(0);
   await expect(page.getByText("Suy luận nội bộ")).toHaveCount(0);
+  await expect(page.getByText("Lý luận ẩn")).toHaveCount(0);
 });
 
 async function submitQuestion(page: Page): Promise<void> {
@@ -425,6 +453,44 @@ async function mockAskFailure(page: Page, onAsk: () => void): Promise<void> {
       contentType: "application/json",
       status: 503,
       body: JSON.stringify({ detail: "ask unavailable" }),
+    });
+  });
+}
+
+async function mockAskDelayedSuccess(page: Page): Promise<void> {
+  await page.route(ASK_URL, async (route) => {
+    expect(route.request().method()).toBe("POST");
+    await new Promise((resolve) => {
+      setTimeout(resolve, 2500);
+    });
+    await route.fulfill({
+      contentType: "application/json",
+      status: 200,
+      body: JSON.stringify({
+        request_id: "test-request-id",
+        decision: "answered",
+        answer: ANSWER,
+        citations: [],
+        evidence: [],
+        warnings: [],
+        metadata: {
+          retrieval_strategy: "coverage_aware_quota",
+          retrieval_mode: "hybrid",
+          model: "google/gemini-2.5-flash",
+          reranking_used: false,
+          latency_ms: 1234,
+          conversation_context_used: false,
+          conversation_context_message_count: 0,
+          follow_up_detected: false,
+          retrieval_question_prepared: false,
+          dense_retrieval_used: true,
+          dense_retrieval_fallback_used: false,
+          fallback_used: false,
+          embedding_model_cache_hit: true,
+          embedding_model_loaded_before_request: true,
+          model_cache_key: "bge-m3:test",
+        },
+      }),
     });
   });
 }

@@ -110,27 +110,29 @@ export function AnswerPanel({
           onSelectEvidence={openEvidenceDrawer}
         />
         <div className="mt-5 border-t border-border pt-4">
-          {legalBasisCount > 0 ? (
-            <button
-              className="text-sm font-semibold text-primary underline-offset-4 transition hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30"
-              onClick={() => openEvidenceDrawer()}
-              type="button"
-            >
-              Đã sử dụng {legalBasisCount} căn cứ pháp lý
-            </button>
-          ) : (
-            <p className="text-sm text-muted">
-              Không có căn cứ pháp lý để hiển thị.
-            </p>
-          )}
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            {legalBasisCount > 0 ? (
+              <button
+                className="text-sm font-semibold text-primary underline-offset-4 transition hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30"
+                onClick={() => openEvidenceDrawer()}
+                type="button"
+              >
+                Đã sử dụng {legalBasisCount} căn cứ pháp lý
+              </button>
+            ) : (
+              <p className="text-sm text-muted">
+                Không có căn cứ pháp lý để hiển thị.
+              </p>
+            )}
+          </div>
+          <AnswerProcessPanel
+            metadata={response.metadata}
+            warnings={response.warnings}
+          />
         </div>
       </div>
 
       <WarningNotice warnings={response.warnings} />
-      <AnswerProcessPanel
-        metadata={response.metadata}
-        warnings={response.warnings}
-      />
       <EvidenceDrawer
         citations={response.citations}
         evidence={response.evidence}
