@@ -42,6 +42,7 @@ export interface LegalQAEvidence {
 
 export interface LegalQAResponseMetadata {
   retrieval_strategy: string;
+  retrieval_mode?: string;
   model: string | null;
   reranking_used: boolean;
   latency_ms: number;
@@ -49,6 +50,12 @@ export interface LegalQAResponseMetadata {
   conversation_context_message_count: number;
   follow_up_detected: boolean;
   retrieval_question_prepared: boolean;
+  dense_retrieval_used?: boolean;
+  dense_retrieval_fallback_used?: boolean;
+  fallback_used?: boolean;
+  embedding_model_cache_hit?: boolean;
+  embedding_model_loaded_before_request?: boolean;
+  model_cache_key?: string;
 }
 
 export interface LegalQAResponse {
