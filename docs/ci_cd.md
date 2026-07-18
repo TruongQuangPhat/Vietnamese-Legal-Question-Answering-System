@@ -957,9 +957,19 @@ the production `/ask` request.
 It sends exactly one `/ask` request with a configurable timeout up to 600
 seconds for production ML cold start and `top_k=5`, prints only safe summary
 fields, and fails if HTTP status is not `200`, `decision == "error"`,
-`warnings` contains `ask_timeout`, `metadata.model` is null,
-`metadata.retrieval_question_prepared` is false, or the answer is the generic
-internal-error answer.
+`metadata.model` is null or empty, the answer is missing or too short, citations
+are missing, severe warnings are present, or the answer is the generic
+internal-error answer. Severe warnings include `ask_timeout`,
+`query_embedding_timeout`, `qdrant_retrieval_timeout`, `internal_error`,
+`retrieval_error`, and `llm_timeout`.
+
+Production Ask Smoke validates the canonical hybrid production path. For
+standalone legal questions, `metadata.retrieval_question_prepared=false` is
+diagnostic only and is not a failure by itself: HTTP 200, `decision=answered`,
+model presence, a non-empty answer, citations, and no timeout/internal-error
+warnings are the primary success criteria. `retrieval_question_prepared=false`
+remains a hard failure when `metadata.follow_up_detected=true`, because a
+follow-up smoke should normally be rewritten into a retrieval-ready question.
 
 Production `/ask` timeout diagnostics come from sanitized
 `legal_qa_request_timing` logs. The logs record stage names and elapsed

@@ -610,12 +610,21 @@ the primary production retrieval mode. Sparse mode must not be used to validate 
 
 It sends one `/ask` request only. `timeout_seconds` is configurable up to 600
 seconds for production ML cold start. It fails if the ask HTTP status is not
-`200`, the response reports `decision=error`, contains `ask_timeout`, has
-`metadata.model=null`, has `metadata.retrieval_question_prepared=false`, or
-returns the generic internal error answer. It prints only safe summary fields:
-HTTP status, response keys, answer length, citation/evidence counts,
-model-present status, retrieval-question-prepared status, sanitized warnings,
-and latency when present.
+`200`, the response reports `decision=error`, has `metadata.model=null` or an
+empty model, returns a missing or too-short answer, has no citations, contains a
+severe warning, or returns the generic internal error answer. Severe warnings
+include `ask_timeout`, `query_embedding_timeout`, `qdrant_retrieval_timeout`,
+`internal_error`, `retrieval_error`, and `llm_timeout`.
+
+For standalone legal questions, `metadata.retrieval_question_prepared=false` is
+diagnostic only and is not a failure by itself. The primary pass criteria are
+HTTP 200, `decision=answered`, model presence, a non-empty answer, citations,
+and no timeout/internal-error warnings. `retrieval_question_prepared=false`
+remains a hard failure when `metadata.follow_up_detected=true`, because that
+smoke path is explicitly testing follow-up question rewriting. The workflow
+prints only safe summary fields: HTTP status, response keys, answer length,
+citation/evidence counts, model-present status, retrieval-question-prepared
+status, follow-up-detected status, sanitized warnings, and latency when present.
 
 ## Vercel Production Cutover
 
