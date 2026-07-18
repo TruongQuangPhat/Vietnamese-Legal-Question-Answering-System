@@ -315,6 +315,15 @@ def _build_timing_logger(request: LegalQARequest) -> LegalQATimingLogger:
             timeout_seconds=_safe_optional_float(metadata.get("timeout_seconds")),
             fallback_used=bool(metadata.get("fallback_used", False)),
             top_k_override=_safe_optional_int(metadata.get("top_k")),
+            collection_name=_safe_identifier(metadata.get("collection_name")),
+            vector_name=_safe_identifier(metadata.get("vector_name")),
+            vector_dimension=_safe_optional_int(metadata.get("vector_dimension")),
+            qdrant_method=_safe_identifier(metadata.get("qdrant_method")),
+            response_type=_safe_identifier(metadata.get("response_type")),
+            returned_points=_safe_optional_int(metadata.get("returned_points")),
+            sanitized_exception_message=_safe_log_message(
+                metadata.get("sanitized_exception_message")
+            ),
         )
 
     return log_timing
@@ -382,6 +391,13 @@ def _log_request_timing(
     timeout_seconds: float | None = None,
     fallback_used: bool = False,
     top_k_override: int | None = None,
+    collection_name: str | None = None,
+    vector_name: str | None = None,
+    vector_dimension: int | None = None,
+    qdrant_method: str | None = None,
+    response_type: str | None = None,
+    returned_points: int | None = None,
+    sanitized_exception_message: str | None = None,
 ) -> None:
     payload = {
         "event": "legal_qa_request_timing",
@@ -399,6 +415,13 @@ def _log_request_timing(
         "service_mode": _safe_service_mode(),
         "timeout_seconds": timeout_seconds,
         "fallback_used": fallback_used,
+        "collection_name": collection_name,
+        "vector_name": vector_name,
+        "vector_dimension": vector_dimension,
+        "qdrant_method": qdrant_method,
+        "response_type": response_type,
+        "returned_points": returned_points,
+        "sanitized_exception_message": sanitized_exception_message,
     }
     logger.info(
         "legal_qa_request_timing stage=%s",
@@ -425,6 +448,31 @@ def _safe_optional_int(value: Any) -> int | None:
     if isinstance(value, int) and value > 0:
         return value
     return None
+
+
+def _safe_identifier(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if len(stripped) > 160:
+        return None
+    if not all(character.isalnum() or character in {":", "_", "-", "."} for character in stripped):
+        return None
+    return stripped
+
+
+def _safe_log_message(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped or len(stripped) > 240:
+        return None
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 :_=.-")
+    if not all(character in allowed for character in stripped):
+        return None
+    return stripped
 
 
 def _safe_model_cache_key(value: Any) -> str | None:

@@ -44,6 +44,7 @@ def emit_retrieval_timing(
     timeout_seconds: float | None = None,
     fallback_used: bool = False,
     top_k: int | None = None,
+    **safe_metadata: object,
 ) -> None:
     """Emit one sanitized retrieval timing event when a request context is active."""
     context = _TIMING_CONTEXT.get()
@@ -61,6 +62,7 @@ def emit_retrieval_timing(
         timeout_seconds=timeout_seconds,
         fallback_used=fallback_used,
         top_k=top_k,
+        **safe_metadata,
     )
 
 

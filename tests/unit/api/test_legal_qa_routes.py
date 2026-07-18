@@ -569,6 +569,62 @@ async def test_ask_route_logs_sanitized_timing_metadata(
 
 
 @pytest.mark.asyncio
+async def test_ask_route_logs_sanitized_qdrant_timing_metadata(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="src.api.routes.legal_qa")
+    app = create_app(AppSettings.from_env({"LEGAL_QA_SERVICE_MODE": "fake"}))
+
+    class QdrantTimingWorkflow:
+        def run(self, request: LegalQAWorkflowRequest) -> LegalQAWorkflowResult:
+            if request.timing_logger is not None:
+                request.timing_logger(
+                    "qdrant_retrieval_error",
+                    request.request_id,
+                    12,
+                    34,
+                    "ResponseHandlingException",
+                    collection_name="vnlaw_chunks_bgem3_v1_full",
+                    vector_name="dense",
+                    vector_dimension=1024,
+                    qdrant_method="query_points",
+                    response_type="QueryResponse",
+                    returned_points=5,
+                    sanitized_exception_message=(
+                        "qdrant response handling failed: source=ValidationError"
+                    ),
+                )
+            return _workflow_answer()
+
+    async def get_service() -> LegalQAService:
+        return LegalQAService(workflow=QdrantTimingWorkflow())
+
+    app.dependency_overrides[get_legal_qa_service] = get_service
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/legal-qa/ask",
+            json={"question": "Câu hỏi hợp lệ?"},
+        )
+
+    assert response.status_code == 200
+    timing_records = _log_records_prefix(caplog, "legal_qa_request_timing")
+    qdrant_record = next(
+        record for record in timing_records if record.stage == "qdrant_retrieval_error"
+    )
+    assert qdrant_record.collection_name == "vnlaw_chunks_bgem3_v1_full"
+    assert qdrant_record.vector_name == "dense"
+    assert qdrant_record.vector_dimension == 1024
+    assert qdrant_record.qdrant_method == "query_points"
+    assert qdrant_record.response_type == "QueryResponse"
+    assert qdrant_record.returned_points == 5
+    assert qdrant_record.sanitized_exception_message == (
+        "qdrant response handling failed: source=ValidationError"
+    )
+
+
+@pytest.mark.asyncio
 async def test_ask_route_returns_controlled_timeout_response(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
@@ -905,6 +961,43 @@ def _rate_limit_settings(
             "LEGAL_QA_RATE_LIMIT_REQUESTS": str(requests),
             "LEGAL_QA_RATE_LIMIT_WINDOW_SECONDS": str(window_seconds),
         }
+    )
+
+
+def _workflow_answer() -> LegalQAWorkflowResult:
+    return LegalQAWorkflowResult(
+        decision=LegalQAWorkflowDecision.ANSWERED,
+        answer="Câu trả lời thử nghiệm có căn cứ.",
+        citations=[
+            LegalQAWorkflowCitation(
+                evidence_id="E1",
+                chunk_id="chunk-1",
+                law_id="BLDS_2015",
+                law_name="Bộ luật Dân sự 2015",
+                citation="Bộ luật Dân sự 2015, Điều 1",
+                source_url="https://thuvienphapluat.vn/example",
+                hierarchy_path="Điều 1",
+            )
+        ],
+        evidence=[
+            LegalQAWorkflowEvidence(
+                evidence_id="E1",
+                chunk_id="chunk-1",
+                law_id="BLDS_2015",
+                law_name="Bộ luật Dân sự 2015",
+                citation="Bộ luật Dân sự 2015, Điều 1",
+                text="Nội dung căn cứ kiểm thử.",
+                source_url="https://thuvienphapluat.vn/example",
+                score=0.9,
+            )
+        ],
+        warnings=[],
+        metadata=LegalQAWorkflowMetadata(
+            retrieval_strategy="coverage_aware_quota",
+            model="stub",
+            reranking_used=False,
+            latency_ms=1,
+        ),
     )
 
 

@@ -126,10 +126,14 @@ class FakeQdrantClient:
         *,
         points: list[Any] | None = None,
         fail_query: bool = False,
+        query_error: BaseException | None = None,
+        response: Any | None = None,
         delay_seconds: float = 0.0,
     ) -> None:
         self.points = points if points is not None else [make_point()]
         self.fail_query = fail_query
+        self.query_error = query_error
+        self.response = response
         self.delay_seconds = delay_seconds
         self.query_calls: list[dict[str, Any]] = []
         self.mutation_calls: list[str] = []
@@ -138,8 +142,12 @@ class FakeQdrantClient:
         self.query_calls.append(kwargs)
         if self.delay_seconds:
             await asyncio.sleep(self.delay_seconds)
+        if self.query_error is not None:
+            raise self.query_error
         if self.fail_query:
             raise RuntimeError("qdrant unavailable")
+        if self.response is not None:
+            return self.response
         return SimpleNamespace(points=self.points[: kwargs["limit"]])
 
     async def upsert(self, **kwargs: Any) -> None:
@@ -267,8 +275,20 @@ async def test_dense_retriever_calls_qdrant_with_named_vector_and_no_vectors() -
     assert client.query_calls[0]["with_payload"] is True
     assert client.query_calls[0]["with_vectors"] is False
     assert client.query_calls[0]["limit"] == 2
+    assert client.query_calls[0].get("timeout") is None
     assert client.query_calls[0]["query_filter"].must[0].key == "law_id"
     assert client.mutation_calls == []
+
+
+@pytest.mark.asyncio
+async def test_dense_retriever_passes_bounded_timeout_to_qdrant_query() -> None:
+    """Configured Qdrant timeout is sent to the read-only query call."""
+    client = FakeQdrantClient()
+    retriever = make_retriever(client=client, qdrant_timeout_seconds=2.2)
+
+    await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert client.query_calls[0]["timeout"] == 3
 
 
 @pytest.mark.asyncio
@@ -401,6 +421,71 @@ async def test_qdrant_timeout_fails_fast() -> None:
 
 
 @pytest.mark.asyncio
+async def test_qdrant_response_handling_timeout_is_reported_as_timeout() -> None:
+    """Qdrant client response handling timeout keeps timeout classification."""
+    response_handling_error = make_response_handling_exception(TimeoutError("read timed out"))
+    retriever = make_retriever(
+        client=FakeQdrantClient(query_error=response_handling_error),
+        qdrant_timeout_seconds=1.0,
+    )
+
+    with pytest.raises(QdrantRetrievalTimeoutError) as error:
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert error.value.failure_stage == "qdrant_retrieval_timeout"
+    assert error.value.warning_code == "qdrant_retrieval_timeout"
+
+
+@pytest.mark.asyncio
+async def test_qdrant_response_handling_exception_is_reported_safely() -> None:
+    """Qdrant client response handling errors preserve safe stage metadata."""
+    response_handling_error = make_response_handling_exception(ValueError("invalid body"))
+    retriever = make_retriever(client=FakeQdrantClient(query_error=response_handling_error))
+
+    with pytest.raises(QdrantRetrievalError) as error:
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert error.value.failure_stage == "qdrant_retrieval_error"
+    assert error.value.warning_code == "qdrant_retrieval_error"
+    assert error.value.cause_class == "ResponseHandlingException"
+
+
+@pytest.mark.asyncio
+async def test_qdrant_points_query_response_mapping_supports_sequence_wrapper() -> None:
+    """Older Qdrant result-list shapes parse without triggering fallback."""
+    result = await make_retriever(
+        client=FakeQdrantClient(response=[make_point(point_id="point-list")])
+    ).retrieve("Câu hỏi hợp lệ?")
+
+    assert result.results[0].point_id == "point-list"
+    assert result.metadata["dense_retrieval_used"] is True
+    assert result.metadata["fallback_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_qdrant_points_query_response_mapping_supports_mapping_wrapper() -> None:
+    """Dict-like points wrappers parse without exposing raw payloads."""
+    result = await make_retriever(
+        client=FakeQdrantClient(response={"points": [make_point(point_id="point-dict")]})
+    ).retrieve("Câu hỏi hợp lệ?")
+
+    assert result.results[0].point_id == "point-dict"
+    assert result.metadata["dense_retrieval_fallback_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_malformed_qdrant_response_shape_fails_as_qdrant_error() -> None:
+    """Unsupported response wrappers are classified as Qdrant retrieval errors."""
+    retriever = make_retriever(client=FakeQdrantClient(response=object()))
+
+    with pytest.raises(QdrantRetrievalError) as error:
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert error.value.failure_stage == "qdrant_retrieval_error"
+    assert error.value.warning_code == "qdrant_retrieval_error"
+
+
+@pytest.mark.asyncio
 async def test_vector_dimension_mismatch_rejected_before_qdrant() -> None:
     """Wrong query vector dimensions do not reach Qdrant."""
     client = FakeQdrantClient()
@@ -453,7 +538,10 @@ async def test_qdrant_failure_is_reported() -> None:
     """Qdrant failures become retrieval errors."""
     retriever = make_retriever(client=FakeQdrantClient(fail_query=True))
 
-    with pytest.raises(QdrantRetrievalError, match="Qdrant dense retrieval failed") as error:
+    with pytest.raises(
+        QdrantRetrievalError,
+        match="qdrant retrieval failed: exception=RuntimeError",
+    ) as error:
         await retriever.retrieve("test")
 
     assert error.value.failure_stage == "qdrant_retrieval_error"
@@ -507,7 +595,7 @@ async def test_invalid_score_fails_mapping() -> None:
     """Scores must be finite numeric values."""
     retriever = make_retriever(client=FakeQdrantClient(points=[make_point(score=float("nan"))]))
 
-    with pytest.raises(DenseRetrieverError, match="invalid score"):
+    with pytest.raises(QdrantRetrievalError, match="qdrant result score invalid"):
         await retriever.retrieve("test")
 
 
@@ -556,3 +644,60 @@ async def test_dense_retriever_timing_logs_do_not_include_raw_query() -> None:
         "dense_retriever_completed",
     }.issubset(stages)
     assert raw_query not in repr(events)
+
+
+@pytest.mark.asyncio
+async def test_qdrant_response_handling_timing_logs_safe_source_summary() -> None:
+    """Qdrant response handling logs include safe source class diagnostics only."""
+    events: list[dict[str, Any]] = []
+
+    def timing_logger(
+        stage: str,
+        request_id: str | None,
+        elapsed_ms: int,
+        total_elapsed_ms: int,
+        exception_class: str | None,
+        **metadata: Any,
+    ) -> None:
+        events.append(
+            {
+                "stage": stage,
+                "request_id": request_id,
+                "elapsed_ms": elapsed_ms,
+                "total_elapsed_ms": total_elapsed_ms,
+                "exception_class": exception_class,
+                **metadata,
+            }
+        )
+
+    retriever = make_retriever(
+        client=FakeQdrantClient(
+            query_error=make_response_handling_exception(ValueError("raw payload text"))
+        )
+    )
+    context = RetrievalTimingContext(
+        logger=timing_logger,
+        request_id="request-1",
+        timing_started_at=time.perf_counter(),
+    )
+
+    with retrieval_timing_context(context), pytest.raises(QdrantRetrievalError):
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    failure = next(event for event in events if event["stage"] == "qdrant_retrieval_error")
+    assert failure["exception_class"] == "ResponseHandlingException"
+    assert failure["qdrant_method"] == "query_points"
+    assert failure["collection_name"] == "dev"
+    assert failure["vector_name"] == "dense"
+    assert failure["vector_dimension"] == 3
+    assert failure["sanitized_exception_message"] == (
+        "qdrant response handling failed: source=ValueError"
+    )
+    assert "raw payload text" not in repr(events)
+
+
+def make_response_handling_exception(source: Exception) -> Exception:
+    """Build the installed qdrant-client response handling exception."""
+    from qdrant_client.http.exceptions import ResponseHandlingException
+
+    return ResponseHandlingException(source)
