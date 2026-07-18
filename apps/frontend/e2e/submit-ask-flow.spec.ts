@@ -39,6 +39,14 @@ test("composer hides technical controls and keeps legal ask defaults internal", 
   await expect(composer.getByText("Hiển thị bằng chứng")).toHaveCount(0);
   await expect(composer.getByRole("spinbutton")).toHaveCount(0);
 
+  const textareaBox = await page.getByLabel("Câu hỏi pháp lý").boundingBox();
+  const buttonBox = await composer.getByRole("button", { name: "Gửi" }).boundingBox();
+  expect(textareaBox).not.toBeNull();
+  expect(buttonBox).not.toBeNull();
+  expect(Math.abs((buttonBox?.y ?? 0) - (textareaBox?.y ?? 0))).toBeLessThanOrEqual(
+    4,
+  );
+
   await submitQuestion(page);
 
   expect(askPayload?.top_k).toBe(5);

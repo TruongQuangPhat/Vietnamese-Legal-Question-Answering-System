@@ -19,7 +19,7 @@ export function AskForm({
 }: AskFormProps) {
   return (
     <form
-      className="rounded-md border border-border bg-surface p-2 shadow-sm"
+      className="flex items-start gap-2 rounded-md border border-border bg-surface p-2 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         if (isLoading) {
@@ -29,7 +29,7 @@ export function AskForm({
         onSubmit();
       }}
     >
-      <div>
+      <div className="min-w-0 flex-1">
         <label className="sr-only" htmlFor="question">
           Câu hỏi pháp lý
         </label>
@@ -61,19 +61,17 @@ export function AskForm({
         ) : null}
       </div>
 
-      <div className="mt-1.5 flex justify-end border-t border-border pt-1.5">
-        <button
-          aria-label={isLoading ? "Dừng tạo câu trả lời" : "Gửi câu hỏi"}
-          className={`rounded-md px-4 py-1.5 text-sm font-semibold text-white transition ${
-            isLoading
-              ? "bg-[#8a3b3b] hover:bg-[#743232]"
-              : "bg-primary hover:bg-[#0c625b]"
-          }`}
-          type="submit"
-        >
-          {isLoading ? "Dừng" : "Gửi"}
-        </button>
-      </div>
+      <button
+        aria-label={isLoading ? "Dừng tạo câu trả lời" : "Gửi câu hỏi"}
+        className={`min-w-16 shrink-0 self-start rounded-md px-4 py-1.5 text-sm font-semibold text-white transition ${
+          isLoading
+            ? "bg-[#8a3b3b] hover:bg-[#743232]"
+            : "bg-primary hover:bg-[#0c625b]"
+        }`}
+        type="submit"
+      >
+        {isLoading ? "Dừng" : "Gửi"}
+      </button>
     </form>
   );
 }
