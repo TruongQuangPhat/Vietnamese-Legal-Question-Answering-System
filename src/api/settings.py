@@ -8,23 +8,22 @@ from collections.abc import Mapping
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dotenv import dotenv_values
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.indexing.embedding_model import inspect_embedding_model_path
-from src.services.legal_qa_workflow import (
-    DEFAULT_CHUNKS_PATH,
-    DEFAULT_LLM_CONFIG_PATH,
-    DEFAULT_RETRIEVAL_CONFIG_PATH,
-    LegalQARetrievalMode,
-    LegalQARuntimeSettings,
-    LegalQAServiceMode,
-)
+from src.services.legal_qa_modes import LegalQARetrievalMode, LegalQAServiceMode
+
+if TYPE_CHECKING:
+    from src.services.legal_qa_workflow import LegalQARuntimeSettings
 
 DEFAULT_CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
 DEFAULT_DOTENV_PATH = Path(".env")
+DEFAULT_CHUNKS_PATH = Path("data/processed/legal_chunks.jsonl")
+DEFAULT_RETRIEVAL_CONFIG_PATH = Path("configs/retrieval/retrieval.yml")
+DEFAULT_LLM_CONFIG_PATH = Path("configs/llm/openrouter.yml")
 DEFAULT_RATE_LIMIT_REQUESTS = 10
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
 DEFAULT_ASK_TIMEOUT_SECONDS = 90.0
@@ -352,6 +351,8 @@ class AppSettings(BaseSettings):
         if self.legal_qa_collection_name is None:
             issues.append("missing_qdrant_collection")
         if self.embedding_model_path is not None:
+            from src.indexing.embedding_model import inspect_embedding_model_path
+
             model_path_status = inspect_embedding_model_path(self.embedding_model_path)
             if not model_path_status.exists:
                 issues.append("missing_embedding_model_path")
@@ -382,6 +383,8 @@ class AppSettings(BaseSettings):
 
     def to_legal_qa_runtime_settings(self) -> LegalQARuntimeSettings:
         """Convert API settings to the Legal QA service runtime contract."""
+        from src.services.legal_qa_workflow import LegalQARuntimeSettings
+
         return LegalQARuntimeSettings(
             service_mode=self.legal_qa_service_mode,
             retrieval_mode=self.legal_qa_retrieval_mode,

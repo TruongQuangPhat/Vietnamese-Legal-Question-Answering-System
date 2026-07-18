@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from src.indexing.qdrant_collection import build_qdrant_client
-from src.services.legal_qa_workflow import LegalQAServiceMode
+from src.services.legal_qa_modes import LegalQAServiceMode
 
 DEFAULT_READINESS_TIMEOUT_SECONDS = 3.0
 

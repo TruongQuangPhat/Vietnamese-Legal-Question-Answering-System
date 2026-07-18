@@ -7,7 +7,6 @@ import os
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
-from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -31,6 +30,7 @@ from src.services.legal_qa_api_service import (
     LegalQAWorkflowRequest,
     LegalQAWorkflowResult,
 )
+from src.services.legal_qa_modes import LegalQARetrievalMode, LegalQAServiceMode
 
 DEFAULT_CHUNKS_PATH = Path("data/processed/legal_chunks.jsonl")
 DEFAULT_RETRIEVAL_CONFIG_PATH = Path("configs/retrieval/retrieval.yml")
@@ -50,20 +50,6 @@ CAUTION_ANSWER_PREFIX = (
     "Lưu ý: bằng chứng truy xuất có liên quan nhưng còn yếu hoặc cần thận trọng; "
     "câu trả lời dưới đây chỉ dựa trên các căn cứ được trích dẫn."
 )
-
-
-class LegalQAServiceMode(StrEnum):
-    """Runtime mode for the Legal QA API service."""
-
-    FAKE = "fake"
-    REAL = "real"
-
-
-class LegalQARetrievalMode(StrEnum):
-    """Real-mode retrieval strategy supported by the production API."""
-
-    HYBRID = "hybrid"
-    SPARSE = "sparse"
 
 
 @dataclass(frozen=True)
