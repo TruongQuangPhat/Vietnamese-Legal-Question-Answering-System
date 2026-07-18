@@ -208,6 +208,12 @@ class CoverageAwareQuotaRetriever:
             query_vector_dimension=dense_result.query_vector_dimension,
             results=fused,
             issues=[*dense_result.issues, *sparse_result.issues],
+            metadata={
+                "retrieval_mode": "hybrid",
+                "dense_retrieval_used": True,
+                "dense_retrieval_fallback_used": False,
+                "fallback_used": False,
+            },
         )
 
     async def _fallback_sparse_result(
@@ -269,6 +275,15 @@ class CoverageAwareQuotaRetriever:
             query_vector_dimension=0,
             results=bounded_sparse_result.results[: self._config.final_top_k],
             issues=issues,
+            metadata={
+                "retrieval_mode": "hybrid",
+                "dense_retrieval_used": False,
+                "dense_retrieval_fallback_used": True,
+                "fallback_used": True,
+                "retriever_stage_failed": dense_issue.details.get("failure_stage")
+                if dense_issue is not None
+                else "dense_retriever_error",
+            },
         )
 
     async def warmup_embedding(self) -> None:

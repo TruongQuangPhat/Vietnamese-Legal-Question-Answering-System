@@ -345,6 +345,11 @@ async def test_ask_route_returns_safe_error_when_service_fails() -> None:
         "conversation_context_message_count": 0,
         "follow_up_detected": False,
         "retrieval_question_prepared": False,
+        "retrieval_mode": "hybrid",
+        "dense_retrieval_used": False,
+        "dense_retrieval_fallback_used": False,
+        "fallback_used": False,
+        "retriever_stage_failed": None,
     }
     assert "secret traceback details" not in response.text
 

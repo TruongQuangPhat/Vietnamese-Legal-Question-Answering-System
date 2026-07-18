@@ -13,6 +13,8 @@ import pytest
 from src.retrieval.dense_retriever import (
     DenseRetriever,
     DenseRetrieverError,
+    EmbeddingModelLoadTimeoutError,
+    QdrantRetrievalError,
     QdrantRetrievalTimeoutError,
     QueryEmbeddingError,
     QueryEmbeddingTimeoutError,
@@ -60,11 +62,25 @@ class FakeEmbedder:
         *,
         fail: bool = False,
         delay_seconds: float = 0.0,
+        load_delay_seconds: float = 0.0,
+        fail_load: bool = False,
     ) -> None:
         self.vector = vector if vector is not None else [1.0, 0.0, 0.0]
         self.fail = fail
         self.delay_seconds = delay_seconds
+        self.load_delay_seconds = load_delay_seconds
+        self.fail_load = fail_load
+        self.is_loaded = False
+        self.load_calls = 0
         self.calls: list[tuple[str, int]] = []
+
+    def ensure_loaded(self) -> None:
+        self.load_calls += 1
+        if self.load_delay_seconds:
+            time.sleep(self.load_delay_seconds)
+        if self.fail_load:
+            raise RuntimeError("embedding model load unavailable")
+        self.is_loaded = True
 
     def embed_query(self, query_text: str, *, batch_size: int = 1) -> list[float]:
         self.calls.append((query_text, batch_size))
@@ -181,6 +197,7 @@ def make_retriever(
     *,
     embedder: FakeEmbedder | None = None,
     client: FakeQdrantClient | None = None,
+    embedding_model_load_timeout_seconds: float | None = None,
     query_embedding_timeout_seconds: float | None = None,
     qdrant_timeout_seconds: float | None = None,
 ) -> DenseRetriever:
@@ -193,6 +210,7 @@ def make_retriever(
         expected_vector_dim=3,
         default_top_k=2,
         embedding_batch_size=1,
+        embedding_model_load_timeout_seconds=embedding_model_load_timeout_seconds,
         query_embedding_timeout_seconds=query_embedding_timeout_seconds,
         qdrant_timeout_seconds=qdrant_timeout_seconds,
     )
@@ -264,6 +282,49 @@ async def test_query_embedding_timeout_fails_fast() -> None:
 
 
 @pytest.mark.asyncio
+async def test_embedding_model_load_timeout_is_not_reported_as_qdrant_error() -> None:
+    client = FakeQdrantClient()
+    embedder = FakeEmbedder(load_delay_seconds=0.05)
+    retriever = make_retriever(
+        embedder=embedder,
+        client=client,
+        embedding_model_load_timeout_seconds=0.001,
+        query_embedding_timeout_seconds=1.0,
+    )
+
+    with pytest.raises(EmbeddingModelLoadTimeoutError) as error:
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert error.value.failure_stage == "embedding_model_load_timeout"
+    assert error.value.warning_code == "embedding_model_load_timeout"
+    assert embedder.load_calls == 1
+    assert embedder.calls == []
+    assert client.query_calls == []
+
+
+@pytest.mark.asyncio
+async def test_successful_dense_retrieval_marks_dense_used_without_fallback() -> None:
+    result = await make_retriever().retrieve("Câu hỏi hợp lệ?")
+
+    assert result.metadata["retrieval_mode"] == "hybrid"
+    assert result.metadata["dense_retrieval_used"] is True
+    assert result.metadata["dense_retrieval_fallback_used"] is False
+    assert result.metadata["fallback_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_warmup_loads_model_once_and_retrieve_reuses_loaded_model() -> None:
+    embedder = FakeEmbedder()
+    retriever = make_retriever(embedder=embedder)
+
+    await retriever.warmup_embedding()
+    await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert embedder.load_calls == 1
+    assert embedder.calls == [("legal qa warmup", 1), ("Câu hỏi hợp lệ?", 1)]
+
+
+@pytest.mark.asyncio
 async def test_qdrant_timeout_fails_fast() -> None:
     retriever = make_retriever(
         client=FakeQdrantClient(delay_seconds=0.05),
@@ -327,8 +388,11 @@ async def test_qdrant_failure_is_reported() -> None:
     """Qdrant failures become retrieval errors."""
     retriever = make_retriever(client=FakeQdrantClient(fail_query=True))
 
-    with pytest.raises(DenseRetrieverError, match="Qdrant dense retrieval failed"):
+    with pytest.raises(QdrantRetrievalError, match="Qdrant dense retrieval failed") as error:
         await retriever.retrieve("test")
+
+    assert error.value.failure_stage == "qdrant_retrieval_error"
+    assert error.value.warning_code == "qdrant_retrieval_error"
 
 
 @pytest.mark.asyncio

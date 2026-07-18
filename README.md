@@ -86,7 +86,7 @@ Azure production is accepted for the real hybrid Legal QA path:
   `encode_completed=true`.
 - Production Ask Smoke passes with HTTP 200, `decision=answered`,
   `metadata.model` present, at least one citation, and no
-  timeout/internal-error warnings.
+  timeout/internal-error warnings or dense retrieval fallback.
 
 The production backend packages public `BAAI/bge-m3` into the Docker image at
 `/models/embedding/bge-m3`. Runtime uses
@@ -109,9 +109,11 @@ Render is deprecated as a production backend and retained only as legacy or
 rollback context. Render Free is not suitable for real `/api/v1/legal-qa/ask`
 because of memory/runtime limits. Sparse retrieval is only a degraded emergency
 mode or fallback; it is not the production default and must not replace the
-canonical hybrid path for production-quality validation. Do not repeatedly call
-real production `/ask`; use the controlled smoke workflow and inspect sanitized
-logs before rerunning after any failure.
+canonical hybrid path for production-quality validation. In hybrid production
+smoke, `fallback_used=true`, `dense_retrieval_fallback_used=true`, or
+`dense_retrieval_used=false` is degraded retrieval and must be investigated.
+Do not repeatedly call real production `/ask`; use the controlled smoke workflow
+and inspect sanitized logs before rerunning after any failure.
 
 ## Current Results
 

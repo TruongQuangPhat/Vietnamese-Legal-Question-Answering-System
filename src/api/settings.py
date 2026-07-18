@@ -29,6 +29,7 @@ DEFAULT_RATE_LIMIT_REQUESTS = 10
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
 DEFAULT_ASK_TIMEOUT_SECONDS = 90.0
 DEFAULT_RETRIEVAL_TIMEOUT_SECONDS = 60.0
+DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS = 60.0
 DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
 DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
@@ -104,6 +105,10 @@ class AppSettings(BaseSettings):
     legal_qa_ask_timeout_seconds: float = Field(DEFAULT_ASK_TIMEOUT_SECONDS, gt=0.0)
     legal_qa_retrieval_timeout_seconds: float = Field(
         DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
+        gt=0.0,
+    )
+    legal_qa_embedding_model_load_timeout_seconds: float = Field(
+        DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS,
         gt=0.0,
     )
     legal_qa_query_embedding_timeout_seconds: float = Field(
@@ -222,6 +227,11 @@ class AppSettings(BaseSettings):
                 env.get("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS"),
                 default=DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
                 name="LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS",
+            ),
+            legal_qa_embedding_model_load_timeout_seconds=_parse_positive_float(
+                env.get("LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS"),
+                default=DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS,
+                name="LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS",
             ),
             legal_qa_query_embedding_timeout_seconds=_parse_positive_float(
                 env.get("LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS"),
@@ -387,6 +397,9 @@ class AppSettings(BaseSettings):
             model=self.legal_qa_model,
             embedding_model_path=self.embedding_model_path,
             retrieval_timeout_seconds=self.legal_qa_retrieval_timeout_seconds,
+            embedding_model_load_timeout_seconds=(
+                self.legal_qa_embedding_model_load_timeout_seconds
+            ),
             query_embedding_timeout_seconds=self.legal_qa_query_embedding_timeout_seconds,
             qdrant_timeout_seconds=self.legal_qa_qdrant_timeout_seconds,
             llm_timeout_seconds=self.legal_qa_llm_timeout_seconds,

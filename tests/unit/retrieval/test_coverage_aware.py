@@ -53,6 +53,11 @@ async def test_sparse_fallback_attempted_when_dense_times_out_and_enabled() -> N
     assert result.query_vector_dimension == 0
     assert result.results[0].chunk_id == "chunk-1"
     assert [issue.code for issue in result.issues] == ["query_embedding_timeout"]
+    assert result.metadata["retrieval_mode"] == "hybrid"
+    assert result.metadata["dense_retrieval_used"] is False
+    assert result.metadata["dense_retrieval_fallback_used"] is True
+    assert result.metadata["fallback_used"] is True
+    assert result.metadata["retriever_stage_failed"] == "query_embedding_timeout"
     assert dense.calls == [{"query": "Hợp đồng dân sự vô hiệu khi nào?", "top_k": 50}]
     assert sparse.calls == [{"query": "Hợp đồng dân sự vô hiệu khi nào?", "top_k": 10}]
 
@@ -67,6 +72,22 @@ async def test_sparse_fallback_not_attempted_when_disabled() -> None:
         await retriever.retrieve(query="Hợp đồng dân sự vô hiệu khi nào?")
 
     assert sparse.calls == []
+
+
+@pytest.mark.asyncio
+async def test_successful_hybrid_retrieval_marks_dense_used_without_fallback() -> None:
+    dense = StaticCandidateRetriever(_retrieval_result([_chunk()], "dense"))
+    sparse = StaticCandidateRetriever(
+        _retrieval_result([_chunk(chunk_id="chunk-2")], "sparse_bm25")
+    )
+    retriever = _coverage_retriever(dense, sparse, dense_fallback_enabled=True)
+
+    result = await retriever.retrieve(query="Hợp đồng dân sự vô hiệu khi nào?")
+
+    assert result.metadata["retrieval_mode"] == "hybrid"
+    assert result.metadata["dense_retrieval_used"] is True
+    assert result.metadata["dense_retrieval_fallback_used"] is False
+    assert result.metadata["fallback_used"] is False
 
 
 @pytest.mark.asyncio
@@ -130,11 +151,11 @@ def _retrieval_result(chunks: list[RetrievedChunk], vector_name: str) -> Retriev
     )
 
 
-def _chunk() -> RetrievedChunk:
+def _chunk(*, chunk_id: str = "chunk-1") -> RetrievedChunk:
     return RetrievedChunk(
         rank=1,
         score=1.0,
-        chunk_id="chunk-1",
+        chunk_id=chunk_id,
         law_id="BLDS_2015",
         law_name="Bộ luật Dân sự 2015",
         article_number="123",

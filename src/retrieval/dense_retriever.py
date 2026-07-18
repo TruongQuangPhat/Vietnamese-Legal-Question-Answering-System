@@ -174,6 +174,7 @@ class DenseRetriever:
         expected_vector_dim: int = DEFAULT_DENSE_DIMENSION,
         default_top_k: int = DEFAULT_TOP_K,
         embedding_batch_size: int = 1,
+        embedding_model_load_timeout_seconds: float | None = None,
         query_embedding_timeout_seconds: float | None = None,
         qdrant_timeout_seconds: float | None = None,
     ) -> None:
@@ -187,6 +188,11 @@ class DenseRetriever:
             raise DenseRetrieverError("default_top_k must be positive")
         if embedding_batch_size <= 0:
             raise DenseRetrieverError("embedding_batch_size must be positive")
+        if (
+            embedding_model_load_timeout_seconds is not None
+            and embedding_model_load_timeout_seconds <= 0
+        ):
+            raise DenseRetrieverError("embedding_model_load_timeout_seconds must be positive")
         if query_embedding_timeout_seconds is not None and query_embedding_timeout_seconds <= 0:
             raise DenseRetrieverError("query_embedding_timeout_seconds must be positive")
         if qdrant_timeout_seconds is not None and qdrant_timeout_seconds <= 0:
@@ -199,6 +205,7 @@ class DenseRetriever:
         self.expected_vector_dim = expected_vector_dim
         self.default_top_k = default_top_k
         self.embedding_batch_size = embedding_batch_size
+        self.embedding_model_load_timeout_seconds = embedding_model_load_timeout_seconds
         self.query_embedding_timeout_seconds = query_embedding_timeout_seconds
         self.qdrant_timeout_seconds = qdrant_timeout_seconds
 
@@ -319,6 +326,12 @@ class DenseRetriever:
             filters=retrieval_query.filters,
             results=chunks,
             issues=result_issues,
+            metadata={
+                "retrieval_mode": "hybrid",
+                "dense_retrieval_used": True,
+                "dense_retrieval_fallback_used": False,
+                "fallback_used": False,
+            },
         )
         emit_retrieval_timing(
             stage="dense_retriever_completed",
@@ -402,33 +415,33 @@ class DenseRetriever:
         started = time.perf_counter()
         emit_retrieval_timing(
             stage="embedding_model_load_started",
-            timeout_seconds=self.query_embedding_timeout_seconds,
+            timeout_seconds=self.embedding_model_load_timeout_seconds,
         )
         try:
             load_call = asyncio.to_thread(ensure_loaded)
-            if self.query_embedding_timeout_seconds is None:
+            if self.embedding_model_load_timeout_seconds is None:
                 await load_call
             else:
                 await asyncio.wait_for(
                     load_call,
-                    timeout=self.query_embedding_timeout_seconds,
+                    timeout=self.embedding_model_load_timeout_seconds,
                 )
         except TimeoutError as exc:
             emit_retrieval_timing(
                 stage="embedding_model_load_timeout",
                 stage_started_at=started,
                 exception_class="TimeoutError",
-                timeout_seconds=self.query_embedding_timeout_seconds,
+                timeout_seconds=self.embedding_model_load_timeout_seconds,
             )
             raise EmbeddingModelLoadTimeoutError(
-                timeout_seconds=self.query_embedding_timeout_seconds or 0.0
+                timeout_seconds=self.embedding_model_load_timeout_seconds or 0.0
             ) from exc
         except Exception as exc:
             emit_retrieval_timing(
                 stage="dense_retriever_failed",
                 stage_started_at=started,
                 exception_class=safe_exception_class(exc),
-                timeout_seconds=self.query_embedding_timeout_seconds,
+                timeout_seconds=self.embedding_model_load_timeout_seconds,
             )
             raise EmbeddingModelLoadError(cause_class=safe_exception_class(exc)) from exc
         emit_retrieval_timing(stage="embedding_model_load_completed", stage_started_at=started)

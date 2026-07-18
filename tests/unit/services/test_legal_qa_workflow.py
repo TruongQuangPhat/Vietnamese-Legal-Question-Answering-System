@@ -119,6 +119,11 @@ def test_real_workflow_adapter_maps_answered_result_with_citations() -> None:
     assert response.evidence[0].score == 0.95
     assert response.metadata.retrieval_strategy == "coverage_aware_quota"
     assert response.metadata.model == "google/gemini-2.5-flash"
+    assert response.metadata.retrieval_mode == "hybrid"
+    assert response.metadata.dense_retrieval_used is True
+    assert response.metadata.dense_retrieval_fallback_used is False
+    assert response.metadata.fallback_used is False
+    assert response.metadata.retriever_stage_failed is None
     assert retriever.calls[0]["query"] == (
         "Người lao động được quyền đơn phương chấm dứt hợp đồng khi nào? "
         "Vậy hợp đồng xác định thời hạn thì sao?"
@@ -550,6 +555,9 @@ def test_real_workflow_builder_preserves_hybrid_dense_path_with_local_model(
             qdrant_url="http://qdrant:6333",
             embedding_model_path=model_path,
             model="google/gemini-2.5-flash",
+            embedding_model_load_timeout_seconds=60.0,
+            query_embedding_timeout_seconds=45.0,
+            qdrant_timeout_seconds=30.0,
         )
     )
 
@@ -557,6 +565,10 @@ def test_real_workflow_builder_preserves_hybrid_dense_path_with_local_model(
     assert calls["embedding_model"]["model_name"] == str(model_path)
     assert calls["embedding_model"]["model_revision"] is None
     assert calls["embedding_model"]["require_local_files"] is True
+    assert calls["qdrant_client"]["timeout_seconds"] == 30.0
+    assert calls["dense_retriever"]["embedding_model_load_timeout_seconds"] == 60.0
+    assert calls["dense_retriever"]["query_embedding_timeout_seconds"] == 45.0
+    assert calls["dense_retriever"]["qdrant_timeout_seconds"] == 30.0
     assert isinstance(calls["dense_retriever"]["embedding_model"], FakeEmbeddingModel)
     assert isinstance(calls["coverage_retriever"]["dense_retriever"], FakeDenseRetriever)
     assert isinstance(calls["coverage_retriever"]["sparse_retriever"], FakeSparseRetriever)
@@ -579,6 +591,12 @@ def _retrieval_result(chunks: list[RetrievedChunk]) -> RetrievalResult:
         query_vector_dimension=1024,
         results=chunks,
         issues=[],
+        metadata={
+            "retrieval_mode": "hybrid",
+            "dense_retrieval_used": True,
+            "dense_retrieval_fallback_used": False,
+            "fallback_used": False,
+        },
     )
 
 

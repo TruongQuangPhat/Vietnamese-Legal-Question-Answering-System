@@ -458,7 +458,8 @@ GET /health -> HTTP 200
 GET /api/v1/readiness -> HTTP 200 and ready true
 GET /api/v1/legal-qa/warmup -> HTTP 200 with warmed=true
 Production Ask Smoke -> HTTP 200, decision=answered, metadata.model present,
-citations >= 1, and no timeout/internal_error warnings
+citations >= 1, dense_retrieval_used=true, fallback_used=false, and no
+timeout/internal_error warnings
 ```
 
 The production container packages public `BAAI/bge-m3` under
@@ -466,6 +467,8 @@ The production container packages public `BAAI/bge-m3` under
 `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`, `HF_HUB_OFFLINE=1`,
 `TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1`, so warmup and ask do
 not download model files at request time.
+`LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS` bounds BGE-M3 initialization
+separately from query embedding and Qdrant retrieval.
 
 The canonical production pipeline remains:
 
@@ -483,6 +486,10 @@ Question
 Sparse retrieval may remain as a degraded emergency mode or fallback, but it is
 not the production default and must not replace the canonical hybrid path for
 production quality validation.
+In hybrid production smoke, `fallback_used=true`,
+`dense_retrieval_fallback_used=true`, or `dense_retrieval_used=false` is
+degraded retrieval and must be investigated rather than accepted as final
+production quality.
 
 Render is deprecated as a production backend and retained only as historical
 context or rollback reference. Render Free previously passed liveness/readiness

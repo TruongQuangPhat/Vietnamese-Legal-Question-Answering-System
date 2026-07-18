@@ -83,7 +83,10 @@ Current durable status:
 * production validation must preserve the canonical hybrid path
   BGE-M3 / FlagEmbedding -> DenseRetriever -> Qdrant dense retrieval ->
   coverage-aware hybrid retrieval -> evidence selection -> LLM generation, and
-  real production `/ask` must not be called repeatedly;
+  real production `/ask` must not be called repeatedly; in hybrid production
+  smoke, dense fallback is degraded retrieval and must fail validation when
+  `fallback_used=true`, `dense_retrieval_fallback_used=true`, or
+  `dense_retrieval_used=false`;
 * GraphRAG, time-aware filtering, production MLOps, and fine-tuning are not part
   of the adopted evaluated pipeline.
 

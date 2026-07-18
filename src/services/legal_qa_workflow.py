@@ -39,6 +39,7 @@ DEFAULT_FINAL_TOP_K = 10
 DEFAULT_PROVIDER = "openrouter"
 DEFAULT_RETRIEVAL_STRATEGY = "coverage_aware_quota"
 DEFAULT_RETRIEVAL_TIMEOUT_SECONDS = 60.0
+DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS = 60.0
 DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
 DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
@@ -85,6 +86,7 @@ class LegalQARuntimeSettings:
     model: str | None = None
     embedding_model_path: Path | None = None
     retrieval_timeout_seconds: float = DEFAULT_RETRIEVAL_TIMEOUT_SECONDS
+    embedding_model_load_timeout_seconds: float = DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS
     query_embedding_timeout_seconds: float = DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS
     qdrant_timeout_seconds: float = DEFAULT_QDRANT_TIMEOUT_SECONDS
     llm_timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
@@ -133,6 +135,11 @@ class LegalQARuntimeSettings:
                 env.get("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS"),
                 default=DEFAULT_RETRIEVAL_TIMEOUT_SECONDS,
                 name="LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS",
+            ),
+            embedding_model_load_timeout_seconds=_positive_float(
+                env.get("LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS"),
+                default=DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS,
+                name="LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS",
             ),
             query_embedding_timeout_seconds=_positive_float(
                 env.get("LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS"),
@@ -508,7 +515,7 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
 
     qdrant_client = build_qdrant_client(
         url=qdrant_url,
-        timeout_seconds=retrieval_config.qdrant.timeout_seconds,
+        timeout_seconds=settings.qdrant_timeout_seconds,
         api_key=settings.qdrant_api_key,
     )
     embedding_model = BgeM3EmbeddingModel(
@@ -528,6 +535,7 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         expected_vector_dim=retrieval_config.dense_retrieval.expected_vector_dim,
         default_top_k=fusion_config.dense_candidate_k,
         embedding_batch_size=retrieval_config.embedding.batch_size,
+        embedding_model_load_timeout_seconds=settings.embedding_model_load_timeout_seconds,
         query_embedding_timeout_seconds=settings.query_embedding_timeout_seconds,
         qdrant_timeout_seconds=settings.qdrant_timeout_seconds,
     )
@@ -588,6 +596,15 @@ def map_rag_answer_to_workflow_result(
         model=result.model or fallback_model,
         reranking_used=False,
         latency_ms=latency_ms,
+        retrieval_mode=str(result.retrieval_metadata.get("retrieval_mode") or "hybrid"),
+        dense_retrieval_used=bool(result.retrieval_metadata.get("dense_retrieval_used", False)),
+        dense_retrieval_fallback_used=bool(
+            result.retrieval_metadata.get("dense_retrieval_fallback_used", False)
+        ),
+        fallback_used=bool(result.retrieval_metadata.get("fallback_used", False)),
+        retriever_stage_failed=_safe_metadata_string(
+            result.retrieval_metadata.get("retriever_stage_failed")
+        ),
     )
     warnings = [
         *result.fallback_reasons,
@@ -697,9 +714,21 @@ def _missing_answer_metadata(result: RagAnswerResult) -> list[str]:
 
 def _retrieval_warning_codes(result: RagAnswerResult) -> list[str]:
     codes = result.retrieval_metadata.get("retrieval_issue_codes")
-    if not isinstance(codes, list):
-        return []
-    return [str(code) for code in codes if isinstance(code, str) and code.strip()]
+    warnings = []
+    if isinstance(codes, list):
+        warnings.extend(str(code) for code in codes if isinstance(code, str) and code.strip())
+    if result.retrieval_metadata.get("dense_retrieval_fallback_used") is True:
+        warnings.append("dense_retrieval_fallback_used")
+    return list(dict.fromkeys(warnings))
+
+
+def _safe_metadata_string(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped or not stripped.replace("_", "").isalnum():
+        return None
+    return stripped
 
 
 def _answer_with_optional_caution(result: RagAnswerResult) -> str:
