@@ -27,12 +27,19 @@ from src.services.legal_qa_api_service import (
 )
 from src.services.legal_qa_context import LegalQAContextPreparer
 from src.services.legal_qa_workflow import (
+    LegalQARetrievalMode,
     LegalQARuntimeSettings,
     LegalQAServiceMode,
     RealLegalQAWorkflow,
     build_legal_qa_service,
     build_real_legal_qa_workflow,
 )
+
+
+def test_runtime_settings_accept_sparse_retrieval_mode_as_degraded_fallback() -> None:
+    settings = LegalQARuntimeSettings.from_env({"LEGAL_QA_RETRIEVAL_MODE": "sparse"})
+
+    assert settings.retrieval_mode == LegalQARetrievalMode.SPARSE
 
 
 class StaticRetriever:

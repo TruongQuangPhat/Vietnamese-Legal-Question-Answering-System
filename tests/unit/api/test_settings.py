@@ -204,7 +204,7 @@ def test_settings_reject_invalid_rate_limit_configuration(
     ("name", "value"),
     [
         ("LEGAL_QA_ASK_TIMEOUT_SECONDS", "0"),
-        ("LEGAL_QA_RETRIEVAL_MODE", "sparse"),
+        ("LEGAL_QA_RETRIEVAL_MODE", "dense"),
         ("LEGAL_QA_RETRIEVAL_TIMEOUT_SECONDS", "-1"),
         ("LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS", "not-a-number"),
         ("LEGAL_QA_QDRANT_TIMEOUT_SECONDS", "0"),
@@ -224,6 +224,12 @@ def test_settings_reject_invalid_ask_runtime_safety_configuration(
 ) -> None:
     with pytest.raises(ValueError, match=name):
         AppSettings.from_env({name: value})
+
+
+def test_settings_accept_sparse_retrieval_mode_as_degraded_fallback() -> None:
+    settings = AppSettings.from_env({"LEGAL_QA_RETRIEVAL_MODE": "sparse"})
+
+    assert settings.legal_qa_retrieval_mode == LegalQARetrievalMode.SPARSE
 
 
 def test_settings_parse_postgres_conversation_store_configuration() -> None:

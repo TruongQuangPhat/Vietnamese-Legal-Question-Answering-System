@@ -204,7 +204,10 @@ snapshot into `/models/embedding/bge-m3` during Docker build. In production,
 from the image instead of downloading model files during `/warmup` or `/ask`.
 The target production retrieval path remains BGE-M3 query embedding, Qdrant
 dense retrieval, coverage-aware hybrid retrieval, evidence selection, and LLM
-generation. Sparse BM25 remains an emergency fallback only.
+generation. The rule is: hybrid is the canonical project pipeline; sparse is a degraded
+emergency mode only for local troubleshooting or constrained-host recovery, and
+production Azure deployment targets `LEGAL_QA_RETRIEVAL_MODE=hybrid`. Sparse
+mode must not be used to validate final production quality.
 
 `GET /api/v1/legal-qa/warmup` is explicit and separate from `/health` and
 `/api/v1/readiness`. Warmup reports sanitized local model-path status, model

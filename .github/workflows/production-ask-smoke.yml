@@ -35,6 +35,7 @@ jobs:
     env:
       AZURE_PRODUCTION_BACKEND_URL: ${{ secrets.AZURE_PRODUCTION_BACKEND_URL }}
       CONFIRM_REAL_PRODUCTION_ASK: ${{ inputs.confirm_real_production_ask }}
+      EXPECTED_RETRIEVAL_MODE: hybrid
       SMOKE_QUESTION: ${{ inputs.question }}
       TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
 
@@ -69,6 +70,8 @@ jobs:
             printf 'timeout_seconds must be between 1 and 600.\n'
             exit 1
           fi
+
+          printf 'Expected production retrieval mode: %s\n' "$EXPECTED_RETRIEVAL_MODE"
 
       - name: Check production health and readiness
         run: |

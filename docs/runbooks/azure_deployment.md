@@ -604,8 +604,9 @@ logs before running the single `/ask` smoke.
 Production App Service settings keep the original hybrid path:
 `LEGAL_QA_RETRIEVAL_MODE=hybrid`, `EMBEDDING_MODEL_PATH=/models/embedding/bge-m3`,
 Qdrant dense retrieval enabled, reranking disabled, and `LEGAL_QA_MAX_TOP_K=5`.
-Sparse BM25 fallback is an emergency fallback only, not the primary production
-retrieval mode.
+The rule is: hybrid is the canonical project pipeline; sparse is a degraded
+emergency mode only for local troubleshooting or constrained-host recovery, not
+the primary production retrieval mode. Sparse mode must not be used to validate final production quality.
 
 It sends one `/ask` request only. `timeout_seconds` is configurable up to 600
 seconds for production ML cold start. It fails if the ask HTTP status is not

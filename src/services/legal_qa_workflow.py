@@ -62,6 +62,7 @@ class LegalQARetrievalMode(StrEnum):
     """Real-mode retrieval strategy supported by the production API."""
 
     HYBRID = "hybrid"
+    SPARSE = "sparse"
 
 
 @dataclass(frozen=True)

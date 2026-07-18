@@ -40,6 +40,17 @@ def test_production_deploy_preserves_hybrid_retrieval_and_model_path() -> None:
     assert 'EMBEDDING_MODEL_PATH="$EMBEDDING_MODEL_PATH"' in workflow
 
 
+def test_production_ask_smoke_does_not_force_sparse_retrieval() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/production-ask-smoke.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "EXPECTED_RETRIEVAL_MODE: hybrid" in workflow
+    assert "Expected production retrieval mode:" in workflow
+    assert "LEGAL_QA_RETRIEVAL_MODE=sparse" not in workflow
+    assert "/api/v1/legal-qa/ask" in workflow
+
+
 def test_production_ask_smoke_requires_packaged_model_warmup() -> None:
     workflow = (REPO_ROOT / ".github/workflows/production-ask-smoke.yml").read_text(
         encoding="utf-8"
@@ -53,3 +64,17 @@ def test_production_ask_smoke_requires_packaged_model_warmup() -> None:
     assert '"required_files_present"' in workflow
     assert '"model_load_completed"' in workflow
     assert '"encode_completed"' in workflow
+
+
+def test_sparse_mode_is_documented_as_emergency_degraded_only() -> None:
+    docs = "\n".join(
+        [
+            (REPO_ROOT / "docs/api_deployment.md").read_text(encoding="utf-8"),
+            (REPO_ROOT / "docs/ci_cd.md").read_text(encoding="utf-8"),
+            (REPO_ROOT / "docs/runbooks/azure_deployment.md").read_text(encoding="utf-8"),
+        ]
+    )
+
+    assert "hybrid is the canonical project pipeline" in docs
+    assert "sparse is a degraded emergency mode only" in docs
+    assert "Sparse mode must not be used to validate final production quality" in docs

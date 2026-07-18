@@ -918,8 +918,11 @@ Required production resources and settings:
 The production target path remains hybrid: BGE-M3 / FlagEmbedding query
 embedding loaded from the baked local model path, Qdrant dense retrieval, local
 BM25 sparse retrieval, coverage-aware fusion/quota retrieval, evidence
-selection, and LLM generation. Sparse BM25 fallback may remain available for
-controlled dense failures, but it is not the primary production path.
+selection, and LLM generation. The rule is: hybrid is the canonical project
+pipeline; sparse is a degraded emergency mode only for local troubleshooting or constrained-host
+recovery, and production Azure deployment targets
+`LEGAL_QA_RETRIEVAL_MODE=hybrid`. Sparse mode must not be used to validate final
+production quality.
 
 `.github/workflows/deploy-production.yml` remains planning-only and is not the
 container deployment path.
