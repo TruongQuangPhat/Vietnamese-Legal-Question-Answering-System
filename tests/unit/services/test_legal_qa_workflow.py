@@ -607,6 +607,8 @@ def test_real_workflow_builder_preserves_hybrid_dense_path_with_local_model(
             embedding_model_load_timeout_seconds=60.0,
             query_embedding_timeout_seconds=45.0,
             qdrant_timeout_seconds=30.0,
+            qdrant_retry_attempts=3,
+            qdrant_retry_backoff_seconds=0.2,
         )
     )
 
@@ -618,6 +620,9 @@ def test_real_workflow_builder_preserves_hybrid_dense_path_with_local_model(
     assert calls["dense_retriever"]["embedding_model_load_timeout_seconds"] == 60.0
     assert calls["dense_retriever"]["query_embedding_timeout_seconds"] == 45.0
     assert calls["dense_retriever"]["qdrant_timeout_seconds"] == 30.0
+    assert calls["dense_retriever"]["qdrant_max_attempts"] == 3
+    assert calls["dense_retriever"]["qdrant_retry_backoff_seconds"] == 0.2
+    assert callable(calls["dense_retriever"]["qdrant_client_factory"])
     assert isinstance(calls["dense_retriever"]["embedding_model"], FakeEmbeddingModel)
     assert isinstance(calls["coverage_retriever"]["dense_retriever"], FakeDenseRetriever)
     assert isinstance(calls["coverage_retriever"]["sparse_retriever"], FakeSparseRetriever)

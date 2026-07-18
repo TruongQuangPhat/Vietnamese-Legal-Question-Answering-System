@@ -127,21 +127,26 @@ class FakeQdrantClient:
         points: list[Any] | None = None,
         fail_query: bool = False,
         query_error: BaseException | None = None,
+        query_errors: list[BaseException] | None = None,
         response: Any | None = None,
         delay_seconds: float = 0.0,
     ) -> None:
         self.points = points if points is not None else [make_point()]
         self.fail_query = fail_query
         self.query_error = query_error
+        self.query_errors = list(query_errors or [])
         self.response = response
         self.delay_seconds = delay_seconds
         self.query_calls: list[dict[str, Any]] = []
         self.mutation_calls: list[str] = []
+        self.closed = False
 
     async def query_points(self, **kwargs: Any) -> Any:
         self.query_calls.append(kwargs)
         if self.delay_seconds:
             await asyncio.sleep(self.delay_seconds)
+        if self.query_errors:
+            raise self.query_errors.pop(0)
         if self.query_error is not None:
             raise self.query_error
         if self.fail_query:
@@ -165,6 +170,9 @@ class FakeQdrantClient:
     async def delete_collection(self, **kwargs: Any) -> None:
         self.mutation_calls.append("delete_collection")
         raise AssertionError("retrieval must not delete collections")
+
+    async def close(self) -> None:
+        self.closed = True
 
 
 class ResponseHandlingException(Exception):  # noqa: N818
@@ -251,6 +259,9 @@ def make_retriever(
     embedding_model_load_timeout_seconds: float | None = None,
     query_embedding_timeout_seconds: float | None = None,
     qdrant_timeout_seconds: float | None = None,
+    qdrant_max_attempts: int = 2,
+    qdrant_retry_backoff_seconds: float = 0.0,
+    qdrant_client_factory: Any | None = None,
 ) -> DenseRetriever:
     """Build a retriever using small fake vectors."""
     return DenseRetriever(
@@ -264,6 +275,9 @@ def make_retriever(
         embedding_model_load_timeout_seconds=embedding_model_load_timeout_seconds,
         query_embedding_timeout_seconds=query_embedding_timeout_seconds,
         qdrant_timeout_seconds=qdrant_timeout_seconds,
+        qdrant_max_attempts=qdrant_max_attempts,
+        qdrant_retry_backoff_seconds=qdrant_retry_backoff_seconds,
+        qdrant_client_factory=qdrant_client_factory,
     )
 
 
@@ -467,6 +481,71 @@ async def test_qdrant_response_handling_timeout_can_use_wrapped_cause() -> None:
 
 
 @pytest.mark.asyncio
+async def test_qdrant_transient_response_handling_retry_can_succeed() -> None:
+    """A transient response handling error can retry and keep dense retrieval healthy."""
+    client = FakeQdrantClient(
+        query_errors=[make_response_handling_exception(ValueError("temporary body"))],
+    )
+    retriever = make_retriever(client=client, qdrant_max_attempts=2)
+
+    result = await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert len(client.query_calls) == 2
+    assert result.metadata["dense_retrieval_used"] is True
+    assert result.metadata["fallback_used"] is False
+    assert result.metadata["qdrant_attempts"] == 2
+    assert result.metadata["qdrant_client_recreated"] is False
+
+
+@pytest.mark.asyncio
+async def test_qdrant_transient_retry_recreates_client_when_factory_is_available() -> None:
+    """Transient transport failures can recreate the Qdrant client before retrying."""
+    first_client = FakeQdrantClient(
+        query_errors=[make_response_handling_exception(ValueError("temporary body"))],
+    )
+    second_client = FakeQdrantClient(points=[make_point(point_id="point-after-recreate")])
+    clients = [second_client]
+
+    def factory() -> FakeQdrantClient:
+        return clients.pop(0)
+
+    retriever = make_retriever(
+        client=first_client,
+        qdrant_max_attempts=2,
+        qdrant_client_factory=factory,
+    )
+
+    result = await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert first_client.closed is True
+    assert len(first_client.query_calls) == 1
+    assert len(second_client.query_calls) == 1
+    assert result.results[0].point_id == "point-after-recreate"
+    assert result.metadata["qdrant_client_recreated"] is True
+    assert result.metadata["fallback_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_qdrant_transient_response_handling_retry_exhaustion_fails_safely() -> None:
+    """All failed transient attempts still surface qdrant_retrieval_error."""
+    client = FakeQdrantClient(
+        query_errors=[
+            make_response_handling_exception(ValueError("temporary body 1")),
+            make_response_handling_exception(ValueError("temporary body 2")),
+        ],
+    )
+    retriever = make_retriever(client=client, qdrant_max_attempts=2)
+
+    with pytest.raises(QdrantRetrievalError) as error:
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert len(client.query_calls) == 2
+    assert error.value.failure_stage == "qdrant_retrieval_error"
+    assert error.value.warning_code == "qdrant_retrieval_error"
+    assert error.value.cause_class == "ResponseHandlingException"
+
+
+@pytest.mark.asyncio
 async def test_qdrant_response_handling_exception_is_reported_safely() -> None:
     """Qdrant client response handling errors preserve safe stage metadata."""
     response_handling_error = make_response_handling_exception(ValueError("invalid body"))
@@ -478,6 +557,18 @@ async def test_qdrant_response_handling_exception_is_reported_safely() -> None:
     assert error.value.failure_stage == "qdrant_retrieval_error"
     assert error.value.warning_code == "qdrant_retrieval_error"
     assert error.value.cause_class == "ResponseHandlingException"
+
+
+@pytest.mark.asyncio
+async def test_deterministic_qdrant_response_shape_error_is_not_retried() -> None:
+    """Unsupported response wrappers are deterministic parse errors, not transport retries."""
+    client = FakeQdrantClient(response=object())
+    retriever = make_retriever(client=client, qdrant_max_attempts=3)
+
+    with pytest.raises(QdrantRetrievalError):
+        await retriever.retrieve("Câu hỏi hợp lệ?")
+
+    assert len(client.query_calls) == 1
 
 
 @pytest.mark.asyncio

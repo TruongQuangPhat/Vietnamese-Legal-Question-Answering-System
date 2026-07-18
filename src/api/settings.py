@@ -31,6 +31,8 @@ DEFAULT_RETRIEVAL_TIMEOUT_SECONDS = 60.0
 DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS = 60.0
 DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
 DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
+DEFAULT_QDRANT_RETRY_ATTEMPTS = 2
+DEFAULT_QDRANT_RETRY_BACKOFF_SECONDS = 0.15
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_TOP_K = 10
 DEFAULT_RETRIEVAL_MODE = LegalQARetrievalMode.HYBRID
@@ -115,6 +117,11 @@ class AppSettings(BaseSettings):
         gt=0.0,
     )
     legal_qa_qdrant_timeout_seconds: float = Field(DEFAULT_QDRANT_TIMEOUT_SECONDS, gt=0.0)
+    legal_qa_qdrant_retry_attempts: int = Field(DEFAULT_QDRANT_RETRY_ATTEMPTS, gt=0)
+    legal_qa_qdrant_retry_backoff_seconds: float = Field(
+        DEFAULT_QDRANT_RETRY_BACKOFF_SECONDS,
+        ge=0.0,
+    )
     legal_qa_llm_timeout_seconds: float = Field(DEFAULT_LLM_TIMEOUT_SECONDS, gt=0.0)
     legal_qa_max_top_k: int = Field(DEFAULT_MAX_TOP_K, gt=0)
     legal_qa_reranking_enabled: bool = False
@@ -241,6 +248,16 @@ class AppSettings(BaseSettings):
                 env.get("LEGAL_QA_QDRANT_TIMEOUT_SECONDS"),
                 default=DEFAULT_QDRANT_TIMEOUT_SECONDS,
                 name="LEGAL_QA_QDRANT_TIMEOUT_SECONDS",
+            ),
+            legal_qa_qdrant_retry_attempts=_parse_positive_int(
+                env.get("LEGAL_QA_QDRANT_RETRY_ATTEMPTS"),
+                default=DEFAULT_QDRANT_RETRY_ATTEMPTS,
+                name="LEGAL_QA_QDRANT_RETRY_ATTEMPTS",
+            ),
+            legal_qa_qdrant_retry_backoff_seconds=_parse_non_negative_float(
+                env.get("LEGAL_QA_QDRANT_RETRY_BACKOFF_SECONDS"),
+                default=DEFAULT_QDRANT_RETRY_BACKOFF_SECONDS,
+                name="LEGAL_QA_QDRANT_RETRY_BACKOFF_SECONDS",
             ),
             legal_qa_llm_timeout_seconds=_parse_positive_float(
                 env.get("LEGAL_QA_LLM_TIMEOUT_SECONDS"),
@@ -405,6 +422,8 @@ class AppSettings(BaseSettings):
             ),
             query_embedding_timeout_seconds=self.legal_qa_query_embedding_timeout_seconds,
             qdrant_timeout_seconds=self.legal_qa_qdrant_timeout_seconds,
+            qdrant_retry_attempts=self.legal_qa_qdrant_retry_attempts,
+            qdrant_retry_backoff_seconds=self.legal_qa_qdrant_retry_backoff_seconds,
             llm_timeout_seconds=self.legal_qa_llm_timeout_seconds,
             reranking_enabled=self.legal_qa_reranking_enabled,
             dense_retrieval_fallback_enabled=self.legal_qa_dense_retrieval_fallback_enabled,
@@ -527,6 +546,19 @@ def _parse_positive_float(raw_value: str | None, *, default: float, name: str) -
         raise ValueError(f"{name} must be a positive number") from exc
     if parsed <= 0:
         raise ValueError(f"{name} must be a positive number")
+    return parsed
+
+
+def _parse_non_negative_float(raw_value: str | None, *, default: float, name: str) -> float:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a non-negative number") from exc
+    if parsed < 0:
+        raise ValueError(f"{name} must be a non-negative number")
     return parsed
 
 

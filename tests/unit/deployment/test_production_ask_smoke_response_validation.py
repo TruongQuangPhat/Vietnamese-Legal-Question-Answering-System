@@ -174,7 +174,9 @@ def test_smoke_validation_logs_sanitized_summary_fields() -> None:
     assert "Model cache key: bge-m3:test-cache" in lines
     assert "Retrieval question prepared: False" in lines
     assert "Follow-up detected: False" in lines
+    assert "Request ID: test-request" in lines
     assert "Warnings: " in lines
+    assert "Severe warnings: " in lines
 
 
 def test_warmup_validation_passes_for_first_warmup_cache_fill() -> None:

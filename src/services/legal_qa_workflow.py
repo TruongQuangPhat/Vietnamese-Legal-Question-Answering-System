@@ -42,6 +42,8 @@ DEFAULT_RETRIEVAL_TIMEOUT_SECONDS = 60.0
 DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS = 60.0
 DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS = 45.0
 DEFAULT_QDRANT_TIMEOUT_SECONDS = 30.0
+DEFAULT_QDRANT_RETRY_ATTEMPTS = 2
+DEFAULT_QDRANT_RETRY_BACKOFF_SECONDS = 0.15
 DEFAULT_LLM_TIMEOUT_SECONDS = 30.0
 DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED = True
 DEFAULT_DENSE_RETRIEVAL_FALLBACK_MODE = "sparse"
@@ -75,6 +77,8 @@ class LegalQARuntimeSettings:
     embedding_model_load_timeout_seconds: float = DEFAULT_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS
     query_embedding_timeout_seconds: float = DEFAULT_QUERY_EMBEDDING_TIMEOUT_SECONDS
     qdrant_timeout_seconds: float = DEFAULT_QDRANT_TIMEOUT_SECONDS
+    qdrant_retry_attempts: int = DEFAULT_QDRANT_RETRY_ATTEMPTS
+    qdrant_retry_backoff_seconds: float = DEFAULT_QDRANT_RETRY_BACKOFF_SECONDS
     llm_timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
     reranking_enabled: bool = False
     dense_retrieval_fallback_enabled: bool = DEFAULT_DENSE_RETRIEVAL_FALLBACK_ENABLED
@@ -136,6 +140,16 @@ class LegalQARuntimeSettings:
                 env.get("LEGAL_QA_QDRANT_TIMEOUT_SECONDS"),
                 default=DEFAULT_QDRANT_TIMEOUT_SECONDS,
                 name="LEGAL_QA_QDRANT_TIMEOUT_SECONDS",
+            ),
+            qdrant_retry_attempts=_positive_int(
+                env.get("LEGAL_QA_QDRANT_RETRY_ATTEMPTS"),
+                default=DEFAULT_QDRANT_RETRY_ATTEMPTS,
+                name="LEGAL_QA_QDRANT_RETRY_ATTEMPTS",
+            ),
+            qdrant_retry_backoff_seconds=_non_negative_float(
+                env.get("LEGAL_QA_QDRANT_RETRY_BACKOFF_SECONDS"),
+                default=DEFAULT_QDRANT_RETRY_BACKOFF_SECONDS,
+                name="LEGAL_QA_QDRANT_RETRY_BACKOFF_SECONDS",
             ),
             llm_timeout_seconds=_positive_float(
                 env.get("LEGAL_QA_LLM_TIMEOUT_SECONDS"),
@@ -509,11 +523,14 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         else retrieval_config.embedding.model_revision
     )
 
-    qdrant_client = build_qdrant_client(
-        url=qdrant_url,
-        timeout_seconds=settings.qdrant_timeout_seconds,
-        api_key=settings.qdrant_api_key,
-    )
+    def qdrant_client_factory() -> object:
+        return build_qdrant_client(
+            url=qdrant_url,
+            timeout_seconds=settings.qdrant_timeout_seconds,
+            api_key=settings.qdrant_api_key,
+        )
+
+    qdrant_client = qdrant_client_factory()
     embedding_model = BgeM3EmbeddingModel(
         model_name=embedding_model_name,
         model_revision=embedding_model_revision,
@@ -534,6 +551,9 @@ def build_real_legal_qa_workflow(settings: LegalQARuntimeSettings) -> LegalQAWor
         embedding_model_load_timeout_seconds=settings.embedding_model_load_timeout_seconds,
         query_embedding_timeout_seconds=settings.query_embedding_timeout_seconds,
         qdrant_timeout_seconds=settings.qdrant_timeout_seconds,
+        qdrant_max_attempts=settings.qdrant_retry_attempts,
+        qdrant_retry_backoff_seconds=settings.qdrant_retry_backoff_seconds,
+        qdrant_client_factory=qdrant_client_factory,
     )
     sparse_retriever = SparseBM25Retriever.from_jsonl(
         settings.chunks_path,
@@ -823,6 +843,32 @@ def _positive_float(raw_value: str | None, *, default: float, name: str) -> floa
         raise ValueError(f"{name} must be a positive number") from exc
     if parsed <= 0:
         raise ValueError(f"{name} must be a positive number")
+    return parsed
+
+
+def _non_negative_float(raw_value: str | None, *, default: float, name: str) -> float:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a non-negative number") from exc
+    if parsed < 0:
+        raise ValueError(f"{name} must be a non-negative number")
+    return parsed
+
+
+def _positive_int(raw_value: str | None, *, default: int, name: str) -> int:
+    value = _non_blank(raw_value)
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if parsed <= 0:
+        raise ValueError(f"{name} must be a positive integer")
     return parsed
 
 

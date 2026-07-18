@@ -62,6 +62,8 @@ def test_settings_default_to_local_fake_mode() -> None:
     assert settings.legal_qa_embedding_model_load_timeout_seconds == 60.0
     assert settings.legal_qa_query_embedding_timeout_seconds == 45.0
     assert settings.legal_qa_qdrant_timeout_seconds == 30.0
+    assert settings.legal_qa_qdrant_retry_attempts == 2
+    assert settings.legal_qa_qdrant_retry_backoff_seconds == 0.15
     assert settings.legal_qa_llm_timeout_seconds == 30.0
     assert settings.legal_qa_max_top_k == 10
     assert settings.legal_qa_reranking_enabled is False
@@ -131,6 +133,8 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
             "LEGAL_QA_EMBEDDING_MODEL_LOAD_TIMEOUT_SECONDS": "40",
             "LEGAL_QA_QUERY_EMBEDDING_TIMEOUT_SECONDS": "25",
             "LEGAL_QA_QDRANT_TIMEOUT_SECONDS": "10",
+            "LEGAL_QA_QDRANT_RETRY_ATTEMPTS": "3",
+            "LEGAL_QA_QDRANT_RETRY_BACKOFF_SECONDS": "0.2",
             "LEGAL_QA_LLM_TIMEOUT_SECONDS": "20",
             "LEGAL_QA_MAX_TOP_K": "5",
             "LEGAL_QA_RERANKING_ENABLED": "false",
@@ -149,6 +153,8 @@ def test_settings_parse_ask_runtime_safety_configuration() -> None:
     assert settings.legal_qa_embedding_model_load_timeout_seconds == 40.0
     assert settings.legal_qa_query_embedding_timeout_seconds == 25.0
     assert settings.legal_qa_qdrant_timeout_seconds == 10.0
+    assert settings.legal_qa_qdrant_retry_attempts == 3
+    assert settings.legal_qa_qdrant_retry_backoff_seconds == 0.2
     assert settings.legal_qa_llm_timeout_seconds == 20.0
     assert settings.legal_qa_max_top_k == 5
     assert settings.legal_qa_reranking_enabled is False
@@ -402,6 +408,8 @@ def test_settings_convert_to_legal_qa_runtime_settings() -> None:
     assert runtime_settings.model == "google/gemini-2.5-flash"
     assert runtime_settings.embedding_model_path == Path("models/embedding/bge-m3")
     assert runtime_settings.embedding_model_load_timeout_seconds == 60.0
+    assert runtime_settings.qdrant_retry_attempts == 2
+    assert runtime_settings.qdrant_retry_backoff_seconds == 0.15
 
 
 def test_settings_load_dotenv_with_process_environment_precedence(

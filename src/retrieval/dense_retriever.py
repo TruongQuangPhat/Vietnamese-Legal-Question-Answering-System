@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import math
+import random
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
 from pydantic import ValidationError
@@ -145,6 +147,9 @@ class QdrantRetrievalClient(Protocol):
         ...
 
 
+QdrantClientFactory = Callable[[], QdrantRetrievalClient]
+
+
 class DenseRetriever:
     """Embed Vietnamese queries and run read-only dense search in Qdrant.
 
@@ -177,6 +182,9 @@ class DenseRetriever:
         embedding_model_load_timeout_seconds: float | None = None,
         query_embedding_timeout_seconds: float | None = None,
         qdrant_timeout_seconds: float | None = None,
+        qdrant_max_attempts: int = 2,
+        qdrant_retry_backoff_seconds: float = 0.15,
+        qdrant_client_factory: QdrantClientFactory | None = None,
     ) -> None:
         if not collection_name.strip():
             raise DenseRetrieverError("collection_name must not be blank")
@@ -197,8 +205,13 @@ class DenseRetriever:
             raise DenseRetrieverError("query_embedding_timeout_seconds must be positive")
         if qdrant_timeout_seconds is not None and qdrant_timeout_seconds <= 0:
             raise DenseRetrieverError("qdrant_timeout_seconds must be positive")
+        if qdrant_max_attempts <= 0:
+            raise DenseRetrieverError("qdrant_max_attempts must be positive")
+        if qdrant_retry_backoff_seconds < 0:
+            raise DenseRetrieverError("qdrant_retry_backoff_seconds must not be negative")
 
         self._qdrant_client = qdrant_client
+        self._qdrant_client_factory = qdrant_client_factory
         self._embedding_model = embedding_model
         self.collection_name = collection_name
         self.dense_vector_name = dense_vector_name
@@ -208,6 +221,8 @@ class DenseRetriever:
         self.embedding_model_load_timeout_seconds = embedding_model_load_timeout_seconds
         self.query_embedding_timeout_seconds = query_embedding_timeout_seconds
         self.qdrant_timeout_seconds = qdrant_timeout_seconds
+        self.qdrant_max_attempts = qdrant_max_attempts
+        self.qdrant_retry_backoff_seconds = qdrant_retry_backoff_seconds
 
     async def retrieve(
         self,
@@ -266,74 +281,17 @@ class DenseRetriever:
         if query_filter is not None:
             search_kwargs["query_filter"] = query_filter
 
-        try:
-            qdrant_started = time.perf_counter()
-            emit_retrieval_timing(
-                stage="qdrant_retrieval_started",
-                top_k=retrieval_query.top_k,
-                timeout_seconds=self.qdrant_timeout_seconds,
-                collection_name=retrieval_query.collection_name,
-                vector_name=self.dense_vector_name,
-                vector_dimension=len(vector),
-                qdrant_method=qdrant_method,
-            )
-            qdrant_call = self._qdrant_client.query_points(**search_kwargs)
-            if self.qdrant_timeout_seconds is None:
-                response = await qdrant_call
-            else:
-                response = await asyncio.wait_for(
-                    qdrant_call,
-                    timeout=self.qdrant_timeout_seconds,
-                )
-        except TimeoutError as exc:
-            emit_retrieval_timing(
-                stage="qdrant_retrieval_timeout",
-                stage_started_at=qdrant_started,
-                exception_class="TimeoutError",
-                timeout_seconds=self.qdrant_timeout_seconds,
-                top_k=retrieval_query.top_k,
-                collection_name=retrieval_query.collection_name,
-                vector_name=self.dense_vector_name,
-                vector_dimension=len(vector),
-                qdrant_method=qdrant_method,
-                sanitized_exception_message="qdrant request timed out",
-            )
-            raise QdrantRetrievalTimeoutError(
-                timeout_seconds=self.qdrant_timeout_seconds or 0.0
-            ) from exc
-        except Exception as exc:
-            if _qdrant_exception_is_timeout(exc):
-                emit_retrieval_timing(
-                    stage="qdrant_retrieval_timeout",
-                    stage_started_at=qdrant_started,
-                    exception_class=safe_exception_class(exc),
-                    timeout_seconds=self.qdrant_timeout_seconds,
-                    top_k=retrieval_query.top_k,
-                    collection_name=retrieval_query.collection_name,
-                    vector_name=self.dense_vector_name,
-                    vector_dimension=len(vector),
-                    qdrant_method=qdrant_method,
-                    sanitized_exception_message=_safe_qdrant_exception_summary(exc),
-                )
-                raise QdrantRetrievalTimeoutError(
-                    timeout_seconds=self.qdrant_timeout_seconds or 0.0
-                ) from exc
-            emit_retrieval_timing(
-                stage="qdrant_retrieval_error",
-                stage_started_at=qdrant_started,
-                exception_class=safe_exception_class(exc),
-                timeout_seconds=self.qdrant_timeout_seconds,
-                top_k=retrieval_query.top_k,
-                collection_name=retrieval_query.collection_name,
-                vector_name=self.dense_vector_name,
-                vector_dimension=len(vector),
-                qdrant_method=qdrant_method,
-                sanitized_exception_message=_safe_qdrant_exception_summary(exc),
-            )
-            raise QdrantRetrievalError(
-                cause_class=safe_exception_class(exc),
-                safe_message=_safe_qdrant_exception_summary(exc),
-            ) from exc
+        (
+            response,
+            qdrant_started,
+            qdrant_attempts,
+            qdrant_client_recreated,
+        ) = await self._query_qdrant_with_retries(
+            search_kwargs=search_kwargs,
+            retrieval_query=retrieval_query,
+            vector_dimension=len(vector),
+            qdrant_method=qdrant_method,
+        )
         try:
             points = _extract_qdrant_points(response)
             emit_retrieval_timing(
@@ -346,6 +304,9 @@ class DenseRetriever:
                 qdrant_method=qdrant_method,
                 response_type=type(response).__name__,
                 returned_points=len(points),
+                attempt_number=qdrant_attempts,
+                max_attempts=self.qdrant_max_attempts,
+                client_recreated=qdrant_client_recreated,
             )
 
             result_issues: list[RetrievalIssue] = []
@@ -367,6 +328,9 @@ class DenseRetriever:
                 qdrant_method=qdrant_method,
                 response_type=type(response).__name__,
                 sanitized_exception_message=_safe_qdrant_exception_summary(exc),
+                attempt_number=qdrant_attempts,
+                max_attempts=self.qdrant_max_attempts,
+                client_recreated=qdrant_client_recreated,
             )
             raise QdrantRetrievalError(
                 cause_class=safe_exception_class(exc),
@@ -391,6 +355,8 @@ class DenseRetriever:
                 "embedding_model_cache_hit": loaded_before_request,
                 "embedding_model_loaded_before_request": loaded_before_request,
                 "model_cache_key": self._embedding_model_cache_key(),
+                "qdrant_attempts": qdrant_attempts,
+                "qdrant_client_recreated": qdrant_client_recreated,
             },
         )
         emit_retrieval_timing(
@@ -399,6 +365,125 @@ class DenseRetriever:
             top_k=retrieval_query.top_k,
         )
         return result
+
+    async def _query_qdrant_with_retries(
+        self,
+        *,
+        search_kwargs: dict[str, Any],
+        retrieval_query: RetrievalQuery,
+        vector_dimension: int,
+        qdrant_method: str,
+    ) -> tuple[Any, float, int, bool]:
+        qdrant_started = time.perf_counter()
+        client_recreated = False
+        last_exception: BaseException | None = None
+        last_attempt_started = qdrant_started
+
+        for attempt in range(1, self.qdrant_max_attempts + 1):
+            last_attempt_started = time.perf_counter()
+            emit_retrieval_timing(
+                stage="qdrant_retrieval_started",
+                top_k=retrieval_query.top_k,
+                timeout_seconds=self.qdrant_timeout_seconds,
+                collection_name=retrieval_query.collection_name,
+                vector_name=self.dense_vector_name,
+                vector_dimension=vector_dimension,
+                qdrant_method=qdrant_method,
+                attempt_number=attempt,
+                max_attempts=self.qdrant_max_attempts,
+                client_recreated=client_recreated,
+            )
+            try:
+                qdrant_call = self._qdrant_client.query_points(**search_kwargs)
+                if self.qdrant_timeout_seconds is None:
+                    response = await qdrant_call
+                else:
+                    response = await asyncio.wait_for(
+                        qdrant_call,
+                        timeout=self.qdrant_timeout_seconds,
+                    )
+            except Exception as exc:
+                last_exception = exc
+                if not _qdrant_exception_is_transient(exc) or attempt >= self.qdrant_max_attempts:
+                    break
+                client_recreated = await self._recreate_qdrant_client_if_supported()
+                emit_retrieval_timing(
+                    stage="qdrant_retrieval_retry_scheduled",
+                    stage_started_at=last_attempt_started,
+                    exception_class=safe_exception_class(exc),
+                    timeout_seconds=self.qdrant_timeout_seconds,
+                    top_k=retrieval_query.top_k,
+                    collection_name=retrieval_query.collection_name,
+                    vector_name=self.dense_vector_name,
+                    vector_dimension=vector_dimension,
+                    qdrant_method=qdrant_method,
+                    sanitized_exception_message=_safe_qdrant_exception_summary(exc),
+                    source_exception_class=_wrapped_qdrant_exception_source_class(exc),
+                    source_exception_message=_safe_wrapped_qdrant_exception_message(exc),
+                    attempt_number=attempt,
+                    max_attempts=self.qdrant_max_attempts,
+                    client_recreated=client_recreated,
+                )
+                await self._sleep_before_qdrant_retry(attempt)
+                continue
+            return response, qdrant_started, attempt, client_recreated
+
+        if last_exception is None:
+            raise QdrantRetrievalError(
+                cause_class="UnknownError",
+                safe_message="qdrant retrieval failed before a response was received",
+            )
+
+        failure_stage = (
+            "qdrant_retrieval_timeout"
+            if _qdrant_exception_is_timeout(last_exception)
+            else "qdrant_retrieval_error"
+        )
+        emit_retrieval_timing(
+            stage=failure_stage,
+            stage_started_at=last_attempt_started,
+            exception_class=safe_exception_class(last_exception),
+            timeout_seconds=self.qdrant_timeout_seconds,
+            top_k=retrieval_query.top_k,
+            collection_name=retrieval_query.collection_name,
+            vector_name=self.dense_vector_name,
+            vector_dimension=vector_dimension,
+            qdrant_method=qdrant_method,
+            sanitized_exception_message=_safe_qdrant_exception_summary(last_exception),
+            source_exception_class=_wrapped_qdrant_exception_source_class(last_exception),
+            source_exception_message=_safe_wrapped_qdrant_exception_message(last_exception),
+            attempt_number=self.qdrant_max_attempts,
+            max_attempts=self.qdrant_max_attempts,
+            client_recreated=client_recreated,
+            fallback_started=True,
+        )
+        if _qdrant_exception_is_timeout(last_exception):
+            raise QdrantRetrievalTimeoutError(
+                timeout_seconds=self.qdrant_timeout_seconds or 0.0
+            ) from last_exception
+        raise QdrantRetrievalError(
+            cause_class=safe_exception_class(last_exception),
+            safe_message=_safe_qdrant_exception_summary(last_exception),
+        ) from last_exception
+
+    async def _recreate_qdrant_client_if_supported(self) -> bool:
+        if self._qdrant_client_factory is None:
+            return False
+        close = getattr(self._qdrant_client, "close", None)
+        if close is not None and callable(close):
+            maybe_awaitable = close()
+            if inspect.isawaitable(maybe_awaitable):
+                await maybe_awaitable
+        self._qdrant_client = self._qdrant_client_factory()
+        return True
+
+    async def _sleep_before_qdrant_retry(self, attempt: int) -> None:
+        if self.qdrant_retry_backoff_seconds <= 0:
+            return
+        base_delay = self.qdrant_retry_backoff_seconds * (2 ** max(0, attempt - 1))
+        delay = min(base_delay, 1.0)
+        jitter = random.uniform(0.0, delay * 0.25) if delay > 0 else 0.0
+        await asyncio.sleep(delay + jitter)
 
     def _coerce_query(
         self,
@@ -729,6 +814,31 @@ def _qdrant_exception_is_timeout(exc: BaseException) -> bool:
     )
 
 
+def _qdrant_exception_is_transient(exc: BaseException) -> bool:
+    if _qdrant_exception_is_timeout(exc):
+        return True
+    transient_class_names = {
+        "APIConnectionError",
+        "ConnectError",
+        "ConnectionError",
+        "ConnectTimeout",
+        "LocalProtocolError",
+        "NetworkError",
+        "ProtocolError",
+        "ReadError",
+        "RemoteProtocolError",
+        "ResponseHandlingException",
+        "TransportError",
+        "WriteError",
+    }
+    if type(exc).__name__ in transient_class_names:
+        return True
+    return any(
+        type(wrapped).__name__ in transient_class_names
+        for wrapped in _wrapped_qdrant_exception_sources(exc)
+    )
+
+
 def _safe_qdrant_exception_summary(exc: BaseException) -> str:
     exception_class = type(exc).__name__
     source_class = _wrapped_qdrant_exception_source_class(exc)
@@ -748,6 +858,13 @@ def _safe_qdrant_exception_summary(exc: BaseException) -> str:
     if message.startswith("invalid retrieved chunk at rank"):
         return "qdrant result payload validation failed"
     return f"qdrant retrieval failed: exception={exception_class}"
+
+
+def _safe_wrapped_qdrant_exception_message(exc: BaseException) -> str | None:
+    sources = _wrapped_qdrant_exception_sources(exc)
+    if not sources:
+        return None
+    return _safe_qdrant_exception_summary(sources[0])
 
 
 def _wrapped_qdrant_exception_sources(exc: BaseException) -> tuple[BaseException, ...]:
