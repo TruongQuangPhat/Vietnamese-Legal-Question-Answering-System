@@ -229,6 +229,12 @@ Optional provider secrets belong in environment variables or an uncommitted
 `.env`. Do not store API keys in configs, docs, reports, or source code.
 Committed YAML config under `configs/` is for non-secret, reviewable pipeline
 and runtime defaults; `.env` only selects or overrides local runtime values.
+The committed `.env.example` is a local-safe dotenv template with blank secret
+fields, memory conversation storage, auth disabled, DB tests disabled, blank
+`EMBEDDING_MODEL_PATH`, and `LEGAL_QA_CHUNKS_OVERWRITE` blank by default.
+Azure production settings, including `/models/embedding/bge-m3` and the
+accepted Azure backend URL, are documented there as override comments and must
+be supplied through App Service or GitHub Environments.
 
 For backend runtime configuration and local smoke checks, see
 `docs/backend-runtime.md`.

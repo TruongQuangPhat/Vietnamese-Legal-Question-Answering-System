@@ -205,6 +205,13 @@ TRANSFORMERS_OFFLINE=1
 HF_DATASETS_OFFLINE=1
 ```
 
+These are Azure App Service overrides, not local `.env.example` defaults. The
+committed `.env.example` keeps local-only defaults safe: memory conversation
+storage, auth disabled, DB tests disabled, blank provider secrets, blank
+`EMBEDDING_MODEL_PATH`, and blank `LEGAL_QA_CHUNKS_OVERWRITE`. Store real
+database URLs, session secrets, Qdrant keys, OpenRouter keys, and Azure
+identity values only in App Service settings or GitHub Environments.
+
 These settings do not make real QA quality acceptable by themselves. They are
 runtime guardrails for diagnosing whether the bottleneck is model loading,
 query embedding, Qdrant retrieval, provider generation, or memory pressure.

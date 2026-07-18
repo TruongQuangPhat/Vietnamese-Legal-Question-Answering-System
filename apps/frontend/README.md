@@ -34,6 +34,9 @@ Using `python -m uvicorn` ensures uvicorn runs with the project Python
 environment managed by `uv`.
 
 The Legal QA form calls the backend configured by `NEXT_PUBLIC_API_BASE_URL`.
+The frontend `.env.example` is local-only by default and contains no secrets.
+`NEXT_PUBLIC_API_BASE_URL` is public and embedded into the browser bundle at
+build time.
 
 ## Vercel Production
 
