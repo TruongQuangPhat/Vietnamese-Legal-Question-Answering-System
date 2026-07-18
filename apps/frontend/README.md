@@ -60,11 +60,14 @@ should not be used as the normal backend. In browser DevTools Network, Legal QA
 requests should go to:
 
 ```text
-vnlaw-backend-prod-phat.azurewebsites.net
+https://vnlaw-backend-prod-phat.azurewebsites.net/api/v1/legal-qa/ask
 ```
 
-If requests go to `onrender.com`, the Vercel environment is stale and must be
-redeployed with the Azure backend URL.
+If production Network requests show localhost, for example
+`http://localhost:8000/api/v1/legal-qa/ask`, `NEXT_PUBLIC_API_BASE_URL` was not
+injected at build time or the deployed bundle is stale. If requests go to
+`onrender.com`, the Vercel environment is stale. In both cases, redeploy Vercel
+Production with the Azure backend URL.
 
 For Azure backend UI smoke before any future frontend production change, first
 set a Vercel Preview deployment to:

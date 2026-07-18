@@ -1,4 +1,4 @@
-import { getApiBaseUrl, normalizeApiBaseUrl } from "./api-config";
+import { getApiBaseUrl, joinApiPath, normalizeApiBaseUrl } from "./api-config";
 import type { LegalQARequest, LegalQAResponse } from "@/types/legal-qa";
 
 const LEGAL_QA_ASK_PATH = "/api/v1/legal-qa/ask";
@@ -30,7 +30,7 @@ export async function askLegalQuestion(
 
   let response: Response;
   try {
-    response = await fetcher(`${apiBaseUrl}${LEGAL_QA_ASK_PATH}`, {
+    response = await fetcher(joinApiPath(apiBaseUrl, LEGAL_QA_ASK_PATH), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

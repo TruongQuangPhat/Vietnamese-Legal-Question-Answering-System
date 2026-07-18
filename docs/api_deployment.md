@@ -836,9 +836,10 @@ with the final browser-reachable HTTPS API origin. Setting a different runtime
 container environment value does not reliably replace the already compiled
 client value.
 
-The current code falls back to `http://localhost:8000` when the setting is
-missing or blank. That is convenient locally but should become a production
-configuration error or be replaced by a deliberate same-origin proxy design.
+The frontend allows `http://localhost:8000` only outside production when
+`NEXT_PUBLIC_API_BASE_URL` is missing. Production builds fail clearly if the
+value is missing or blank so a stale Vercel environment cannot silently compile
+a localhost backend URL into the browser bundle.
 
 ## Fake mode and real mode
 
