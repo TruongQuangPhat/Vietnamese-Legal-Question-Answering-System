@@ -24,6 +24,24 @@ class GoldenCase:
     expected_primary_clauses: tuple[str | None, ...]
 
 
+@dataclass(frozen=True)
+class ExpectedEvidenceTarget:
+    law_id: str
+    article_number: str
+    clause_number: str | None = None
+    point_label: str | None = None
+
+
+@dataclass(frozen=True)
+class HoldoutCase:
+    case_id: str
+    query: str
+    intent: str
+    expected_targets: tuple[ExpectedEvidenceTarget, ...]
+    primary_target: ExpectedEvidenceTarget | None = None
+    forbid_labor_termination_articles: bool = False
+
+
 GOLDEN_CASES = (
     GoldenCase(
         case_id="employee_unilateral_termination",
@@ -54,6 +72,124 @@ GOLDEN_CASES = (
         query="Người lao động có được nghỉ việc không cần báo trước trong trường hợp nào?",
         expected_article="35",
         expected_primary_clauses=("2",),
+    ),
+)
+
+OUT_OF_TOPIC_HOLDOUT_CASES = (
+    HoldoutCase(
+        case_id="worker_maternity_return_notice",
+        query=(
+            "Khoản 4 Điều 139 Bộ luật Lao động quy định lao động nữ đi làm trước "
+            "khi hết thời gian nghỉ thai sản phải báo trước thế nào?"
+        ),
+        intent="maternity_leave_notice",
+        expected_targets=(ExpectedEvidenceTarget(LABOR_LAW_ID, "139", "4"),),
+        primary_target=ExpectedEvidenceTarget(LABOR_LAW_ID, "139", "4"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="worker_weekly_rest",
+        query=(
+            "Khoản 1 Điều 111 Bộ luật Lao động quy định người lao động được nghỉ "
+            "hằng tuần ít nhất bao lâu?"
+        ),
+        intent="weekly_rest",
+        expected_targets=(ExpectedEvidenceTarget(LABOR_LAW_ID, "111", "1"),),
+        primary_target=ExpectedEvidenceTarget(LABOR_LAW_ID, "111", "1"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="worker_annual_leave",
+        query="Khoản 1 Điều 113 Bộ luật Lao động quy định người lao động nghỉ hằng năm bao nhiêu ngày?",
+        intent="annual_leave",
+        expected_targets=(ExpectedEvidenceTarget(LABOR_LAW_ID, "113"),),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="civil_unlawful_transaction",
+        query=(
+            "Giao dịch dân sự trái pháp luật do vi phạm điều cấm của luật hoặc "
+            "trái đạo đức xã hội theo Điều 123 Bộ luật Dân sự thế nào?"
+        ),
+        intent="civil_transaction_validity",
+        expected_targets=(ExpectedEvidenceTarget("BLDS_2015", "123"),),
+        primary_target=ExpectedEvidenceTarget("BLDS_2015", "123"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="civil_authorization_unilateral_termination",
+        query=(
+            "Khoản 1 Điều 569 Bộ luật Dân sự quy định bên ủy quyền đơn phương "
+            "chấm dứt hợp đồng ủy quyền thế nào?"
+        ),
+        intent="civil_authorization_contract",
+        expected_targets=(ExpectedEvidenceTarget("BLDS_2015", "569", "1"),),
+        primary_target=ExpectedEvidenceTarget("BLDS_2015", "569", "1"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="marriage_age_condition",
+        query=(
+            "Điểm a khoản 1 Điều 8 Luật Hôn nhân và gia đình quy định điều kiện "
+            "kết hôn về độ tuổi thế nào?"
+        ),
+        intent="marriage_conditions",
+        expected_targets=(ExpectedEvidenceTarget("LHNGD_VBHN", "8", "1", "a"),),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="land_user_common_rights",
+        query="Khoản 1 Điều 26 Luật Đất đai quy định quyền chung của người sử dụng đất thế nào?",
+        intent="land_user_rights",
+        expected_targets=(ExpectedEvidenceTarget("LDD_VBHN", "26", "1"),),
+        primary_target=ExpectedEvidenceTarget("LDD_VBHN", "26", "1"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="health_insurance_information_duty",
+        query=(
+            "Khoản 4 Điều 39 Luật Bảo hiểm y tế quy định trách nhiệm cung cấp thông tin thế nào?"
+        ),
+        intent="health_insurance_duties",
+        expected_targets=(ExpectedEvidenceTarget("LBHYT_VBHN", "39", "4"),),
+        primary_target=ExpectedEvidenceTarget("LBHYT_VBHN", "39", "4"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="notary_reporting_duty",
+        query=(
+            "Khoản 8 Điều 36 Luật Công chứng quy định nghĩa vụ báo cáo, kiểm tra, "
+            "thanh tra thế nào?"
+        ),
+        intent="notary_organization_duties",
+        expected_targets=(ExpectedEvidenceTarget("LCCONGCHUNG_VBHN", "36", "8"),),
+        primary_target=ExpectedEvidenceTarget("LCCONGCHUNG_VBHN", "36", "8"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="notary_cross_reference_direct_target",
+        query=(
+            "Khoản 5 Điều 36 Luật Công chứng quy định nghĩa vụ mua bảo hiểm "
+            "trách nhiệm nghề nghiệp của tổ chức hành nghề công chứng thế nào?"
+        ),
+        intent="direct_cross_reference_target",
+        expected_targets=(ExpectedEvidenceTarget("LCCONGCHUNG_VBHN", "36", "5"),),
+        primary_target=ExpectedEvidenceTarget("LCCONGCHUNG_VBHN", "36", "5"),
+        forbid_labor_termination_articles=True,
+    ),
+    HoldoutCase(
+        case_id="weekly_and_annual_leave_multi_article",
+        query=(
+            "Khoản 1 Điều 111 và Khoản 1 Điều 113 Bộ luật Lao động quy định nghỉ "
+            "hằng tuần và nghỉ hằng năm thế nào?"
+        ),
+        intent="multi_article_leave_coverage",
+        expected_targets=(
+            ExpectedEvidenceTarget(LABOR_LAW_ID, "111", "1"),
+            ExpectedEvidenceTarget(LABOR_LAW_ID, "113"),
+        ),
+        primary_target=ExpectedEvidenceTarget(LABOR_LAW_ID, "111", "1"),
+        forbid_labor_termination_articles=True,
     ),
 )
 
@@ -126,3 +262,163 @@ async def test_employee_termination_keeps_article_34_clause_9_auxiliary_not_prim
     assert all(
         selected.packet.article_number != "39" for selected in selection.selected_evidence[:1]
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case",
+    OUT_OF_TOPIC_HOLDOUT_CASES,
+    ids=[case.case_id for case in OUT_OF_TOPIC_HOLDOUT_CASES],
+)
+async def test_out_of_topic_holdout_cases_retain_expected_evidence_and_citations(
+    sparse_retriever: SparseBM25Retriever,
+    case: HoldoutCase,
+) -> None:
+    """Termination-specific heuristics must not displace other legal intents."""
+    retrieval = await sparse_retriever.retrieve(case.query, top_k=50)
+    bundle = build_evidence_bundle(retrieval)
+    selection = select_evidence_for_answer(bundle)
+    prompt = build_naive_rag_prompt(query=case.query, selection_result=selection)
+    diagnostics = _case_diagnostics(
+        case, retrieval.results, selection.selected_evidence, prompt.evidence
+    )
+
+    for target in case.expected_targets:
+        assert _target_rank(retrieval.results, target) is not None, diagnostics
+        assert _target_present_in_selected(selection.selected_evidence, target), diagnostics
+        assert _target_present_in_prompt(prompt.evidence, target), diagnostics
+
+    if case.primary_target is not None:
+        assert _packet_matches_target(selection.selected_evidence[0].packet, case.primary_target), (
+            diagnostics
+        )
+        assert _prompt_evidence_matches_target(prompt.evidence[0], case.primary_target), diagnostics
+
+    if case.forbid_labor_termination_articles:
+        selected_forbidden = [
+            selected.packet
+            for selected in selection.selected_evidence
+            if _is_labor_termination_article(
+                selected.packet.law_id,
+                selected.packet.article_number,
+            )
+        ]
+        prompt_forbidden = [
+            evidence
+            for evidence in prompt.evidence
+            if _is_labor_termination_article(evidence.law_id, evidence.article_number)
+        ]
+        assert not selected_forbidden, diagnostics
+        assert not prompt_forbidden, diagnostics
+
+
+@pytest.mark.asyncio
+async def test_direct_cross_reference_target_is_not_dropped(
+    sparse_retriever: SparseBM25Retriever,
+) -> None:
+    """A cross-reference provision remains citable when it is the direct target."""
+    case = next(
+        item
+        for item in OUT_OF_TOPIC_HOLDOUT_CASES
+        if item.case_id == "notary_cross_reference_direct_target"
+    )
+    target = case.expected_targets[0]
+    retrieval = await sparse_retriever.retrieve(case.query, top_k=50)
+    bundle = build_evidence_bundle(retrieval)
+    selection = select_evidence_for_answer(bundle)
+    prompt = build_naive_rag_prompt(query=case.query, selection_result=selection)
+    diagnostics = _case_diagnostics(
+        case, retrieval.results, selection.selected_evidence, prompt.evidence
+    )
+
+    target_candidate = next(
+        chunk for chunk in retrieval.results if _chunk_matches_target(chunk, target)
+    )
+
+    assert "theo quy định tại Điều 39" in (target_candidate.text or "")
+    assert _target_present_in_selected(selection.selected_evidence, target), diagnostics
+    assert _target_present_in_prompt(prompt.evidence, target), diagnostics
+
+
+def _case_diagnostics(
+    case: HoldoutCase,
+    candidates: list[object],
+    selected: list[object],
+    prompt_evidence: list[object],
+) -> str:
+    expected = [
+        {
+            "law_id": target.law_id,
+            "article_number": target.article_number,
+            "clause_number": target.clause_number,
+            "point_label": target.point_label,
+            "candidate_rank": _target_rank(candidates, target),
+        }
+        for target in case.expected_targets
+    ]
+    return (
+        f"case={case.case_id} intent={case.intent} expected={expected} "
+        f"selected={[_selected_summary(item) for item in selected]} "
+        f"citations={[_prompt_summary(item) for item in prompt_evidence]}"
+    )
+
+
+def _target_rank(candidates: list[object], target: ExpectedEvidenceTarget) -> int | None:
+    for candidate in candidates:
+        if _chunk_matches_target(candidate, target):
+            return candidate.rank
+    return None
+
+
+def _target_present_in_selected(
+    selected: list[object],
+    target: ExpectedEvidenceTarget,
+) -> bool:
+    return any(_packet_matches_target(item.packet, target) for item in selected)
+
+
+def _target_present_in_prompt(
+    prompt_evidence: list[object],
+    target: ExpectedEvidenceTarget,
+) -> bool:
+    return any(_prompt_evidence_matches_target(item, target) for item in prompt_evidence)
+
+
+def _chunk_matches_target(chunk: object, target: ExpectedEvidenceTarget) -> bool:
+    return (
+        chunk.law_id == target.law_id
+        and chunk.article_number == target.article_number
+        and (target.clause_number is None or chunk.clause_number == target.clause_number)
+        and (target.point_label is None or chunk.point_label == target.point_label)
+    )
+
+
+def _packet_matches_target(packet: object, target: ExpectedEvidenceTarget) -> bool:
+    return (
+        packet.law_id == target.law_id
+        and packet.article_number == target.article_number
+        and (target.clause_number is None or packet.clause_number == target.clause_number)
+        and (target.point_label is None or packet.point_label == target.point_label)
+    )
+
+
+def _prompt_evidence_matches_target(item: object, target: ExpectedEvidenceTarget) -> bool:
+    return (
+        item.law_id == target.law_id
+        and item.article_number == target.article_number
+        and (target.clause_number is None or item.clause_number == target.clause_number)
+        and (target.point_label is None or item.point_label == target.point_label)
+    )
+
+
+def _is_labor_termination_article(law_id: str | None, article_number: str | None) -> bool:
+    return law_id == LABOR_LAW_ID and article_number in {"35", "36", "39"}
+
+
+def _selected_summary(item: object) -> tuple[str | None, str | None, str | None, str | None]:
+    packet = item.packet
+    return (packet.law_id, packet.article_number, packet.clause_number, packet.point_label)
+
+
+def _prompt_summary(item: object) -> tuple[str | None, str | None, str | None, str | None]:
+    return (item.law_id, item.article_number, item.clause_number, item.point_label)
