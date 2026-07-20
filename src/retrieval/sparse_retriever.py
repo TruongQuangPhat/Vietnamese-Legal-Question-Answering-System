@@ -68,6 +68,38 @@ def tokenize_sparse_text(value: str) -> list[str]:
     return TOKEN_PATTERN.findall(normalize_sparse_text(value))
 
 
+def expand_legal_query_tokens(tokens: list[str]) -> list[str]:
+    """Add conservative Vietnamese legal synonym tokens for sparse retrieval.
+
+    The expansion is phrase-triggered and domain-generic. It bridges common
+    user wording such as "nghỉ việc" to legal terms used in the corpus without
+    changing result counts, filters, or retrieval metadata.
+    """
+    normalized = " ".join(tokens)
+    expansions: list[str] = []
+
+    if _contains_phrase(normalized, "nghỉ việc"):
+        expansions.extend(["chấm", "dứt", "hợp", "đồng", "lao", "động"])
+    if _contains_phrase(normalized, "đơn phương") or _contains_phrase(
+        normalized, "chấm dứt hợp đồng"
+    ):
+        expansions.extend(["đơn", "phương", "chấm", "dứt", "hợp", "đồng"])
+    if _contains_phrase(normalized, "báo trước"):
+        expansions.extend(["thời", "hạn", "báo", "trước"])
+    if _contains_phrase(normalized, "không cần báo trước") or _contains_phrase(
+        normalized, "không phải báo trước"
+    ):
+        expansions.extend(["không", "cần", "báo", "trước", "không", "phải", "báo", "trước"])
+    if _contains_phrase(normalized, "trái pháp luật") or _contains_phrase(
+        normalized, "bị coi là trái"
+    ):
+        expansions.extend(["trái", "pháp", "luật"])
+
+    if not expansions:
+        return tokens
+    return [*tokens, *expansions]
+
+
 class SparseBM25Retriever:
     """Rank local legal chunks with deterministic Okapi BM25 scoring.
 
@@ -217,7 +249,7 @@ class SparseBM25Retriever:
             raise SparseRetrieverError("sparse BM25 baseline does not support filters")
 
         started = time.perf_counter()
-        query_tokens = tokenize_sparse_text(retrieval_query.query)
+        query_tokens = expand_legal_query_tokens(tokenize_sparse_text(retrieval_query.query))
         if not query_tokens:
             return RetrievalResult(
                 query=retrieval_query.query,
@@ -311,6 +343,10 @@ def _build_postings(documents: list[SparseDocument]) -> dict[str, list[tuple[int
     return dict(postings)
 
 
+def _contains_phrase(normalized_tokens: str, phrase: str) -> bool:
+    return f" {normalize_sparse_text(phrase)} " in f" {normalized_tokens} "
+
+
 def _indexable_text(payload: Mapping[str, Any]) -> str:
     parts = [
         payload.get("law_id"),
@@ -318,9 +354,25 @@ def _indexable_text(payload: Mapping[str, Any]) -> str:
         payload.get("citation"),
         payload.get("hierarchy_path"),
         payload.get("article_title"),
+        _local_parent_context(payload),
         payload.get("text"),
     ]
     return "\n".join(part for part in parts if isinstance(part, str))
+
+
+def _local_parent_context(payload: Mapping[str, Any]) -> str | None:
+    text = payload.get("text")
+    parent_text = payload.get("parent_text")
+    if not isinstance(text, str) or not isinstance(parent_text, str):
+        return None
+    normalized_text = " ".join(text.split())
+    normalized_parent = " ".join(parent_text.split())
+    if not normalized_text or not normalized_parent:
+        return None
+    index = normalized_parent.find(normalized_text)
+    if index < 0:
+        return None
+    return normalized_parent[max(0, index - 300) : index]
 
 
 def _payload_to_retrieved_chunk(

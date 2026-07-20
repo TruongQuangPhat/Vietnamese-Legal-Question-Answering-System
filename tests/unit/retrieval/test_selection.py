@@ -32,6 +32,7 @@ def make_chunk(
     level: str | None = "clause",
     chunk_kind: str | None = "clause",
     article_number: str | None = "113",
+    article_title: str | None = "Nghỉ hằng năm",
     clause_number: str | None = "1",
     point_label: str | None = None,
     citation: str | None = "Khoản 1, Điều 113, Bộ luật Lao động (VBHN 2025)",
@@ -51,6 +52,7 @@ def make_chunk(
         level=level,
         chunk_kind=chunk_kind,
         article_number=article_number,
+        article_title=article_title,
         clause_number=clause_number,
         point_label=point_label,
         citation=citation,
@@ -70,10 +72,10 @@ def make_packet(**kwargs: object) -> EvidencePacket:
     )
 
 
-def make_bundle(packets: list[EvidencePacket]) -> EvidenceBundle:
+def make_bundle(packets: list[EvidencePacket], *, query: str = "test") -> EvidenceBundle:
     """Build an evidence bundle from already-classified packets."""
     return EvidenceBundle(
-        query="test",
+        query=query,
         collection_name="vnlaw_chunks_bgem3_v1_full",
         vector_name="dense",
         top_k=20,
@@ -155,6 +157,160 @@ def test_safe_evidence_is_selected_before_caution_evidence() -> None:
     assert result.selected_count == 2
     assert result.selected_evidence[0].chunk_id == "safe"
     assert result.selected_evidence[1].chunk_id == "caution"
+
+
+def test_selection_prioritizes_direct_employee_termination_article() -> None:
+    """Direct employee-right provisions outrank employer and unlawful neighbors."""
+    employee_direct = make_packet(
+        rank=8,
+        chunk_id="article-35-clause-2-a",
+        article_number="35",
+        article_title="Quyền đơn phương chấm dứt hợp đồng lao động của người lao động",
+        clause_number="2",
+        point_label="a",
+        citation="Bộ luật Lao động, Điểm a, Khoản 2, Điều 35",
+        text="a) Không được bố trí theo đúng công việc, địa điểm làm việc.",
+        parent_text=(
+            "Điều 35. Quyền đơn phương chấm dứt hợp đồng lao động của người lao động\n"
+            "2. Người lao động có quyền đơn phương chấm dứt hợp đồng lao động "
+            "không cần báo trước trong trường hợp sau đây:\n"
+            "a) Không được bố trí theo đúng công việc, địa điểm làm việc."
+        ),
+    )
+    employer_neighbor = make_packet(
+        rank=1,
+        chunk_id="article-36",
+        article_number="36",
+        article_title="Quyền đơn phương chấm dứt hợp đồng lao động của người sử dụng lao động",
+        clause_number="1",
+        citation="Bộ luật Lao động, Khoản 1, Điều 36",
+        text="1. Người sử dụng lao động có quyền đơn phương chấm dứt hợp đồng lao động.",
+        parent_text=(
+            "Điều 36. Quyền đơn phương chấm dứt hợp đồng lao động của "
+            "người sử dụng lao động\n"
+            "1. Người sử dụng lao động có quyền đơn phương chấm dứt hợp đồng lao động."
+        ),
+    )
+    unlawful_neighbor = make_packet(
+        rank=2,
+        chunk_id="article-39",
+        article_number="39",
+        article_title="Đơn phương chấm dứt hợp đồng lao động trái pháp luật",
+        clause_number=None,
+        level="article",
+        chunk_kind="article",
+        citation="Bộ luật Lao động, Điều 39",
+        text=(
+            "Điều 39. Đơn phương chấm dứt hợp đồng lao động trái pháp luật là "
+            "trường hợp chấm dứt hợp đồng lao động không đúng quy định."
+        ),
+        parent_text=(
+            "Điều 39. Đơn phương chấm dứt hợp đồng lao động trái pháp luật là "
+            "trường hợp chấm dứt hợp đồng lao động không đúng quy định."
+        ),
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [employer_neighbor, unlawful_neighbor, employee_direct],
+            query="Người lao động được đơn phương chấm dứt hợp đồng trong trường hợp nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "article-35-clause-2-a"
+
+
+def test_selection_prioritizes_unlawful_definition_when_query_asks_unlawful() -> None:
+    """Unlawful-definition questions should cite the definition article first."""
+    definition = make_packet(
+        rank=5,
+        chunk_id="article-39",
+        article_number="39",
+        article_title="Đơn phương chấm dứt hợp đồng lao động trái pháp luật",
+        clause_number=None,
+        level="article",
+        chunk_kind="article",
+        citation="Bộ luật Lao động, Điều 39",
+        text=(
+            "Điều 39. Đơn phương chấm dứt hợp đồng lao động trái pháp luật là "
+            "trường hợp chấm dứt hợp đồng lao động không đúng quy định."
+        ),
+        parent_text=(
+            "Điều 39. Đơn phương chấm dứt hợp đồng lao động trái pháp luật là "
+            "trường hợp chấm dứt hợp đồng lao động không đúng quy định."
+        ),
+    )
+    termination_right = make_packet(
+        rank=1,
+        chunk_id="article-36",
+        article_number="36",
+        article_title="Quyền đơn phương chấm dứt hợp đồng lao động của người sử dụng lao động",
+        citation="Bộ luật Lao động, Khoản 3, Điều 36",
+        text="3. Người sử dụng lao động không phải báo trước trong một số trường hợp.",
+        parent_text=(
+            "Điều 36. Quyền đơn phương chấm dứt hợp đồng lao động của "
+            "người sử dụng lao động\n"
+            "3. Người sử dụng lao động không phải báo trước trong một số trường hợp."
+        ),
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [termination_right, definition],
+            query="Khi nào đơn phương chấm dứt hợp đồng lao động bị coi là trái pháp luật?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "article-39"
+
+
+def test_selection_demotes_cross_reference_only_evidence() -> None:
+    """A substantive provision outranks a chunk that only points to another Article."""
+    cross_reference = make_packet(
+        rank=1,
+        chunk_id="article-34-clause-9",
+        article_number="34",
+        article_title="Các trường hợp chấm dứt hợp đồng lao động",
+        clause_number="9",
+        citation="Bộ luật Lao động, Khoản 9, Điều 34",
+        text=(
+            "9. Người lao động đơn phương chấm dứt hợp đồng lao động theo quy định "
+            "tại Điều 35 của Bộ luật này."
+        ),
+        parent_text=(
+            "Điều 34. Các trường hợp chấm dứt hợp đồng lao động\n"
+            "9. Người lao động đơn phương chấm dứt hợp đồng lao động theo quy định "
+            "tại Điều 35 của Bộ luật này."
+        ),
+    )
+    direct = make_packet(
+        rank=2,
+        chunk_id="article-35-clause-1-a",
+        article_number="35",
+        article_title="Quyền đơn phương chấm dứt hợp đồng lao động của người lao động",
+        clause_number="1",
+        point_label="a",
+        citation="Bộ luật Lao động, Điểm a, Khoản 1, Điều 35",
+        text="a) Ít nhất 45 ngày nếu làm việc theo hợp đồng lao động không xác định thời hạn.",
+        parent_text=(
+            "Điều 35. Quyền đơn phương chấm dứt hợp đồng lao động của người lao động\n"
+            "1. Người lao động có quyền đơn phương chấm dứt hợp đồng lao động "
+            "nhưng phải báo trước cho người sử dụng lao động như sau:\n"
+            "a) Ít nhất 45 ngày nếu làm việc theo hợp đồng lao động không xác định thời hạn."
+        ),
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [cross_reference, direct],
+            query="Người lao động được đơn phương chấm dứt hợp đồng trong trường hợp nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "article-35-clause-1-a"
 
 
 def test_caution_evidence_with_citable_child_text_can_be_selected() -> None:

@@ -7,6 +7,8 @@ with a model, or mutate corpus artifacts.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from collections.abc import Sequence
 from enum import StrEnum
 from typing import Any
@@ -19,6 +21,18 @@ from src.retrieval.evidence import (
     EvidenceBundle,
     EvidencePacket,
     EvidenceSafetyLevel,
+)
+
+_TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
+_SUBJECT_EMPLOYEE = "người lao động"
+_SUBJECT_EMPLOYER = "người sử dụng lao động"
+_UNLAWFUL_TERMINATION = "trái pháp luật"
+_TERMINATION_PHRASE = "đơn phương chấm dứt hợp đồng lao động"
+_REFERENCE_ONLY_PATTERN = re.compile(
+    r"^(?:\d+\.|[a-zà-ỹđ]\))?\s*"
+    r".{0,140}?\btheo\s+quy\s+định\s+tại\s+điều\s+\d+\b"
+    r"(?:\s+của\s+bộ\s+luật\s+này)?\.?$",
+    re.IGNORECASE,
 )
 
 
@@ -249,7 +263,7 @@ def select_evidence_for_answer(
 
     selected = sorted(
         selected,
-        key=lambda item: _selection_sort_key(item, expected_targets or ()),
+        key=lambda item: _selection_sort_key(item, expected_targets or (), evidence_bundle.query),
     )[: settings.max_selected_packets]
 
     for item in selected:
@@ -599,10 +613,205 @@ def _packet_matches_any_expected_target(
 def _selection_sort_key(
     item: SelectedEvidence,
     expected_targets: Sequence[ExpectedTarget],
-) -> tuple[int, int, int, float]:
+    query: str,
+) -> tuple[int, int, int, int, float]:
     target_order = 0 if _packet_matches_any_expected_target(item.packet, expected_targets) else 1
+    directness_order = -_direct_evidence_score(item.packet, query=query)
     safety_order = 0 if item.safety_level == EvidenceSafetyLevel.SAFE else 1
-    return (target_order, safety_order, item.rank, -item.score)
+    return (target_order, directness_order, safety_order, item.rank, -item.score)
+
+
+def _direct_evidence_score(packet: EvidencePacket, *, query: str) -> int:
+    """Score whether a packet directly answers the query.
+
+    The score uses only query text and packet metadata/text. It does not use
+    qrels, expected targets, article-specific constants, or generated answers.
+    """
+    normalized_query = _normalize_legal_text(query)
+    if not normalized_query:
+        return 0
+
+    title = _normalize_legal_text(_metadata_string(packet, "article_title"))
+    law_title = _normalize_legal_text(packet.law_title)
+    child_text = _normalize_legal_text(
+        packet.safe_citable_text.text if packet.safe_citable_text is not None else ""
+    )
+    auxiliary_text = _normalize_legal_text(
+        packet.auxiliary_context.text if packet.auxiliary_context is not None else ""
+    )
+    local_parent_context = _normalize_legal_text(_metadata_string(packet, "local_parent_context"))
+    if not local_parent_context:
+        local_parent_context = _local_parent_context(
+            child_text=child_text,
+            parent_text=auxiliary_text,
+        )
+    combined = " ".join(part for part in (title, child_text, auxiliary_text) if part)
+
+    score = 0
+    title_overlap = _important_token_overlap(normalized_query, title)
+    child_overlap = _important_token_overlap(normalized_query, child_text)
+    parent_overlap = _important_token_overlap(normalized_query, auxiliary_text)
+    score += min(title_overlap, 8) * 2
+    score += min(child_overlap, 8)
+    score += min(parent_overlap, 6)
+
+    query_subject = _query_subject(normalized_query)
+    title_or_child = " ".join(part for part in (title, child_text) if part)
+    if query_subject and _contains_phrase(title_or_child, query_subject):
+        score += 12
+    if query_subject == _SUBJECT_EMPLOYEE and _contains_phrase(title, _SUBJECT_EMPLOYER):
+        score -= 16
+    if query_subject == _SUBJECT_EMPLOYER and _contains_phrase(title, _SUBJECT_EMPLOYEE):
+        score -= 16
+
+    if _contains_phrase(normalized_query, _TERMINATION_PHRASE) and _contains_phrase(
+        combined, _TERMINATION_PHRASE
+    ):
+        score += 8
+    if _contains_phrase(normalized_query, "báo trước") and _contains_phrase(
+        " ".join(part for part in (title_or_child, local_parent_context) if part), "báo trước"
+    ):
+        score += 5
+    if (
+        _contains_phrase(normalized_query, "không cần báo trước")
+        or _contains_phrase(normalized_query, "không phải báo trước")
+    ) and (
+        _contains_phrase(local_parent_context, "không cần báo trước")
+        or _contains_phrase(local_parent_context, "không phải báo trước")
+        or _contains_phrase(title_or_child, "không cần báo trước")
+        or _contains_phrase(title_or_child, "không phải báo trước")
+    ):
+        score += 10
+    if (
+        (
+            _contains_phrase(normalized_query, "không cần báo trước")
+            or _contains_phrase(normalized_query, "không phải báo trước")
+        )
+        and _contains_phrase(local_parent_context, "phải báo trước")
+        and not (
+            _contains_phrase(local_parent_context, "không cần báo trước")
+            or _contains_phrase(local_parent_context, "không phải báo trước")
+        )
+    ):
+        score -= 12
+
+    query_is_unlawful = _contains_phrase(normalized_query, _UNLAWFUL_TERMINATION)
+    packet_is_unlawful = _contains_phrase(title_or_child, _UNLAWFUL_TERMINATION)
+    if query_is_unlawful and packet_is_unlawful:
+        score += 24
+        if _contains_phrase(title, _UNLAWFUL_TERMINATION):
+            score += 12
+        if _contains_phrase(normalized_query, "bị coi") and _contains_phrase(
+            combined, "là trường hợp"
+        ):
+            score += 20
+    elif packet_is_unlawful:
+        score -= 12
+    elif query_is_unlawful and _contains_phrase(title_or_child, _TERMINATION_PHRASE):
+        score -= 30
+
+    if _contains_phrase(normalized_query, "lao động") and not _contains_phrase(
+        law_title, "lao động"
+    ):
+        score -= 8
+    if _contains_any(title, ("tạm đình chỉ", "thi hành quyết định")) and not _contains_any(
+        normalized_query,
+        ("tạm đình chỉ", "thi hành", "quyết định"),
+    ):
+        score -= 10
+
+    if _is_cross_reference_only(child_text):
+        score -= 14
+
+    return score
+
+
+def _metadata_string(packet: EvidencePacket, key: str) -> str:
+    value = packet.metadata.get(key)
+    return value if isinstance(value, str) else ""
+
+
+def _local_parent_context(*, child_text: str, parent_text: str) -> str:
+    if not child_text or not parent_text:
+        return ""
+    index = parent_text.find(child_text)
+    if index < 0:
+        return ""
+    return parent_text[max(0, index - 280) : index]
+
+
+def _important_token_overlap(query: str, text: str) -> int:
+    if not query or not text:
+        return 0
+    return len(_important_tokens(query) & _important_tokens(text))
+
+
+def _important_tokens(text: str) -> set[str]:
+    stopwords = {
+        "a",
+        "b",
+        "c",
+        "d",
+        "đ",
+        "e",
+        "g",
+        "của",
+        "có",
+        "được",
+        "khi",
+        "nào",
+        "trong",
+        "trường",
+        "hợp",
+        "theo",
+        "quy",
+        "định",
+        "tại",
+        "điều",
+        "khoản",
+        "điểm",
+        "này",
+        "là",
+        "và",
+        "hoặc",
+        "cho",
+        "phải",
+        "bao",
+        "lâu",
+    }
+    return {
+        token for token in _TOKEN_PATTERN.findall(text) if len(token) > 1 and token not in stopwords
+    }
+
+
+def _query_subject(normalized_query: str) -> str | None:
+    if _contains_phrase(normalized_query, _SUBJECT_EMPLOYER):
+        return _SUBJECT_EMPLOYER
+    if _contains_phrase(normalized_query, _SUBJECT_EMPLOYEE):
+        return _SUBJECT_EMPLOYEE
+    return None
+
+
+def _is_cross_reference_only(normalized_child_text: str) -> bool:
+    if not normalized_child_text:
+        return False
+    return _REFERENCE_ONLY_PATTERN.match(normalized_child_text) is not None
+
+
+def _normalize_legal_text(text: str | None) -> str:
+    if text is None:
+        return ""
+    normalized = unicodedata.normalize("NFC", text).casefold()
+    return " ".join(_TOKEN_PATTERN.findall(normalized))
+
+
+def _contains_phrase(text: str, phrase: str) -> bool:
+    normalized_phrase = _normalize_legal_text(phrase)
+    return f" {normalized_phrase} " in f" {text} "
+
+
+def _contains_any(text: str, phrases: Sequence[str]) -> bool:
+    return any(_contains_phrase(text, phrase) for phrase in phrases)
 
 
 def _has_high_citation_risk(

@@ -401,7 +401,7 @@ def build_evidence_packet(
         parent_context_policy=parent_policy,
         safety_level=safety_level,
         safety_issues=issues,
-        metadata=chunk.metadata,
+        metadata=_packet_metadata(chunk),
         warnings=chunk.warnings,
     )
 
@@ -485,6 +485,31 @@ def _base_safety_issues(chunk: RetrievedChunk) -> list[EvidenceSafetyIssue]:
             )
         )
     return issues
+
+
+def _packet_metadata(chunk: RetrievedChunk) -> dict[str, Any]:
+    metadata = dict(chunk.metadata)
+    if chunk.article_title:
+        metadata.setdefault("article_title", chunk.article_title)
+    if chunk.hierarchy_path:
+        metadata.setdefault("hierarchy_path", chunk.hierarchy_path)
+    local_context = _local_parent_context(chunk)
+    if local_context:
+        metadata.setdefault("local_parent_context", local_context)
+    return metadata
+
+
+def _local_parent_context(chunk: RetrievedChunk) -> str:
+    if not chunk.text or not chunk.parent_text:
+        return ""
+    child_text = _normalize_whitespace(chunk.text)
+    parent_text = _normalize_whitespace(chunk.parent_text)
+    if not child_text or not parent_text:
+        return ""
+    index = parent_text.find(child_text)
+    if index < 0:
+        return ""
+    return parent_text[max(0, index - 300) : index]
 
 
 def _parent_context_policy(
