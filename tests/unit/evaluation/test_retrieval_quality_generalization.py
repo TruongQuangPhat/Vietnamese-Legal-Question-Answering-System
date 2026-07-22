@@ -5,12 +5,19 @@ from __future__ import annotations
 import src.evaluation.benchmark.direct_evidence as canonical_direct_evidence
 import src.evaluation.retrieval_quality_generalization as compatibility_direct_evidence
 from src.evaluation.benchmark.direct_evidence import (
+    DIRECT_EVIDENCE_METRIC_CONTRACT_VERSION,
+    DIRECT_EVIDENCE_SCHEMA_VERSION,
     BenchmarkRuntimeConfig,
+    CaseEvaluation,
     EvidenceTarget,
+    _selection_input_retrieval,
+    build_report_metadata,
     compare_reports,
     compute_aggregate_metrics,
     metric_definitions,
+    validate_report_compatibility,
 )
+from src.retrieval.models import RetrievalResult, RetrievedChunk
 
 
 def test_direct_evidence_benchmark_uses_canonical_benchmark_package() -> None:
@@ -23,6 +30,12 @@ def test_direct_evidence_benchmark_uses_canonical_benchmark_package() -> None:
         compatibility_direct_evidence.BenchmarkRuntimeConfig
         is canonical_direct_evidence.BenchmarkRuntimeConfig
     )
+    assert set(compatibility_direct_evidence.__all__) >= {
+        "BenchmarkRuntimeConfig",
+        "EvidenceTarget",
+        "compare_reports",
+        "validate_report_compatibility",
+    }
 
 
 def test_metric_definitions_document_required_contracts() -> None:
@@ -187,6 +200,90 @@ def test_recall_at_10_can_pass_while_primary_accuracy_fails() -> None:
     assert metrics["citation_alignment_accuracy"] == 0.0
 
 
+def test_runtime_aligned_selection_view_scores_only_top_10_candidates() -> None:
+    """Production-aligned selection input is structurally bounded to top 10."""
+    retrieval = RetrievalResult(
+        query="q",
+        collection_name="fixture",
+        vector_name="sparse_bm25",
+        top_k=50,
+        elapsed_ms=0.0,
+        query_vector_dimension=0,
+        results=[
+            RetrievedChunk(
+                rank=index,
+                score=1.0 / index,
+                chunk_id=f"c{index}",
+                law_id="BLLD_VBHN",
+                article_number=str(index),
+                text="x" * 80,
+            )
+            for index in range(1, 51)
+        ],
+    )
+
+    bounded = _selection_input_retrieval(retrieval, selection_input_top_k=10)
+
+    assert len(retrieval.results) == 50
+    assert len(bounded.results) == 10
+    assert bounded.metadata["diagnostic_result_count"] == 50
+    assert bounded.metadata["selection_input_top_k"] == 10
+    assert bounded.results[-1].rank == 10
+
+
+def test_case_evaluation_preserves_prompt_and_forbidden_target_semantics() -> None:
+    """Canonical case rows distinguish primary, supporting, required, and forbidden roles."""
+    primary = EvidenceTarget("BLLD_VBHN", "113", "1", role="primary")
+    supporting = EvidenceTarget("BLLD_VBHN", "111", "1", role="supporting")
+    forbidden = EvidenceTarget(
+        "BLLD_VBHN",
+        "114",
+        role="forbidden",
+        forbidden_primary=True,
+        forbidden_citation=True,
+    )
+    evaluation = CaseEvaluation(
+        case_id="leave",
+        query="q",
+        split="holdout",
+        intent="multi_article_leave",
+        expected_targets=(primary, supporting),
+        primary_target=primary,
+        candidate_ranks={primary.as_key(): 1, supporting.as_key(): 2},
+        selection_input_ranks={primary.as_key(): 1, supporting.as_key(): 2},
+        selection_input_top_k=10,
+        selected_evidence=[
+            {"law_id": "BLLD_VBHN", "article_number": "113", "clause_number": "1"},
+            {"law_id": "BLLD_VBHN", "article_number": "111", "clause_number": "1"},
+        ],
+        prompt_evidence=[
+            {"law_id": "BLLD_VBHN", "article_number": "113", "clause_number": "1"},
+            {"law_id": "BLLD_VBHN", "article_number": "111", "clause_number": "1"},
+        ],
+        forbidden_selected=[
+            {"law_id": "BLLD_VBHN", "article_number": "114", "target": forbidden.to_dict()}
+        ],
+        forbidden_cited=[],
+        pass_status=False,
+        pass_reason="forbidden primary target found",
+        primary_evidence_accuracy=True,
+        citation_alignment_accuracy=True,
+        multi_article_coverage_accuracy=True,
+        cross_reference_only_primary_error=False,
+        wrong_actor_primary_error=False,
+        wrong_domain_primary_error=False,
+    )
+
+    row = evaluation.to_dict(recall_depths=(5, 10))
+
+    assert row["actual_primary_evidence"]["article_number"] == "113"
+    assert row["actual_primary_prompt_evidence"]["article_number"] == "113"
+    assert row["expected_targets"][0]["role"] == "primary"
+    assert row["expected_targets"][1]["role"] == "supporting"
+    assert row["forbidden_evidence_found"]["selected"][0]["article_number"] == "114"
+    assert row["multi_article_coverage_accuracy"] is True
+
+
 def test_compare_reports_counts_rank_loss_even_when_case_still_passes() -> None:
     """Regression reporting includes still-passing expected-target rank losses."""
     before = _report([_case(case_id="annual", ranks=[1], passed=True)])
@@ -198,6 +295,42 @@ def test_compare_reports_counts_rank_loss_even_when_case_still_passes() -> None:
     assert comparison["regressions"][0]["type"] == "candidate_rank_loss"
     assert comparison["regressions"][0]["case_still_passing"] is True
     assert comparison["largest_negative_rank_change"] == -2
+
+
+def test_compare_reports_rejects_incompatible_metadata() -> None:
+    """Before/after comparisons require identical machine-readable contracts."""
+    base = _report([_case(case_id="annual", ranks=[1], passed=True)])
+
+    mutations = {
+        "schema_version": "9.9",
+        "metric_contract_version": "other_contract",
+        "corpus_identity": "other_corpus",
+        "case_set_identity": "other_case_set",
+        "matching_granularity": "law_only",
+        "evaluation_stage": "other_stage",
+        "selection_input_top_k": 50,
+        "selected_evidence_budget": 10,
+        "benchmark_mode": "deep_diagnostic",
+    }
+
+    for field, value in mutations.items():
+        candidate = _report([_case(case_id="annual", ranks=[1], passed=True)])
+        if field in {"selection_input_top_k", "selected_evidence_budget"}:
+            candidate["cutoff_configuration"][field] = value
+            candidate["configuration"][field] = value
+        else:
+            candidate[field] = value
+        try:
+            validate_report_compatibility(base, candidate)
+        except ValueError as exc:
+            expected = (
+                f"cutoff_configuration.{field}"
+                if field in {"selection_input_top_k", "selected_evidence_budget"}
+                else field
+            )
+            assert expected in str(exc)
+        else:  # pragma: no cover - pytest assertion path
+            raise AssertionError(f"comparison did not reject {field}")
 
 
 def _case(
@@ -229,9 +362,22 @@ def _case(
 
 
 def _report(cases: list[dict[str, object]]) -> dict[str, object]:
-    return {
+    config = BenchmarkRuntimeConfig.for_mode("runtime_aligned")
+    metadata = build_report_metadata(
+        git_revision="test",
+        corpus_identity="data/processed/legal_chunks.jsonl",
+        pipeline_family="direct_evidence",
+        evaluation_stage="sparse_selection_diagnostic",
+        retrieval_mode="sparse_selection",
+        runtime_config=config,
+    ).to_dict()
+    report = {
         "benchmark_id": "test",
         "repo_root": "/tmp/test",
         "aggregate_metrics": compute_aggregate_metrics(cases),
         "cases": cases,
     }
+    report.update(metadata)
+    assert report["schema_version"] == DIRECT_EVIDENCE_SCHEMA_VERSION
+    assert report["metric_contract_version"] == DIRECT_EVIDENCE_METRIC_CONTRACT_VERSION
+    return report

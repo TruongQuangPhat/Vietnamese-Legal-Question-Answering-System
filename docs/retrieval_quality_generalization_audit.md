@@ -41,6 +41,14 @@ Final disposition totals:
 - REMOVE: 2
 - ISOLATE: 0
 
+Runtime status totals:
+
+- Active generic/domain rule: 21
+- Removed runtime rule: 2
+- Replaced test oracle: 1
+- Unresolved category C runtime rule: 0
+- Unresolved category D runtime rule: 0
+
 | ID | File and function | Original classification | Trigger | Pipeline stage | False-positive risk | False-negative risk | Final disposition | Replacement or generalized abstraction | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | R01 | `src/retrieval/sparse_retriever.py::tokenize_sparse_text` | A | Any sparse query/index text. | Query/index normalization | Low: generic Unicode tokens can match common words. | Low: no Vietnamese word segmentation. | KEEP | NFC/casefold Unicode tokenization preserving legal numbers. | `tests/unit/retrieval/test_sparse_retriever.py`, `tests/integration/retrieval/test_sparse_bm25_workflow.py` |
@@ -67,6 +75,35 @@ Final disposition totals:
 | R22 | `src/retrieval/fusion.py` and `src/retrieval/coverage_aware.py` quota fusion | A | Hybrid retrieval. | Fusion/retrieval orchestration | Medium: quota can retain lower sparse/dense candidates. | Medium: final top 10 can discard target if neither source ranks it well. | KEEP | Fixed weighted RRF plus source quotas. | `tests/integration/retrieval/test_coverage_aware_retrieval_workflow.py`, hybrid fixture |
 | R23 | `src/retrieval/prompting.py` and `src/retrieval/generation.py` prompt/citation guard | A | Prompt/generation validation. | Citation alignment | Low: prompt order follows selected order even if selection is wrong. | Low: generated semantic unsupported claims need separate review. | KEEP | Selected-evidence `[E#]` mapping and unknown-citation rejection. | `tests/unit/retrieval/test_generation.py`, direct benchmark |
 | R24 | `tests/integration/retrieval/test_direct_article_priority_workflow.py` original holdout oracle | D | Holdout tests. | Evaluation oracle | High: expected article could pass as non-primary support. | High: semantic primary failures hidden. | REPLACE | Strict benchmark runner separates candidate, primary, selected, cited, forbidden evidence. | `tests/unit/evaluation/test_retrieval_quality_generalization.py`, direct benchmark |
+
+Runtime status and remaining risk by rule:
+
+| ID | Runtime status | Remaining risk |
+| --- | --- | --- |
+| R01 | Active generic runtime rule | Tokenization remains lexical and may miss Vietnamese word-boundary semantics. |
+| R02 | Removed runtime rule | Colloquial termination recall relies on dense/hybrid retrieval and generic selection instead of expansion. |
+| R03 | Removed runtime rule | Article 35 sparse ranks may remain lower, but top-10 cutoff tests guard primary/citation behavior. |
+| R04 | Active generic runtime rule | Metadata text can still increase lexical overlap; runtime-aligned top-10 tests guard selection behavior. |
+| R05 | Active generic runtime rule | Incorrect upstream metadata would still propagate; processed JSONL validation remains the upstream guard. |
+| R06 | Active generic runtime rule | Parent context may add nearby terms; prompt and selection tests keep it auxiliary-only. |
+| R07 | Active domain-generic runtime rule | Generic scoring still contains tuned bounded components; no known topic-specific branch remains. |
+| R08 | Active evaluation-only rule | Broad article-level expected targets can hide clause specificity if an evaluator defines them too loosely. |
+| R09 | Replaced runtime rule | Generic role/modality/consequence alignment can miss implicit semantics without dense evidence. |
+| R10 | Active legal-domain runtime rule | Explicit locator alignment is strong; malformed locators may not be parsed. |
+| R11 | Active generic runtime rule | Lexical overlap can still prefer related text in close cases; adversarial tests guard known failure modes. |
+| R12 | Active legal-domain runtime rule | Named-law consistency helps only when the query names a law or domain. |
+| R13 | Active legal-domain runtime rule | Role phrase extraction is shallow and can miss paraphrased actors. |
+| R14 | Active legal-domain runtime rule | Governing-role contradiction can be under-applied when the role appears only in parent context. |
+| R15 | Active legal-domain runtime rule | Modality and negation terms are generic but linguistically shallow. |
+| R16 | Active generic runtime rule | Notice-term matching is no longer labor-specific but still lexical. |
+| R17 | Active generic runtime rule | Numeric/time contradiction handling may miss textual numbers or implicit deadlines. |
+| R18 | Active generic runtime rule | Mixed substantive/reference provisions can still be hard to classify perfectly. |
+| R19 | Active legal-domain runtime rule | Domain mismatch only applies when law/domain markers are visible. |
+| R20 | Active generic runtime rule | Procedural terms may be substantive for procedural questions; tests include procedural hard negatives. |
+| R21 | Active generic runtime rule | Consequence/prohibition drift is generic but may underweight direct consequence questions. |
+| R22 | Active generic runtime rule | Fusion top 10 can discard a target if both dense and sparse rank it below cutoff; benchmark cutoffs expose this. |
+| R23 | Active generic runtime rule | Citation-ID validity still does not prove generated semantic faithfulness. |
+| R24 | Replaced test oracle, not runtime | Direct-evidence diagnostic cases remain branch diagnostics until promoted into the frozen benchmark. |
 
 ## Commit Review Decisions
 

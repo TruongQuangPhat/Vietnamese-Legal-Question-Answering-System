@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pytest
 
+from src.evaluation.benchmark.direct_evidence import (
+    BenchmarkRuntimeConfig,
+    EvidenceTarget,
+    provision_summary,
+    summary_matches_target,
+    target_key,
+    target_rank,
+)
 from src.retrieval.coverage_aware import (
     CoverageAwareFusionConfig,
     CoverageAwareQuotaRetriever,
@@ -15,15 +21,7 @@ from src.retrieval.models import RetrievalResult, RetrievedChunk
 from src.retrieval.prompting import build_naive_rag_prompt
 from src.retrieval.selection import EvidenceSelectionConfig, select_evidence_for_answer
 
-
-@dataclass(frozen=True)
-class Target:
-    """Expected legal target used by deterministic hybrid fixtures."""
-
-    law_id: str
-    article: str
-    clause: str | None = None
-    point: str | None = None
+RUNTIME_CONFIG = BenchmarkRuntimeConfig.for_mode("runtime_aligned")
 
 
 class StaticCandidateRetriever:
@@ -54,7 +52,7 @@ class StaticCandidateRetriever:
         (
             "q1_article_35_direct",
             "Người lao động được đơn phương chấm dứt hợp đồng trong trường hợp nào?",
-            Target("BLLD_VBHN", "35"),
+            EvidenceTarget("BLLD_VBHN", "35"),
             [
                 ("labor-35-clause-1", 7, "BLLD_VBHN", "35", "1", None),
                 ("labor-36-clause-1", 1, "BLLD_VBHN", "36", "1", None),
@@ -67,7 +65,7 @@ class StaticCandidateRetriever:
         (
             "q4_article_35_notice_period",
             "Người lao động phải báo trước bao lâu khi đơn phương chấm dứt hợp đồng?",
-            Target("BLLD_VBHN", "35", "1"),
+            EvidenceTarget("BLLD_VBHN", "35", "1"),
             [
                 ("labor-35-clause-1", 4, "BLLD_VBHN", "35", "1", None),
                 ("labor-36-clause-1", 1, "BLLD_VBHN", "36", "1", None),
@@ -80,7 +78,7 @@ class StaticCandidateRetriever:
         (
             "q5_article_35_no_notice",
             "Người lao động có được nghỉ việc không cần báo trước trong trường hợp nào?",
-            Target("BLLD_VBHN", "35", "2"),
+            EvidenceTarget("BLLD_VBHN", "35", "2"),
             [
                 ("labor-35-clause-2", 6, "BLLD_VBHN", "35", "2", None),
                 ("labor-36-clause-1", 1, "BLLD_VBHN", "36", "1", None),
@@ -93,7 +91,7 @@ class StaticCandidateRetriever:
         (
             "annual_leave_article_113",
             "Người lao động nghỉ hằng năm theo Khoản 1 Điều 113 được bao nhiêu ngày?",
-            Target("BLLD_VBHN", "113", "1"),
+            EvidenceTarget("BLLD_VBHN", "113", "1"),
             [
                 ("annual-direct", 1, "BLLD_VBHN", "113", "1", None),
             ],
@@ -105,7 +103,7 @@ class StaticCandidateRetriever:
         (
             "marriage_condition_article_8_point_a",
             "Điểm a khoản 1 Điều 8 Luật Hôn nhân và gia đình quy định độ tuổi kết hôn thế nào?",
-            Target("LHNGD_VBHN", "8", "1", "a"),
+            EvidenceTarget("LHNGD_VBHN", "8", "1", "a"),
             [
                 ("marriage-age", 2, "LHNGD_VBHN", "8", "1", "a"),
             ],
@@ -120,7 +118,7 @@ class StaticCandidateRetriever:
 async def test_hybrid_runtime_aligned_direct_primary_cases(
     case_id: str,
     query: str,
-    target: Target,
+    target: EvidenceTarget,
     dense_specs: list[tuple[str, int, str, str, str | None, str | None]],
     sparse_specs: list[tuple[str, int, str, str, str | None, str | None]],
 ) -> None:
@@ -135,15 +133,15 @@ async def test_hybrid_runtime_aligned_direct_primary_cases(
 
     assert diagnostics["fused_rank"][target_key(target)] is not None, diagnostics
     assert diagnostics["fused_rank"][target_key(target)] <= 10, diagnostics
-    assert _summary_matches_target(diagnostics["selected_evidence"][0], target), diagnostics
-    assert _summary_matches_target(diagnostics["citations"][0], target), diagnostics
+    assert summary_matches_target(diagnostics["selected_evidence"][0], target), diagnostics
+    assert summary_matches_target(diagnostics["citations"][0], target), diagnostics
 
 
 @pytest.mark.asyncio
 async def test_hybrid_runtime_aligned_multi_article_targets_remain_selected_and_cited() -> None:
     """Multi-article coverage survives the production fused top-10 boundary."""
-    weekly = Target("BLLD_VBHN", "111", "1")
-    annual = Target("BLLD_VBHN", "113", "1")
+    weekly = EvidenceTarget("BLLD_VBHN", "111", "1")
+    annual = EvidenceTarget("BLLD_VBHN", "113", "1")
     diagnostics = await _run_hybrid_diagnostics(
         "weekly_and_annual_leave_multi_article",
         query="Khoản 1 Điều 111 và Khoản 1 Điều 113 quy định nghỉ hằng tuần, hằng năm thế nào?",
@@ -159,9 +157,9 @@ async def test_hybrid_runtime_aligned_multi_article_targets_remain_selected_and_
 
     for target in (weekly, annual):
         assert any(
-            _summary_matches_target(item, target) for item in diagnostics["selected_evidence"]
+            summary_matches_target(item, target) for item in diagnostics["selected_evidence"]
         ), diagnostics
-        assert any(_summary_matches_target(item, target) for item in diagnostics["citations"]), (
+        assert any(summary_matches_target(item, target) for item in diagnostics["citations"]), (
             diagnostics
         )
     assert diagnostics["multi_article_coverage_pass"] is True, diagnostics
@@ -174,7 +172,7 @@ async def test_hybrid_runtime_aligned_adversarial_cases_expose_diagnostics() -> 
         (
             "semantic_relevance_vs_lexical_overlap",
             "Khoản 1 Điều 113 quy định người lao động nghỉ hằng năm được bao nhiêu ngày?",
-            Target("BLLD_VBHN", "113", "1"),
+            EvidenceTarget("BLLD_VBHN", "113", "1"),
             [_chunk("annual-direct", rank=1, law_id="BLLD_VBHN", article="113", clause="1")],
             [
                 _chunk("lexical-wrong", rank=1, law_id="BLLD_VBHN", article="114", clause=None),
@@ -184,7 +182,7 @@ async def test_hybrid_runtime_aligned_adversarial_cases_expose_diagnostics() -> 
         (
             "wrong_actor",
             "Người lao động đơn phương chấm dứt hợp đồng trong trường hợp nào?",
-            Target("BLLD_VBHN", "35", "1"),
+            EvidenceTarget("BLLD_VBHN", "35", "1"),
             [_chunk("labor-35-clause-1", rank=2, law_id="BLLD_VBHN", article="35", clause="1")],
             [
                 _chunk("labor-36-clause-1", rank=1, law_id="BLLD_VBHN", article="36", clause="1"),
@@ -194,7 +192,7 @@ async def test_hybrid_runtime_aligned_adversarial_cases_expose_diagnostics() -> 
         (
             "wrong_domain",
             "Theo Bộ luật Lao động, người lao động có quyền gì khi đơn phương chấm dứt hợp đồng?",
-            Target("BLLD_VBHN", "35", "1"),
+            EvidenceTarget("BLLD_VBHN", "35", "1"),
             [_chunk("labor-35-clause-1", rank=1, law_id="BLLD_VBHN", article="35", clause="1")],
             [
                 _chunk("civil-35", rank=1, law_id="BLDS_2015", article="35", clause=None),
@@ -204,7 +202,7 @@ async def test_hybrid_runtime_aligned_adversarial_cases_expose_diagnostics() -> 
         (
             "negation_contradiction",
             "Người lao động không cần báo trước trong trường hợp nào?",
-            Target("BLLD_VBHN", "35", "2"),
+            EvidenceTarget("BLLD_VBHN", "35", "2"),
             [_chunk("labor-35-clause-2", rank=1, law_id="BLLD_VBHN", article="35", clause="2")],
             [
                 _chunk("labor-35-clause-1", rank=1, law_id="BLLD_VBHN", article="35", clause="1"),
@@ -214,7 +212,7 @@ async def test_hybrid_runtime_aligned_adversarial_cases_expose_diagnostics() -> 
         (
             "explicit_cross_reference_target",
             "Khoản 5 Điều 36 Luật Công chứng quy định nghĩa vụ mua bảo hiểm thế nào?",
-            Target("LCCONGCHUNG_VBHN", "36", "5"),
+            EvidenceTarget("LCCONGCHUNG_VBHN", "36", "5"),
             [
                 _chunk(
                     "insurance-substantive",
@@ -257,7 +255,7 @@ async def test_hybrid_runtime_aligned_adversarial_cases_expose_diagnostics() -> 
 @pytest.mark.asyncio
 async def test_hybrid_runtime_aligned_fused_rank_10_is_available_to_selection() -> None:
     """Expected target at fused rank 10 remains available to evidence selection."""
-    target = Target("BLLD_VBHN", "35", "2")
+    target = EvidenceTarget("BLLD_VBHN", "35", "2")
     shared = [
         _chunk(f"shared-{index}", rank=index, law_id="OTHER", article=str(index), clause=None)
         for index in range(1, 10)
@@ -285,7 +283,7 @@ async def test_hybrid_runtime_aligned_fused_rank_10_is_available_to_selection() 
 @pytest.mark.asyncio
 async def test_hybrid_runtime_aligned_fused_rank_11_is_unavailable_to_selection() -> None:
     """Expected target pushed outside fused top 10 is treated as unavailable."""
-    target = Target("BLLD_VBHN", "35", "2")
+    target = EvidenceTarget("BLLD_VBHN", "35", "2")
     shared = [
         _chunk(f"shared-{index}", rank=index, law_id="OTHER", article=str(index), clause=None)
         for index in range(1, 11)
@@ -316,7 +314,7 @@ async def _run_hybrid_diagnostics(
     query: str,
     dense_results: list[RetrievedChunk],
     sparse_results: list[RetrievedChunk],
-    expected_targets: list[Target],
+    expected_targets: list[EvidenceTarget],
 ) -> dict[str, object]:
     dense = StaticCandidateRetriever(dense_results, vector_name="dense")
     sparse = StaticCandidateRetriever(sparse_results, vector_name="sparse_bm25")
@@ -326,9 +324,9 @@ async def _run_hybrid_diagnostics(
         config=CoverageAwareFusionConfig(
             config_id="selected_coverage_aware_quota",
             mode="quota",
-            dense_candidate_k=50,
-            sparse_candidate_k=50,
-            final_top_k=10,
+            dense_candidate_k=RUNTIME_CONFIG.dense_retrieval_top_k,
+            sparse_candidate_k=RUNTIME_CONFIG.sparse_retrieval_top_k,
+            final_top_k=RUNTIME_CONFIG.fusion_output_top_k,
             rrf_k=60,
             dense_weight=1.0,
             sparse_weight=1.5,
@@ -339,34 +337,41 @@ async def _run_hybrid_diagnostics(
         collection_name="fixture",
         vector_name="dense",
     )
-    retrieval = await retriever.retrieve(query=query, top_k=10)
-    bundle = build_evidence_bundle(retrieval, config=ContextAssemblyConfig(max_packets=10))
+    retrieval = await retriever.retrieve(query=query, top_k=RUNTIME_CONFIG.fusion_output_top_k)
+    bundle = build_evidence_bundle(
+        retrieval,
+        config=ContextAssemblyConfig(max_packets=RUNTIME_CONFIG.selection_input_top_k),
+    )
     selection = select_evidence_for_answer(
         bundle,
-        config=EvidenceSelectionConfig(max_selected_packets=5),
+        config=EvidenceSelectionConfig(
+            max_selected_packets=RUNTIME_CONFIG.selected_evidence_budget
+        ),
     )
     prompt = build_naive_rag_prompt(query=query, selection_result=selection)
     selected = [
-        _summary(item.packet, rank=index)
+        provision_summary(item.packet, rank=index)
         for index, item in enumerate(selection.selected_evidence, start=1)
     ]
-    citations = [_summary(item, rank=index) for index, item in enumerate(prompt.evidence, start=1)]
-    fused_top10 = [_summary(item, rank=item.rank) for item in retrieval.results]
+    citations = [
+        provision_summary(item, rank=index) for index, item in enumerate(prompt.evidence, start=1)
+    ]
+    fused_top10 = [provision_summary(item, rank=item.rank) for item in retrieval.results]
     fused_ranks = {
-        target_key(target): _target_rank(retrieval.results, target) for target in expected_targets
+        target_key(target): target_rank(retrieval.results, target) for target in expected_targets
     }
     sparse_ranks = {
-        target_key(target): _target_rank(sparse._results, target) for target in expected_targets
+        target_key(target): target_rank(sparse._results, target) for target in expected_targets
     }
     dense_ranks = {
-        target_key(target): _target_rank(dense._results, target) for target in expected_targets
+        target_key(target): target_rank(dense._results, target) for target in expected_targets
     }
     primary_target = expected_targets[0]
-    direct_primary_pass = bool(selected) and _summary_matches_target(selected[0], primary_target)
-    citation_pass = bool(citations) and _summary_matches_target(citations[0], primary_target)
+    direct_primary_pass = bool(selected) and summary_matches_target(selected[0], primary_target)
+    citation_pass = bool(citations) and summary_matches_target(citations[0], primary_target)
     multi_article_pass = all(
-        any(_summary_matches_target(item, target) for item in selected)
-        and any(_summary_matches_target(item, target) for item in citations)
+        any(summary_matches_target(item, target) for item in selected)
+        and any(summary_matches_target(item, target) for item in citations)
         for target in expected_targets
     )
     return {
@@ -507,49 +512,3 @@ def _citation(
     if point:
         parts.append(f"Điểm {point}")
     return ", ".join(parts)
-
-
-def _summary(item: object, *, rank: int) -> dict[str, object]:
-    return {
-        "rank": rank,
-        "chunk_id": getattr(item, "chunk_id", None),
-        "law_id": getattr(item, "law_id", None),
-        "article_number": getattr(item, "article_number", None),
-        "clause_number": getattr(item, "clause_number", None),
-        "point_label": getattr(item, "point_label", None),
-    }
-
-
-def _target_rank(candidates: list[RetrievedChunk], target: Target) -> int | None:
-    for candidate in candidates:
-        if _chunk_matches_target(candidate, target):
-            return candidate.rank
-    return None
-
-
-def _chunk_matches_target(item: RetrievedChunk, target: Target) -> bool:
-    return (
-        item.law_id == target.law_id
-        and item.article_number == target.article
-        and (target.clause is None or item.clause_number == target.clause)
-        and (target.point is None or item.point_label == target.point)
-    )
-
-
-def _summary_matches_target(item: dict[str, object], target: Target) -> bool:
-    return (
-        item["law_id"] == target.law_id
-        and item["article_number"] == target.article
-        and (target.clause is None or item["clause_number"] == target.clause)
-        and (target.point is None or item["point_label"] == target.point)
-    )
-
-
-def target_key(target: Target) -> str:
-    """Return a stable diagnostic key for a target."""
-    parts = [target.law_id, f"Điều {target.article}"]
-    if target.clause:
-        parts.append(f"Khoản {target.clause}")
-    if target.point:
-        parts.append(f"Điểm {target.point}")
-    return " / ".join(parts)

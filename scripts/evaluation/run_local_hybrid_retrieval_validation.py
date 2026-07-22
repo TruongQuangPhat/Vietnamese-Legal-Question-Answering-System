@@ -14,8 +14,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.retrieval.run_dense_retrieval import validate_cli_arguments  # noqa: E402
+from src.evaluation.benchmark.direct_evidence import (  # noqa: E402
+    DIRECT_EVIDENCE_CASE_SET_IDENTITY,
+    BenchmarkRuntimeConfig,
+    build_report_metadata,
+    compute_aggregate_metrics,
+    evidence_target_from_mapping,
+    parse_evidence_target,
+    provision_summary,
+    summary_matches_target,
+    target_key,
+    target_rank,
+)
 from src.retrieval.workflows.common import DEFAULT_CONFIG, load_retrieval_config  # noqa: E402
+from src.retrieval.workflows.dense_retrieval import validate_cli_arguments  # noqa: E402
 
 DEFAULT_CHUNKS_PATH = Path("data/processed/legal_chunks.jsonl")
 DEFAULT_COLLECTION_NAME = "vnlaw_chunks_bgem3_v1_full"
@@ -112,7 +124,7 @@ def _load_cases(args: argparse.Namespace) -> list[dict[str, Any]]:
             {
                 "case_id": args.case_id,
                 "query": args.question,
-                "expected_targets": [_parse_target(item) for item in args.expected_target],
+                "expected_targets": [parse_evidence_target(item) for item in args.expected_target],
             }
         ]
     assert args.cases is not None
@@ -138,7 +150,9 @@ def _normalize_case(item: dict[str, Any]) -> dict[str, Any]:
         "case_id": str(item.get("case_id") or item.get("id") or "case"),
         "query": query,
         "expected_targets": [
-            _parse_target(target) if isinstance(target, str) else _target_from_mapping(target)
+            parse_evidence_target(target)
+            if isinstance(target, str)
+            else evidence_target_from_mapping(target)
             for target in raw_targets
         ],
     }
@@ -222,8 +236,37 @@ async def _run_cases(args: argparse.Namespace, cases: list[dict[str, Any]]) -> d
                     selector=select_evidence_for_answer,
                 )
             )
-        return {
-            "schema_version": "1.0",
+        runtime_config = BenchmarkRuntimeConfig(
+            mode="runtime_aligned",
+            sparse_retrieval_top_k=args.sparse_top_k,
+            dense_retrieval_top_k=args.dense_top_k,
+            diagnostic_candidate_top_k=max(args.sparse_top_k, args.dense_top_k),
+            fusion_output_top_k=args.fusion_top_k,
+            selection_input_top_k=args.fusion_top_k,
+            selected_evidence_budget=args.selected_evidence_budget,
+            production_aligned=(
+                args.sparse_top_k == DEFAULT_SPARSE_TOP_K
+                and args.dense_top_k == DEFAULT_DENSE_TOP_K
+                and args.fusion_top_k == DEFAULT_FUSION_TOP_K
+                and args.selected_evidence_budget == DEFAULT_SELECTED_EVIDENCE_BUDGET
+            ),
+        )
+        per_case = [
+            _case_metrics_row(item, selection_input_top_k=args.fusion_top_k)
+            for item in case_results
+        ]
+        metadata = build_report_metadata(
+            git_revision=None,
+            corpus_identity=str(args.chunks),
+            case_set_identity=DIRECT_EVIDENCE_CASE_SET_IDENTITY,
+            pipeline_family="direct_evidence",
+            evaluation_stage="local_hybrid_read_only_validation",
+            retrieval_mode="hybrid",
+            runtime_config=runtime_config,
+            warnings=(),
+            limitations=("manual local validation requires user-provided BGE-M3 and Qdrant",),
+        )
+        report = {
             "validation_type": "local_read_only_hybrid_retrieval",
             "collection_name": args.collection_name,
             "collection_metadata": _safe_collection_summary(collection_info),
@@ -233,8 +276,11 @@ async def _run_cases(args: argparse.Namespace, cases: list[dict[str, Any]]) -> d
             "dense_top_k": args.dense_top_k,
             "fusion_top_k": args.fusion_top_k,
             "selected_evidence_budget": args.selected_evidence_budget,
+            "aggregate_metrics": compute_aggregate_metrics(per_case),
             "cases": case_results,
         }
+        report.update(metadata.to_dict())
+        return report
     finally:
         await client.close()
 
@@ -260,34 +306,36 @@ async def _run_one_case(
     prompt = prompt_builder(query=case["query"], selection_result=selection)
     targets = case["expected_targets"]
     selected = [
-        _summary(item.packet, rank=index)
+        provision_summary(item.packet, rank=index)
         for index, item in enumerate(selection.selected_evidence, start=1)
     ]
-    citations = [_summary(item, rank=index) for index, item in enumerate(prompt.evidence, start=1)]
+    citations = [
+        provision_summary(item, rank=index) for index, item in enumerate(prompt.evidence, start=1)
+    ]
     primary_target = targets[0] if targets else None
     direct_primary_pass = bool(
-        primary_target and selected and _matches(selected[0], primary_target)
+        primary_target and selected and summary_matches_target(selected[0], primary_target)
     )
     multi_pass = all(
-        any(_matches(item, target) for item in selected)
-        and any(_matches(item, target) for item in citations)
+        any(summary_matches_target(item, target) for item in selected)
+        and any(summary_matches_target(item, target) for item in citations)
         for target in targets
     )
     return {
         "case_id": case["case_id"],
         "question": case["query"],
-        "expected_targets": targets,
+        "expected_targets": [target.to_dict() for target in targets],
         "sparse_target_rank": {
-            target_key(target): _target_rank(sparse_result.results, target) for target in targets
+            target_key(target): target_rank(sparse_result.results, target) for target in targets
         },
         "dense_target_rank": {
-            target_key(target): _target_rank(dense_result.results, target) for target in targets
+            target_key(target): target_rank(dense_result.results, target) for target in targets
         },
         "fused_target_rank": {
-            target_key(target): _target_rank(fused.results, target) for target in targets
+            target_key(target): target_rank(fused.results, target) for target in targets
         },
         "fused_top10_law_article_clause_set": [
-            _summary(item, rank=item.rank) for item in fused.results
+            provision_summary(item, rank=item.rank) for item in fused.results
         ],
         "selected_evidence_set": selected,
         "citation_set": citations,
@@ -306,77 +354,41 @@ async def _run_one_case(
     }
 
 
-def _parse_target(raw: str) -> dict[str, str | None]:
-    parts = [part.strip() for part in raw.split(":")]
-    if len(parts) < 2 or len(parts) > 4 or not all(parts[:2]):
-        raise ValueError("expected target format is law_id:article[:clause[:point]]")
-    return {
-        "law_id": parts[0],
-        "article_number": parts[1],
-        "clause_number": parts[2] if len(parts) >= 3 and parts[2] else None,
-        "point_label": parts[3] if len(parts) >= 4 and parts[3] else None,
-    }
-
-
-def _target_from_mapping(raw: dict[str, Any]) -> dict[str, str | None]:
-    return {
-        "law_id": str(raw["law_id"]),
-        "article_number": str(raw["article_number"]),
-        "clause_number": str(raw["clause_number"]) if raw.get("clause_number") else None,
-        "point_label": str(raw["point_label"]) if raw.get("point_label") else None,
-    }
-
-
-def _summary(item: Any, *, rank: int) -> dict[str, Any]:
-    return {
-        "rank": rank,
-        "chunk_id": getattr(item, "chunk_id", None),
-        "law_id": getattr(item, "law_id", None),
-        "article_number": getattr(item, "article_number", None),
-        "clause_number": getattr(item, "clause_number", None),
-        "point_label": getattr(item, "point_label", None),
-        "citation": getattr(item, "citation", None),
-    }
-
-
-def _target_rank(candidates: list[Any], target: dict[str, str | None]) -> int | None:
-    for candidate in candidates:
-        if _object_matches(candidate, target):
-            return candidate.rank
-    return None
-
-
-def _matches(summary: dict[str, Any], target: dict[str, str | None]) -> bool:
-    return (
-        summary["law_id"] == target["law_id"]
-        and summary["article_number"] == target["article_number"]
-        and (target["clause_number"] is None or summary["clause_number"] == target["clause_number"])
-        and (target["point_label"] is None or summary["point_label"] == target["point_label"])
-    )
-
-
-def _object_matches(item: Any, target: dict[str, str | None]) -> bool:
-    return (
-        getattr(item, "law_id", None) == target["law_id"]
-        and getattr(item, "article_number", None) == target["article_number"]
-        and (
-            target["clause_number"] is None
-            or getattr(item, "clause_number", None) == target["clause_number"]
+def _case_metrics_row(
+    case: dict[str, Any],
+    *,
+    selection_input_top_k: int,
+) -> dict[str, Any]:
+    """Convert local-hybrid diagnostics into canonical aggregate-metric input."""
+    target_rows = []
+    for target in case["expected_targets"]:
+        target_row = dict(target)
+        key = target_key(evidence_target_from_mapping(target))
+        rank = case["fused_target_rank"].get(key)
+        target_row.update(
+            {
+                "target_key": key,
+                "candidate_rank": rank,
+                "selection_input_rank": rank
+                if rank is not None and rank <= selection_input_top_k
+                else None,
+                "available_to_selection": rank is not None and rank <= selection_input_top_k,
+            }
         )
-        and (
-            target["point_label"] is None
-            or getattr(item, "point_label", None) == target["point_label"]
-        )
-    )
-
-
-def target_key(target: dict[str, str | None]) -> str:
-    parts = [target["law_id"] or "", f"Điều {target['article_number']}"]
-    if target["clause_number"]:
-        parts.append(f"Khoản {target['clause_number']}")
-    if target["point_label"]:
-        parts.append(f"Điểm {target['point_label']}")
-    return " / ".join(parts)
+        target_rows.append(target_row)
+    return {
+        "case_id": case["case_id"],
+        "expected_targets": target_rows,
+        "primary_evidence_accuracy": case["direct_primary_pass"],
+        "citation_alignment_accuracy": case["multi_article_coverage_pass"],
+        "cross_reference_only_primary_error": False,
+        "wrong_actor_primary_error": False,
+        "wrong_domain_primary_error": False,
+        "multi_article_coverage_accuracy": case["multi_article_coverage_pass"]
+        if len(target_rows) > 1
+        else None,
+        "pass": case["direct_primary_pass"] and case["multi_article_coverage_pass"],
+    }
 
 
 def _safe_collection_summary(collection_info: Any) -> dict[str, Any]:

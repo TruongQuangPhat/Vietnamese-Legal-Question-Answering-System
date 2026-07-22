@@ -20,7 +20,12 @@ from typing import Any
 
 LABOR_LAW_ID = "BLLD_VBHN"
 DEFAULT_CORPUS_PATH = Path("data/processed/legal_chunks.jsonl")
+DIRECT_EVIDENCE_SCHEMA_VERSION = "2.1"
+DIRECT_EVIDENCE_COMPARISON_SCHEMA_VERSION = "1.1"
+DIRECT_EVIDENCE_METRIC_CONTRACT_VERSION = "direct_evidence_metrics_v1_runtime_cutoff"
 RUNNER_EVALUATOR_VERSION = "retrieval_quality_generalization_v2_runtime_aligned"
+DIRECT_EVIDENCE_CASE_SET_IDENTITY = "direct_evidence_generalization_v1"
+DIRECT_EVIDENCE_MATCHING_GRANULARITY = "law_article_with_optional_clause_point"
 DEFAULT_SPARSE_RETRIEVAL_TOP_K = 50
 DEFAULT_DENSE_RETRIEVAL_TOP_K = 50
 DEFAULT_DIAGNOSTIC_CANDIDATE_TOP_K = 50
@@ -134,6 +139,52 @@ class BenchmarkRuntimeConfig:
 
 
 @dataclass(frozen=True)
+class DirectEvidenceReportMetadata:
+    """Compatibility metadata for direct-evidence report comparison.
+
+    Reports may be compared only when these fields describe the same metric
+    contract, corpus, case set, evaluation stage, and runtime cutoff semantics.
+    """
+
+    schema_version: str
+    metric_contract_version: str
+    evaluator_version: str
+    git_revision: str | None
+    corpus_identity: str
+    case_set_identity: str
+    pipeline_family: str
+    evaluation_stage: str
+    retrieval_mode: str
+    benchmark_mode: str
+    matching_granularity: str
+    cutoff_configuration: dict[str, Any]
+    warnings: tuple[str, ...] = ()
+    limitations: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize report metadata for machine-readable envelopes."""
+        return {
+            "schema_version": self.schema_version,
+            "metric_contract_version": self.metric_contract_version,
+            "evaluator_version": self.evaluator_version,
+            "runner_evaluator_version": self.evaluator_version,
+            "git_revision": self.git_revision,
+            "corpus_identity": self.corpus_identity,
+            "corpus_identifier_or_path": self.corpus_identity,
+            "case_set_identity": self.case_set_identity,
+            "pipeline_family": self.pipeline_family,
+            "evaluation_stage": self.evaluation_stage,
+            "retrieval_mode": self.retrieval_mode,
+            "benchmark_mode": self.benchmark_mode,
+            "matching_granularity": self.matching_granularity,
+            "cutoff_configuration": self.cutoff_configuration,
+            "configuration": self.cutoff_configuration,
+            "warnings": list(self.warnings),
+            "limitations": list(self.limitations),
+        }
+
+
+@dataclass(frozen=True)
 class EvidenceTarget:
     """Expected legal locator for one benchmark assertion."""
 
@@ -141,6 +192,10 @@ class EvidenceTarget:
     article_number: str
     clause_number: str | None = None
     point_label: str | None = None
+    role: str = "required"
+    acceptable_alternatives: tuple[EvidenceTarget, ...] = ()
+    forbidden_primary: bool = False
+    forbidden_citation: bool = False
 
     def as_key(self) -> str:
         """Return a stable target key at the configured matching granularity."""
@@ -158,7 +213,22 @@ class EvidenceTarget:
             "article_number": self.article_number,
             "clause_number": self.clause_number,
             "point_label": self.point_label,
+            "role": self.role,
+            "acceptable_alternatives": [
+                target.to_locator_dict() for target in self.acceptable_alternatives
+            ],
+            "forbidden_primary": self.forbidden_primary,
+            "forbidden_citation": self.forbidden_citation,
             "matching_granularity": _target_granularity(self),
+        }
+
+    def to_locator_dict(self) -> dict[str, str | None]:
+        """Serialize only the legal locator fields."""
+        return {
+            "law_id": self.law_id,
+            "article_number": self.article_number,
+            "clause_number": self.clause_number,
+            "point_label": self.point_label,
         }
 
 
@@ -172,8 +242,20 @@ class BenchmarkCase:
     intent: str
     expected_targets: tuple[EvidenceTarget, ...]
     primary_target: EvidenceTarget | None = None
+    supporting_targets: tuple[EvidenceTarget, ...] = ()
+    forbidden_primary_targets: tuple[EvidenceTarget, ...] = ()
+    forbidden_citation_targets: tuple[EvidenceTarget, ...] = ()
+    multi_target_all_required: bool = True
     forbid_labor_termination_articles: bool = False
     error_categories: tuple[str, ...] = field(default_factory=tuple)
+
+    def required_targets(self) -> tuple[EvidenceTarget, ...]:
+        """Return targets that must be selected and cited."""
+        return tuple(
+            target
+            for target in (*self.expected_targets, *self.supporting_targets)
+            if not target.forbidden_primary and not target.forbidden_citation
+        )
 
 
 @dataclass(frozen=True)
@@ -634,35 +716,42 @@ def run_sparse_selection_benchmark(
 
     cases = asyncio.run(_run_all())
     per_case = [case.to_dict(recall_depths=recall_depths) for case in cases]
-    return {
-        "schema_version": "2.0",
+    metadata = build_report_metadata(
+        git_revision=_git_revision(repo_root),
+        corpus_identity=str(corpus_path),
+        pipeline_family="direct_evidence",
+        evaluation_stage="sparse_selection_diagnostic",
+        retrieval_mode="sparse_selection",
+        runtime_config=runtime_config,
+        warnings=(),
+        limitations=("deterministic sparse diagnostics do not load BGE-M3 or query Qdrant",),
+    )
+    report = {
         "benchmark_id": "retrieval_quality_generalization",
-        "retrieval_mode": "sparse_selection",
         "repo_root": str(repo_root),
-        "corpus_path": str(corpus_path),
-        "corpus_identifier_or_path": str(corpus_path),
-        "runner_evaluator_version": RUNNER_EVALUATOR_VERSION,
-        "git_revision": _git_revision(repo_root),
-        "benchmark_mode": runtime_config.mode,
         "production_aligned": runtime_config.production_aligned,
         "retrieval_candidate_limit": runtime_config.diagnostic_candidate_top_k,
         "selection_input_limit": runtime_config.selection_input_top_k,
         "selected_evidence_limit": runtime_config.selected_evidence_budget,
-        "configuration": {
-            **runtime_config.to_dict(),
-            "candidate_top_k": runtime_config.diagnostic_candidate_top_k,
-            "recall_depths": list(recall_depths),
-            "evidence_budget": runtime_config.selected_evidence_budget,
-            "context_max_packets": runtime_config.selection_input_top_k,
-            "selection_max_selected_packets": runtime_config.selected_evidence_budget,
-            "prompt_mapping": "selected_evidence_order",
-        },
         "metric_definitions": metric_definitions(),
         "case_count": len(per_case),
         "case_splits": _split_counts(BENCHMARK_CASES),
         "aggregate_metrics": compute_aggregate_metrics(per_case, recall_depths=recall_depths),
         "cases": per_case,
     }
+    report.update(metadata.to_dict())
+    report["configuration"] = {
+        **report["configuration"],
+        "candidate_top_k": runtime_config.diagnostic_candidate_top_k,
+        "recall_depths": list(recall_depths),
+        "evidence_budget": runtime_config.selected_evidence_budget,
+        "context_max_packets": runtime_config.selection_input_top_k,
+        "selection_max_selected_packets": runtime_config.selected_evidence_budget,
+        "prompt_mapping": "selected_evidence_order",
+    }
+    report["cutoff_configuration"] = dict(report["configuration"])
+    report["corpus_path"] = str(corpus_path)
+    return report
 
 
 def metric_definitions() -> dict[str, str]:
@@ -816,10 +905,97 @@ def compute_aggregate_metrics(
     return metrics
 
 
+def build_report_metadata(
+    *,
+    git_revision: str | None,
+    corpus_identity: str,
+    pipeline_family: str,
+    evaluation_stage: str,
+    retrieval_mode: str,
+    runtime_config: BenchmarkRuntimeConfig,
+    case_set_identity: str = DIRECT_EVIDENCE_CASE_SET_IDENTITY,
+    evaluator_version: str = RUNNER_EVALUATOR_VERSION,
+    schema_version: str = DIRECT_EVIDENCE_SCHEMA_VERSION,
+    metric_contract_version: str = DIRECT_EVIDENCE_METRIC_CONTRACT_VERSION,
+    matching_granularity: str = DIRECT_EVIDENCE_MATCHING_GRANULARITY,
+    warnings: Sequence[str] = (),
+    limitations: Sequence[str] = (),
+) -> DirectEvidenceReportMetadata:
+    """Build canonical direct-evidence report metadata."""
+    return DirectEvidenceReportMetadata(
+        schema_version=schema_version,
+        metric_contract_version=metric_contract_version,
+        evaluator_version=evaluator_version,
+        git_revision=git_revision,
+        corpus_identity=corpus_identity,
+        case_set_identity=case_set_identity,
+        pipeline_family=pipeline_family,
+        evaluation_stage=evaluation_stage,
+        retrieval_mode=retrieval_mode,
+        benchmark_mode=runtime_config.mode,
+        matching_granularity=matching_granularity,
+        cutoff_configuration=runtime_config.to_dict(),
+        warnings=tuple(warnings),
+        limitations=tuple(limitations),
+    )
+
+
+def validate_report_compatibility(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    *,
+    allow_diagnostic_mode_mismatch: bool = False,
+) -> None:
+    """Reject direct-evidence report comparison when contracts differ.
+
+    Args:
+        before: Baseline report envelope.
+        after: Candidate report envelope.
+        allow_diagnostic_mode_mismatch: Reserved escape hatch for future
+            explicitly diagnostic comparisons. The default rejects
+            runtime-aligned versus deep-diagnostic reports.
+
+    Raises:
+        ValueError: If any required compatibility field differs.
+    """
+    fields = (
+        "schema_version",
+        "metric_contract_version",
+        "corpus_identity",
+        "case_set_identity",
+        "matching_granularity",
+        "pipeline_family",
+        "evaluation_stage",
+        "retrieval_mode",
+    )
+    mismatches = [field for field in fields if before.get(field) != after.get(field)]
+    before_cutoffs = before.get("cutoff_configuration") or before.get("configuration") or {}
+    after_cutoffs = after.get("cutoff_configuration") or after.get("configuration") or {}
+    cutoff_fields = (
+        "diagnostic_candidate_top_k",
+        "fusion_output_top_k",
+        "selection_input_top_k",
+        "selected_evidence_budget",
+    )
+    for cutoff_field in cutoff_fields:
+        if before_cutoffs.get(cutoff_field) != after_cutoffs.get(cutoff_field):
+            mismatches.append(f"cutoff_configuration.{cutoff_field}")
+    if not allow_diagnostic_mode_mismatch and before.get("benchmark_mode") != after.get(
+        "benchmark_mode"
+    ):
+        mismatches.append("benchmark_mode")
+    if mismatches:
+        joined = ", ".join(mismatches)
+        raise ValueError(f"incompatible direct-evidence reports: {joined}")
+
+
 def compare_reports(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     """Compare two benchmark reports and list every case-level regression."""
+    validate_report_compatibility(before, after)
     before_cases = {case["case_id"]: case for case in before["cases"]}
     after_cases = {case["case_id"]: case for case in after["cases"]}
+    if before_cases.keys() != after_cases.keys():
+        raise ValueError("incompatible direct-evidence reports: case_id set differs")
     regressions: list[dict[str, Any]] = []
     improvements = 0
     unchanged = 0
@@ -844,14 +1020,26 @@ def compare_reports(before: dict[str, Any], after: dict[str, Any]) -> dict[str, 
     ]
 
     return {
-        "schema_version": "1.0",
+        "schema_version": DIRECT_EVIDENCE_COMPARISON_SCHEMA_VERSION,
+        "metric_contract_version": after["metric_contract_version"],
+        "evaluator_version": after["evaluator_version"],
         "benchmark_id": after["benchmark_id"],
+        "case_set_identity": after["case_set_identity"],
+        "corpus_identity": after["corpus_identity"],
+        "pipeline_family": after["pipeline_family"],
+        "evaluation_stage": after["evaluation_stage"],
+        "retrieval_mode": after["retrieval_mode"],
+        "benchmark_mode": after["benchmark_mode"],
+        "matching_granularity": after["matching_granularity"],
+        "cutoff_configuration": after.get("cutoff_configuration") or after["configuration"],
         "before": {
             "repo_root": before.get("repo_root"),
+            "git_revision": before.get("git_revision"),
             "aggregate_metrics": before["aggregate_metrics"],
         },
         "after": {
             "repo_root": after.get("repo_root"),
+            "git_revision": after.get("git_revision"),
             "aggregate_metrics": {
                 **after["aggregate_metrics"],
                 "regression_count": len(regressions),
@@ -933,18 +1121,42 @@ async def _evaluate_case(
     if len(case.expected_targets) > 1:
         multi_article_ok = selected_coverage_ok and citation_ok
 
+    forbidden_primary_targets = (
+        *case.forbidden_primary_targets,
+        *(target for target in case.expected_targets if target.forbidden_primary),
+    )
+    forbidden_citation_targets = (
+        *case.forbidden_citation_targets,
+        *(target for target in case.expected_targets if target.forbidden_citation),
+    )
     forbidden_selected = [
         item
-        for item in selected_summaries
-        if case.forbid_labor_termination_articles
-        and _is_labor_termination_article(item.get("law_id"), item.get("article_number"))
+        for item in selected_summaries[:1]
+        if any(_summary_matches_target(item, target) for target in forbidden_primary_targets)
     ]
     forbidden_cited = [
         item
         for item in prompt_summaries
-        if case.forbid_labor_termination_articles
-        and _is_labor_termination_article(item.get("law_id"), item.get("article_number"))
+        if any(_summary_matches_target(item, target) for target in forbidden_citation_targets)
     ]
+    forbidden_selected.extend(
+        [
+            item
+            for item in selected_summaries
+            if case.forbid_labor_termination_articles
+            and _is_labor_termination_article(item.get("law_id"), item.get("article_number"))
+        ]
+    )
+    forbidden_cited.extend(
+        [
+            item
+            for item in prompt_summaries
+            if case.forbid_labor_termination_articles
+            and _is_labor_termination_article(item.get("law_id"), item.get("article_number"))
+        ]
+    )
+    forbidden_selected = _deduplicate_summaries(forbidden_selected)
+    forbidden_cited = _deduplicate_summaries(forbidden_cited)
     pass_reasons = []
     if any(rank is None for rank in candidate_ranks.values()):
         pass_reasons.append("expected candidate missing")
@@ -1063,6 +1275,61 @@ def _provision_summary(item: Any, rank: int) -> dict[str, Any]:
     }
 
 
+def parse_evidence_target(raw: str) -> EvidenceTarget:
+    """Parse ``law_id:article[:clause[:point]]`` into an evidence target."""
+    parts = [part.strip() for part in raw.split(":")]
+    if len(parts) < 2 or len(parts) > 4 or not all(parts[:2]):
+        raise ValueError("expected target format is law_id:article[:clause[:point]]")
+    return EvidenceTarget(
+        law_id=parts[0],
+        article_number=parts[1],
+        clause_number=parts[2] if len(parts) >= 3 and parts[2] else None,
+        point_label=parts[3] if len(parts) >= 4 and parts[3] else None,
+    )
+
+
+def evidence_target_from_mapping(raw: dict[str, Any]) -> EvidenceTarget:
+    """Build an evidence target from a JSON-compatible mapping."""
+    alternatives = tuple(
+        evidence_target_from_mapping(item) for item in raw.get("acceptable_alternatives", [])
+    )
+    return EvidenceTarget(
+        law_id=str(raw["law_id"]),
+        article_number=str(raw["article_number"]),
+        clause_number=str(raw["clause_number"]) if raw.get("clause_number") else None,
+        point_label=str(raw["point_label"]) if raw.get("point_label") else None,
+        role=str(raw.get("role") or "required"),
+        acceptable_alternatives=alternatives,
+        forbidden_primary=bool(raw.get("forbidden_primary", False)),
+        forbidden_citation=bool(raw.get("forbidden_citation", False)),
+    )
+
+
+def provision_summary(item: Any, *, rank: int) -> dict[str, Any]:
+    """Return the canonical law/article/clause/point summary for one provision."""
+    return _provision_summary(item, rank)
+
+
+def target_rank(candidates: Iterable[Any], target: EvidenceTarget) -> int | None:
+    """Return the first candidate rank matching the expected target."""
+    return _target_rank(candidates, target)
+
+
+def object_matches_target(item: Any, target: EvidenceTarget) -> bool:
+    """Return whether an object with legal locator attributes matches a target."""
+    return _object_matches_target(item, target)
+
+
+def summary_matches_target(item: dict[str, Any], target: EvidenceTarget) -> bool:
+    """Return whether a JSON provision summary matches a target."""
+    return _summary_matches_target(item, target)
+
+
+def target_key(target: EvidenceTarget) -> str:
+    """Return the canonical target key used in per-case report rows."""
+    return target.as_key()
+
+
 def _target_rank(candidates: Iterable[Any], target: EvidenceTarget) -> int | None:
     for candidate in candidates:
         if _object_matches_target(candidate, target):
@@ -1113,6 +1380,24 @@ def _split_counts(cases: Sequence[BenchmarkCase]) -> dict[str, int]:
     for case in cases:
         counts[case.split] = counts.get(case.split, 0) + 1
     return counts
+
+
+def _deduplicate_summaries(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[tuple[Any, ...]] = set()
+    unique: list[dict[str, Any]] = []
+    for item in items:
+        key = (
+            item.get("chunk_id"),
+            item.get("law_id"),
+            item.get("article_number"),
+            item.get("clause_number"),
+            item.get("point_label"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
 
 
 def _target_granularity(target: EvidenceTarget) -> str:

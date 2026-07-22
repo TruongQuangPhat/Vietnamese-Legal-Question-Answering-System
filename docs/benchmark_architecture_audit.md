@@ -44,6 +44,29 @@ strict primary-evidence and citation-alignment behavior. It is not the frozen
 v0.1.0 benchmark and must not be used as a replacement for the official
 Naive/Advanced RAG reports under `artifacts/reports/evaluation/`.
 
+## Canonical Evaluation Core Map
+
+| Concept | Canonical implementation | Legacy or alternate implementation | Still called | Disposition |
+| --- | --- | --- | --- | --- |
+| Frozen benchmark case schema | `src/evaluation/benchmark/schemas.py::BenchmarkQuery` | Direct-evidence diagnostic `BenchmarkCase` | Yes, by separate suites | Keep separate until direct-evidence cases are promoted through the protected freeze workflow. |
+| Direct-evidence diagnostic case schema | `src/evaluation/benchmark/direct_evidence.py::BenchmarkCase` | Test-local case dataclasses | Yes, tests only | Keep as fixtures only; target locators use canonical `EvidenceTarget` where metric semantics matter. |
+| Frozen expected legal target schema | `src/evaluation/benchmark/schemas.py::LegalTarget` and `LegalTargetReference` | `src/retrieval/evaluation.py::ExpectedTarget` strict-generation adapter | Yes | Keep; these serve frozen benchmark and generation-evaluation contracts. |
+| Direct-evidence expected target schema | `src/evaluation/benchmark/direct_evidence.py::EvidenceTarget` | Local-hybrid dict targets and hybrid-fixture `Target` dataclass | Local-hybrid dict targets and hybrid-fixture `Target` removed | Canonical for direct-evidence diagnostics and local hybrid validation. |
+| Frozen retrieval metric contracts | `src/evaluation/benchmark/retrieval_baseline.py` | Direct-evidence metric functions | Yes | Keep namespaced. Frozen metrics are qrels/evidence-group retrieval metrics. |
+| Direct-evidence metric contracts | `src/evaluation/benchmark/direct_evidence.py::metric_definitions` and `compute_aggregate_metrics` | Local-hybrid local aggregation | Local-hybrid now converts cases into canonical metric rows | Canonical for direct-evidence diagnostics and local hybrid validation. |
+| Frozen per-case retrieval result | `src/evaluation/benchmark/retrieval_baseline.py::evaluate_case_retrieval` | Direct-evidence `CaseEvaluation` | Yes | Keep separate because the oracles differ. |
+| Direct-evidence per-case result | `src/evaluation/benchmark/direct_evidence.py::CaseEvaluation` plus canonical target summary helpers | Local-hybrid independently parsed ranks and matching | Local-hybrid now reuses canonical parsing, matching, summaries, and metrics | Canonical for branch diagnostics. |
+| Frozen aggregate benchmark result | `aggregate_case_metrics`, `aggregate_generation_metrics`, and strict-generation aggregators | Direct-evidence aggregate metrics | Yes | Keep separate and namespaced because denominators differ. |
+| Direct-evidence aggregate result | `src/evaluation/benchmark/direct_evidence.py::compute_aggregate_metrics` | Local-hybrid aggregate pass fields | Local-hybrid now calls canonical aggregate metrics | Canonical for direct-evidence diagnostics. |
+| Benchmark metadata | Frozen manifests and artifact writers | Branch diagnostic JSON metadata | Yes | Direct-evidence now uses `DirectEvidenceReportMetadata`; official artifacts keep existing manifest schema. |
+| Direct-evidence compatibility checking | `src/evaluation/benchmark/direct_evidence.py::validate_report_compatibility` | Previous loose same-shape comparison | Yes, via `compare_reports` | Canonical; comparisons reject incompatible schema, contract, corpus, case set, granularity, stage, mode, and cutoffs. |
+| Result comparison | Official frozen comparison helpers and direct-evidence `compare_reports` | Previous direct-evidence loose comparison | Yes | Keep separate because official comparisons use frozen metrics and direct-evidence compares selected-primary/citation regressions. |
+
+The repository therefore has one canonical implementation for each concept
+within its owning evaluation family. Where frozen benchmark and direct-evidence
+diagnostics intentionally differ, metric names and metadata contracts are
+namespaced and comparison is rejected across incompatible envelopes.
+
 ## Path Status
 
 | Path | Status | Notes |
@@ -127,13 +150,13 @@ Naive/Advanced RAG reports under `artifacts/reports/evaluation/`.
 | Component | Duplicated area reviewed | Decision | Rationale and follow-up |
 | --- | --- | --- | --- |
 | `src/evaluation/benchmark/direct_evidence.py` | Case schema, expected-target representation, retrieval metrics, selected-primary and citation metrics, JSON report writer | KEEP_AS_CANONICAL in benchmark package | The oracle is stricter than frozen retrieval metrics because it evaluates primary selected evidence and prompt citation alignment. It remains named `direct_evidence` to avoid conflicting with frozen benchmark metrics. Future promotion of its cases should use the protected benchmark freeze process. |
-| `src/evaluation/retrieval_quality_generalization.py` | Parallel module path outside `src/evaluation/benchmark` | CONVERT_TO_THIN_WRAPPER | This file now only re-exports the canonical package module for branch-era import compatibility. It must not grow independent logic. |
+| `src/evaluation/retrieval_quality_generalization.py` | Parallel module path outside `src/evaluation/benchmark` | CONVERT_TO_THIN_WRAPPER | This file now explicitly re-exports the stable direct-evidence surface from the canonical package module for branch-era import compatibility. It must not grow independent logic or wildcard exports. |
 | `scripts/evaluation/run_retrieval_quality_generalization_benchmark.py` | Argument parsing, JSON serialization, before/after comparison | CONVERT_TO_THIN_WRAPPER | The script delegates reusable logic to `src.evaluation.benchmark.direct_evidence`. It should write to explicit temporary paths and must not create official artifacts. A future CLI consolidation can make this a subcommand of a shared evaluation CLI. |
 | Direct-evidence in-code `BenchmarkCase` registry | Frozen benchmark case registry and `LegalTarget` schemas | MERGE_INTO_EXISTING pending protected benchmark process | The diagnostic cases should not be copied into `data/eval` during this task. If accepted as durable benchmark cases, they need review records, split assignment, qrels/evidence groups, and manifest updates through the official freeze workflow. |
 | `EvidenceTarget` in direct-evidence diagnostics | `LegalTarget` in `src/evaluation/benchmark/schemas.py` | MERGE_INTO_EXISTING pending schema extension | Direct-evidence matching needs article, clause, and point locator exactness plus primary/supporting/forbidden semantics. The current frozen schemas can represent much of this, but citation-alignment and selected-primary oracle fields need a deliberate schema extension before unification. |
 | Direct-evidence aggregate metrics | `retrieval_baseline.py` metrics | MOVE_TO_SHARED_CORE completed at package level | The metric definitions are not duplicates of Recall@k/MRR only. They add selection and citation denominators after runtime cutoff truncation. They must remain explicitly documented to avoid conflicting metric names. |
 | Direct-evidence compare reports | Existing artifact comparison conventions | MOVE_TO_SHARED_CORE for diagnostic use; DEPRECATE for official artifacts | It is useful for same-runner before/after branch comparison under `/tmp`. Official reports should continue using frozen benchmark artifact writers and manifests. |
-| `scripts/evaluation/run_local_hybrid_retrieval_validation.py` | Dense retrieval setup, sparse retrieval setup, coverage-aware fusion setup, service preflight, JSON output | MERGE_INTO_EXISTING pending shared local hybrid factory | It fills a manual safety gap: read-only local hybrid validation without LLM calls. It is not a benchmark framework. Future refactor should move reusable local hybrid factory code into `src/retrieval/workflows` or `src/evaluation/benchmark` and keep this script thin. |
+| `scripts/evaluation/run_local_hybrid_retrieval_validation.py` | Dense retrieval setup, sparse retrieval setup, coverage-aware fusion setup, service preflight, JSON output | MERGE_INTO_EXISTING pending shared local hybrid factory | It fills a manual safety gap: read-only local hybrid validation without LLM calls. It now reuses canonical direct-evidence target parsing, matching, cutoff config, aggregate metrics, and result metadata. It is not a benchmark framework. Future refactor should move reusable local hybrid factory code into `src/retrieval/workflows` or `src/evaluation/benchmark` and keep this script thin. |
 | `tests/unit/evaluation/test_retrieval_quality_generalization.py` | Metric contract tests | KEEP_AS_CANONICAL tests for direct-evidence diagnostics | These tests protect cutoff, denominator, and compatibility-shim behavior without running a benchmark. |
 | `tests/integration/retrieval/test_direct_article_priority_workflow.py` | Retrieval benchmark cases | KEEP_AS_CANONICAL regression tests | These are deterministic workflow regressions, not benchmark artifacts. |
 | `tests/integration/retrieval/test_hybrid_generalization_fixture_workflow.py` | Hybrid benchmark runner behavior | KEEP_AS_CANONICAL fixture tests | These tests model 50 sparse plus 50 dense candidates through the real fusion implementation, fused top 10, selection top 5. They do not query Qdrant or load BGE-M3. |
@@ -199,6 +222,133 @@ paths, normally under `/tmp`, and their JSON must include:
 
 They must not write to `artifacts/reports/evaluation` unless a future task
 promotes the suite into the official benchmark process.
+
+## Direct-Evidence Result Compatibility
+
+Direct-evidence reports use this required envelope:
+
+- `schema_version`;
+- `metric_contract_version`;
+- `evaluator_version`;
+- `git_revision`;
+- `corpus_identity`;
+- `case_set_identity`;
+- `pipeline_family`;
+- `evaluation_stage`;
+- `retrieval_mode`;
+- `benchmark_mode`;
+- `matching_granularity`;
+- `cutoff_configuration`;
+- `cases`;
+- `aggregate_metrics`;
+- `warnings`;
+- `limitations`.
+
+`compare_reports` calls `validate_report_compatibility` before computing any
+delta. Comparison fails with `ValueError` when any of these differ:
+
+- schema version;
+- metric contract version;
+- corpus identity;
+- case-set identity;
+- matching granularity;
+- pipeline family;
+- retrieval mode;
+- evaluation stage;
+- benchmark mode, unless a future explicit diagnostic-only mode is added;
+- diagnostic candidate limit;
+- fusion output limit;
+- selection input limit;
+- selected evidence budget.
+
+This prevents comparing runtime-aligned and deep-diagnostic reports, or
+comparing direct-evidence diagnostics against official Naive/Advanced artifacts,
+as if they shared one oracle.
+
+## Local Environment Readiness
+
+Static inspection found the supported local real-hybrid configuration:
+
+- BGE-M3 model path override: `EMBEDDING_MODEL_PATH` or
+  `LEGAL_QA_EMBEDDING_MODEL_PATH`.
+- Default model name when no local path is provided: `BAAI/bge-m3`.
+- Retrieval config: `configs/retrieval/retrieval.yml`.
+- Qdrant URL default: `http://localhost:6333`.
+- Expected collection for retrieval/runtime validation:
+  `vnlaw_chunks_bgem3_v1_full`.
+- Dense vector name: `dense`.
+- Expected dense dimension: `1024`.
+- Distance in indexing config: `Cosine`.
+- Local fake-mode `docker-compose.yml` does not start Qdrant and does not
+  mount a Qdrant volume.
+- `.env.example` documents Qdrant and model variables but does not provide a
+  local model artifact path.
+
+Blocker: this repository does not contain a committed BGE-M3 model artifact,
+Qdrant volume, collection snapshot, or safe local collection restoration
+procedure for `vnlaw_chunks_bgem3_v1_full`. Actual local hybrid validation
+therefore requires the user to provide an existing local BGE-M3 directory and a
+read-only local Qdrant instance containing the expected collection. Do not use
+production Qdrant as a substitute and do not rebuild the collection during this
+branch-validation task.
+
+## Final Benchmark Run Policy
+
+These commands are required only after the repository is marked ready for
+benchmark; they were not executed during this audit.
+
+| Run | Mandatory | Reason | Required services | Calls external LLM | Existing artifacts reusable | Compatibility requirements |
+| --- | --- | --- | --- | --- | --- | --- |
+| Direct-evidence runtime-aligned diagnostic | Yes | Branch gate for selected-primary and citation alignment under production cutoffs | None; local processed chunks only | No | No, regenerate current same-runner before/after JSON under `/tmp` | Same direct-evidence schema, metric contract, corpus, case set, mode, granularity, and cutoffs. |
+| Direct-evidence deep diagnostic | Optional | Root-cause analysis for targets outside top-10 selection input | None; local processed chunks only | No | No | Must not be compared to runtime-aligned mode except through future explicit diagnostic-only comparison. |
+| Official Advanced retrieval benchmark | Yes for final quality claim | Confirms adopted coverage-aware retrieval on frozen v0.1.0 | BGE-M3 and read-only Qdrant for dense/hybrid runs | No | Historical artifacts are reference only; final branch validation should write a unique new output directory when explicitly approved | Frozen benchmark manifests, corpus, split, and config fixed. |
+| Official Naive retrieval benchmark | Optional unless comparing against refreshed Advanced results | Historical baseline comparison | BGE-M3 and read-only Qdrant | No | Historical baseline may be reused only when evaluator/corpus/config compatibility is unchanged | Same frozen benchmark version and retrieval artifact contract. |
+| Naive/Advanced comparison | Optional reporting | Places branch result against historical baseline | Existing compatible retrieval artifacts | No | Existing artifacts may be reused if compatibility is verified | Reject incompatible benchmark versions, config hashes, corpus hashes, or metric schemas. |
+| Local real hybrid validation | Yes before PASS | Validates actual local BGE-M3 + Qdrant + sparse + fusion + selection + prompt mapping path | Local BGE-M3 model and read-only local Qdrant collection | No | No | Must use direct-evidence schema, runtime cutoffs 50/50 -> 10 -> 5, and report local-service limitations. |
+| Generation benchmark | Optional for this retrieval-quality branch unless final scope expands to answers | Validates strict generation and fallback behavior | LLM provider and compatible retrieval artifacts | Yes | Existing official artifacts are reference only | Requires explicit approval, fixed retrieval artifact inputs, and no overwritten official reports. |
+
+Manual command templates for the final benchmark phase:
+
+```bash
+# Direct-evidence runtime-aligned diagnostic, after explicit approval.
+uv run python scripts/evaluation/run_retrieval_quality_generalization_benchmark.py run \
+  --mode runtime_aligned \
+  --repo-root /path/to/checkout \
+  --corpus /home/phat/AI_Project/VnLaw-QA/data/processed/legal_chunks.jsonl \
+  --sparse-retrieval-top-k 50 \
+  --dense-retrieval-top-k 50 \
+  --diagnostic-candidate-top-k 50 \
+  --fusion-output-top-k 10 \
+  --selection-input-top-k 10 \
+  --selected-evidence-budget 5 \
+  --output /tmp/vnlaw-benchmarks/runtime-aligned-after.json
+
+# Optional direct-evidence deep diagnostic.
+uv run python scripts/evaluation/run_retrieval_quality_generalization_benchmark.py run \
+  --mode deep_diagnostic \
+  --repo-root /path/to/checkout \
+  --corpus /home/phat/AI_Project/VnLaw-QA/data/processed/legal_chunks.jsonl \
+  --output /tmp/vnlaw-benchmarks/deep-diagnostic-after.json
+
+# Compare same-contract direct-evidence reports.
+uv run python scripts/evaluation/run_retrieval_quality_generalization_benchmark.py compare \
+  --before /tmp/vnlaw-benchmarks/runtime-aligned-before.json \
+  --after /tmp/vnlaw-benchmarks/runtime-aligned-after.json \
+  --output /tmp/vnlaw-benchmarks/runtime-aligned-comparison.json
+
+# Local real hybrid validation; loads BGE-M3 and queries local Qdrant read-only.
+uv run python scripts/evaluation/run_local_hybrid_retrieval_validation.py \
+  --confirm-local-read-only \
+  --config configs/retrieval/retrieval.yml \
+  --chunks data/processed/legal_chunks.jsonl \
+  --cases /tmp/vnlaw-benchmarks/direct-evidence-cases.json \
+  --collection-name vnlaw_chunks_bgem3_v1_full \
+  --sparse-top-k 50 \
+  --dense-top-k 50 \
+  --fusion-top-k 10 \
+  --selected-evidence-budget 5 \
+  --output /tmp/vnlaw-benchmarks/local-hybrid-validation.json
+```
 
 ## Canonical Future Direction
 
