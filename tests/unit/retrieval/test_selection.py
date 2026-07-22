@@ -221,6 +221,89 @@ def test_selection_prioritizes_direct_employee_termination_article() -> None:
     assert result.selected_evidence[0].chunk_id == "article-35-clause-2-a"
 
 
+def test_point_locator_does_not_promote_sibling_point_through_clause_match() -> None:
+    """Point-level locators must not let a sibling point inherit clause alignment."""
+    point_a = make_packet(
+        rank=2,
+        chunk_id="law-x-article-8-clause-1-point-a",
+        law_id="LAW_X",
+        law_name="Luật Kiểm thử",
+        article_number="8",
+        article_title="Điều kiện đăng ký",
+        clause_number="1",
+        point_label="a",
+        citation="Luật Kiểm thử, Điểm a, Khoản 1, Điều 8",
+        text="a) Cá nhân từ đủ 20 tuổi trở lên được đăng ký.",
+        parent_text=(
+            "Điều 8. Điều kiện đăng ký\n"
+            "1. Việc đăng ký phải tuân theo các điều kiện sau đây:\n"
+            "a) Cá nhân từ đủ 20 tuổi trở lên được đăng ký;\n"
+            "b) Việc đăng ký do cá nhân tự nguyện quyết định."
+        ),
+    )
+    sibling_point = make_packet(
+        rank=1,
+        chunk_id="law-x-article-8-clause-1-point-b",
+        law_id="LAW_X",
+        law_name="Luật Kiểm thử",
+        article_number="8",
+        article_title="Điều kiện đăng ký",
+        clause_number="1",
+        point_label="b",
+        citation="Luật Kiểm thử, Điểm b, Khoản 1, Điều 8",
+        text="b) Việc đăng ký do cá nhân tự nguyện quyết định.",
+        parent_text=None,
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [sibling_point, point_a],
+            query="Điểm a khoản 1 Điều 8 Luật Kiểm thử quy định điều kiện độ tuổi thế nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "law-x-article-8-clause-1-point-a"
+
+
+def test_clause_locator_does_not_promote_sibling_clause_through_article_match() -> None:
+    """Clause-level locators must keep sibling clauses below the exact clause."""
+    exact_clause = make_packet(
+        rank=2,
+        chunk_id="law-y-article-12-clause-2",
+        law_id="LAW_Y",
+        law_name="Luật Kiểm thử",
+        article_number="12",
+        article_title="Nghĩa vụ của tổ chức",
+        clause_number="2",
+        citation="Luật Kiểm thử, Khoản 2, Điều 12",
+        text="2. Tổ chức phải thông báo trong thời hạn 05 ngày.",
+        parent_text=None,
+    )
+    sibling_clause = make_packet(
+        rank=1,
+        chunk_id="law-y-article-12-clause-1",
+        law_id="LAW_Y",
+        law_name="Luật Kiểm thử",
+        article_number="12",
+        article_title="Nghĩa vụ của tổ chức",
+        clause_number="1",
+        citation="Luật Kiểm thử, Khoản 1, Điều 12",
+        text="1. Tổ chức có quyền yêu cầu cơ quan xác nhận hồ sơ.",
+        parent_text=None,
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [sibling_clause, exact_clause],
+            query="Khoản 2 Điều 12 Luật Kiểm thử quy định thời hạn thông báo bao lâu?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "law-y-article-12-clause-2"
+
+
 def test_selection_prioritizes_unlawful_definition_when_query_asks_unlawful() -> None:
     """Unlawful-definition questions should cite the definition article first."""
     definition = make_packet(

@@ -859,6 +859,13 @@ def _query_locators(normalized_query: str) -> list[dict[str, str | None]]:
             "clause": match.group("clause"),
             "point": None,
         }
+        if any(
+            existing["article"] == candidate["article"]
+            and existing.get("clause") == candidate["clause"]
+            and existing.get("point") is not None
+            for existing in locators
+        ):
+            continue
         if candidate not in locators:
             locators.append(candidate)
     for match in _ARTICLE_LOCATOR_PATTERN.finditer(normalized_query):
