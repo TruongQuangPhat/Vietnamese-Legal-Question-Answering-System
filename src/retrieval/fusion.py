@@ -37,6 +37,7 @@ class QuotaSelectionConfig:
     fused_best: int
     sparse_quota: int
     dense_quota: int
+    prefer_distinct_legal_targets: bool = True
 
 
 @dataclass(frozen=True)
@@ -140,21 +141,51 @@ def select_with_source_quotas(
     }
     selected: list[FusedCandidate] = []
     seen: set[str] = set()
+    seen_legal_targets: set[tuple[str | None, str | None]] = set()
 
-    _append_from_candidates(selected, seen, candidates, quota_config.fused_best)
+    _append_from_candidates(
+        selected,
+        seen,
+        candidates,
+        quota_config.fused_best,
+        seen_legal_targets=seen_legal_targets,
+        prefer_distinct_legal_targets=False,
+    )
+    seen_legal_targets = set()
     sparse_order = [
         by_id[result.chunk_id]
         for result in sorted(sparse_results, key=lambda chunk: (chunk.rank, chunk.chunk_id or ""))
         if result.chunk_id in by_id
     ]
-    _append_from_candidates(selected, seen, sparse_order, quota_config.sparse_quota)
+    _append_from_candidates(
+        selected,
+        seen,
+        sparse_order,
+        quota_config.sparse_quota,
+        seen_legal_targets=seen_legal_targets,
+        prefer_distinct_legal_targets=quota_config.prefer_distinct_legal_targets,
+    )
     dense_order = [
         by_id[result.chunk_id]
         for result in sorted(dense_results, key=lambda chunk: (chunk.rank, chunk.chunk_id or ""))
         if result.chunk_id in by_id
     ]
-    _append_from_candidates(selected, seen, dense_order, quota_config.dense_quota)
-    _append_from_candidates(selected, seen, candidates, final_top_k - len(selected))
+    _append_from_candidates(
+        selected,
+        seen,
+        dense_order,
+        quota_config.dense_quota,
+        seen_legal_targets=seen_legal_targets,
+        prefer_distinct_legal_targets=quota_config.prefer_distinct_legal_targets,
+    )
+    _append_from_candidates(
+        selected,
+        seen,
+        candidates,
+        final_top_k - len(selected),
+        seen_legal_targets=seen_legal_targets,
+        prefer_distinct_legal_targets=False,
+    )
     return selected[:final_top_k]
 
 
@@ -322,19 +353,46 @@ def _append_from_candidates(
     seen: set[str],
     candidates: list[FusedCandidate],
     limit: int,
+    *,
+    seen_legal_targets: set[tuple[str | None, str | None]] | None = None,
+    prefer_distinct_legal_targets: bool = False,
 ) -> None:
     if limit <= 0:
         return
+    if seen_legal_targets is None:
+        seen_legal_targets = {_article_key(candidate) for candidate in selected}
     added = 0
-    for candidate in candidates:
-        chunk_id = candidate.chunk.chunk_id
-        if chunk_id is None or chunk_id in seen:
-            continue
-        selected.append(candidate)
-        seen.add(chunk_id)
-        added += 1
-        if added >= limit:
-            return
+    candidate_passes: tuple[Iterable[FusedCandidate], ...] = (iter(candidates),)
+    if prefer_distinct_legal_targets:
+        candidate_passes = (
+            (
+                candidate
+                for candidate in candidates
+                if _article_key(candidate) not in seen_legal_targets
+            ),
+            iter(candidates),
+        )
+    for candidate_iter in candidate_passes:
+        for candidate in candidate_iter:
+            if _append_one_candidate(selected, seen, seen_legal_targets, candidate):
+                added += 1
+                if added >= limit:
+                    return
+
+
+def _append_one_candidate(
+    selected: list[FusedCandidate],
+    seen: set[str],
+    seen_legal_targets: set[tuple[str | None, str | None]],
+    candidate: FusedCandidate,
+) -> bool:
+    chunk_id = candidate.chunk.chunk_id
+    if chunk_id is None or chunk_id in seen:
+        return False
+    selected.append(candidate)
+    seen.add(chunk_id)
+    seen_legal_targets.add(_article_key(candidate))
+    return True
 
 
 def _diversity_sort_key(

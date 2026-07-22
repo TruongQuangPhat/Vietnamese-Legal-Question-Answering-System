@@ -17,13 +17,14 @@ def _hit(
     *,
     rank: int,
     score: float = 1.0,
+    law_id: str = "LAW_A",
     article_number: str = "1",
 ) -> RetrievedChunk:
     return RetrievedChunk(
         rank=rank,
         score=score,
         chunk_id=chunk_id,
-        law_id="LAW_A",
+        law_id=law_id,
         article_number=article_number,
         text="Synthetic legal text.",
     )
@@ -139,6 +140,52 @@ def test_quota_selection_adds_sparse_and_dense_slots() -> None:
     assert fused[0].metadata["fusion"]["retrieval_method"] == "hybrid_dense_sparse_rrf"
     assert any(candidate.metadata["fusion"]["sparse_rank"] is not None for candidate in fused)
     assert any(candidate.metadata["fusion"]["dense_rank"] is not None for candidate in fused)
+
+
+def test_source_quota_prefers_distinct_legal_targets_before_sparse_duplicates() -> None:
+    """Sparse quota keeps a lower-ranked distinct provision before article duplicates."""
+    fused = reciprocal_rank_fusion(
+        dense_results=[
+            _hit(f"dense_{index}", rank=index, article_number=f"D{index}") for index in range(1, 6)
+        ],
+        sparse_results=[
+            _hit("civil_clause_1", rank=1, law_id="LAW_CIVIL", article_number="569"),
+            _hit("civil_clause_2", rank=2, law_id="LAW_CIVIL", article_number="569"),
+            _hit("labor_clause_36", rank=3, law_id="LAW_LABOR", article_number="36"),
+            _hit("labor_clause_37", rank=4, law_id="LAW_LABOR", article_number="37"),
+            _hit("labor_clause_35", rank=5, law_id="LAW_LABOR", article_number="35"),
+        ],
+        final_top_k=4,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=0, sparse_quota=4, dense_quota=0),
+    )
+
+    sparse_ids = [
+        candidate.chunk_id
+        for candidate in fused
+        if candidate.metadata["fusion"]["sparse_rank"] is not None
+    ]
+    assert "labor_clause_35" in sparse_ids
+    assert "civil_clause_2" not in sparse_ids
+
+
+def test_source_quota_fills_duplicate_legal_targets_when_distinct_targets_are_exhausted() -> None:
+    """Legal-target diversity is a preference, not a hard exclusion."""
+    fused = reciprocal_rank_fusion(
+        dense_results=[],
+        sparse_results=[
+            _hit("article_1_clause_1", rank=1, article_number="1"),
+            _hit("article_1_clause_2", rank=2, article_number="1"),
+        ],
+        final_top_k=2,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=0, sparse_quota=2, dense_quota=0),
+    )
+
+    assert [candidate.chunk_id for candidate in fused] == [
+        "article_1_clause_1",
+        "article_1_clause_2",
+    ]
 
 
 def test_diversity_penalty_promotes_different_article() -> None:
