@@ -13,7 +13,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from src.evaluation.benchmark.fingerprinting import sha256_file
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    sha256_file,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.loader import (
     BenchmarkFileSet,
     load_benchmark_dataset,
@@ -73,6 +77,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default=None)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -87,7 +92,7 @@ async def run_baseline(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     client: Any | None = None
     try:
-        validate_cli_arguments(args.output_dir)
+        validate_cli_arguments(args.output_dir, output_policy=args.output_policy)
         retrieval_config = load_retrieval_config(args.config)
         top_k = args.top_k or retrieval_config.dense_retrieval.top_k
         if top_k <= 0:
@@ -216,13 +221,15 @@ async def run_baseline(argv: list[str] | None = None) -> int:
     return EXIT_SUCCESS
 
 
-def validate_cli_arguments(output_dir: Path) -> None:
-    """Reject output paths outside the approved evaluation report area."""
-    resolved = output_dir.expanduser().resolve()
-    if resolved != EVALUATION_REPORTS_ROOT and EVALUATION_REPORTS_ROOT not in resolved.parents:
-        raise ValueError(
-            "output-dir must be under artifacts/reports/evaluation for this benchmark run"
-        )
+def validate_cli_arguments(output_dir: Path, *, output_policy: str = "canonical") -> None:
+    """Validate the output path against the shared official benchmark policy."""
+    validate_benchmark_output_dir(
+        output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=output_policy,
+        label="output-dir",
+    )
 
 
 async def read_collection_info(client: Any, collection_name: str) -> dict[str, Any]:

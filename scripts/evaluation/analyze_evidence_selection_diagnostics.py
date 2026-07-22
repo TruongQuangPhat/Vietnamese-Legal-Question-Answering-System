@@ -18,6 +18,10 @@ from src.evaluation.benchmark.evidence_selection_diagnostics import (
     EvidenceSelectionDiagnosticsPaths,
     run_evidence_selection_diagnostics,
 )
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    validate_benchmark_output_dir,
+)
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -32,6 +36,7 @@ DEFAULT_EVIDENCE_GROUPS = Path("data/eval/legal_qa_benchmark/evidence_groups.jso
 DEFAULT_OUTPUT_DIR = Path(
     "artifacts/reports/evaluation/advanced_rag/evidence_selection_diagnostics"
 )
+EVALUATION_REPORTS_ROOT = REPO_ROOT / "artifacts/reports/evaluation"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -56,6 +61,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--qrels", type=Path, default=DEFAULT_QRELS)
     parser.add_argument("--evidence-groups", type=Path, default=DEFAULT_EVIDENCE_GROUPS)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -64,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     """Run offline evidence selection diagnostics."""
     args = build_arg_parser().parse_args(argv)
     try:
+        validate_cli_arguments(args.output_dir, output_policy=args.output_policy)
         diagnostics = run_evidence_selection_diagnostics(_paths_from_args(args))
     except (OSError, ValueError, EvidenceSelectionDiagnosticsError) as exc:
         print(f"evidence selection diagnostics failed: {exc}", file=sys.stderr)
@@ -77,6 +84,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Primary bottleneck: {summary['likely_primary_bottleneck']}")
         print(f"Output: {args.output_dir}")
     return EXIT_SUCCESS
+
+
+def validate_cli_arguments(output_dir: Path, *, output_policy: str = "canonical") -> None:
+    """Validate the output path against the shared official benchmark policy."""
+    validate_benchmark_output_dir(
+        output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=output_policy,
+        label="output-dir",
+    )
 
 
 def _paths_from_args(args: argparse.Namespace) -> EvidenceSelectionDiagnosticsPaths:

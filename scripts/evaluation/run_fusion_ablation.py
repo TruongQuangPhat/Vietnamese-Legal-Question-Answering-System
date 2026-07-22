@@ -17,6 +17,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.fusion_ablation import FusionAblationPaths, run_development_ablation
 from src.evaluation.benchmark.loader import BenchmarkFileSet
 from src.evaluation.qdrant import build_evaluation_qdrant_client
@@ -70,6 +74,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_FIXED_RRF_REFERENCE_DIR,
     )
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -84,7 +89,7 @@ async def run_command(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     client: Any | None = None
     try:
-        validate_cli_arguments(args.output_dir)
+        validate_cli_arguments(args.output_dir, output_policy=args.output_policy)
         retrieval_config = load_retrieval_config(args.config)
         collection_name = args.collection_name or retrieval_config.qdrant.collection_name
         url = args.url or retrieval_config.qdrant.url
@@ -169,11 +174,15 @@ def _paths_from_args(args: argparse.Namespace) -> FusionAblationPaths:
     )
 
 
-def validate_cli_arguments(output_dir: Path) -> None:
-    """Reject output paths outside the approved evaluation report area."""
-    resolved = output_dir.expanduser().resolve()
-    if resolved != EVALUATION_REPORTS_ROOT and EVALUATION_REPORTS_ROOT not in resolved.parents:
-        raise ValueError("output-dir must be under artifacts/reports/evaluation")
+def validate_cli_arguments(output_dir: Path, *, output_policy: str = "canonical") -> None:
+    """Validate the output path against the shared official benchmark policy."""
+    validate_benchmark_output_dir(
+        output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=output_policy,
+        label="output-dir",
+    )
 
 
 if __name__ == "__main__":

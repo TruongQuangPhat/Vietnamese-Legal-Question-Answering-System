@@ -19,7 +19,10 @@ from src.evaluation.benchmark.enums import (
     TargetRole,
 )
 from src.evaluation.benchmark.exceptions import BenchmarkFreezeError
-from src.evaluation.benchmark.fingerprinting import create_benchmark_manifest
+from src.evaluation.benchmark.fingerprinting import (
+    create_benchmark_manifest,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.loader import BenchmarkFileSet
 from src.evaluation.benchmark.schemas import BenchmarkConfig, SplitManifest
 from src.indexing.official_artifacts import write_json_atomic
@@ -197,6 +200,106 @@ def test_freeze_refuses_existing_output(tmp_path: Path) -> None:
             output_path=output,
             change_log=["Synthetic freeze."],
         )
+
+
+def test_canonical_output_policy_accepts_new_artifact_root_path(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    reports_root = repo_root / "artifacts/reports/evaluation"
+    output_dir = reports_root / "advanced_rag/sparse_retrieval_refresh"
+
+    resolved = validate_benchmark_output_dir(
+        output_dir,
+        repo_root=repo_root,
+        evaluation_reports_root=reports_root,
+        output_policy="canonical",
+    )
+
+    assert resolved == output_dir.resolve()
+
+
+def test_canonical_output_policy_rejects_external_tmp_path(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    reports_root = repo_root / "artifacts/reports/evaluation"
+    output_dir = tmp_path / "vnlaw-benchmarks/staged"
+
+    with pytest.raises(ValueError, match="canonical benchmark output"):
+        validate_benchmark_output_dir(
+            output_dir,
+            repo_root=repo_root,
+            evaluation_reports_root=reports_root,
+            output_policy="canonical",
+        )
+
+
+def test_staging_output_policy_accepts_new_external_path(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    reports_root = repo_root / "artifacts/reports/evaluation"
+    output_dir = tmp_path / "vnlaw-benchmarks/staged"
+
+    resolved = validate_benchmark_output_dir(
+        output_dir,
+        repo_root=repo_root,
+        evaluation_reports_root=reports_root,
+        output_policy="staging",
+    )
+
+    assert resolved == output_dir.resolve()
+
+
+def test_staging_output_policy_rejects_repository_path(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    reports_root = repo_root / "artifacts/reports/evaluation"
+    output_dir = repo_root / "tmp-output"
+
+    with pytest.raises(ValueError, match="outside the repository root"):
+        validate_benchmark_output_dir(
+            output_dir,
+            repo_root=repo_root,
+            evaluation_reports_root=reports_root,
+            output_policy="staging",
+        )
+
+
+def test_staging_output_policy_rejects_protected_artifact_path(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    reports_root = repo_root / "artifacts/reports/evaluation"
+    output_dir = reports_root / "advanced_rag/staged"
+
+    with pytest.raises(ValueError, match="outside the repository root"):
+        validate_benchmark_output_dir(
+            output_dir,
+            repo_root=repo_root,
+            evaluation_reports_root=reports_root,
+            output_policy="staging",
+        )
+
+
+def test_output_policy_rejects_existing_file_and_non_empty_directory(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    reports_root = repo_root / "artifacts/reports/evaluation"
+    existing_file = tmp_path / "vnlaw-benchmarks/report.json"
+    existing_file.parent.mkdir()
+    existing_file.write_text("existing", encoding="utf-8")
+    non_empty_dir = tmp_path / "vnlaw-benchmarks/non-empty"
+    non_empty_dir.mkdir()
+    (non_empty_dir / "metrics_all.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="existing output file"):
+        validate_benchmark_output_dir(
+            existing_file,
+            repo_root=repo_root,
+            evaluation_reports_root=reports_root,
+            output_policy="staging",
+        )
+    with pytest.raises(ValueError, match="non-empty benchmark output directory"):
+        validate_benchmark_output_dir(
+            non_empty_dir,
+            repo_root=repo_root,
+            evaluation_reports_root=reports_root,
+            output_policy="staging",
+        )
+    assert existing_file.read_text(encoding="utf-8") == "existing"
+    assert (non_empty_dir / "metrics_all.json").is_file()
 
 
 def test_freeze_refuses_missing_assignment(tmp_path: Path) -> None:

@@ -34,6 +34,7 @@ from scripts.evaluation.run_reranking_ablation import (
     _paths_from_args,
     validate_output_dir,
 )
+from src.evaluation.benchmark.fingerprinting import add_benchmark_output_policy_argument
 from src.evaluation.benchmark.reranking_ablation import (
     RerankingAblationError,
     run_final_reranked_report,
@@ -95,6 +96,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_BASE_REFERENCE_DIR,
     )
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -109,9 +111,9 @@ async def run_command(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     client: Any | None = None
     try:
-        validate_output_dir(args.ablation_dir)
-        validate_output_dir(args.output_dir)
-        validate_output_dir(args.comparison_dir)
+        validate_output_dir(args.ablation_dir, output_policy=args.output_policy)
+        validate_output_dir(args.output_dir, output_policy=args.output_policy)
+        validate_output_dir(args.comparison_dir, output_policy=args.output_policy)
         model_path = resolve_local_model_path(args.reranker_model)
         reranker = NativeTransformersReranker(
             model_name=args.reranker_model,

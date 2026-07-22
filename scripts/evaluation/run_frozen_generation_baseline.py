@@ -19,7 +19,11 @@ from pydantic import ValidationError
 
 from src.evaluation.benchmark.enums import TargetRole
 from src.evaluation.benchmark.exceptions import BenchmarkLoadError
-from src.evaluation.benchmark.fingerprinting import sha256_file
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    sha256_file,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.generation_baseline import (
     aggregate_generation_metrics,
     build_generation_breakdowns,
@@ -106,6 +110,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout-s", type=float, default=30.0)
     parser.add_argument("--no-auxiliary-context", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--sample-development", type=int, default=None)
     parser.add_argument("--sample-held-out", type=int, default=None)
     parser.add_argument("--quiet", action="store_true")
@@ -289,10 +294,13 @@ def validate_cli_arguments(args: argparse.Namespace) -> None:
     ):
         if value is not None and value < 0:
             raise ValueError(f"{label} must be non-negative")
-    resolved = args.output_dir.expanduser().resolve()
-    root = EVALUATION_REPORTS_ROOT.resolve()
-    if root not in (resolved, *resolved.parents):
-        raise ValueError(f"output directory must be under {root}")
+    validate_benchmark_output_dir(
+        args.output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=args.output_policy,
+        label="output-dir",
+    )
 
 
 def verify_retrieval_compatibility(

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -24,6 +25,7 @@ from src.indexing.official_artifacts import write_json_atomic
 
 INVALID_FREEZE_VERSIONS = {"draft", "dev", "development", "placeholder", "tbd", "todo"}
 _MANIFEST_HASH_PLACEHOLDER = "0" * 64
+BenchmarkOutputPolicy = Literal["canonical", "staging"]
 
 
 def sha256_file(path: Path | str) -> str:
@@ -40,6 +42,156 @@ def sha256_file(path: Path | str) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def add_benchmark_output_policy_argument(parser: Any) -> None:
+    """Add the shared official benchmark output policy option to a CLI parser.
+
+    Canonical mode preserves the historical protected artifact boundary under
+    ``artifacts/reports/evaluation``. Staging mode must be explicit and is only
+    for external review runs such as ``/tmp/vnlaw-benchmarks/...``.
+    """
+    parser.add_argument(
+        "--output-policy",
+        choices=("canonical", "staging"),
+        default="canonical",
+        help=(
+            "Output policy: canonical writes only under artifacts/reports/evaluation; "
+            "staging writes only outside the repository for review runs."
+        ),
+    )
+
+
+def validate_benchmark_output_dir(
+    output_dir: Path,
+    *,
+    repo_root: Path,
+    evaluation_reports_root: Path,
+    output_policy: BenchmarkOutputPolicy = "canonical",
+    label: str = "output-dir",
+) -> Path:
+    """Validate an official benchmark output directory.
+
+    Args:
+        output_dir: Requested output directory.
+        repo_root: Repository root used to detect staging paths inside the repo.
+        evaluation_reports_root: Canonical protected artifact root.
+        output_policy: ``canonical`` or explicit ``staging`` mode.
+        label: CLI label used in deterministic error messages.
+
+    Returns:
+        Resolved output path.
+
+    Raises:
+        ValueError: If the requested path violates the active output policy.
+    """
+    if str(output_dir).strip() == "":
+        _raise_output_policy_error(
+            policy=output_policy,
+            label=label,
+            resolved=Path(".").resolve(),
+            reason=f"{label} must not be empty",
+        )
+    resolved = output_dir.expanduser().resolve()
+    resolved_repo_root = repo_root.expanduser().resolve()
+    resolved_reports_root = evaluation_reports_root.expanduser().resolve()
+
+    _reject_unsafe_existing_destination(
+        resolved,
+        policy=output_policy,
+        label=label,
+    )
+    if output_policy == "canonical":
+        if not _is_path_at_or_under(resolved, resolved_reports_root):
+            _raise_output_policy_error(
+                policy=output_policy,
+                label=label,
+                resolved=resolved,
+                reason="canonical benchmark output must be under artifacts/reports/evaluation",
+            )
+        return resolved
+
+    if output_policy == "staging":
+        if _is_path_at_or_under(resolved, resolved_repo_root):
+            _raise_output_policy_error(
+                policy=output_policy,
+                label=label,
+                resolved=resolved,
+                reason="staging output must resolve outside the repository root",
+            )
+        if _is_path_at_or_under(resolved, resolved_reports_root):
+            _raise_output_policy_error(
+                policy=output_policy,
+                label=label,
+                resolved=resolved,
+                reason="staging output must not target protected evaluation artifacts",
+            )
+        return resolved
+
+    _raise_output_policy_error(
+        policy=output_policy,
+        label=label,
+        resolved=resolved,
+        reason=f"unsupported output policy {output_policy!r}",
+    )
+
+
+def _reject_unsafe_existing_destination(
+    resolved: Path,
+    *,
+    policy: str,
+    label: str,
+) -> None:
+    home = Path.home().resolve()
+    if resolved == Path(resolved.anchor):
+        _raise_output_policy_error(
+            policy=policy,
+            label=label,
+            resolved=resolved,
+            reason=f"{label} must not be filesystem root",
+        )
+    if resolved == home:
+        _raise_output_policy_error(
+            policy=policy,
+            label=label,
+            resolved=resolved,
+            reason=f"{label} must not be the user home directory",
+        )
+    if resolved.exists() and resolved.is_file():
+        _raise_output_policy_error(
+            policy=policy,
+            label=label,
+            resolved=resolved,
+            reason=f"refusing to overwrite existing output file for {label}",
+        )
+    if resolved.exists() and resolved.is_dir() and any(resolved.iterdir()):
+        _raise_output_policy_error(
+            policy=policy,
+            label=label,
+            resolved=resolved,
+            reason=f"refusing to overwrite existing non-empty benchmark output directory for {label}",
+        )
+    if resolved.exists() and not resolved.is_dir():
+        _raise_output_policy_error(
+            policy=policy,
+            label=label,
+            resolved=resolved,
+            reason=f"{label} must be a directory path",
+        )
+
+
+def _is_path_at_or_under(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+def _raise_output_policy_error(
+    *,
+    policy: str,
+    label: str,
+    resolved: Path,
+    reason: str,
+) -> None:
+    raise ValueError(f"{policy} output policy rejected {label} {os.fspath(resolved)}: {reason}")
 
 
 def canonical_json_bytes(value: Any) -> bytes:

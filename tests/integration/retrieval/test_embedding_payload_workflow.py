@@ -83,10 +83,15 @@ class FakeQdrantClient:
 @pytest.fixture(autouse=True)
 def fake_qdrant_point_struct(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the workflow independent from qdrant-client."""
+
+    async def inline_to_thread(func: Any, /, *args: Any, **kwargs: Any) -> Any:
+        return func(*args, **kwargs)
+
     monkeypatch.setattr(
         "src.indexing.indexing_service._load_qdrant_models",
         lambda: SimpleNamespace(PointStruct=FakePointStruct),
     )
+    monkeypatch.setattr("src.indexing.indexing_service.asyncio.to_thread", inline_to_thread)
 
 
 @pytest.mark.asyncio

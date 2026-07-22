@@ -14,6 +14,10 @@ import yaml
 from pydantic import ValidationError
 
 from src.evaluation.benchmark.exceptions import BenchmarkLoadError
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.loader import BenchmarkFileSet, load_benchmark_manifest
 from src.evaluation.benchmark.strict_generation_evaluation import (
     StrictGenerationEvaluationError,
@@ -98,6 +102,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--url", default=None)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default=None)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -275,10 +280,13 @@ def validate_cli_arguments(args: argparse.Namespace) -> None:
         raise ValueError("timeout-s must be positive")
     if not 0 <= args.temperature <= 2:
         raise ValueError("temperature must be between 0 and 2")
-    resolved = args.output_dir.expanduser().resolve()
-    root = EVALUATION_REPORTS_ROOT.resolve()
-    if root not in (resolved, *resolved.parents):
-        raise ValueError(f"output directory must be under {root}")
+    validate_benchmark_output_dir(
+        args.output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=args.output_policy,
+        label="output-dir",
+    )
 
 
 def load_json_object(path: Path) -> dict[str, Any]:

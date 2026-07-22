@@ -13,6 +13,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.strict_generation_error_analysis import (
     StrictGenerationErrorAnalysisError,
     StrictGenerationErrorAnalysisPaths,
@@ -25,6 +29,7 @@ DEFAULT_INPUT_DIR = Path("artifacts/reports/evaluation/advanced_rag/strict_gener
 DEFAULT_OUTPUT_DIR = Path(
     "artifacts/reports/evaluation/advanced_rag/strict_generation_error_analysis"
 )
+EVALUATION_REPORTS_ROOT = REPO_ROOT / "artifacts/reports/evaluation"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -40,6 +45,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--breakdowns", type=Path, default=None)
     parser.add_argument("--comparison", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -48,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     """Run offline strict generation error analysis."""
     args = build_arg_parser().parse_args(argv)
     try:
+        validate_cli_arguments(args.output_dir, output_policy=args.output_policy)
         analysis = run_strict_generation_error_analysis(_paths_from_args(args))
     except (OSError, ValueError, StrictGenerationErrorAnalysisError) as exc:
         print(f"strict generation error analysis failed: {exc}", file=sys.stderr)
@@ -63,6 +70,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Primary bottleneck: {bottleneck['primary_bottleneck']}")
         print(f"Output: {args.output_dir}")
     return EXIT_SUCCESS
+
+
+def validate_cli_arguments(output_dir: Path, *, output_policy: str = "canonical") -> None:
+    """Validate the output path against the shared official benchmark policy."""
+    validate_benchmark_output_dir(
+        output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=output_policy,
+        label="output-dir",
+    )
 
 
 def _paths_from_args(args: argparse.Namespace) -> StrictGenerationErrorAnalysisPaths:

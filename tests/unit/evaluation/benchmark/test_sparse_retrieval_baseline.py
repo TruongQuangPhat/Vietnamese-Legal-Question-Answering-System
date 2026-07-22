@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
+from scripts.evaluation import run_frozen_sparse_retrieval_baseline as sparse_cli
 from src.evaluation.benchmark.enums import (
     BenchmarkSplit,
     EvidenceGroupRequirement,
@@ -131,6 +134,57 @@ def test_write_sparse_outputs_creates_required_artifacts(tmp_path: Path) -> None
         encoding="utf-8"
     )
     assert not _contains_secret_like_key(manifest)
+
+
+def test_sparse_cli_output_policy_failure_does_not_overwrite_file(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output_file = tmp_path / "existing-output.json"
+    output_file.write_text("do not truncate", encoding="utf-8")
+
+    exit_code = sparse_cli.main(
+        [
+            "--output-dir",
+            str(output_file),
+            "--output-policy",
+            "staging",
+            "--quiet",
+        ]
+    )
+
+    assert exit_code == sparse_cli.EXIT_FAILURE
+    assert output_file.read_text(encoding="utf-8") == "do not truncate"
+    captured = capsys.readouterr()
+    assert "staging output policy rejected output-dir" in captured.err
+
+
+def test_sparse_cli_delegates_output_validation_to_shared_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_validate_benchmark_output_dir(*args: object, **kwargs: object) -> Path:
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return tmp_path / "resolved"
+
+    monkeypatch.setattr(
+        sparse_cli,
+        "validate_benchmark_output_dir",
+        fake_validate_benchmark_output_dir,
+    )
+
+    sparse_cli.validate_cli_arguments(tmp_path / "staged", output_policy="staging")
+
+    assert captured["args"] == (tmp_path / "staged",)
+    assert captured["kwargs"] == {
+        "repo_root": sparse_cli.REPO_ROOT,
+        "evaluation_reports_root": sparse_cli.EVALUATION_REPORTS_ROOT,
+        "output_policy": "staging",
+        "label": "output-dir",
+    }
 
 
 def _contains_secret_like_key(value: Any) -> bool:

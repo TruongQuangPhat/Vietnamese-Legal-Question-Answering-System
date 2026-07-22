@@ -17,6 +17,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.hybrid_retrieval_baseline import (
     HybridBenchmarkConfig,
     HybridBenchmarkPaths,
@@ -75,6 +79,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--comparison-dir", type=Path, default=DEFAULT_COMPARISON_DIR)
     parser.add_argument("--dense-reference-dir", type=Path, default=DEFAULT_DENSE_REFERENCE_DIR)
     parser.add_argument("--sparse-reference-dir", type=Path, default=DEFAULT_SPARSE_REFERENCE_DIR)
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -89,8 +94,12 @@ async def run_baseline(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     client: Any | None = None
     try:
-        validate_cli_arguments(args.output_dir)
-        validate_cli_arguments(args.comparison_dir)
+        validate_cli_arguments(args.output_dir, output_policy=args.output_policy)
+        validate_cli_arguments(
+            args.comparison_dir,
+            output_policy=args.output_policy,
+            label="comparison-dir",
+        )
         retrieval_config = load_retrieval_config(args.config)
         collection_name = args.collection_name or retrieval_config.qdrant.collection_name
         url = args.url or retrieval_config.qdrant.url
@@ -199,13 +208,20 @@ async def run_baseline(argv: list[str] | None = None) -> int:
     return EXIT_SUCCESS
 
 
-def validate_cli_arguments(output_dir: Path) -> None:
-    """Reject output paths outside the approved evaluation report area."""
-    resolved = output_dir.expanduser().resolve()
-    if resolved != EVALUATION_REPORTS_ROOT and EVALUATION_REPORTS_ROOT not in resolved.parents:
-        raise ValueError(
-            "output-dir must be under artifacts/reports/evaluation for this benchmark run"
-        )
+def validate_cli_arguments(
+    output_dir: Path,
+    *,
+    output_policy: str = "canonical",
+    label: str = "output-dir",
+) -> None:
+    """Validate an output path against the shared official benchmark policy."""
+    validate_benchmark_output_dir(
+        output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=output_policy,
+        label=label,
+    )
 
 
 async def read_collection_info(client: Any, collection_name: str) -> dict[str, Any]:

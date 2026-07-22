@@ -17,6 +17,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from src.evaluation.benchmark.fingerprinting import (
+    add_benchmark_output_policy_argument,
+    validate_benchmark_output_dir,
+)
 from src.evaluation.benchmark.loader import BenchmarkFileSet
 from src.evaluation.benchmark.reranking_ablation import (
     RerankingAblationError,
@@ -91,6 +95,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_BASE_REFERENCE_DIR,
     )
+    add_benchmark_output_policy_argument(parser)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -105,7 +110,7 @@ async def run_command(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     client: Any | None = None
     try:
-        validate_output_dir(args.output_dir)
+        validate_output_dir(args.output_dir, output_policy=args.output_policy)
         model_path = resolve_local_model_path(args.reranker_model)
         reranker = NativeTransformersReranker(
             model_name=args.reranker_model,
@@ -197,11 +202,15 @@ def _paths_from_args(args: argparse.Namespace) -> RerankingBenchmarkPaths:
     )
 
 
-def validate_output_dir(output_dir: Path) -> None:
-    """Reject outputs outside the approved evaluation report tree."""
-    resolved = output_dir.expanduser().resolve()
-    if resolved != EVALUATION_REPORTS_ROOT and EVALUATION_REPORTS_ROOT not in resolved.parents:
-        raise ValueError("output-dir must be under artifacts/reports/evaluation")
+def validate_output_dir(output_dir: Path, *, output_policy: str = "canonical") -> None:
+    """Validate the output path against the shared official benchmark policy."""
+    validate_benchmark_output_dir(
+        output_dir,
+        repo_root=REPO_ROOT,
+        evaluation_reports_root=EVALUATION_REPORTS_ROOT,
+        output_policy=output_policy,
+        label="output-dir",
+    )
 
 
 if __name__ == "__main__":

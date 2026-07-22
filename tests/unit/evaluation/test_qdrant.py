@@ -77,3 +77,26 @@ def test_evaluation_runners_use_authenticated_qdrant_helper() -> None:
         source = path.read_text(encoding="utf-8")
         assert "build_evaluation_qdrant_client(" in source, path
         assert "build_qdrant_client(" not in source, path
+
+
+def test_active_evaluation_runners_use_shared_output_policy() -> None:
+    runner_paths = [
+        Path("scripts/evaluation/run_frozen_retrieval_baseline.py"),
+        Path("scripts/evaluation/run_frozen_sparse_retrieval_baseline.py"),
+        Path("scripts/evaluation/run_frozen_hybrid_retrieval_baseline.py"),
+        Path("scripts/evaluation/run_fusion_ablation.py"),
+        Path("scripts/evaluation/run_coverage_aware_hybrid_retrieval.py"),
+        Path("scripts/evaluation/run_reranking_ablation.py"),
+        Path("scripts/evaluation/run_reranked_retrieval.py"),
+        Path("scripts/evaluation/analyze_evidence_selection_diagnostics.py"),
+        Path("scripts/evaluation/run_frozen_generation_baseline.py"),
+        Path("scripts/evaluation/run_strict_generation_evaluation.py"),
+        Path("scripts/evaluation/analyze_strict_generation_errors.py"),
+    ]
+
+    for path in runner_paths:
+        source = path.read_text(encoding="utf-8")
+        assert "add_benchmark_output_policy_argument(parser)" in source, path
+        assert "validate_benchmark_output_dir(" in source or "validate_output_dir(" in source, path
+        assert "output-dir must be under artifacts/reports/evaluation" not in source, path
+        assert "output directory must be under" not in source, path
