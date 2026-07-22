@@ -107,12 +107,33 @@ The reproducible runner is:
 
 ```bash
 uv run python scripts/evaluation/run_retrieval_quality_generalization_benchmark.py run \
+  --mode runtime_aligned \
   --repo-root <checkout> \
   --corpus /home/phat/AI_Project/VnLaw-QA/data/processed/legal_chunks.jsonl \
-  --candidate-top-k 50 \
-  --evidence-budget 5 \
+  --sparse-retrieval-top-k 50 \
+  --dense-retrieval-top-k 50 \
+  --diagnostic-candidate-top-k 50 \
+  --fusion-output-top-k 10 \
+  --selection-input-top-k 10 \
+  --selected-evidence-budget 5 \
   --output /tmp/<report>.json
 ```
+
+The runner has two explicit modes:
+
+- `runtime_aligned`: default and PR-gating mode. It retains a top-50 sparse
+  diagnostic pool for rank, Recall@k, and MRR diagnostics, then truncates to
+  the top 10 candidates before evidence packet construction, evidence
+  selection, primary-evidence evaluation, citation mapping, and multi-article
+  selected/cited coverage. It selects at most 5 evidence packets.
+- `deep_diagnostic`: debugging-only mode. It retains a top-50 diagnostic pool
+  and may pass up to 50 candidates into evidence selection. This mode can help
+  explain missed top-10 cases, but must not be used to claim production
+  readiness.
+
+Every JSON report includes the benchmark mode, retrieval candidate limit,
+selection input limit, selected evidence limit, production-alignment flag,
+corpus path, runner/evaluator version, and evaluated git revision.
 
 Metric contracts are emitted in each JSON report. Matching is exact at the
 target's specified granularity: law ID and Article are always required; Clause
@@ -121,45 +142,51 @@ with `clause_number = null` and `point_label = null`; this intentionally accepts
 any clause or point from the same Article. Multiple acceptable clauses in the
 same Article are represented as an article-level target when the benchmark
 intent accepts any of them; otherwise each required clause is listed as a
-separate expected target. Recall@5 and Recall@10 are micro-averaged over
-expected targets, so a multi-article question contributes one denominator item
-per expected provision. Expected Article MRR is macro-averaged per question
-using the best-ranked expected target for that question. Primary evidence
-accuracy is macro-averaged per question and requires `selected_evidence[0]` to
-match the primary target. Citation alignment is macro-averaged per question and
-requires all expected targets in prompt evidence plus `prompt.evidence[0]`
-matching the primary target when one is defined. Multi-article coverage is
-macro-averaged over multi-target cases only and requires every expected target
-selected and cited. The deterministic benchmark passes candidate depth 50 into
-evidence construction and keeps the runtime default selected-evidence budget of
-5. Regression counting includes semantic regressions and candidate-rank losses.
-A semantic regression is a pass-to-fail, primary/citation/multi-target loss,
-wrong-domain increase, wrong-actor increase, or cross-reference-only primary
-error. A rank regression is an expected target whose candidate rank moves lower
-or disappears, even when the case still passes.
+separate expected target.
+
+Retrieval metrics are calculated from the full diagnostic candidate pool:
+
+- Recall@5;
+- Recall@10;
+- Expected Article MRR;
+- expected target rank;
+- rank regression.
+
+Selection and citation metrics are calculated only after runtime-aligned
+truncation to the top-10 selection input:
+
+- Primary Evidence Accuracy;
+- Citation Alignment Accuracy;
+- Cross-reference-only Primary Error Rate;
+- Wrong-actor Primary Error Rate;
+- Wrong-domain Primary Error Rate;
+- Multi-article Coverage Accuracy;
+- semantic regression count.
+
+Recall@5 and Recall@10 are micro-averaged over expected targets, so a
+multi-article question contributes one denominator item per expected provision.
+Expected Article MRR is macro-averaged per question using the best-ranked
+expected target for that question. Primary evidence accuracy is macro-averaged
+per question and requires `selected_evidence[0]` to match the primary target
+after selection-input truncation. Citation alignment is macro-averaged per
+question and requires all expected targets in prompt evidence plus
+`prompt.evidence[0]` matching the primary target when one is defined.
+Multi-article coverage is macro-averaged over multi-target cases only and
+requires every expected target selected and cited from the runtime-aligned
+selection pool. Regression counting includes semantic regressions and
+candidate-rank losses. A semantic regression is a pass-to-fail,
+primary/citation/multi-target loss, wrong-domain increase, wrong-actor
+increase, or cross-reference-only primary error. A rank regression is an
+expected target whose diagnostic-pool candidate rank moves lower or disappears,
+even when the case still passes.
 
 ## Reproducible Before/After Metrics
 
-The same runner, corpus, top-k values, evidence budget, and evaluator were run
-against detached worktrees/checkouts for `6642112` and `fc41f4a`. Reports were
-written to `/tmp` and no protected data path was modified.
-
-| Metric | `6642112` before | `fc41f4a` after |
-| --- | ---: | ---: |
-| Expected Evidence Recall@5 | 1.0000 | 0.9355 |
-| Expected Evidence Recall@10 | 1.0000 | 1.0000 |
-| Expected Article MRR | 0.9400 | 0.9020 |
-| Primary Evidence Accuracy | 0.6000 | 1.0000 |
-| Citation Alignment Accuracy | 0.5667 | 1.0000 |
-| Cross-reference-only Primary Error Rate | 0.0000 | 0.0000 |
-| Wrong-actor Primary Error Rate | 0.0667 | 0.0000 |
-| Wrong-domain Primary Error Rate | 0.1333 | 0.0000 |
-| Multi-article Coverage Accuracy | 0.0000 | 1.0000 |
-| Passing cases | 16 / 30 | 30 / 30 |
-| Regression count | n/a | 3 candidate-rank losses |
-
-Improved cases: 14. Unchanged cases: 13. Regressed case-target ranks: 3.
-Largest positive rank change: 0. Largest negative rank change: -5.
+Previous before/after metrics were produced before the benchmark was aligned
+with the production top-10 selection input. They are superseded. Because the
+oracle changed again, final before/after metrics must be regenerated manually
+with the current evaluator against both `6642112` and the new branch HEAD. The
+current Codex session intentionally did not execute the full benchmark runner.
 
 Rank regressions that remain semantically passing:
 
@@ -169,10 +196,10 @@ Rank regressions that remain semantically passing:
 
 These are development/regression labor cases affected by removal of
 termination-specific sparse expansion and duplicated BM25 token weighting.
-They do not cause primary-evidence or citation failures after selection, but
-they are still reported as candidate-rank regressions and prevent a final PASS
-claim without an accepted materiality decision or further generic retrieval
-work.
+They do not cause primary-evidence or citation failures in deterministic
+sparse-only runtime-aligned tests using selection input 10, but they are still
+reported as candidate-rank regressions and require actual local hybrid
+validation before any final PASS claim.
 
 The after-run Recall@5 value changed from an earlier manually reported 0.9333
 to 0.9355 because the benchmark oracle now uses target-level micro-averaging
@@ -207,6 +234,58 @@ survival through the final fused top 10. Actual dense/Qdrant hybrid validation
 is required to confirm fused rank, selected primary evidence, and prompt
 citations under runtime cutoffs.
 
+Selection input must be 10 because the production `coverage_aware_quota` path
+passes only the fused top 10 to evidence construction and selection. Keeping the
+diagnostic retrieval pool at 50 remains useful because sparse and dense source
+rank movements, Recall@5/10, MRR, and missed-target root causes need visibility
+beyond the final selected packets. The benchmark therefore distinguishes:
+
+```text
+retrieval candidate pool
+→ runtime-aligned selection input
+→ final selected evidence
+```
+
+The removed termination-specific query expansion and duplicated BM25 weighting
+must not be restored just to recover Article 35 ranks. Those rules were
+topic-specific and produced false positives in unrelated labor and cross-domain
+queries. Generic dense retrieval, sparse original-query matching, bounded
+parent context, RRF fusion, and generic selection alignment are the maintained
+path.
+
+## Actual Hybrid Validation
+
+The safe manual entry point is:
+
+```bash
+uv run python scripts/evaluation/run_local_hybrid_retrieval_validation.py \
+  --confirm-local-read-only \
+  --question "<question>" \
+  --expected-target "BLLD_VBHN:35" \
+  --output /tmp/vnlaw-local-hybrid-validation.json
+```
+
+The script is read-only and fails before execution unless
+`--confirm-local-read-only` is present. It uses local BGE-M3, read-only Qdrant
+dense retrieval, local sparse retrieval, the existing coverage-aware quota
+fusion implementation, evidence selection, and prompt citation mapping. It does
+not create, recreate, delete, upload, or modify Qdrant collections; it does not
+index or re-embed documents; it does not call a production endpoint; and it
+does not call an external LLM.
+
+Static configuration reviewed for manual validation:
+
+- BGE-M3 model path environment variables: `EMBEDDING_MODEL_PATH` or
+  `LEGAL_QA_EMBEDDING_MODEL_PATH`;
+- Qdrant URL default: `http://localhost:6333`;
+- Qdrant API-key environment variables: `LEGAL_QA_QDRANT_API_KEY` or
+  `QDRANT_API_KEY` without printing the secret;
+- collection: `vnlaw_chunks_bgem3_v1_full`;
+- vector name: `dense`;
+- expected dense dimension: 1024;
+- sparse corpus path: `data/processed/legal_chunks.jsonl`;
+- production-aligned defaults: sparse 50, dense 50, fused 10, selected 5.
+
 Adversarial unit tests cover:
 
 - semantic relevance versus keyword overlap;
@@ -221,11 +300,12 @@ Adversarial unit tests cover:
 - The broad benchmark is deterministic and useful for regression, but it is not
   a lawyer-reviewed benchmark and must not be used to claim broad legal QA
   quality.
-- Local Qdrant was unavailable on `localhost:6333`, and local BGE-M3 model
-  paths checked in this session were absent. Actual local dense/Qdrant hybrid
-  validation was therefore not run.
-- Deterministic dense-candidate plus hybrid-fusion integration fixtures cover
-  semantic dense evidence versus lexical overlap, multi-article coverage, and
-  explicit cross-reference target behavior. Fixture validation is not a
-  substitute for real Qdrant/BGE-M3 validation, so the current status remains
-  PARTIAL.
+- Actual local dense/Qdrant hybrid validation must be run manually with local
+  BGE-M3 and the existing read-only Qdrant collection
+  `vnlaw_chunks_bgem3_v1_full`. This Codex session did not load BGE-M3 or query
+  Qdrant.
+- Deterministic dense-candidate plus hybrid-fusion integration fixtures now
+  model 50 sparse candidates plus 50 dense candidates, real coverage-aware
+  fusion to fused top 10, selected evidence top 5, and prompt citation mapping.
+  Fixture validation is not a substitute for real Qdrant/BGE-M3 validation, so
+  the current status remains PARTIAL.

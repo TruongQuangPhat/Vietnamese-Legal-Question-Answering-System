@@ -11,6 +11,7 @@ import asyncio
 import importlib
 import json
 import re
+import subprocess
 import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -19,9 +20,16 @@ from typing import Any
 
 LABOR_LAW_ID = "BLLD_VBHN"
 DEFAULT_CORPUS_PATH = Path("data/processed/legal_chunks.jsonl")
-DEFAULT_CANDIDATE_TOP_K = 50
+RUNNER_EVALUATOR_VERSION = "retrieval_quality_generalization_v2_runtime_aligned"
+DEFAULT_SPARSE_RETRIEVAL_TOP_K = 50
+DEFAULT_DENSE_RETRIEVAL_TOP_K = 50
+DEFAULT_DIAGNOSTIC_CANDIDATE_TOP_K = 50
+DEFAULT_FUSION_OUTPUT_TOP_K = 10
+DEFAULT_SELECTION_INPUT_TOP_K = 10
+DEFAULT_SELECTED_EVIDENCE_BUDGET = 5
+DEFAULT_CANDIDATE_TOP_K = DEFAULT_DIAGNOSTIC_CANDIDATE_TOP_K
 DEFAULT_RECALL_DEPTHS = (5, 10)
-DEFAULT_EVIDENCE_BUDGET = 5
+DEFAULT_EVIDENCE_BUDGET = DEFAULT_SELECTED_EVIDENCE_BUDGET
 REFERENCE_ONLY_PATTERN = re.compile(
     r"^(?:\d+\.|[a-zà-ỹđ]\))?\s*"
     r".{0,180}?\b(?:theo\s+quy\s+định\s+tại|thực\s+hiện\s+theo|thuộc\s+trường\s+hợp\s+"
@@ -29,6 +37,100 @@ REFERENCE_ONLY_PATTERN = re.compile(
     r"(?:\s+của\s+bộ\s+luật\s+này)?\.?$",
     re.IGNORECASE,
 )
+
+
+@dataclass(frozen=True)
+class BenchmarkRuntimeConfig:
+    """Runtime and diagnostic candidate budgets used by the benchmark runner."""
+
+    mode: str = "runtime_aligned"
+    sparse_retrieval_top_k: int = DEFAULT_SPARSE_RETRIEVAL_TOP_K
+    dense_retrieval_top_k: int = DEFAULT_DENSE_RETRIEVAL_TOP_K
+    diagnostic_candidate_top_k: int = DEFAULT_DIAGNOSTIC_CANDIDATE_TOP_K
+    fusion_output_top_k: int = DEFAULT_FUSION_OUTPUT_TOP_K
+    selection_input_top_k: int = DEFAULT_SELECTION_INPUT_TOP_K
+    selected_evidence_budget: int = DEFAULT_SELECTED_EVIDENCE_BUDGET
+    production_aligned: bool = True
+
+    @classmethod
+    def for_mode(cls, mode: str) -> BenchmarkRuntimeConfig:
+        """Return the named benchmark mode with production defaults."""
+        if mode == "runtime_aligned":
+            return cls(mode=mode, selection_input_top_k=DEFAULT_SELECTION_INPUT_TOP_K)
+        if mode == "deep_diagnostic":
+            return cls(
+                mode=mode,
+                selection_input_top_k=DEFAULT_DIAGNOSTIC_CANDIDATE_TOP_K,
+                production_aligned=False,
+            )
+        raise ValueError(f"unsupported benchmark mode: {mode}")
+
+    def with_overrides(
+        self,
+        *,
+        sparse_retrieval_top_k: int | None = None,
+        dense_retrieval_top_k: int | None = None,
+        diagnostic_candidate_top_k: int | None = None,
+        fusion_output_top_k: int | None = None,
+        selection_input_top_k: int | None = None,
+        selected_evidence_budget: int | None = None,
+    ) -> BenchmarkRuntimeConfig:
+        """Return a copy with validated explicit CLI overrides."""
+        config = BenchmarkRuntimeConfig(
+            mode=self.mode,
+            sparse_retrieval_top_k=sparse_retrieval_top_k or self.sparse_retrieval_top_k,
+            dense_retrieval_top_k=dense_retrieval_top_k or self.dense_retrieval_top_k,
+            diagnostic_candidate_top_k=(
+                diagnostic_candidate_top_k or self.diagnostic_candidate_top_k
+            ),
+            fusion_output_top_k=fusion_output_top_k or self.fusion_output_top_k,
+            selection_input_top_k=selection_input_top_k or self.selection_input_top_k,
+            selected_evidence_budget=selected_evidence_budget or self.selected_evidence_budget,
+            production_aligned=(
+                self.production_aligned
+                and (selection_input_top_k or self.selection_input_top_k)
+                == DEFAULT_SELECTION_INPUT_TOP_K
+                and (fusion_output_top_k or self.fusion_output_top_k) == DEFAULT_FUSION_OUTPUT_TOP_K
+                and (selected_evidence_budget or self.selected_evidence_budget)
+                == DEFAULT_SELECTED_EVIDENCE_BUDGET
+            ),
+        )
+        config.validate()
+        return config
+
+    def validate(self) -> None:
+        """Validate candidate budgets before any retrieval is executed."""
+        values = {
+            "sparse_retrieval_top_k": self.sparse_retrieval_top_k,
+            "dense_retrieval_top_k": self.dense_retrieval_top_k,
+            "diagnostic_candidate_top_k": self.diagnostic_candidate_top_k,
+            "fusion_output_top_k": self.fusion_output_top_k,
+            "selection_input_top_k": self.selection_input_top_k,
+            "selected_evidence_budget": self.selected_evidence_budget,
+        }
+        for name, value in values.items():
+            if value <= 0:
+                raise ValueError(f"{name} must be positive")
+        if self.selection_input_top_k > self.diagnostic_candidate_top_k:
+            raise ValueError("selection_input_top_k cannot exceed diagnostic_candidate_top_k")
+        if self.selected_evidence_budget > self.selection_input_top_k:
+            raise ValueError("selected_evidence_budget cannot exceed selection_input_top_k")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize benchmark mode and candidate budgets."""
+        return {
+            "benchmark_mode": self.mode,
+            "sparse_retrieval_top_k": self.sparse_retrieval_top_k,
+            "dense_retrieval_top_k": self.dense_retrieval_top_k,
+            "diagnostic_candidate_top_k": self.diagnostic_candidate_top_k,
+            "retrieval_candidate_limit": self.diagnostic_candidate_top_k,
+            "fusion_output_top_k": self.fusion_output_top_k,
+            "selection_input_top_k": self.selection_input_top_k,
+            "selection_input_limit": self.selection_input_top_k,
+            "selected_evidence_budget": self.selected_evidence_budget,
+            "selected_evidence_limit": self.selected_evidence_budget,
+            "production_aligned": self.production_aligned,
+        }
 
 
 @dataclass(frozen=True)
@@ -85,6 +187,8 @@ class CaseEvaluation:
     expected_targets: tuple[EvidenceTarget, ...]
     primary_target: EvidenceTarget | None
     candidate_ranks: dict[str, int | None]
+    selection_input_ranks: dict[str, int | None]
+    selection_input_top_k: int
     selected_evidence: list[dict[str, Any]]
     prompt_evidence: list[dict[str, Any]]
     forbidden_selected: list[dict[str, Any]]
@@ -109,6 +213,9 @@ class CaseEvaluation:
                     **target.to_dict(),
                     "target_key": key,
                     "candidate_rank": rank,
+                    "selection_input_rank": self.selection_input_ranks.get(key),
+                    "available_to_selection": self.selection_input_ranks.get(key) is not None,
+                    "selection_input_top_k": self.selection_input_top_k,
                     "candidate_presence": rank is not None,
                     "candidate_presence_by_depth": {
                         f"at_{depth}": rank is not None and rank <= depth for depth in recall_depths
@@ -461,8 +568,15 @@ def run_sparse_selection_benchmark(
     *,
     repo_root: Path,
     corpus_path: Path,
-    candidate_top_k: int = DEFAULT_CANDIDATE_TOP_K,
-    evidence_budget: int = DEFAULT_EVIDENCE_BUDGET,
+    mode: str = "runtime_aligned",
+    sparse_retrieval_top_k: int | None = None,
+    dense_retrieval_top_k: int | None = None,
+    diagnostic_candidate_top_k: int | None = None,
+    fusion_output_top_k: int | None = None,
+    selection_input_top_k: int | None = None,
+    selected_evidence_budget: int | None = None,
+    candidate_top_k: int | None = None,
+    evidence_budget: int | None = None,
     recall_depths: Sequence[int] = DEFAULT_RECALL_DEPTHS,
 ) -> dict[str, Any]:
     """Run the benchmark against one checkout's sparse/selection pipeline.
@@ -478,12 +592,29 @@ def run_sparse_selection_benchmark(
         primary prompt evidence to match the primary target when defined.
         Regression counting is performed only by ``compare_reports``.
     """
+    if candidate_top_k is not None and diagnostic_candidate_top_k is None:
+        diagnostic_candidate_top_k = candidate_top_k
+    if evidence_budget is not None and selected_evidence_budget is None:
+        selected_evidence_budget = evidence_budget
+    runtime_config = BenchmarkRuntimeConfig.for_mode(mode).with_overrides(
+        sparse_retrieval_top_k=sparse_retrieval_top_k,
+        dense_retrieval_top_k=dense_retrieval_top_k,
+        diagnostic_candidate_top_k=diagnostic_candidate_top_k,
+        fusion_output_top_k=fusion_output_top_k,
+        selection_input_top_k=selection_input_top_k,
+        selected_evidence_budget=selected_evidence_budget,
+    )
     _install_target_repo(repo_root)
     modules = _load_target_pipeline_modules()
-    context_config = modules["ContextAssemblyConfig"](max_packets=candidate_top_k)
+    context_config = modules["ContextAssemblyConfig"](
+        max_packets=runtime_config.selection_input_top_k
+    )
+    selection_config = modules["EvidenceSelectionConfig"](
+        max_selected_packets=runtime_config.selected_evidence_budget
+    )
     retriever = modules["SparseBM25Retriever"].from_jsonl(
         corpus_path,
-        default_top_k=candidate_top_k,
+        default_top_k=runtime_config.sparse_retrieval_top_k,
     )
 
     async def _run_all() -> list[CaseEvaluation]:
@@ -495,7 +626,8 @@ def run_sparse_selection_benchmark(
                     retriever=retriever,
                     modules=modules,
                     context_config=context_config,
-                    candidate_top_k=candidate_top_k,
+                    selection_config=selection_config,
+                    runtime_config=runtime_config,
                 )
             )
         return results
@@ -503,17 +635,26 @@ def run_sparse_selection_benchmark(
     cases = asyncio.run(_run_all())
     per_case = [case.to_dict(recall_depths=recall_depths) for case in cases]
     return {
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "benchmark_id": "retrieval_quality_generalization",
         "retrieval_mode": "sparse_selection",
         "repo_root": str(repo_root),
         "corpus_path": str(corpus_path),
+        "corpus_identifier_or_path": str(corpus_path),
+        "runner_evaluator_version": RUNNER_EVALUATOR_VERSION,
+        "git_revision": _git_revision(repo_root),
+        "benchmark_mode": runtime_config.mode,
+        "production_aligned": runtime_config.production_aligned,
+        "retrieval_candidate_limit": runtime_config.diagnostic_candidate_top_k,
+        "selection_input_limit": runtime_config.selection_input_top_k,
+        "selected_evidence_limit": runtime_config.selected_evidence_budget,
         "configuration": {
-            "candidate_top_k": candidate_top_k,
+            **runtime_config.to_dict(),
+            "candidate_top_k": runtime_config.diagnostic_candidate_top_k,
             "recall_depths": list(recall_depths),
-            "evidence_budget": evidence_budget,
-            "context_max_packets": candidate_top_k,
-            "selection_max_selected_packets": "runtime_default",
+            "evidence_budget": runtime_config.selected_evidence_budget,
+            "context_max_packets": runtime_config.selection_input_top_k,
+            "selection_max_selected_packets": runtime_config.selected_evidence_budget,
             "prompt_mapping": "selected_evidence_order",
         },
         "metric_definitions": metric_definitions(),
@@ -528,25 +669,29 @@ def metric_definitions() -> dict[str, str]:
     """Return the documented metric contracts used by this benchmark."""
     return {
         "recall_at_5": (
-            "micro-averaged expected-target recall at candidate rank <= 5; "
+            "retrieval metric: micro-averaged expected-target recall at candidate rank <= 5 "
+            "inside the full diagnostic retrieval pool; "
             "denominator is total expected targets, so a multi-article case contributes "
             "one denominator item per expected provision"
         ),
         "recall_at_10": (
-            "micro-averaged expected-target recall at candidate rank <= 10; "
-            "denominator is total expected targets"
+            "retrieval metric: micro-averaged expected-target recall at candidate rank <= 10 "
+            "inside the full diagnostic retrieval pool; denominator is total expected targets"
         ),
         "expected_article_mrr": (
-            "macro-averaged per-question reciprocal rank using the best-ranked expected "
-            "target for each case; cases with no expected target candidate contribute 0"
+            "retrieval metric: macro-averaged per-question reciprocal rank using the "
+            "best-ranked expected target in the full diagnostic retrieval pool; cases "
+            "with no expected target candidate contribute 0"
         ),
         "primary_evidence_accuracy": (
-            "macro-averaged fraction of cases where selected_evidence[0] exactly matches "
-            "primary_target at that target's granularity"
+            "selection metric: macro-averaged fraction of cases where selected_evidence[0] "
+            "exactly matches primary_target after truncating to the configured selection "
+            "input limit"
         ),
         "citation_alignment_accuracy": (
-            "macro-averaged fraction of cases where prompt evidence cites every expected "
-            "target and prompt.evidence[0] matches primary_target when present"
+            "selection metric: macro-averaged fraction of cases where prompt evidence built "
+            "from selected evidence cites every expected target and prompt.evidence[0] "
+            "matches primary_target when present"
         ),
         "cross_reference_only_primary_error_rate": (
             "macro-averaged fraction of cases where the selected primary is a generic "
@@ -581,22 +726,38 @@ def metric_definitions() -> dict[str, str]:
             "multiple clauses in the same article; otherwise enumerate each required "
             "clause as a separate expected target"
         ),
-        "candidate_depth": "candidate ranks are measured against the top-k retrieval output",
+        "candidate_depth": (
+            "candidate ranks, Recall@5, Recall@10, Expected Article MRR, and rank "
+            "regressions are measured against the top-50 diagnostic retrieval pool by default"
+        ),
         "evidence_selection_input_budget": (
-            "the deterministic benchmark builds evidence packets from candidate_top_k "
-            "retrieval results; current configured benchmark value is 50"
+            "runtime_aligned mode builds evidence packets, selected evidence, and prompt "
+            "citations from the top-10 selection input; deep_diagnostic mode may use up "
+            "to the top-50 diagnostic pool and is not production-aligned"
         ),
         "single_target_scoring": (
             "primary evidence and first prompt evidence must match the primary target"
         ),
         "multi_target_coverage": (
-            "all expected targets must be present in selected evidence and prompt citations"
+            "all expected targets must be present in selected evidence and prompt citations "
+            "after selection-input truncation; a multi-article case fails coverage when "
+            "any required target is outside the selection input even if Recall@10 or "
+            "diagnostic Recall@50 would find it"
         ),
         "regression_counting": (
             "semantic regressions are pass-to-fail, primary/citation/multi-target losses, "
             "wrong-domain increases, wrong-actor increases, or cross-reference-only "
             "primary errors; rank regressions are expected-target candidate ranks that "
             "move lower or disappear"
+        ),
+        "rank_regression_definition": (
+            "an expected target rank regression occurs when the same target moves to a "
+            "larger diagnostic-pool rank or disappears"
+        ),
+        "semantic_regression_definition": (
+            "a semantic regression is a lost pass, primary-evidence loss, citation-alignment "
+            "loss, multi-target coverage loss, or new wrong-actor/wrong-domain/"
+            "cross-reference-only primary error"
         ),
     }
 
@@ -698,6 +859,12 @@ def compare_reports(before: dict[str, Any], after: dict[str, Any]) -> dict[str, 
         },
         "regressions": regressions,
         "regression_count": len(regressions),
+        "semantic_regression_count": sum(
+            1 for regression in regressions if regression["type"] != "candidate_rank_loss"
+        ),
+        "rank_regression_count": sum(
+            1 for regression in regressions if regression["type"] == "candidate_rank_loss"
+        ),
         "improved_case_count": improvements,
         "unchanged_case_count": unchanged,
         "largest_positive_rank_change": max(rank_changes) if rank_changes else 0,
@@ -711,11 +878,19 @@ async def _evaluate_case(
     retriever: Any,
     modules: dict[str, Any],
     context_config: Any,
-    candidate_top_k: int,
+    selection_config: Any,
+    runtime_config: BenchmarkRuntimeConfig,
 ) -> CaseEvaluation:
-    retrieval = await retriever.retrieve(case.query, top_k=candidate_top_k)
-    bundle = modules["build_evidence_bundle"](retrieval, config=context_config)
-    selection = modules["select_evidence_for_answer"](bundle)
+    retrieval = await retriever.retrieve(
+        case.query,
+        top_k=runtime_config.diagnostic_candidate_top_k,
+    )
+    selection_retrieval = _selection_input_retrieval(
+        retrieval,
+        selection_input_top_k=runtime_config.selection_input_top_k,
+    )
+    bundle = modules["build_evidence_bundle"](selection_retrieval, config=context_config)
+    selection = modules["select_evidence_for_answer"](bundle, config=selection_config)
     prompt_evidence: list[Any] = []
     if selection.selected_evidence:
         prompt = modules["build_naive_rag_prompt"](query=case.query, selection_result=selection)
@@ -729,6 +904,10 @@ async def _evaluate_case(
     ]
     candidate_ranks = {
         target.as_key(): _target_rank(retrieval.results, target) for target in case.expected_targets
+    }
+    selection_input_ranks = {
+        target.as_key(): _target_rank(selection_retrieval.results, target)
+        for target in case.expected_targets
     }
 
     primary_ok = (
@@ -787,6 +966,8 @@ async def _evaluate_case(
         expected_targets=case.expected_targets,
         primary_target=case.primary_target,
         candidate_ranks=candidate_ranks,
+        selection_input_ranks=selection_input_ranks,
+        selection_input_top_k=runtime_config.selection_input_top_k,
         selected_evidence=selected_summaries,
         prompt_evidence=prompt_summaries,
         forbidden_selected=forbidden_selected,
@@ -826,9 +1007,39 @@ def _load_target_pipeline_modules() -> dict[str, Any]:
         "ContextAssemblyConfig": evidence.ContextAssemblyConfig,
         "build_evidence_bundle": evidence.build_evidence_bundle,
         "build_naive_rag_prompt": prompting.build_naive_rag_prompt,
+        "EvidenceSelectionConfig": selection.EvidenceSelectionConfig,
         "select_evidence_for_answer": selection.select_evidence_for_answer,
         "SparseBM25Retriever": sparse.SparseBM25Retriever,
     }
+
+
+def _selection_input_retrieval(retrieval: Any, *, selection_input_top_k: int) -> Any:
+    """Return a retrieval result view bounded to the runtime selection input."""
+    bounded_results = list(retrieval.results[:selection_input_top_k])
+    metadata = dict(getattr(retrieval, "metadata", {}) or {})
+    metadata["diagnostic_result_count"] = len(retrieval.results)
+    metadata["selection_input_top_k"] = selection_input_top_k
+    return retrieval.model_copy(
+        update={
+            "top_k": selection_input_top_k,
+            "results": bounded_results,
+            "metadata": metadata,
+        }
+    )
+
+
+def _git_revision(repo_root: Path) -> str | None:
+    """Return the evaluated checkout revision without failing benchmark execution."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip() or None
 
 
 def _provision_summary(item: Any, rank: int) -> dict[str, Any]:

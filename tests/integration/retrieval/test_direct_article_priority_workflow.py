@@ -15,6 +15,7 @@ from src.retrieval.sparse_retriever import SparseBM25Retriever
 CHUNKS_PATH = Path("data/processed/legal_chunks.jsonl")
 LABOR_LAW_ID = "BLLD_VBHN"
 BENCHMARK_CONTEXT_CONFIG = ContextAssemblyConfig(max_packets=50)
+RUNTIME_ALIGNED_CONTEXT_CONFIG = ContextAssemblyConfig(max_packets=10)
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,27 @@ GOLDEN_CASES = (
         query="Người lao động có được nghỉ việc không cần báo trước trong trường hợp nào?",
         expected_article="35",
         expected_primary_clauses=("2",),
+    ),
+)
+
+ARTICLE_35_RUNTIME_CUTOFF_CASES = (
+    (
+        "employee_unilateral_termination",
+        "Người lao động được đơn phương chấm dứt hợp đồng trong trường hợp nào?",
+        ExpectedEvidenceTarget(LABOR_LAW_ID, "35"),
+        {7},
+    ),
+    (
+        "employee_notice_period",
+        "Người lao động phải báo trước bao lâu khi đơn phương chấm dứt hợp đồng?",
+        ExpectedEvidenceTarget(LABOR_LAW_ID, "35", "1"),
+        {4},
+    ),
+    (
+        "employee_no_notice",
+        "Người lao động có được nghỉ việc không cần báo trước trong trường hợp nào?",
+        ExpectedEvidenceTarget(LABOR_LAW_ID, "35", "2"),
+        {6},
     ),
 )
 
@@ -370,6 +392,49 @@ async def test_employee_termination_keeps_article_34_clause_9_auxiliary_not_prim
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    ("case_id", "query", "target", "accepted_sparse_ranks"),
+    ARTICLE_35_RUNTIME_CUTOFF_CASES,
+    ids=[case[0] for case in ARTICLE_35_RUNTIME_CUTOFF_CASES],
+)
+async def test_article_35_rank_regressions_survive_runtime_aligned_sparse_cutoff(
+    sparse_retriever: SparseBM25Retriever,
+    case_id: str,
+    query: str,
+    target: ExpectedEvidenceTarget,
+    accepted_sparse_ranks: set[int],
+) -> None:
+    """Article 35 targets remain primary/cited from top-10 sparse selection input."""
+    retrieval = await sparse_retriever.retrieve(query, top_k=50)
+    selection_retrieval = retrieval.model_copy(
+        update={"top_k": 10, "results": retrieval.results[:10]}
+    )
+    bundle = build_evidence_bundle(selection_retrieval, config=RUNTIME_ALIGNED_CONTEXT_CONFIG)
+    selection = select_evidence_for_answer(bundle)
+    prompt = build_naive_rag_prompt(query=query, selection_result=selection)
+    diagnostics = _runtime_cutoff_diagnostics(
+        case_id,
+        retrieval.results,
+        selection.selected_evidence,
+        prompt.evidence,
+        target,
+    )
+
+    sparse_rank = _target_rank(retrieval.results, target)
+    assert sparse_rank in accepted_sparse_ranks, diagnostics
+    assert sparse_rank is not None and sparse_rank <= 10, diagnostics
+    assert _packet_matches_target(selection.selected_evidence[0].packet, target), diagnostics
+    assert _prompt_evidence_matches_target(prompt.evidence[0], target), diagnostics
+    assert all(
+        not (
+            selected.packet.law_id == LABOR_LAW_ID
+            and selected.packet.article_number in {"34", "36", "39"}
+        )
+        for selected in selection.selected_evidence[:1]
+    ), diagnostics
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "case",
     OUT_OF_TOPIC_HOLDOUT_CASES,
     ids=[case.case_id for case in OUT_OF_TOPIC_HOLDOUT_CASES],
@@ -497,6 +562,21 @@ def _case_diagnostics(
     )
 
 
+def _runtime_cutoff_diagnostics(
+    case_id: str,
+    candidates: list[object],
+    selected: list[object],
+    prompt_evidence: list[object],
+    target: ExpectedEvidenceTarget,
+) -> str:
+    return (
+        f"case={case_id} expected={target} target_rank={_target_rank(candidates, target)} "
+        f"top10={[_candidate_summary(item) for item in candidates[:10]]} "
+        f"selected={[_selected_summary(item) for item in selected]} "
+        f"citations={[_prompt_summary(item) for item in prompt_evidence]}"
+    )
+
+
 def _target_rank(candidates: list[object], target: ExpectedEvidenceTarget) -> int | None:
     for candidate in candidates:
         if _chunk_matches_target(candidate, target):
@@ -556,3 +636,13 @@ def _selected_summary(item: object) -> tuple[str | None, str | None, str | None,
 
 def _prompt_summary(item: object) -> tuple[str | None, str | None, str | None, str | None]:
     return (item.law_id, item.article_number, item.clause_number, item.point_label)
+
+
+def _candidate_summary(item: object) -> tuple[int, str | None, str | None, str | None, str | None]:
+    return (
+        item.rank,
+        item.law_id,
+        item.article_number,
+        item.clause_number,
+        item.point_label,
+    )
