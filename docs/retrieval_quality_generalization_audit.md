@@ -4,6 +4,8 @@ This audit covers the legal QA path from user question through sparse/dense
 retrieval, fusion, evidence packet construction, evidence selection, prompt
 evidence mapping, citation guarding, API metadata mapping, and benchmark
 diagnostics. It was created while reviewing commits `b27793d` and `6642112`.
+The benchmark framework boundaries and direct-evidence diagnostic disposition
+are documented in `docs/benchmark_architecture_audit.md`.
 
 ## Summary
 

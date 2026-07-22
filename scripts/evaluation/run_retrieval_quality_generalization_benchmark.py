@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.evaluation.retrieval_quality_generalization import (  # noqa: E402
+from src.evaluation.benchmark.direct_evidence import (  # noqa: E402
     DEFAULT_CORPUS_PATH,
     DEFAULT_DENSE_RETRIEVAL_TOP_K,
     DEFAULT_DIAGNOSTIC_CANDIDATE_TOP_K,

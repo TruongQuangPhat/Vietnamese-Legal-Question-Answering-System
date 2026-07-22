@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
-from src.evaluation.retrieval_quality_generalization import (
+import src.evaluation.benchmark.direct_evidence as canonical_direct_evidence
+import src.evaluation.retrieval_quality_generalization as compatibility_direct_evidence
+from src.evaluation.benchmark.direct_evidence import (
     BenchmarkRuntimeConfig,
     EvidenceTarget,
     compare_reports,
     compute_aggregate_metrics,
     metric_definitions,
 )
+
+
+def test_direct_evidence_benchmark_uses_canonical_benchmark_package() -> None:
+    """The branch-era import path remains a shim over the canonical package."""
+    assert (
+        compatibility_direct_evidence.RUNNER_EVALUATOR_VERSION
+        == canonical_direct_evidence.RUNNER_EVALUATOR_VERSION
+    )
+    assert (
+        compatibility_direct_evidence.BenchmarkRuntimeConfig
+        is canonical_direct_evidence.BenchmarkRuntimeConfig
+    )
 
 
 def test_metric_definitions_document_required_contracts() -> None:
