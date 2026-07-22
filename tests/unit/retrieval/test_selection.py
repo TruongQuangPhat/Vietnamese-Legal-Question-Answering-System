@@ -304,6 +304,52 @@ def test_clause_locator_does_not_promote_sibling_clause_through_article_match() 
     assert result.selected_evidence[0].chunk_id == "law-y-article-12-clause-2"
 
 
+def test_condition_list_query_prefers_governing_clause_over_procedure_clause() -> None:
+    """Condition-list questions prioritize direct enumerating provisions."""
+    governing_condition = make_packet(
+        rank=5,
+        chunk_id="law-z-article-20-clause-1-point-a",
+        law_id="LAW_Z",
+        law_name="Luật Kiểm thử",
+        article_number="20",
+        article_title="Quyền chấm dứt thỏa thuận của tổ chức",
+        clause_number="1",
+        point_label="a",
+        citation="Luật Kiểm thử, Điểm a, Khoản 1, Điều 20",
+        text="a) Bên kia thường xuyên không hoàn thành nghĩa vụ theo thỏa thuận;",
+        parent_text=(
+            "Điều 20. Quyền chấm dứt thỏa thuận của tổ chức\n"
+            "1. Tổ chức có quyền chấm dứt thỏa thuận trong các trường hợp sau đây:\n"
+            "a) Bên kia thường xuyên không hoàn thành nghĩa vụ theo thỏa thuận;"
+        ),
+    )
+    procedure = make_packet(
+        rank=1,
+        chunk_id="law-z-article-20-clause-3",
+        law_id="LAW_Z",
+        law_name="Luật Kiểm thử",
+        article_number="20",
+        article_title="Quyền chấm dứt thỏa thuận của tổ chức",
+        clause_number="3",
+        citation="Luật Kiểm thử, Khoản 3, Điều 20",
+        text=(
+            "3. Khi chấm dứt thỏa thuận theo quy định tại điểm d khoản 1 Điều này "
+            "thì tổ chức không phải thông báo trước."
+        ),
+        parent_text=None,
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [procedure, governing_condition],
+            query="Tổ chức được chấm dứt thỏa thuận trong trường hợp nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "law-z-article-20-clause-1-point-a"
+
+
 def test_selection_prioritizes_unlawful_definition_when_query_asks_unlawful() -> None:
     """Unlawful-definition questions should cite the definition article first."""
     definition = make_packet(

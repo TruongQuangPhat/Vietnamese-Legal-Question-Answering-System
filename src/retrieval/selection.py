@@ -769,6 +769,7 @@ def _direct_evidence_score(packet: EvidencePacket, *, query: str) -> int:
         "law_title_alignment": _law_title_alignment(normalized_query, law_title),
         "role_alignment": _role_alignment(normalized_query, citable_context),
         "governing_role_alignment": _governing_role_alignment(normalized_query, citable_context),
+        "condition_list_alignment": _condition_list_alignment(normalized_query, citable_context),
         "modality_negation_alignment": _modality_negation_alignment(
             normalized_query, citable_context
         ),
@@ -991,6 +992,38 @@ def _modality_negation_alignment(normalized_query: str, text: str) -> float:
     elif not query_negation and text_negation:
         score -= 3.0 if "được" in query_modalities else 1.5
     return score
+
+
+def _condition_list_alignment(normalized_query: str, text: str) -> float:
+    asks_for_conditions = _contains_any(
+        normalized_query,
+        (
+            "trong trường hợp nào",
+            "trường hợp nào",
+            "những trường hợp",
+            "các trường hợp",
+            "điều kiện nào",
+            "điều kiện để",
+            "điều kiện gì",
+        ),
+    )
+    if not asks_for_conditions:
+        return 0.0
+    if _contains_any(
+        text,
+        (
+            "trường hợp sau đây",
+            "các trường hợp sau đây",
+            "những trường hợp sau đây",
+            "điều kiện sau đây",
+            "các điều kiện sau đây",
+            "phải tuân theo các điều kiện",
+        ),
+    ):
+        return 2.4
+    if _contains_any(text, ("theo quy định tại điểm", "theo quy định tại khoản")):
+        return -1.4
+    return 0.0
 
 
 def _notice_term_alignment(normalized_query: str, text: str) -> float:
