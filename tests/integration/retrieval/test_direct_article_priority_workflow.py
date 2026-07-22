@@ -7,13 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from src.retrieval.evidence import build_evidence_bundle
+from src.retrieval.evidence import ContextAssemblyConfig, build_evidence_bundle
 from src.retrieval.prompting import build_naive_rag_prompt
 from src.retrieval.selection import select_evidence_for_answer
 from src.retrieval.sparse_retriever import SparseBM25Retriever
 
 CHUNKS_PATH = Path("data/processed/legal_chunks.jsonl")
 LABOR_LAW_ID = "BLLD_VBHN"
+BENCHMARK_CONTEXT_CONFIG = ContextAssemblyConfig(max_packets=50)
 
 
 @dataclass(frozen=True)
@@ -102,7 +103,8 @@ OUT_OF_TOPIC_HOLDOUT_CASES = (
         case_id="worker_annual_leave",
         query="Khoản 1 Điều 113 Bộ luật Lao động quy định người lao động nghỉ hằng năm bao nhiêu ngày?",
         intent="annual_leave",
-        expected_targets=(ExpectedEvidenceTarget(LABOR_LAW_ID, "113"),),
+        expected_targets=(ExpectedEvidenceTarget(LABOR_LAW_ID, "113", "1"),),
+        primary_target=ExpectedEvidenceTarget(LABOR_LAW_ID, "113", "1"),
         forbid_labor_termination_articles=True,
     ),
     HoldoutCase(
@@ -135,6 +137,7 @@ OUT_OF_TOPIC_HOLDOUT_CASES = (
         ),
         intent="marriage_conditions",
         expected_targets=(ExpectedEvidenceTarget("LHNGD_VBHN", "8", "1", "a"),),
+        primary_target=ExpectedEvidenceTarget("LHNGD_VBHN", "8", "1", "a"),
         forbid_labor_termination_articles=True,
     ),
     HoldoutCase(
@@ -186,10 +189,111 @@ OUT_OF_TOPIC_HOLDOUT_CASES = (
         intent="multi_article_leave_coverage",
         expected_targets=(
             ExpectedEvidenceTarget(LABOR_LAW_ID, "111", "1"),
-            ExpectedEvidenceTarget(LABOR_LAW_ID, "113"),
+            ExpectedEvidenceTarget(LABOR_LAW_ID, "113", "1"),
         ),
         primary_target=ExpectedEvidenceTarget(LABOR_LAW_ID, "111", "1"),
         forbid_labor_termination_articles=True,
+    ),
+)
+
+BROAD_CROSS_DOMAIN_CASES = (
+    HoldoutCase(
+        case_id="constitutional_human_rights",
+        query="Khoản 1 Điều 14 Hiến pháp quy định quyền con người, quyền công dân thế nào?",
+        intent="constitutional_rights",
+        expected_targets=(ExpectedEvidenceTarget("HP_2013", "14", "1"),),
+        primary_target=ExpectedEvidenceTarget("HP_2013", "14", "1"),
+    ),
+    HoldoutCase(
+        case_id="criminal_code_crime_definition",
+        query="Khoản 1 Điều 8 Bộ luật Hình sự quy định khái niệm tội phạm thế nào?",
+        intent="criminal_definition",
+        expected_targets=(ExpectedEvidenceTarget("BLHS_VBHN", "8", "1"),),
+        primary_target=ExpectedEvidenceTarget("BLHS_VBHN", "8", "1"),
+    ),
+    HoldoutCase(
+        case_id="civil_procedure_litigant_duty",
+        query="Khoản 1 Điều 70 Bộ luật Tố tụng dân sự quy định nghĩa vụ của đương sự thế nào?",
+        intent="civil_procedure_actor_duty",
+        expected_targets=(ExpectedEvidenceTarget("BLTTDS_VBHN", "70", "1"),),
+        primary_target=ExpectedEvidenceTarget("BLTTDS_VBHN", "70", "1"),
+    ),
+    HoldoutCase(
+        case_id="criminal_procedure_accused_definition",
+        query="Khoản 1 Điều 60 Bộ luật Tố tụng hình sự quy định bị can là ai?",
+        intent="criminal_procedure_actor_definition",
+        expected_targets=(ExpectedEvidenceTarget("BLTTHS_VBHN", "60", "1"),),
+        primary_target=ExpectedEvidenceTarget("BLTTHS_VBHN", "60", "1"),
+    ),
+    HoldoutCase(
+        case_id="food_safety_prohibited_act",
+        query="Khoản 1 Điều 5 Luật An toàn thực phẩm quy định hành vi bị cấm nào?",
+        intent="prohibition",
+        expected_targets=(ExpectedEvidenceTarget("LATTP_VBHN", "5", "1"),),
+        primary_target=ExpectedEvidenceTarget("LATTP_VBHN", "5", "1"),
+    ),
+    HoldoutCase(
+        case_id="environment_protection_principle",
+        query="Khoản 1 Điều 4 Luật Bảo vệ môi trường quy định nguyên tắc bảo vệ môi trường thế nào?",
+        intent="environment_principle",
+        expected_targets=(ExpectedEvidenceTarget("LBVMT_VBHN", "4", "1"),),
+        primary_target=ExpectedEvidenceTarget("LBVMT_VBHN", "4", "1"),
+    ),
+    HoldoutCase(
+        case_id="enterprise_business_right",
+        query="Khoản 1 Điều 7 Luật Doanh nghiệp quy định quyền tự do kinh doanh thế nào?",
+        intent="enterprise_permission",
+        expected_targets=(ExpectedEvidenceTarget("LDN_VBHN", "7", "1"),),
+        primary_target=ExpectedEvidenceTarget("LDN_VBHN", "7", "1"),
+    ),
+    HoldoutCase(
+        case_id="commerce_sale_contract_form",
+        query="Khoản 1 Điều 24 Luật Thương mại quy định hình thức hợp đồng mua bán hàng hóa thế nào?",
+        intent="commerce_contract_form",
+        expected_targets=(ExpectedEvidenceTarget("LTM_VBHN", "24", "1"),),
+        primary_target=ExpectedEvidenceTarget("LTM_VBHN", "24", "1"),
+    ),
+    HoldoutCase(
+        case_id="ip_right_definition",
+        query="Khoản 1 Điều 4 Luật Sở hữu trí tuệ giải thích quyền sở hữu trí tuệ là gì?",
+        intent="intellectual_property_definition",
+        expected_targets=(ExpectedEvidenceTarget("LSHTT_VBHN", "4", "1"),),
+        primary_target=ExpectedEvidenceTarget("LSHTT_VBHN", "4", "1"),
+    ),
+    HoldoutCase(
+        case_id="housing_owner_right_point",
+        query="Điểm a khoản 1 Điều 10 Luật Nhà ở quy định quyền bất khả xâm phạm về nhà ở thế nào?",
+        intent="housing_owner_right",
+        expected_targets=(ExpectedEvidenceTarget("LNO_VBHN", "10", "1", "a"),),
+        primary_target=ExpectedEvidenceTarget("LNO_VBHN", "10", "1", "a"),
+    ),
+    HoldoutCase(
+        case_id="taxpayer_support_right",
+        query="Khoản 1 Điều 16 Luật Quản lý thuế quy định quyền được hỗ trợ của người nộp thuế thế nào?",
+        intent="taxpayer_right",
+        expected_targets=(ExpectedEvidenceTarget("LQLT_VBHN", "16", "1"),),
+        primary_target=ExpectedEvidenceTarget("LQLT_VBHN", "16", "1"),
+    ),
+    HoldoutCase(
+        case_id="traffic_general_rule",
+        query="Khoản 1 Điều 10 Luật Trật tự, an toàn giao thông đường bộ quy định quy tắc đi bên phải thế nào?",
+        intent="traffic_rule",
+        expected_targets=(ExpectedEvidenceTarget("LTATGT_VBHN", "10", "1"),),
+        primary_target=ExpectedEvidenceTarget("LTATGT_VBHN", "10", "1"),
+    ),
+    HoldoutCase(
+        case_id="employment_state_management_point",
+        query="Điểm a khoản 1 Điều 6 Luật Việc làm quy định ban hành văn bản về việc làm thế nào?",
+        intent="employment_state_management",
+        expected_targets=(ExpectedEvidenceTarget("LVL_2025", "6", "1", "a"),),
+        primary_target=ExpectedEvidenceTarget("LVL_2025", "6", "1", "a"),
+    ),
+    HoldoutCase(
+        case_id="citizen_id_card_holder",
+        query="Khoản 1 Điều 19 Luật Căn cước quy định người được cấp thẻ căn cước là ai?",
+        intent="identity_card_holder",
+        expected_targets=(ExpectedEvidenceTarget("LCC_VBHN", "19", "1"),),
+        primary_target=ExpectedEvidenceTarget("LCC_VBHN", "19", "1"),
     ),
 )
 
@@ -210,7 +314,7 @@ async def test_direct_article_priority_golden_cases(
 ) -> None:
     """Golden questions select and cite the direct substantive article first."""
     retrieval = await sparse_retriever.retrieve(case.query, top_k=50)
-    bundle = build_evidence_bundle(retrieval)
+    bundle = build_evidence_bundle(retrieval, config=BENCHMARK_CONTEXT_CONFIG)
     selection = select_evidence_for_answer(bundle)
     prompt = build_naive_rag_prompt(query=case.query, selection_result=selection)
 
@@ -238,7 +342,7 @@ async def test_employee_termination_keeps_article_34_clause_9_auxiliary_not_prim
     """Article 34 Clause 9 may appear as a cross-reference, but is not primary."""
     query = "Người lao động được đơn phương chấm dứt hợp đồng trong trường hợp nào?"
     retrieval = await sparse_retriever.retrieve(query, top_k=50)
-    bundle = build_evidence_bundle(retrieval)
+    bundle = build_evidence_bundle(retrieval, config=BENCHMARK_CONTEXT_CONFIG)
     selection = select_evidence_for_answer(bundle)
     prompt = build_naive_rag_prompt(query=query, selection_result=selection)
 
@@ -276,7 +380,7 @@ async def test_out_of_topic_holdout_cases_retain_expected_evidence_and_citations
 ) -> None:
     """Termination-specific heuristics must not displace other legal intents."""
     retrieval = await sparse_retriever.retrieve(case.query, top_k=50)
-    bundle = build_evidence_bundle(retrieval)
+    bundle = build_evidence_bundle(retrieval, config=BENCHMARK_CONTEXT_CONFIG)
     selection = select_evidence_for_answer(bundle)
     prompt = build_naive_rag_prompt(query=case.query, selection_result=selection)
     diagnostics = _case_diagnostics(
@@ -324,7 +428,7 @@ async def test_direct_cross_reference_target_is_not_dropped(
     )
     target = case.expected_targets[0]
     retrieval = await sparse_retriever.retrieve(case.query, top_k=50)
-    bundle = build_evidence_bundle(retrieval)
+    bundle = build_evidence_bundle(retrieval, config=BENCHMARK_CONTEXT_CONFIG)
     selection = select_evidence_for_answer(bundle)
     prompt = build_naive_rag_prompt(query=case.query, selection_result=selection)
     diagnostics = _case_diagnostics(
@@ -338,6 +442,36 @@ async def test_direct_cross_reference_target_is_not_dropped(
     assert "theo quy định tại Điều 39" in (target_candidate.text or "")
     assert _target_present_in_selected(selection.selected_evidence, target), diagnostics
     assert _target_present_in_prompt(prompt.evidence, target), diagnostics
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case",
+    BROAD_CROSS_DOMAIN_CASES,
+    ids=[case.case_id for case in BROAD_CROSS_DOMAIN_CASES],
+)
+async def test_broad_cross_domain_cases_select_primary_evidence(
+    sparse_retriever: SparseBM25Retriever,
+    case: HoldoutCase,
+) -> None:
+    """Broad cross-domain cases require the direct provision as primary evidence."""
+    retrieval = await sparse_retriever.retrieve(case.query, top_k=50)
+    bundle = build_evidence_bundle(retrieval, config=BENCHMARK_CONTEXT_CONFIG)
+    selection = select_evidence_for_answer(bundle)
+    prompt = build_naive_rag_prompt(query=case.query, selection_result=selection)
+    diagnostics = _case_diagnostics(
+        case, retrieval.results, selection.selected_evidence, prompt.evidence
+    )
+
+    assert case.primary_target is not None
+    assert _packet_matches_target(selection.selected_evidence[0].packet, case.primary_target), (
+        diagnostics
+    )
+    assert _prompt_evidence_matches_target(prompt.evidence[0], case.primary_target), diagnostics
+    for target in case.expected_targets:
+        assert _target_rank(retrieval.results, target) is not None, diagnostics
+        assert _target_present_in_selected(selection.selected_evidence, target), diagnostics
+        assert _target_present_in_prompt(prompt.evidence, target), diagnostics
 
 
 def _case_diagnostics(

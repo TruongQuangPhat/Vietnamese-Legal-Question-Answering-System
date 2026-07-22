@@ -9,7 +9,6 @@ import pytest
 
 from src.retrieval.sparse_retriever import (
     SparseBM25Retriever,
-    expand_legal_query_tokens,
     tokenize_sparse_text,
 )
 
@@ -51,19 +50,6 @@ def test_tokenization_preserves_vietnamese_terms_and_numbers() -> None:
     tokens = tokenize_sparse_text("Khoản 1 Điều 17 Luật Đất đai")
 
     assert tokens == ["khoản", "1", "điều", "17", "luật", "đất", "đai"]
-
-
-def test_legal_query_expansion_adds_termination_notice_terms() -> None:
-    tokens = tokenize_sparse_text("Người lao động nghỉ việc không cần báo trước")
-
-    expanded = expand_legal_query_tokens(tokens)
-
-    assert "nghỉ" in expanded
-    assert "chấm" in expanded
-    assert "dứt" in expanded
-    assert "hợp" in expanded
-    assert "đồng" in expanded
-    assert expanded.count("báo") > tokens.count("báo")
 
 
 @pytest.mark.asyncio

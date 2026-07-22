@@ -313,6 +313,192 @@ def test_selection_demotes_cross_reference_only_evidence() -> None:
     assert result.selected_evidence[0].chunk_id == "article-35-clause-1-a"
 
 
+def test_adversarial_keyword_overlap_does_not_beat_direct_role_alignment() -> None:
+    """Wrong legal issue with more shared words is not primary."""
+    correct = make_packet(
+        rank=4,
+        chunk_id="direct-buyer",
+        law_id="LTM_VBHN",
+        law_name="Luật Thương mại",
+        article_number="24",
+        article_title="Hình thức hợp đồng mua bán hàng hóa",
+        citation="Khoản 1, Điều 24, Luật Thương mại",
+        text="1. Hợp đồng mua bán hàng hóa được thể hiện bằng lời nói, bằng văn bản.",
+        parent_text="Điều 24. Hình thức hợp đồng mua bán hàng hóa\n1. Hợp đồng mua bán hàng hóa được thể hiện bằng lời nói, bằng văn bản.",
+    )
+    overlap_wrong = make_packet(
+        rank=1,
+        chunk_id="wrong-overlap",
+        law_id="LTM_VBHN",
+        law_name="Luật Thương mại",
+        article_number="1",
+        article_title="Phạm vi điều chỉnh",
+        citation="Điều 1, Luật Thương mại",
+        text="Điều này nói về hoạt động thương mại, mua bán hàng hóa, cung ứng dịch vụ.",
+        parent_text="Điều 1. Phạm vi điều chỉnh",
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [overlap_wrong, correct],
+            query="Hợp đồng mua bán hàng hóa được thể hiện bằng hình thức nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "direct-buyer"
+
+
+def test_adversarial_actor_contradiction_is_not_primary() -> None:
+    """Same action with a different governing actor is penalized."""
+    employee = make_packet(
+        rank=3,
+        chunk_id="employee-right",
+        article_title="Quyền đơn phương chấm dứt hợp đồng lao động của người lao động",
+        text="1. Người lao động có quyền đơn phương chấm dứt hợp đồng lao động.",
+        parent_text="Điều 35. Quyền đơn phương chấm dứt hợp đồng lao động của người lao động",
+    )
+    employer = make_packet(
+        rank=1,
+        chunk_id="employer-right",
+        article_number="36",
+        article_title="Quyền đơn phương chấm dứt hợp đồng lao động của người sử dụng lao động",
+        citation="Khoản 1, Điều 36, Bộ luật Lao động",
+        text="1. Người sử dụng lao động có quyền đơn phương chấm dứt hợp đồng lao động.",
+        parent_text="Điều 36. Quyền đơn phương chấm dứt hợp đồng lao động của người sử dụng lao động",
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [employer, employee],
+            query="Người lao động được đơn phương chấm dứt hợp đồng trong trường hợp nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "employee-right"
+
+
+def test_adversarial_negation_contradiction_is_penalized() -> None:
+    """A must-notice rule is not primary for a no-notice query."""
+    no_notice = make_packet(
+        rank=3,
+        chunk_id="no-notice",
+        article_title="Quyền chấm dứt hợp đồng của người lao động",
+        clause_number="2",
+        citation="Khoản 2, Điều 35, Bộ luật Lao động",
+        text="2. Người lao động có quyền chấm dứt hợp đồng không cần báo trước.",
+        parent_text="Điều 35. 2. Người lao động có quyền chấm dứt hợp đồng không cần báo trước.",
+    )
+    must_notice = make_packet(
+        rank=1,
+        chunk_id="must-notice",
+        article_title="Quyền chấm dứt hợp đồng của người lao động",
+        clause_number="1",
+        citation="Khoản 1, Điều 35, Bộ luật Lao động",
+        text="1. Người lao động phải báo trước khi chấm dứt hợp đồng.",
+        parent_text="Điều 35. 1. Người lao động phải báo trước khi chấm dứt hợp đồng.",
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle([must_notice, no_notice], query="Người lao động không cần báo trước khi nào?"),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "no-notice"
+
+
+def test_adversarial_time_contradiction_is_penalized() -> None:
+    """A different deadline does not win on keyword overlap alone."""
+    forty_five = make_packet(
+        rank=2,
+        chunk_id="forty-five-days",
+        text="a) Ít nhất 45 ngày nếu làm việc theo hợp đồng không xác định thời hạn.",
+        parent_text="1. Người lao động phải báo trước như sau: a) Ít nhất 45 ngày.",
+    )
+    thirty = make_packet(
+        rank=1,
+        chunk_id="thirty-days",
+        text="b) Ít nhất 30 ngày nếu làm việc theo hợp đồng xác định thời hạn.",
+        parent_text="1. Người lao động phải báo trước như sau: b) Ít nhất 30 ngày.",
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle([thirty, forty_five], query="Người lao động phải báo trước 45 ngày khi nào?"),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "forty-five-days"
+
+
+def test_adversarial_explicit_cross_reference_target_can_remain_primary() -> None:
+    """A reference provision remains primary when the query explicitly targets it."""
+    cross_reference = make_packet(
+        rank=2,
+        chunk_id="article-36-clause-5",
+        law_id="LCCONGCHUNG_VBHN",
+        law_name="Luật Công chứng",
+        article_number="36",
+        clause_number="5",
+        citation="Khoản 5, Điều 36, Luật Công chứng",
+        text="5. Mua bảo hiểm trách nhiệm nghề nghiệp theo quy định tại Điều 39 của Luật này.",
+        parent_text="Điều 36. Nghĩa vụ của tổ chức hành nghề công chứng\n5. Mua bảo hiểm trách nhiệm nghề nghiệp theo quy định tại Điều 39 của Luật này.",
+    )
+    substantive = make_packet(
+        rank=1,
+        chunk_id="article-39",
+        law_id="LCCONGCHUNG_VBHN",
+        law_name="Luật Công chứng",
+        article_number="39",
+        clause_number="1",
+        citation="Khoản 1, Điều 39, Luật Công chứng",
+        text="1. Bảo hiểm trách nhiệm nghề nghiệp của công chứng viên được mua hằng năm.",
+        parent_text="Điều 39. Bảo hiểm trách nhiệm nghề nghiệp",
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [substantive, cross_reference],
+            query="Khoản 5 Điều 36 Luật Công chứng quy định nghĩa vụ mua bảo hiểm thế nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert result.selected_evidence[0].chunk_id == "article-36-clause-5"
+
+
+def test_adversarial_multi_article_selection_keeps_required_coverage() -> None:
+    """Directness priority does not collapse a valid multi-article answer to one article."""
+    weekly = make_packet(
+        rank=1,
+        chunk_id="weekly-rest",
+        article_number="111",
+        article_title="Nghỉ hằng tuần",
+        citation="Khoản 1, Điều 111, Bộ luật Lao động",
+        text="1. Mỗi tuần, người lao động được nghỉ ít nhất 24 giờ liên tục.",
+        parent_text="Điều 111. Nghỉ hằng tuần",
+    )
+    annual = make_packet(
+        rank=2,
+        chunk_id="annual-leave",
+        article_number="113",
+        article_title="Nghỉ hằng năm",
+        citation="Khoản 1, Điều 113, Bộ luật Lao động",
+        text="1. Người lao động làm việc đủ 12 tháng thì được nghỉ hằng năm.",
+        parent_text="Điều 113. Nghỉ hằng năm",
+    )
+
+    result = select_evidence_for_answer(
+        make_bundle(
+            [weekly, annual],
+            query="Nghỉ hằng tuần và nghỉ hằng năm của người lao động được quy định thế nào?",
+        ),
+        config=EvidenceSelectionConfig(max_selected_packets=2),
+    )
+
+    assert {item.chunk_id for item in result.selected_evidence} == {"weekly-rest", "annual-leave"}
+
+
 def test_caution_evidence_with_citable_child_text_can_be_selected() -> None:
     """Caution evidence is selectable when citation and child text are present."""
     caution = make_packet(

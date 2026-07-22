@@ -24,14 +24,118 @@ from src.retrieval.evidence import (
 )
 
 _TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
-_SUBJECT_EMPLOYEE = "người lao động"
-_SUBJECT_EMPLOYER = "người sử dụng lao động"
-_UNLAWFUL_TERMINATION = "trái pháp luật"
-_TERMINATION_PHRASE = "đơn phương chấm dứt hợp đồng lao động"
+_ARTICLE_LOCATOR_PATTERN = re.compile(r"\bđiều\s+(?P<article>\d+[a-z]?)\b", re.IGNORECASE)
+_CLAUSE_ARTICLE_LOCATOR_PATTERN = re.compile(
+    r"\bkhoản\s+(?P<clause>\d+[a-z]?)\s+điều\s+(?P<article>\d+[a-z]?)\b",
+    re.IGNORECASE,
+)
+_POINT_CLAUSE_ARTICLE_LOCATOR_PATTERN = re.compile(
+    r"\bđiểm\s+(?P<point>[a-zà-ỹđ]{1,2})\s+khoản\s+(?P<clause>\d+[a-z]?)\s+điều\s+"
+    r"(?P<article>\d+[a-z]?)\b",
+    re.IGNORECASE,
+)
 _REFERENCE_ONLY_PATTERN = re.compile(
     r"^(?:\d+\.|[a-zà-ỹđ]\))?\s*"
-    r".{0,140}?\btheo\s+quy\s+định\s+tại\s+điều\s+\d+\b"
+    r".{0,180}?\b(?:theo\s+quy\s+định\s+tại|thực\s+hiện\s+theo|thuộc\s+trường\s+hợp\s+"
+    r"quy\s+định\s+tại|dẫn\s+chiếu\s+đến)\s+(?:điều|khoản)\s+\d+\b"
     r"(?:\s+của\s+bộ\s+luật\s+này)?\.?$",
+    re.IGNORECASE,
+)
+_LAW_MARKERS = {
+    "bộ luật",
+    "luật",
+    "hiến pháp",
+    "nghị định",
+    "thông tư",
+}
+_GENERIC_STOPWORDS = {
+    "a",
+    "b",
+    "c",
+    "d",
+    "đ",
+    "e",
+    "g",
+    "ai",
+    "bao",
+    "bởi",
+    "các",
+    "căn",
+    "cho",
+    "của",
+    "có",
+    "để",
+    "được",
+    "gì",
+    "hay",
+    "khi",
+    "khác",
+    "là",
+    "làm",
+    "mà",
+    "một",
+    "nào",
+    "này",
+    "như",
+    "nêu",
+    "phải",
+    "quy",
+    "ra",
+    "sau",
+    "sau đây",
+    "số",
+    "tại",
+    "thì",
+    "theo",
+    "thế",
+    "trong",
+    "trường",
+    "trường hợp",
+    "và",
+    "về",
+    "việc",
+}
+_ROLE_HEADS = (
+    "người",
+    "bên",
+    "cơ quan",
+    "tổ chức",
+    "cá nhân",
+    "vợ",
+    "chồng",
+    "nguyên đơn",
+    "bị đơn",
+)
+_ROLE_BOUNDARY_TOKENS = {
+    "có",
+    "được",
+    "phải",
+    "không",
+    "quyền",
+    "nghĩa",
+    "trách",
+    "quy",
+    "theo",
+    "trong",
+    "khi",
+    "nào",
+    "thế",
+}
+_MODALITY_TERMS = (
+    "có quyền",
+    "quyền",
+    "nghĩa vụ",
+    "trách nhiệm",
+    "phải",
+    "được",
+    "không được",
+    "không phải",
+    "không cần",
+    "cấm",
+)
+_NEGATION_TERMS = ("không được", "không phải", "không cần", "không", "trừ", "ngoại trừ")
+_TIME_QUANTITY_PATTERN = re.compile(
+    r"\b\d+(?:[,.]\d+)?\s*(?:ngày|tháng|năm|tuổi|giờ|%|phần\s+trăm|lần|đồng)\b",
     re.IGNORECASE,
 )
 
@@ -614,18 +718,19 @@ def _selection_sort_key(
     item: SelectedEvidence,
     expected_targets: Sequence[ExpectedTarget],
     query: str,
-) -> tuple[int, int, int, int, float]:
+) -> tuple[int, float, int, str]:
     target_order = 0 if _packet_matches_any_expected_target(item.packet, expected_targets) else 1
-    directness_order = -_direct_evidence_score(item.packet, query=query)
-    safety_order = 0 if item.safety_level == EvidenceSafetyLevel.SAFE else 1
-    return (target_order, directness_order, safety_order, item.rank, -item.score)
+    safety_penalty = 0.0 if item.safety_level == EvidenceSafetyLevel.SAFE else 2.0
+    adjusted_score = item.score + _direct_evidence_score(item.packet, query=query) - safety_penalty
+    return (target_order, -adjusted_score, item.rank, item.chunk_id or item.packet_id)
 
 
 def _direct_evidence_score(packet: EvidencePacket, *, query: str) -> int:
-    """Score whether a packet directly answers the query.
+    """Return bounded generic query-evidence alignment adjustments.
 
     The score uses only query text and packet metadata/text. It does not use
-    qrels, expected targets, article-specific constants, or generated answers.
+    qrels, expected targets, article-specific constants, generated answers, or
+    individual benchmark cases.
     """
     normalized_query = _normalize_legal_text(query)
     if not normalized_query:
@@ -645,85 +750,42 @@ def _direct_evidence_score(packet: EvidencePacket, *, query: str) -> int:
             child_text=child_text,
             parent_text=auxiliary_text,
         )
-    combined = " ".join(part for part in (title, child_text, auxiliary_text) if part)
+    citable_context = " ".join(part for part in (title, child_text, local_parent_context) if part)
+    combined = " ".join(
+        part for part in (title, child_text, local_parent_context, auxiliary_text) if part
+    )
 
-    score = 0
-    title_overlap = _important_token_overlap(normalized_query, title)
-    child_overlap = _important_token_overlap(normalized_query, child_text)
-    parent_overlap = _important_token_overlap(normalized_query, auxiliary_text)
-    score += min(title_overlap, 8) * 2
-    score += min(child_overlap, 8)
-    score += min(parent_overlap, 6)
-
-    query_subject = _query_subject(normalized_query)
-    title_or_child = " ".join(part for part in (title, child_text) if part)
-    if query_subject and _contains_phrase(title_or_child, query_subject):
-        score += 12
-    if query_subject == _SUBJECT_EMPLOYEE and _contains_phrase(title, _SUBJECT_EMPLOYER):
-        score -= 16
-    if query_subject == _SUBJECT_EMPLOYER and _contains_phrase(title, _SUBJECT_EMPLOYEE):
-        score -= 16
-
-    if _contains_phrase(normalized_query, _TERMINATION_PHRASE) and _contains_phrase(
-        combined, _TERMINATION_PHRASE
-    ):
-        score += 8
-    if _contains_phrase(normalized_query, "báo trước") and _contains_phrase(
-        " ".join(part for part in (title_or_child, local_parent_context) if part), "báo trước"
-    ):
-        score += 5
-    if (
-        _contains_phrase(normalized_query, "không cần báo trước")
-        or _contains_phrase(normalized_query, "không phải báo trước")
-    ) and (
-        _contains_phrase(local_parent_context, "không cần báo trước")
-        or _contains_phrase(local_parent_context, "không phải báo trước")
-        or _contains_phrase(title_or_child, "không cần báo trước")
-        or _contains_phrase(title_or_child, "không phải báo trước")
-    ):
-        score += 10
-    if (
-        (
-            _contains_phrase(normalized_query, "không cần báo trước")
-            or _contains_phrase(normalized_query, "không phải báo trước")
+    components = {
+        "explicit_locator_alignment": _explicit_locator_alignment(packet, normalized_query),
+        "article_title_alignment": min(_important_token_overlap(normalized_query, title), 8) * 0.75,
+        "substantive_content_alignment": min(
+            _important_token_overlap(normalized_query, child_text), 10
         )
-        and _contains_phrase(local_parent_context, "phải báo trước")
-        and not (
-            _contains_phrase(local_parent_context, "không cần báo trước")
-            or _contains_phrase(local_parent_context, "không phải báo trước")
+        * 0.30,
+        "local_parent_context_alignment": min(
+            _important_token_overlap(normalized_query, local_parent_context), 8
         )
-    ):
-        score -= 12
-
-    query_is_unlawful = _contains_phrase(normalized_query, _UNLAWFUL_TERMINATION)
-    packet_is_unlawful = _contains_phrase(title_or_child, _UNLAWFUL_TERMINATION)
-    if query_is_unlawful and packet_is_unlawful:
-        score += 24
-        if _contains_phrase(title, _UNLAWFUL_TERMINATION):
-            score += 12
-        if _contains_phrase(normalized_query, "bị coi") and _contains_phrase(
-            combined, "là trường hợp"
-        ):
-            score += 20
-    elif packet_is_unlawful:
-        score -= 12
-    elif query_is_unlawful and _contains_phrase(title_or_child, _TERMINATION_PHRASE):
-        score -= 30
-
-    if _contains_phrase(normalized_query, "lao động") and not _contains_phrase(
-        law_title, "lao động"
-    ):
-        score -= 8
-    if _contains_any(title, ("tạm đình chỉ", "thi hành quyết định")) and not _contains_any(
-        normalized_query,
-        ("tạm đình chỉ", "thi hành", "quyết định"),
-    ):
-        score -= 10
-
-    if _is_cross_reference_only(child_text):
-        score -= 14
-
-    return score
+        * 0.35,
+        "law_title_alignment": _law_title_alignment(normalized_query, law_title),
+        "role_alignment": _role_alignment(normalized_query, citable_context),
+        "governing_role_alignment": _governing_role_alignment(normalized_query, citable_context),
+        "modality_negation_alignment": _modality_negation_alignment(
+            normalized_query, citable_context
+        ),
+        "notice_term_alignment": _notice_term_alignment(normalized_query, citable_context),
+        "time_quantity_alignment": _time_quantity_alignment(normalized_query, citable_context),
+        "reference_only_penalty": _reference_only_adjustment(packet, normalized_query, child_text),
+        "domain_mismatch_penalty": _domain_mismatch_adjustment(normalized_query, law_title),
+        "procedural_drift_penalty": _procedural_drift_adjustment(normalized_query, title),
+        "legal_consequence_drift_penalty": _legal_consequence_drift_adjustment(
+            normalized_query, title
+        ),
+        "topic_drift_penalty": _topic_drift_adjustment(normalized_query, combined),
+    }
+    packet.metadata["selection_alignment"] = {
+        key: round(value, 4) for key, value in components.items() if value
+    }
+    return int(round(max(-10.0, min(16.0, sum(components.values())))))
 
 
 def _metadata_string(packet: EvidencePacket, key: str) -> str:
@@ -747,55 +809,274 @@ def _important_token_overlap(query: str, text: str) -> int:
 
 
 def _important_tokens(text: str) -> set[str]:
-    stopwords = {
-        "a",
-        "b",
-        "c",
-        "d",
-        "đ",
-        "e",
-        "g",
-        "của",
-        "có",
-        "được",
-        "khi",
-        "nào",
-        "trong",
-        "trường",
-        "hợp",
-        "theo",
-        "quy",
-        "định",
-        "tại",
-        "điều",
-        "khoản",
-        "điểm",
-        "này",
-        "là",
-        "và",
-        "hoặc",
-        "cho",
-        "phải",
-        "bao",
-        "lâu",
-    }
     return {
-        token for token in _TOKEN_PATTERN.findall(text) if len(token) > 1 and token not in stopwords
+        token
+        for token in _TOKEN_PATTERN.findall(text)
+        if len(token) > 1 and token not in _GENERIC_STOPWORDS
     }
-
-
-def _query_subject(normalized_query: str) -> str | None:
-    if _contains_phrase(normalized_query, _SUBJECT_EMPLOYER):
-        return _SUBJECT_EMPLOYER
-    if _contains_phrase(normalized_query, _SUBJECT_EMPLOYEE):
-        return _SUBJECT_EMPLOYEE
-    return None
 
 
 def _is_cross_reference_only(normalized_child_text: str) -> bool:
     if not normalized_child_text:
         return False
     return _REFERENCE_ONLY_PATTERN.match(normalized_child_text) is not None
+
+
+def _explicit_locator_alignment(packet: EvidencePacket, normalized_query: str) -> float:
+    locators = _query_locators(normalized_query)
+    if not locators:
+        return 0.0
+    best = 0.0
+    for locator in locators:
+        if packet.article_number != locator["article"]:
+            continue
+        score = 4.0
+        if locator.get("clause") is not None:
+            score = 5.5 if packet.clause_number == locator["clause"] else -3.5
+        if locator.get("point") is not None:
+            score = 7.0 if packet.point_label == locator["point"] else -4.0
+        best = max(best, score)
+    if best:
+        return best
+    if any(packet.article_number == locator["article"] for locator in locators):
+        return 2.0
+    return 0.0
+
+
+def _query_locators(normalized_query: str) -> list[dict[str, str | None]]:
+    locators: list[dict[str, str | None]] = []
+    for match in _POINT_CLAUSE_ARTICLE_LOCATOR_PATTERN.finditer(normalized_query):
+        locators.append(
+            {
+                "article": match.group("article"),
+                "clause": match.group("clause"),
+                "point": match.group("point"),
+            }
+        )
+    for match in _CLAUSE_ARTICLE_LOCATOR_PATTERN.finditer(normalized_query):
+        candidate = {
+            "article": match.group("article"),
+            "clause": match.group("clause"),
+            "point": None,
+        }
+        if candidate not in locators:
+            locators.append(candidate)
+    for match in _ARTICLE_LOCATOR_PATTERN.finditer(normalized_query):
+        candidate = {"article": match.group("article"), "clause": None, "point": None}
+        if not any(existing["article"] == candidate["article"] for existing in locators):
+            locators.append(candidate)
+    return locators
+
+
+def _law_title_alignment(normalized_query: str, law_title: str) -> float:
+    if not law_title:
+        return 0.0
+    query_tokens = _important_tokens(normalized_query)
+    law_tokens = _important_tokens(law_title)
+    if not query_tokens or not law_tokens:
+        return 0.0
+    overlap = len(query_tokens & law_tokens)
+    if overlap:
+        return min(overlap, 5) * 0.35
+    if any(marker in normalized_query for marker in _LAW_MARKERS):
+        return -1.0
+    return 0.0
+
+
+def _role_alignment(normalized_query: str, text: str) -> float:
+    query_roles = _role_phrases(normalized_query)
+    if not query_roles:
+        return 0.0
+    text_roles = _role_phrases(text)
+    if not text_roles:
+        return -1.25
+    if query_roles & text_roles:
+        return 1.75
+    query_role_tokens = {token for role in query_roles for token in role.split()}
+    text_role_tokens = {token for role in text_roles for token in role.split()}
+    if query_role_tokens & text_role_tokens:
+        return -3.5
+    return 0.0
+
+
+def _governing_role_alignment(normalized_query: str, text: str) -> float:
+    query_role = _governing_role(normalized_query)
+    if query_role is None:
+        return 0.0
+    text_role = _governing_role(text)
+    if text_role is None:
+        return 0.0
+    if query_role == text_role:
+        return 3.0
+    if set(query_role.split()) & set(text_role.split()):
+        return -4.0
+    return -2.0
+
+
+def _governing_role(text: str) -> str | None:
+    roles = _role_phrases(text)
+    if not roles:
+        return None
+    role_positions = [(role, text.find(role)) for role in roles if text.find(role) >= 0]
+    owned_roles = [
+        (role, position)
+        for role, position in role_positions
+        if position >= 0 and f"của {role}" in text[max(0, position - 5) : position + len(role) + 5]
+    ]
+    if owned_roles:
+        return max(owned_roles, key=lambda item: len(item[0]))[0]
+    modality_positions = [
+        position
+        for term in ("có quyền", "phải", "được", "có nghĩa vụ", "có trách nhiệm")
+        if (position := text.find(term)) >= 0
+    ]
+    if modality_positions:
+        first_modality = min(modality_positions)
+        prior_roles = [
+            (role, position)
+            for role, position in role_positions
+            if position <= first_modality and first_modality - position <= 80
+        ]
+        if prior_roles:
+            return max(prior_roles, key=lambda item: (item[1], len(item[0])))[0]
+    return max(roles, key=len)
+
+
+def _role_phrases(text: str) -> set[str]:
+    tokens = _TOKEN_PATTERN.findall(text)
+    phrases: set[str] = set()
+    for index, token in enumerate(tokens):
+        if token not in _ROLE_HEADS:
+            continue
+        role_tokens: list[str] = []
+        for candidate in tokens[index : index + 5]:
+            if len(role_tokens) > 0 and (
+                candidate in _ROLE_BOUNDARY_TOKENS or candidate.isdigit() or len(candidate) == 1
+            ):
+                break
+            role_tokens.append(candidate)
+        for length in range(1, len(role_tokens) + 1):
+            phrase_tokens = role_tokens[:length]
+            if not phrase_tokens:
+                continue
+            if len(phrase_tokens) == 1 and phrase_tokens[0] in {"người", "bên"}:
+                continue
+            if phrase_tokens[-1] in _GENERIC_STOPWORDS and length > 1:
+                continue
+            phrases.add(" ".join(phrase_tokens))
+    return phrases
+
+
+def _modality_negation_alignment(normalized_query: str, text: str) -> float:
+    query_modalities = {
+        term for term in _MODALITY_TERMS if _contains_phrase(normalized_query, term)
+    }
+    if not query_modalities:
+        return 0.0
+    text_modalities = {term for term in _MODALITY_TERMS if _contains_phrase(text, term)}
+    score = 0.8 if query_modalities & text_modalities else 0.0
+    query_negation = {term for term in _NEGATION_TERMS if _contains_phrase(normalized_query, term)}
+    text_negation = {term for term in _NEGATION_TERMS if _contains_phrase(text, term)}
+    if query_negation and text_negation:
+        score += 1.4
+    elif query_negation and not text_negation and _contains_phrase(text, "phải"):
+        score -= 2.5
+    elif not query_negation and text_negation:
+        score -= 3.0 if "được" in query_modalities else 1.5
+    return score
+
+
+def _notice_term_alignment(normalized_query: str, text: str) -> float:
+    if not _contains_phrase(normalized_query, "báo trước"):
+        return 0.0
+    if _contains_phrase(text, "báo trước"):
+        return 2.0
+    return -2.5
+
+
+def _time_quantity_alignment(normalized_query: str, text: str) -> float:
+    query_values = set(_TIME_QUANTITY_PATTERN.findall(normalized_query))
+    if not query_values and not _contains_any(
+        normalized_query, ("bao lâu", "bao nhiêu", "thời hạn")
+    ):
+        return 0.0
+    text_values = set(_TIME_QUANTITY_PATTERN.findall(text))
+    if query_values and text_values:
+        return 1.6 if query_values & text_values else -1.6
+    if text_values:
+        return 0.8
+    return -2.0
+
+
+def _reference_only_adjustment(
+    packet: EvidencePacket,
+    normalized_query: str,
+    child_text: str,
+) -> float:
+    if not _is_cross_reference_only(child_text):
+        return 0.0
+    if any(
+        packet.article_number == locator["article"] for locator in _query_locators(normalized_query)
+    ):
+        return 0.0
+    return -4.0
+
+
+def _domain_mismatch_adjustment(normalized_query: str, law_title: str) -> float:
+    query_law_tokens = _law_domain_tokens(normalized_query)
+    if not query_law_tokens or not law_title:
+        return 0.0
+    law_tokens = _important_tokens(law_title)
+    if query_law_tokens & law_tokens:
+        return 0.0
+    return -4.0
+
+
+def _procedural_drift_adjustment(normalized_query: str, title: str) -> float:
+    procedural_terms = ("tố tụng", "thủ tục", "khởi kiện", "thi hành", "quyết định", "tòa án")
+    if not _contains_any(title, procedural_terms):
+        return 0.0
+    if _contains_any(normalized_query, procedural_terms):
+        return 0.0
+    return -3.0
+
+
+def _legal_consequence_drift_adjustment(normalized_query: str, title: str) -> float:
+    consequence_terms = (
+        "hủy bỏ",
+        "nghĩa vụ",
+        "trách nhiệm",
+        "bồi thường",
+        "trái pháp luật",
+        "không được",
+    )
+    if not _contains_any(title, consequence_terms):
+        return 0.0
+    if _contains_any(normalized_query, consequence_terms):
+        return 0.0
+    return -4.0
+
+
+def _law_domain_tokens(text: str) -> set[str]:
+    tokens = _TOKEN_PATTERN.findall(text)
+    domain_tokens: set[str] = set()
+    for index, token in enumerate(tokens):
+        if token in {"luật", "hiến", "pháp"}:
+            domain_tokens.update(tokens[index + 1 : index + 5])
+        if token == "bộ" and index + 1 < len(tokens) and tokens[index + 1] == "luật":
+            domain_tokens.update(tokens[index + 2 : index + 6])
+    return {token for token in domain_tokens if token not in _GENERIC_STOPWORDS}
+
+
+def _topic_drift_adjustment(normalized_query: str, text: str) -> float:
+    query_tokens = _important_tokens(normalized_query)
+    text_tokens = _important_tokens(text)
+    if len(query_tokens) < 3 or not text_tokens:
+        return 0.0
+    overlap_rate = len(query_tokens & text_tokens) / len(query_tokens)
+    if overlap_rate < 0.15:
+        return -1.5
+    return 0.0
 
 
 def _normalize_legal_text(text: str | None) -> str:
