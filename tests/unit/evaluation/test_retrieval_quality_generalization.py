@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.evaluation.retrieval_quality_generalization import (
+    EvidenceTarget,
     compare_reports,
     compute_aggregate_metrics,
     metric_definitions,
@@ -19,8 +20,30 @@ def test_metric_definitions_document_required_contracts() -> None:
     assert "multi_target_coverage" in definitions
     assert "primary_evidence_accuracy" in definitions
     assert "citation_alignment_accuracy" in definitions
+    assert "cross_reference_only_primary_error_rate" in definitions
+    assert "wrong_actor_primary_error_rate" in definitions
+    assert "wrong_domain_primary_error_rate" in definitions
+    assert "multi_article_coverage_accuracy" in definitions
+    assert "regression_count" in definitions
     assert "regression_counting" in definitions
     assert "law_id + article_number" in definitions["exact_matching_granularity"]
+    assert "micro-averaged" in definitions["recall_at_5"]
+    assert "macro-averaged" in definitions["expected_article_mrr"]
+    assert "article-level target" in definitions["multiple_acceptable_clauses"]
+
+
+def test_expected_target_granularity_documents_article_clause_and_point_matching() -> None:
+    """Target serialization distinguishes article, clause, and point granularity."""
+    article = EvidenceTarget("BLLD_VBHN", "35")
+    clause = EvidenceTarget("BLLD_VBHN", "35", "1")
+    point = EvidenceTarget("LHNGD_VBHN", "8", "1", "a")
+
+    assert article.to_dict()["matching_granularity"] == "law_article"
+    assert article.as_key() == "BLLD_VBHN / Điều 35"
+    assert clause.to_dict()["matching_granularity"] == "law_article_clause"
+    assert clause.as_key() == "BLLD_VBHN / Điều 35 / Khoản 1"
+    assert point.to_dict()["matching_granularity"] == "law_article_clause_point"
+    assert point.as_key() == "LHNGD_VBHN / Điều 8 / Khoản 1 / Điểm a"
 
 
 def test_compute_aggregate_metrics_uses_target_level_recall_and_case_level_accuracy() -> None:

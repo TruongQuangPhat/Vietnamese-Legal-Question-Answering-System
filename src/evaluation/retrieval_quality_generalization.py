@@ -527,27 +527,76 @@ def run_sparse_selection_benchmark(
 def metric_definitions() -> dict[str, str]:
     """Return the documented metric contracts used by this benchmark."""
     return {
+        "recall_at_5": (
+            "micro-averaged expected-target recall at candidate rank <= 5; "
+            "denominator is total expected targets, so a multi-article case contributes "
+            "one denominator item per expected provision"
+        ),
+        "recall_at_10": (
+            "micro-averaged expected-target recall at candidate rank <= 10; "
+            "denominator is total expected targets"
+        ),
+        "expected_article_mrr": (
+            "macro-averaged per-question reciprocal rank using the best-ranked expected "
+            "target for each case; cases with no expected target candidate contribute 0"
+        ),
+        "primary_evidence_accuracy": (
+            "macro-averaged fraction of cases where selected_evidence[0] exactly matches "
+            "primary_target at that target's granularity"
+        ),
+        "citation_alignment_accuracy": (
+            "macro-averaged fraction of cases where prompt evidence cites every expected "
+            "target and prompt.evidence[0] matches primary_target when present"
+        ),
+        "cross_reference_only_primary_error_rate": (
+            "macro-averaged fraction of cases where the selected primary is a generic "
+            "reference-only provision that is not itself the expected primary target"
+        ),
+        "wrong_actor_primary_error_rate": (
+            "macro-averaged fraction of actor-sensitive cases whose selected primary "
+            "does not match the expected primary target"
+        ),
+        "wrong_domain_primary_error_rate": (
+            "macro-averaged fraction of cases where selected primary law_id differs "
+            "from primary_target.law_id"
+        ),
+        "multi_article_coverage_accuracy": (
+            "macro-averaged over cases with more than one expected target; every expected "
+            "target must be selected and cited"
+        ),
+        "regression_count": (
+            "count of case-level semantic regressions plus expected-target candidate "
+            "rank losses, including still-passing cases"
+        ),
         "exact_matching_granularity": (
             "law_id + article_number are mandatory; clause_number and point_label "
             "are mandatory only when present in the expected target"
         ),
+        "article_level_expectations": (
+            "an expected target with clause_number=None and point_label=None matches any "
+            "candidate/selected/cited provision in the same law and article"
+        ),
+        "multiple_acceptable_clauses": (
+            "represented as an article-level target when the benchmark intent accepts "
+            "multiple clauses in the same article; otherwise enumerate each required "
+            "clause as a separate expected target"
+        ),
         "candidate_depth": "candidate ranks are measured against the top-k retrieval output",
+        "evidence_selection_input_budget": (
+            "the deterministic benchmark builds evidence packets from candidate_top_k "
+            "retrieval results; current configured benchmark value is 50"
+        ),
         "single_target_scoring": (
             "primary evidence and first prompt evidence must match the primary target"
         ),
         "multi_target_coverage": (
             "all expected targets must be present in selected evidence and prompt citations"
         ),
-        "primary_evidence_accuracy": (
-            "fraction of cases where selected_evidence[0] exactly matches primary_target"
-        ),
-        "citation_alignment_accuracy": (
-            "fraction of cases where prompt evidence cites every expected target and "
-            "prompt.evidence[0] matches primary_target when present"
-        ),
         "regression_counting": (
-            "a regression is any pass-to-fail, primary/citation/multi-target loss, "
-            "or expected-target candidate rank loss including still-passing cases"
+            "semantic regressions are pass-to-fail, primary/citation/multi-target losses, "
+            "wrong-domain increases, wrong-actor increases, or cross-reference-only "
+            "primary errors; rank regressions are expected-target candidate ranks that "
+            "move lower or disappear"
         ),
     }
 
