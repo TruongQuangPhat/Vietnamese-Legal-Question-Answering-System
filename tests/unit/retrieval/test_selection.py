@@ -350,6 +350,45 @@ def test_condition_list_query_prefers_governing_clause_over_procedure_clause() -
     assert result.selected_evidence[0].chunk_id == "law-z-article-20-clause-1-point-a"
 
 
+def test_selection_tie_breaking_is_stable_when_input_order_changes() -> None:
+    """Equal primary scores use retrieval rank and identity, not list order."""
+    rule_a = make_packet(
+        rank=1,
+        chunk_id="law-stable-article-3-clause-1",
+        law_id="LAW_STABLE",
+        law_name="Luật Kiểm thử",
+        article_number="3",
+        article_title="Quyền của cá nhân",
+        clause_number="1",
+        citation="Luật Kiểm thử, Khoản 1, Điều 3",
+        text="1. Cá nhân có quyền yêu cầu tổ chức cung cấp thông tin.",
+        parent_text=None,
+    )
+    rule_b = make_packet(
+        rank=1,
+        chunk_id="law-stable-article-3-clause-2",
+        law_id="LAW_STABLE",
+        law_name="Luật Kiểm thử",
+        article_number="3",
+        article_title="Quyền của cá nhân",
+        clause_number="2",
+        citation="Luật Kiểm thử, Khoản 2, Điều 3",
+        text="2. Cá nhân có quyền yêu cầu tổ chức xác nhận thông tin.",
+        parent_text=None,
+    )
+
+    forward = select_evidence_for_answer(
+        make_bundle([rule_a, rule_b], query="Cá nhân có quyền yêu cầu thông tin thế nào?"),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+    reversed_input = select_evidence_for_answer(
+        make_bundle([rule_b, rule_a], query="Cá nhân có quyền yêu cầu thông tin thế nào?"),
+        config=EvidenceSelectionConfig(max_selected_packets=1),
+    )
+
+    assert reversed_input.selected_evidence[0].chunk_id == forward.selected_evidence[0].chunk_id
+
+
 def test_selection_prioritizes_unlawful_definition_when_query_asks_unlawful() -> None:
     """Unlawful-definition questions should cite the definition article first."""
     definition = make_packet(

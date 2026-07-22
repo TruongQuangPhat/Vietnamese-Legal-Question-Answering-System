@@ -23,12 +23,12 @@ contracts, and API response metadata were reviewed and remain generic.
 ## Rule Inventory
 
 The inventory now separates original classification from final disposition.
-Unique reviewed rules reconcile exactly with the total: 24.
+Unique reviewed rules reconcile exactly with the total: 26.
 
 Original classification totals:
 
-- A. Generic and justified: 7
-- B. Legal-domain-specific but justified: 13
+- A. Generic and justified: 8
+- B. Legal-domain-specific but justified: 14
 - C. Topic-specific and insufficiently justified: 3
 - D. Question-specific or article-specific: 1
 - E. Obsolete, duplicated, or dead logic: 0
@@ -36,14 +36,14 @@ Original classification totals:
 Final disposition totals:
 
 - KEEP: 8
-- GENERALIZE: 12
+- GENERALIZE: 14
 - REPLACE: 2
 - REMOVE: 2
 - ISOLATE: 0
 
 Runtime status totals:
 
-- Active generic/domain rule: 21
+- Active generic/domain rule: 23
 - Removed runtime rule: 2
 - Replaced test oracle: 1
 - Unresolved category C runtime rule: 0
@@ -75,6 +75,8 @@ Runtime status totals:
 | R22 | `src/retrieval/fusion.py` and `src/retrieval/coverage_aware.py` quota fusion | A | Hybrid retrieval. | Fusion/retrieval orchestration | Medium: quota can retain lower sparse/dense candidates. | Medium: final top 10 can discard target if neither source ranks it well. | KEEP | Fixed weighted RRF plus source quotas. | `tests/integration/retrieval/test_coverage_aware_retrieval_workflow.py`, hybrid fixture |
 | R23 | `src/retrieval/prompting.py` and `src/retrieval/generation.py` prompt/citation guard | A | Prompt/generation validation. | Citation alignment | Low: prompt order follows selected order even if selection is wrong. | Low: generated semantic unsupported claims need separate review. | KEEP | Selected-evidence `[E#]` mapping and unknown-citation rejection. | `tests/unit/retrieval/test_generation.py`, direct benchmark |
 | R24 | `tests/integration/retrieval/test_direct_article_priority_workflow.py` original holdout oracle | D | Holdout tests. | Evaluation oracle | High: expected article could pass as non-primary support. | High: semantic primary failures hidden. | REPLACE | Strict benchmark runner separates candidate, primary, selected, cited, forbidden evidence. | `tests/unit/evaluation/test_retrieval_quality_generalization.py`, direct benchmark |
+| R25 | `src/retrieval/fusion.py::select_with_source_quotas` legal-target diversity | A | Source quota additions after fused-best selection. | Hybrid fusion cutoff | Medium: a lower-ranked distinct legal target can enter before a same-article duplicate. | Medium: if all relevant evidence is same article, diversity must not drop duplicates. | GENERALIZE | Quota additions prefer distinct `(law_id, article_number)` targets, then fill duplicates when needed. | `tests/unit/retrieval/test_fusion.py`, actual local hybrid 30-case validation |
+| R26 | `src/retrieval/selection.py::_condition_list_alignment` | B | Generic condition-list questions and governing-rule lead-ins. | Primary evidence selection | Medium: list lead-ins can appear in related support clauses. | Medium: unusual drafting may omit recognized list lead-ins. | GENERALIZE | Bounded condition/enumeration alignment and generic cross-reference-procedure demotion. | `tests/unit/retrieval/test_selection.py`, actual local hybrid 30-case validation |
 
 Runtime status and remaining risk by rule:
 
@@ -104,6 +106,8 @@ Runtime status and remaining risk by rule:
 | R22 | Active generic runtime rule | Fusion top 10 can discard a target if both dense and sparse rank it below cutoff; benchmark cutoffs expose this. |
 | R23 | Active generic runtime rule | Citation-ID validity still does not prove generated semantic faithfulness. |
 | R24 | Replaced test oracle, not runtime | Direct-evidence diagnostic cases remain branch diagnostics until promoted into the frozen benchmark. |
+| R25 | Active generic runtime rule | Distinct-article preference is bounded to source quota additions and may still miss a target if source ranks are too low. |
+| R26 | Active legal-domain runtime rule | Vietnamese condition-list drafting is recognized lexically; unusual paraphrases may still rely on dense retrieval and overlap. |
 
 ## Commit Review Decisions
 
@@ -268,10 +272,17 @@ the sparse retrieval cutoff of 50:
 - `employee_notice_period`: Article 35 Clause 1 rank 4;
 - `employee_no_notice`: Article 35 Clause 2 rank 6.
 
-These ranks are inside the sparse source cutoff but do not prove real hybrid
-survival through the final fused top 10. Actual dense/Qdrant hybrid validation
-is required to confirm fused rank, selected primary evidence, and prompt
-citations under runtime cutoffs.
+These ranks are inside the sparse source cutoff. Actual dense/Qdrant hybrid
+validation at the Stage 4 remediation commit confirmed that the expected
+evidence also survives the final fused top-10 boundary after the generalized
+fusion and primary-selection fixes:
+
+- `employee_unilateral_termination`: Article 35 fused rank 9, primary Article
+  35, citations aligned.
+- `employee_notice_period`: Article 35 Clause 1 fused rank 7, primary Article
+  35.1, citations aligned.
+- `employee_no_notice`: Article 35 Clause 2 fused rank 8, primary Article
+  35.2, citations aligned.
 
 Selection input must be 10 because the production `coverage_aware_quota` path
 passes only the fused top 10 to evidence construction and selection. Keeping the
@@ -312,7 +323,7 @@ not create, recreate, delete, upload, or modify Qdrant collections; it does not
 index or re-embed documents; it does not call a production endpoint; and it
 does not call an external LLM.
 
-Static configuration reviewed for manual validation:
+Static configuration reviewed for validation:
 
 - BGE-M3 model path environment variables: `EMBEDDING_MODEL_PATH` or
   `LEGAL_QA_EMBEDDING_MODEL_PATH`;
@@ -324,6 +335,27 @@ Static configuration reviewed for manual validation:
 - expected dense dimension: 1024;
 - sparse corpus path: `data/processed/legal_chunks.jsonl`;
 - production-aligned defaults: sparse 50, dense 50, fused 10, selected 5.
+
+The actual local hybrid remediation run used local `FlagEmbedding.BGEM3FlagModel`
+with the existing Hugging Face cache and a local copied-storage Qdrant instance
+for collection `vnlaw_chunks_bgem3_v1_full`. The original Qdrant source storage
+at `/home/phat/qdrant_storage/vnlaw` was not mounted. The Stage 4 30-case
+actual-hybrid run produced:
+
+- cases: 30;
+- expected targets: 31;
+- Recall@10 / required target availability: 1.0000;
+- Primary Evidence Accuracy: 1.0000;
+- Citation Alignment Accuracy: 1.0000;
+- Cross-reference-only Primary Error Rate: 0;
+- Wrong-actor Primary Error Rate: 0;
+- Wrong-domain Primary Error Rate: 0;
+- Multi-article Coverage Accuracy: 1.0000;
+- semantic failures: 0.
+
+This actual local result is remediation evidence only. Final PASS still
+requires a fresh copied-storage Qdrant run and the final deterministic/official
+benchmark matrix at the final branch HEAD.
 
 Adversarial unit tests cover:
 
@@ -339,12 +371,11 @@ Adversarial unit tests cover:
 - The broad benchmark is deterministic and useful for regression, but it is not
   a lawyer-reviewed benchmark and must not be used to claim broad legal QA
   quality.
-- Actual local dense/Qdrant hybrid validation must be run manually with local
-  BGE-M3 and the existing read-only Qdrant collection
-  `vnlaw_chunks_bgem3_v1_full`. This Codex session did not load BGE-M3 or query
-  Qdrant.
+- Actual local dense/Qdrant hybrid validation has passed for the remediation
+  Stage 4 head, but final PASS still requires rerunning it from a fresh copied
+  storage directory at the final committed head.
 - Deterministic dense-candidate plus hybrid-fusion integration fixtures now
   model 50 sparse candidates plus 50 dense candidates, real coverage-aware
   fusion to fused top 10, selected evidence top 5, and prompt citation mapping.
-  Fixture validation is not a substitute for real Qdrant/BGE-M3 validation, so
-  the current status remains PARTIAL.
+  Fixture validation remains useful for regression but is not a substitute for
+  the final real Qdrant/BGE-M3 validation.

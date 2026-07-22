@@ -188,6 +188,40 @@ def test_source_quota_fills_duplicate_legal_targets_when_distinct_targets_are_ex
     ]
 
 
+def test_source_quota_is_stable_when_input_order_changes() -> None:
+    """Quota diversity depends on source ranks, not caller list order."""
+    sparse_results = [
+        _hit("civil_clause_1", rank=1, law_id="LAW_CIVIL", article_number="10"),
+        _hit("civil_clause_2", rank=2, law_id="LAW_CIVIL", article_number="10"),
+        _hit("admin_rule", rank=3, law_id="LAW_ADMIN", article_number="20"),
+        _hit("tax_rule", rank=4, law_id="LAW_TAX", article_number="30"),
+        _hit("business_rule", rank=5, law_id="LAW_BUSINESS", article_number="40"),
+    ]
+    dense_results = [
+        _hit("dense_civil", rank=1, law_id="LAW_CIVIL", article_number="11"),
+        _hit("dense_admin", rank=2, law_id="LAW_ADMIN", article_number="21"),
+    ]
+
+    forward = reciprocal_rank_fusion(
+        dense_results=dense_results,
+        sparse_results=sparse_results,
+        final_top_k=5,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=0, sparse_quota=4, dense_quota=1),
+    )
+    reversed_input = reciprocal_rank_fusion(
+        dense_results=list(reversed(dense_results)),
+        sparse_results=list(reversed(sparse_results)),
+        final_top_k=5,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=0, sparse_quota=4, dense_quota=1),
+    )
+
+    assert [candidate.chunk_id for candidate in reversed_input] == [
+        candidate.chunk_id for candidate in forward
+    ]
+
+
 def test_diversity_penalty_promotes_different_article() -> None:
     fused = reciprocal_rank_fusion(
         dense_results=[
