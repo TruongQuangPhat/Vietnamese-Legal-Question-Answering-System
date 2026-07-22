@@ -38,6 +38,7 @@ class QuotaSelectionConfig:
     sparse_quota: int
     dense_quota: int
     prefer_distinct_legal_targets: bool = True
+    prefer_dominant_source_law: bool = True
 
 
 @dataclass(frozen=True)
@@ -141,7 +142,7 @@ def select_with_source_quotas(
     }
     selected: list[FusedCandidate] = []
     seen: set[str] = set()
-    seen_legal_targets: set[tuple[str | None, str | None]] = set()
+    seen_legal_targets: set[tuple[str | None, str | None, str | None, str | None]] = set()
 
     _append_from_candidates(
         selected,
@@ -157,6 +158,9 @@ def select_with_source_quotas(
         for result in sorted(sparse_results, key=lambda chunk: (chunk.rank, chunk.chunk_id or ""))
         if result.chunk_id in by_id
     ]
+    sparse_dominant_law = (
+        _dominant_law_id(sparse_results) if quota_config.prefer_dominant_source_law else None
+    )
     _append_from_candidates(
         selected,
         seen,
@@ -164,12 +168,18 @@ def select_with_source_quotas(
         quota_config.sparse_quota,
         seen_legal_targets=seen_legal_targets,
         prefer_distinct_legal_targets=quota_config.prefer_distinct_legal_targets,
+        preferred_law_id=sparse_dominant_law,
+        preferred_source="sparse",
+        preferred_source_rank_limit=final_top_k,
     )
     dense_order = [
         by_id[result.chunk_id]
         for result in sorted(dense_results, key=lambda chunk: (chunk.rank, chunk.chunk_id or ""))
         if result.chunk_id in by_id
     ]
+    dense_dominant_law = (
+        _dominant_law_id(dense_results) if quota_config.prefer_dominant_source_law else None
+    )
     _append_from_candidates(
         selected,
         seen,
@@ -177,6 +187,9 @@ def select_with_source_quotas(
         quota_config.dense_quota,
         seen_legal_targets=seen_legal_targets,
         prefer_distinct_legal_targets=quota_config.prefer_distinct_legal_targets,
+        preferred_law_id=dense_dominant_law,
+        preferred_source="dense",
+        preferred_source_rank_limit=final_top_k,
     )
     _append_from_candidates(
         selected,
@@ -354,24 +367,43 @@ def _append_from_candidates(
     candidates: list[FusedCandidate],
     limit: int,
     *,
-    seen_legal_targets: set[tuple[str | None, str | None]] | None = None,
+    seen_legal_targets: set[tuple[str | None, str | None, str | None, str | None]] | None = None,
     prefer_distinct_legal_targets: bool = False,
+    preferred_law_id: str | None = None,
+    preferred_source: RetrievalSource | None = None,
+    preferred_source_rank_limit: int | None = None,
 ) -> None:
     if limit <= 0:
         return
     if seen_legal_targets is None:
-        seen_legal_targets = {_article_key(candidate) for candidate in selected}
+        seen_legal_targets = {_detail_key(candidate) for candidate in selected}
     added = 0
     candidate_passes: tuple[Iterable[FusedCandidate], ...] = (iter(candidates),)
     if prefer_distinct_legal_targets:
-        candidate_passes = (
-            (
+        passes: list[Iterable[FusedCandidate]] = []
+        if preferred_law_id:
+            passes.append(
                 candidate
                 for candidate in candidates
-                if _article_key(candidate) not in seen_legal_targets
-            ),
-            iter(candidates),
+                if candidate.chunk.law_id == preferred_law_id
+                and _source_rank_within_limit(
+                    candidate,
+                    source=preferred_source,
+                    limit=preferred_source_rank_limit,
+                )
+                and _detail_key(candidate) not in seen_legal_targets
+            )
+        passes.extend(
+            [
+                (
+                    candidate
+                    for candidate in candidates
+                    if _detail_key(candidate) not in seen_legal_targets
+                ),
+                iter(candidates),
+            ]
         )
+        candidate_passes = tuple(passes)
     for candidate_iter in candidate_passes:
         for candidate in candidate_iter:
             if _append_one_candidate(selected, seen, seen_legal_targets, candidate):
@@ -383,7 +415,7 @@ def _append_from_candidates(
 def _append_one_candidate(
     selected: list[FusedCandidate],
     seen: set[str],
-    seen_legal_targets: set[tuple[str | None, str | None]],
+    seen_legal_targets: set[tuple[str | None, str | None, str | None, str | None]],
     candidate: FusedCandidate,
 ) -> bool:
     chunk_id = candidate.chunk.chunk_id
@@ -391,7 +423,7 @@ def _append_one_candidate(
         return False
     selected.append(candidate)
     seen.add(chunk_id)
-    seen_legal_targets.add(_article_key(candidate))
+    seen_legal_targets.add(_detail_key(candidate))
     return True
 
 
@@ -432,6 +464,45 @@ def _detail_key(candidate: FusedCandidate) -> tuple[str | None, str | None, str 
         candidate.chunk.clause_number,
         candidate.chunk.point_label,
     )
+
+
+def _dominant_law_id(
+    candidates: list[RetrievedChunk],
+    *,
+    top_n: int = 20,
+    min_share: float = 0.5,
+) -> str | None:
+    ranked = [
+        candidate
+        for candidate in sorted(candidates, key=lambda chunk: (chunk.rank, chunk.chunk_id or ""))[
+            :top_n
+        ]
+        if candidate.law_id
+    ]
+    if not ranked:
+        return None
+    counts: dict[str, int] = {}
+    for candidate in ranked:
+        counts[candidate.law_id] = counts.get(candidate.law_id, 0) + 1
+    ordered_counts = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    law_id, count = ordered_counts[0]
+    if len(ordered_counts) > 1 and ordered_counts[1][1] == count:
+        return None
+    if count / len(ranked) < min_share:
+        return None
+    return law_id
+
+
+def _source_rank_within_limit(
+    candidate: FusedCandidate,
+    *,
+    source: RetrievalSource | None,
+    limit: int | None,
+) -> bool:
+    if source is None or limit is None:
+        return True
+    source_rank = candidate.dense if source == "dense" else candidate.sparse
+    return source_rank is not None and source_rank.rank <= limit
 
 
 def _with_fusion_metadata(candidate: FusedCandidate, *, rank: int) -> RetrievedChunk:

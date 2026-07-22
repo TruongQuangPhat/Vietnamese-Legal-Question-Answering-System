@@ -19,6 +19,8 @@ def _hit(
     score: float = 1.0,
     law_id: str = "LAW_A",
     article_number: str = "1",
+    clause_number: str | None = None,
+    point_label: str | None = None,
 ) -> RetrievedChunk:
     return RetrievedChunk(
         rank=rank,
@@ -26,6 +28,8 @@ def _hit(
         chunk_id=chunk_id,
         law_id=law_id,
         article_number=article_number,
+        clause_number=clause_number,
+        point_label=point_label,
         text="Synthetic legal text.",
     )
 
@@ -186,6 +190,129 @@ def test_source_quota_fills_duplicate_legal_targets_when_distinct_targets_are_ex
         "article_1_clause_1",
         "article_1_clause_2",
     ]
+
+
+def test_source_quota_preserves_sibling_clause_and_point_targets() -> None:
+    """Source diversity must not collapse distinct legal locators in one article."""
+    fused = reciprocal_rank_fusion(
+        dense_results=[],
+        sparse_results=[
+            _hit(
+                "article_10_clause_1",
+                rank=1,
+                law_id="LAW_CIVIL",
+                article_number="10",
+                clause_number="1",
+            ),
+            _hit(
+                "article_10_clause_2_point_a",
+                rank=2,
+                law_id="LAW_CIVIL",
+                article_number="10",
+                clause_number="2",
+                point_label="a",
+            ),
+            _hit(
+                "article_10_clause_2_point_b",
+                rank=3,
+                law_id="LAW_CIVIL",
+                article_number="10",
+                clause_number="2",
+                point_label="b",
+            ),
+        ],
+        final_top_k=3,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=0, sparse_quota=3, dense_quota=0),
+    )
+
+    assert [candidate.chunk_id for candidate in fused] == [
+        "article_10_clause_1",
+        "article_10_clause_2_point_a",
+        "article_10_clause_2_point_b",
+    ]
+
+
+def test_source_quota_prefers_dominant_source_law_within_source_top_k() -> None:
+    """Source-law expansion is limited to candidates inside the source top-k."""
+    fused = reciprocal_rank_fusion(
+        dense_results=[],
+        sparse_results=[
+            _hit("civil_contract", rank=1, law_id="LAW_CIVIL", article_number="1"),
+            _hit("labor_rule_a", rank=2, law_id="LAW_LABOR", article_number="10"),
+            _hit("labor_rule_b", rank=3, law_id="LAW_LABOR", article_number="11"),
+            _hit("labor_rule_c", rank=4, law_id="LAW_LABOR", article_number="12"),
+            _hit("labor_rule_d", rank=5, law_id="LAW_LABOR", article_number="13"),
+            _hit("labor_direct", rank=6, law_id="LAW_LABOR", article_number="14"),
+        ],
+        final_top_k=4,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=0, sparse_quota=4, dense_quota=0),
+    )
+
+    assert [candidate.chunk_id for candidate in fused] == [
+        "labor_rule_a",
+        "labor_rule_b",
+        "labor_rule_c",
+        "civil_contract",
+    ]
+    assert "labor_rule_d" not in {candidate.chunk_id for candidate in fused}
+
+
+def test_source_quota_uses_source_rank_limit_when_fused_top_k_is_dense_saturated() -> None:
+    """Dense saturation does not let source quotas pull beyond source top-k."""
+    fused = reciprocal_rank_fusion(
+        dense_results=[
+            _hit(f"dense_{index}", rank=index, law_id="LAW_DENSE", article_number=str(index))
+            for index in range(1, 5)
+        ],
+        sparse_results=[
+            _hit("civil_contract", rank=1, law_id="LAW_CIVIL", article_number="1"),
+            _hit("labor_rule_a", rank=2, law_id="LAW_LABOR", article_number="10"),
+            _hit("labor_rule_b", rank=3, law_id="LAW_LABOR", article_number="11"),
+            _hit("labor_rule_c", rank=4, law_id="LAW_LABOR", article_number="12"),
+            _hit("labor_rule_d", rank=5, law_id="LAW_LABOR", article_number="13"),
+        ],
+        final_top_k=4,
+        rrf_k=60,
+        dense_weight=10.0,
+        sparse_weight=1.0,
+        quota_config=QuotaSelectionConfig(fused_best=0, sparse_quota=4, dense_quota=0),
+    )
+
+    assert [candidate.chunk_id for candidate in fused] == [
+        "labor_rule_a",
+        "labor_rule_b",
+        "labor_rule_c",
+        "civil_contract",
+    ]
+    assert "labor_rule_d" not in {candidate.chunk_id for candidate in fused}
+
+
+def test_source_quota_keeps_base_top_k_target_before_dominant_law_expansion() -> None:
+    """Dominant-law expansion must not evict an existing base top-k locator."""
+    shared = [
+        _hit(
+            f"shared_{index}",
+            rank=index,
+            law_id="LAW_DOMINANT",
+            article_number=str(index),
+        )
+        for index in range(1, 10)
+    ]
+    target = _hit("base_rank_10_target", rank=10, law_id="LAW_OTHER", article_number="10")
+    beyond = _hit("dominant_rank_11", rank=11, law_id="LAW_DOMINANT", article_number="11")
+
+    fused = reciprocal_rank_fusion(
+        dense_results=[*shared, target, beyond],
+        sparse_results=[*shared, target, beyond],
+        final_top_k=10,
+        rrf_k=60,
+        quota_config=QuotaSelectionConfig(fused_best=5, sparse_quota=4, dense_quota=1),
+    )
+
+    assert [candidate.chunk_id for candidate in fused][-1] == "base_rank_10_target"
+    assert "dominant_rank_11" not in {candidate.chunk_id for candidate in fused}
 
 
 def test_source_quota_is_stable_when_input_order_changes() -> None:
