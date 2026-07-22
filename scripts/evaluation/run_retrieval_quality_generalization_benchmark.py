@@ -19,6 +19,7 @@ from src.evaluation.benchmark.direct_evidence import (  # noqa: E402
     DEFAULT_RECALL_DEPTHS,
     DEFAULT_SELECTED_EVIDENCE_BUDGET,
     DEFAULT_SPARSE_RETRIEVAL_TOP_K,
+    DirectEvidenceReportValidationError,
     compare_reports,
     load_json_report,
     run_sparse_selection_benchmark,
@@ -141,7 +142,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    comparison = compare_reports(load_json_report(args.before), load_json_report(args.after))
+    try:
+        before = load_json_report(args.before)
+        after = load_json_report(args.after)
+        comparison = compare_reports(before, after)
+    except DirectEvidenceReportValidationError as exc:
+        print(f"Comparison failed: {exc}", file=sys.stderr)
+        return 1
     write_json_report(comparison, args.output)
     print(
         json.dumps(

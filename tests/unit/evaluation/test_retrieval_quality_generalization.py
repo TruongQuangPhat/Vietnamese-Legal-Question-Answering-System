@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+
 import src.evaluation.benchmark.direct_evidence as canonical_direct_evidence
 import src.evaluation.retrieval_quality_generalization as compatibility_direct_evidence
+from scripts.evaluation.run_retrieval_quality_generalization_benchmark import main as runner_main
 from src.evaluation.benchmark.direct_evidence import (
     DIRECT_EVIDENCE_METRIC_CONTRACT_VERSION,
     DIRECT_EVIDENCE_SCHEMA_VERSION,
     BenchmarkRuntimeConfig,
     CaseEvaluation,
+    DirectEvidenceReportValidationError,
     EvidenceTarget,
     _selection_input_retrieval,
     build_report_metadata,
@@ -16,6 +23,7 @@ from src.evaluation.benchmark.direct_evidence import (
     compute_aggregate_metrics,
     metric_definitions,
     validate_report_compatibility,
+    validate_report_schema,
 )
 from src.retrieval.models import RetrievalResult, RetrievedChunk
 
@@ -35,7 +43,12 @@ def test_direct_evidence_benchmark_uses_canonical_benchmark_package() -> None:
         "EvidenceTarget",
         "compare_reports",
         "validate_report_compatibility",
+        "validate_report_schema",
     }
+    assert (
+        compatibility_direct_evidence.validate_report_schema
+        is canonical_direct_evidence.validate_report_schema
+    )
 
 
 def test_metric_definitions_document_required_contracts() -> None:
@@ -297,6 +310,21 @@ def test_compare_reports_counts_rank_loss_even_when_case_still_passes() -> None:
     assert comparison["largest_negative_rank_change"] == -2
 
 
+def test_compare_reports_counts_semantic_regression() -> None:
+    """Regression reporting still captures semantic primary/citation losses."""
+    before = _report([_case(case_id="annual", ranks=[1], primary=True, passed=True)])
+    after = _report([_case(case_id="annual", ranks=[1], primary=False, passed=False)])
+
+    comparison = compare_reports(before, after)
+
+    assert comparison["regression_count"] == 2
+    assert comparison["semantic_regression_count"] == 2
+    assert {item["type"] for item in comparison["regressions"]} == {
+        "primary_evidence_accuracy",
+        "pass",
+    }
+
+
 def test_compare_reports_rejects_incompatible_metadata() -> None:
     """Before/after comparisons require identical machine-readable contracts."""
     base = _report([_case(case_id="annual", ranks=[1], passed=True)])
@@ -333,6 +361,216 @@ def test_compare_reports_rejects_incompatible_metadata() -> None:
             raise AssertionError(f"comparison did not reject {field}")
 
 
+@pytest.mark.parametrize(
+    ("field_name", "message"),
+    [
+        ("schema_version", "missing required field 'schema_version'"),
+        ("metric_contract_version", "missing required field 'metric_contract_version'"),
+        ("corpus_identity", "missing required field 'corpus_identity'"),
+        ("case_set_identity", "missing required field 'case_set_identity'"),
+        ("cases", "missing required field 'cases'"),
+        ("cutoff_configuration", "missing required field 'cutoff_configuration'"),
+    ],
+)
+def test_validate_report_schema_rejects_missing_required_fields(
+    field_name: str,
+    message: str,
+) -> None:
+    """Direct-evidence reports must be complete before comparison."""
+    report = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    report.pop(field_name)
+
+    with pytest.raises(DirectEvidenceReportValidationError, match=message):
+        validate_report_schema(report)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value", "message"),
+    [
+        ("schema_version", None, "field 'schema_version' must not be null"),
+        ("metric_contract_version", "", "field 'metric_contract_version' must not be empty"),
+        ("cases", None, "field 'cases' must not be null"),
+        ("cases", {"case_id": "x"}, "field 'cases' must be a list"),
+        ("aggregate_metrics", [], "field 'aggregate_metrics' must be an object"),
+        ("warnings", {}, "field 'warnings' must be a list"),
+        ("limitations", {}, "field 'limitations' must be a list"),
+    ],
+)
+def test_validate_report_schema_rejects_null_or_malformed_fields(
+    field_name: str,
+    bad_value: object,
+    message: str,
+) -> None:
+    """Null and malformed envelope fields are never compatible by default."""
+    report = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    report[field_name] = bad_value
+
+    with pytest.raises(DirectEvidenceReportValidationError, match=message):
+        validate_report_schema(report)
+
+
+def test_validate_report_schema_rejects_invalid_cases() -> None:
+    """Malformed case rows fail deterministically instead of later KeyError."""
+    report = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    report["cases"][0].pop("primary_evidence_accuracy")
+
+    with pytest.raises(
+        DirectEvidenceReportValidationError,
+        match="missing required field 'primary_evidence_accuracy'",
+    ):
+        validate_report_schema(report)
+
+
+def test_validate_report_schema_rejects_missing_cutoff_metadata() -> None:
+    """Comparison-critical cutoff fields are required in the canonical envelope."""
+    report = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    report["cutoff_configuration"].pop("selection_input_top_k")
+
+    with pytest.raises(
+        DirectEvidenceReportValidationError,
+        match="cutoff_configuration.selection_input_top_k",
+    ):
+        validate_report_schema(report)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("production_aligned", False),
+        ("schema_version", "other_schema"),
+        ("metric_contract_version", "other_contract"),
+        ("matching_granularity", "law_only"),
+        ("evaluation_stage", "other_stage"),
+    ],
+)
+def test_validate_report_compatibility_rejects_contract_mismatches(
+    field_name: str,
+    value: object,
+) -> None:
+    """Comparison rejects semantic contract mismatches even for valid reports."""
+    before = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    after = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    after[field_name] = value
+    if field_name == "production_aligned":
+        after["cutoff_configuration"]["production_aligned"] = value
+        after["configuration"]["production_aligned"] = value
+
+    with pytest.raises(DirectEvidenceReportValidationError, match=field_name):
+        validate_report_compatibility(before, after)
+
+
+def test_validate_report_compatibility_rejects_runtime_and_deep_diagnostic_reports() -> None:
+    """Runtime-aligned and deep-diagnostic reports are not production comparisons."""
+    before = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    after = _report(
+        [_case(case_id="annual", ranks=[1], passed=True)],
+        runtime_config=BenchmarkRuntimeConfig.for_mode("deep_diagnostic"),
+    )
+
+    with pytest.raises(DirectEvidenceReportValidationError, match="selection_input_top_k"):
+        validate_report_compatibility(before, after)
+
+
+def test_validate_report_compatibility_rejects_selected_evidence_budget_mismatch() -> None:
+    """Selected evidence budget differences are comparison-critical."""
+    before = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    after = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    after["cutoff_configuration"]["selected_evidence_budget"] = 4
+    after["configuration"]["selected_evidence_budget"] = 4
+
+    with pytest.raises(DirectEvidenceReportValidationError, match="selected_evidence_budget"):
+        validate_report_compatibility(before, after)
+
+
+@pytest.mark.parametrize(
+    "legacy_report",
+    [
+        {},
+        {"query_count": 128, "recall_at_10": 0.95, "mrr_at_10": 0.68},
+    ],
+)
+def test_legacy_frozen_metrics_are_rejected_as_direct_evidence_reports(
+    legacy_report: dict[str, object],
+) -> None:
+    """Frozen benchmark metrics are valid only under their original manifests."""
+    valid = _report([_case(case_id="annual", ranks=[1], passed=True)])
+
+    with pytest.raises(DirectEvidenceReportValidationError, match="before report is invalid"):
+        compare_reports(legacy_report, valid)
+    with pytest.raises(DirectEvidenceReportValidationError, match="after report is invalid"):
+        compare_reports(valid, legacy_report)
+
+
+def test_compare_reports_rejects_expected_target_set_mismatch() -> None:
+    """Target-set mismatches fail as compatibility errors, not incidental KeyError."""
+    before = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    after = _report([_case(case_id="annual", ranks=[1], passed=True)])
+    after["cases"][0]["expected_targets"][0]["target_key"] = "different-target"
+
+    with pytest.raises(DirectEvidenceReportValidationError, match="expected target set differs"):
+        compare_reports(before, after)
+
+
+def test_comparison_cli_failure_does_not_create_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Failed compare invocations exit cleanly and create no output file."""
+    before = tmp_path / "before.json"
+    after = tmp_path / "after.json"
+    output = tmp_path / "comparison.json"
+    before.write_text(json.dumps({"query_count": 128}), encoding="utf-8")
+    after.write_text(
+        json.dumps(_report([_case(case_id="annual", ranks=[1], passed=True)])), encoding="utf-8"
+    )
+
+    exit_code = runner_main(
+        [
+            "compare",
+            "--before",
+            str(before),
+            "--after",
+            str(after),
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 1
+    assert not output.exists()
+    assert "Comparison failed:" in capsys.readouterr().err
+
+
+def test_comparison_cli_failure_does_not_overwrite_existing_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Failed compare invocations leave existing output untouched."""
+    before = tmp_path / "before.json"
+    after = tmp_path / "after.json"
+    output = tmp_path / "comparison.json"
+    before.write_text("{", encoding="utf-8")
+    after.write_text(
+        json.dumps(_report([_case(case_id="annual", ranks=[1], passed=True)])), encoding="utf-8"
+    )
+    output.write_text("sentinel", encoding="utf-8")
+
+    exit_code = runner_main(
+        [
+            "compare",
+            "--before",
+            str(before),
+            "--after",
+            str(after),
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 1
+    assert output.read_text(encoding="utf-8") == "sentinel"
+    assert "invalid JSON" in capsys.readouterr().err
+
+
 def _case(
     *,
     case_id: str,
@@ -361,8 +599,12 @@ def _case(
     }
 
 
-def _report(cases: list[dict[str, object]]) -> dict[str, object]:
-    config = BenchmarkRuntimeConfig.for_mode("runtime_aligned")
+def _report(
+    cases: list[dict[str, object]],
+    *,
+    runtime_config: BenchmarkRuntimeConfig | None = None,
+) -> dict[str, object]:
+    config = runtime_config or BenchmarkRuntimeConfig.for_mode("runtime_aligned")
     metadata = build_report_metadata(
         git_revision="test",
         corpus_identity="data/processed/legal_chunks.jsonl",
@@ -374,6 +616,7 @@ def _report(cases: list[dict[str, object]]) -> dict[str, object]:
     report = {
         "benchmark_id": "test",
         "repo_root": "/tmp/test",
+        "production_aligned": config.production_aligned,
         "aggregate_metrics": compute_aggregate_metrics(cases),
         "cases": cases,
     }

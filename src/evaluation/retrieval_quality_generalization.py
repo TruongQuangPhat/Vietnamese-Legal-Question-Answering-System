@@ -29,6 +29,7 @@ from src.evaluation.benchmark.direct_evidence import (
     BenchmarkRuntimeConfig,
     CaseEvaluation,
     DirectEvidenceReportMetadata,
+    DirectEvidenceReportValidationError,
     EvidenceTarget,
     build_report_metadata,
     compare_reports,
@@ -44,6 +45,7 @@ from src.evaluation.benchmark.direct_evidence import (
     target_key,
     target_rank,
     validate_report_compatibility,
+    validate_report_schema,
     write_json_report,
 )
 
@@ -68,6 +70,7 @@ __all__ = [
     "BenchmarkCase",
     "BenchmarkRuntimeConfig",
     "CaseEvaluation",
+    "DirectEvidenceReportValidationError",
     "DirectEvidenceReportMetadata",
     "EvidenceTarget",
     "build_report_metadata",
@@ -84,5 +87,6 @@ __all__ = [
     "target_key",
     "target_rank",
     "validate_report_compatibility",
+    "validate_report_schema",
     "write_json_report",
 ]

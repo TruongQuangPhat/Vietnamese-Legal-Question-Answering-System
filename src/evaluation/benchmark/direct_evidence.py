@@ -15,8 +15,11 @@ import subprocess
 import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
+
+from src.indexing.official_artifacts import write_json_atomic
 
 LABOR_LAW_ID = "BLLD_VBHN"
 DEFAULT_CORPUS_PATH = Path("data/processed/legal_chunks.jsonl")
@@ -42,6 +45,10 @@ REFERENCE_ONLY_PATTERN = re.compile(
     r"(?:\s+của\s+bộ\s+luật\s+này)?\.?$",
     re.IGNORECASE,
 )
+
+
+class DirectEvidenceReportValidationError(ValueError):
+    """Raised when a direct-evidence report is malformed or incompatible."""
 
 
 @dataclass(frozen=True)
@@ -958,19 +965,27 @@ def validate_report_compatibility(
     Raises:
         ValueError: If any required compatibility field differs.
     """
+    validate_report_schema(before, label="before report")
+    validate_report_schema(after, label="after report")
     fields = (
         "schema_version",
         "metric_contract_version",
+        "evaluator_version",
         "corpus_identity",
         "case_set_identity",
         "matching_granularity",
         "pipeline_family",
         "evaluation_stage",
         "retrieval_mode",
+        "production_aligned",
     )
-    mismatches = [field for field in fields if before.get(field) != after.get(field)]
-    before_cutoffs = before.get("cutoff_configuration") or before.get("configuration") or {}
-    after_cutoffs = after.get("cutoff_configuration") or after.get("configuration") or {}
+    mismatches = [
+        _mismatch_message(field, before.get(field), after.get(field))
+        for field in fields
+        if before.get(field) != after.get(field)
+    ]
+    before_cutoffs = before["cutoff_configuration"]
+    after_cutoffs = after["cutoff_configuration"]
     cutoff_fields = (
         "diagnostic_candidate_top_k",
         "fusion_output_top_k",
@@ -979,14 +994,60 @@ def validate_report_compatibility(
     )
     for cutoff_field in cutoff_fields:
         if before_cutoffs.get(cutoff_field) != after_cutoffs.get(cutoff_field):
-            mismatches.append(f"cutoff_configuration.{cutoff_field}")
+            mismatches.append(
+                _mismatch_message(
+                    f"cutoff_configuration.{cutoff_field}",
+                    before_cutoffs.get(cutoff_field),
+                    after_cutoffs.get(cutoff_field),
+                )
+            )
     if not allow_diagnostic_mode_mismatch and before.get("benchmark_mode") != after.get(
         "benchmark_mode"
     ):
-        mismatches.append("benchmark_mode")
+        mismatches.append(
+            _mismatch_message(
+                "benchmark_mode", before.get("benchmark_mode"), after.get("benchmark_mode")
+            )
+        )
     if mismatches:
         joined = ", ".join(mismatches)
-        raise ValueError(f"incompatible direct-evidence reports: {joined}")
+        raise DirectEvidenceReportValidationError(f"reports are incompatible: {joined}")
+
+
+def validate_report_schema(report: dict[str, Any], *, label: str = "report") -> None:
+    """Validate one canonical direct-evidence report envelope.
+
+    Legacy frozen benchmark metrics are valid under their own manifests, but
+    they are not direct-evidence reports. This validation therefore requires
+    the full direct-evidence envelope before compatibility comparison can
+    inspect shared fields.
+    """
+    if not isinstance(report, dict):
+        raise DirectEvidenceReportValidationError(f"{label} is invalid: report must be an object")
+
+    required_strings = (
+        "schema_version",
+        "metric_contract_version",
+        "evaluator_version",
+        "git_revision",
+        "corpus_identity",
+        "case_set_identity",
+        "pipeline_family",
+        "evaluation_stage",
+        "retrieval_mode",
+        "benchmark_mode",
+        "matching_granularity",
+        "benchmark_id",
+    )
+    for field_name in required_strings:
+        _require_non_empty_string(report, field_name, label)
+
+    _require_bool(report, "production_aligned", label)
+    _require_dict(report, "aggregate_metrics", label)
+    _require_list(report, "warnings", label)
+    _require_list(report, "limitations", label)
+    _validate_cutoff_configuration(report, label)
+    _validate_report_cases(report, label)
 
 
 def compare_reports(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
@@ -1002,6 +1063,12 @@ def compare_reports(before: dict[str, Any], after: dict[str, Any]) -> dict[str, 
 
     for case_id, before_case in before_cases.items():
         after_case = after_cases[case_id]
+        before_target_keys = {target["target_key"] for target in before_case["expected_targets"]}
+        after_target_keys = {target["target_key"] for target in after_case["expected_targets"]}
+        if before_target_keys != after_target_keys:
+            raise DirectEvidenceReportValidationError(
+                f"reports are incompatible: expected target set differs for case '{case_id}'"
+            )
         case_regressions = _case_regressions(before_case, after_case)
         if case_regressions:
             regressions.extend(case_regressions)
@@ -1485,13 +1552,172 @@ def _target_ranks(cases: Sequence[dict[str, Any]]) -> dict[tuple[str, str], int 
 
 def write_json_report(report: dict[str, Any], output_path: Path) -> None:
     """Write a machine-readable report outside protected data by caller choice."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_json_atomic(output_path, report)
 
 
 def load_json_report(path: Path) -> dict[str, Any]:
     """Load one benchmark report from disk."""
-    return json.loads(path.read_text(encoding="utf-8"))
+    if not path.exists():
+        raise DirectEvidenceReportValidationError(f"report file does not exist: {path}")
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except JSONDecodeError as exc:
+        raise DirectEvidenceReportValidationError(
+            f"invalid JSON in report {path}: {exc.msg}"
+        ) from exc
+    if not isinstance(report, dict):
+        raise DirectEvidenceReportValidationError(f"report JSON must be an object: {path}")
+    return report
+
+
+def _mismatch_message(field_name: str, before: Any, after: Any) -> str:
+    return f"{field_name} differs ({before!r} != {after!r})"
+
+
+def _require_present(report: dict[str, Any], field_name: str, label: str) -> Any:
+    if field_name not in report:
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: missing required field '{field_name}'"
+        )
+    value = report[field_name]
+    if value is None:
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field '{field_name}' must not be null"
+        )
+    return value
+
+
+def _require_non_empty_string(report: dict[str, Any], field_name: str, label: str) -> str:
+    value = _require_present(report, field_name, label)
+    if not isinstance(value, str):
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field '{field_name}' must be a string"
+        )
+    if not value.strip():
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field '{field_name}' must not be empty"
+        )
+    return value
+
+
+def _require_bool(report: dict[str, Any], field_name: str, label: str) -> bool:
+    value = _require_present(report, field_name, label)
+    if not isinstance(value, bool):
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field '{field_name}' must be a boolean"
+        )
+    return value
+
+
+def _require_dict(report: dict[str, Any], field_name: str, label: str) -> dict[str, Any]:
+    value = _require_present(report, field_name, label)
+    if not isinstance(value, dict):
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field '{field_name}' must be an object"
+        )
+    return value
+
+
+def _require_list(report: dict[str, Any], field_name: str, label: str) -> list[Any]:
+    value = _require_present(report, field_name, label)
+    if not isinstance(value, list):
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field '{field_name}' must be a list"
+        )
+    return value
+
+
+def _validate_cutoff_configuration(report: dict[str, Any], label: str) -> None:
+    cutoffs = _require_dict(report, "cutoff_configuration", label)
+    required_positive_ints = (
+        "sparse_retrieval_top_k",
+        "dense_retrieval_top_k",
+        "diagnostic_candidate_top_k",
+        "fusion_output_top_k",
+        "selection_input_top_k",
+        "selected_evidence_budget",
+    )
+    for field_name in required_positive_ints:
+        if field_name not in cutoffs:
+            raise DirectEvidenceReportValidationError(
+                f"{label} is invalid: missing required field 'cutoff_configuration.{field_name}'"
+            )
+        value = cutoffs[field_name]
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise DirectEvidenceReportValidationError(
+                f"{label} is invalid: field 'cutoff_configuration.{field_name}' must be an integer"
+            )
+        if value <= 0:
+            raise DirectEvidenceReportValidationError(
+                f"{label} is invalid: field 'cutoff_configuration.{field_name}' must be positive"
+            )
+    if "production_aligned" not in cutoffs:
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: missing required field 'cutoff_configuration.production_aligned'"
+        )
+    if not isinstance(cutoffs["production_aligned"], bool):
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field 'cutoff_configuration.production_aligned' must be a boolean"
+        )
+    if cutoffs["production_aligned"] != report["production_aligned"]:
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: production_aligned differs from cutoff_configuration.production_aligned"
+        )
+
+
+def _validate_report_cases(report: dict[str, Any], label: str) -> None:
+    cases = _require_list(report, "cases", label)
+    if not cases:
+        raise DirectEvidenceReportValidationError(
+            f"{label} is invalid: field 'cases' must not be empty"
+        )
+    seen_case_ids: set[str] = set()
+    for index, case in enumerate(cases):
+        case_label = f"{label}.cases[{index}]"
+        if not isinstance(case, dict):
+            raise DirectEvidenceReportValidationError(
+                f"{case_label} is invalid: case must be an object"
+            )
+        case_id = _require_non_empty_string(case, "case_id", case_label)
+        if case_id in seen_case_ids:
+            raise DirectEvidenceReportValidationError(
+                f"{case_label} is invalid: duplicate case_id '{case_id}'"
+            )
+        seen_case_ids.add(case_id)
+        expected_targets = _require_list(case, "expected_targets", case_label)
+        for target_index, target in enumerate(expected_targets):
+            target_label = f"{case_label}.expected_targets[{target_index}]"
+            if not isinstance(target, dict):
+                raise DirectEvidenceReportValidationError(
+                    f"{target_label} is invalid: expected target must be an object"
+                )
+            _require_non_empty_string(target, "target_key", target_label)
+            if "candidate_rank" not in target:
+                raise DirectEvidenceReportValidationError(
+                    f"{target_label} is invalid: missing required field 'candidate_rank'"
+                )
+            rank = target["candidate_rank"]
+            if rank is not None and (
+                not isinstance(rank, int) or isinstance(rank, bool) or rank <= 0
+            ):
+                raise DirectEvidenceReportValidationError(
+                    f"{target_label} is invalid: field 'candidate_rank' must be a positive integer or null"
+                )
+        for field_name in (
+            "primary_evidence_accuracy",
+            "citation_alignment_accuracy",
+            "cross_reference_only_primary_error",
+            "wrong_actor_primary_error",
+            "wrong_domain_primary_error",
+            "pass",
+        ):
+            _require_bool(case, field_name, case_label)
+        if "multi_article_coverage_accuracy" not in case:
+            raise DirectEvidenceReportValidationError(
+                f"{case_label} is invalid: missing required field 'multi_article_coverage_accuracy'"
+            )
+        multi_value = case["multi_article_coverage_accuracy"]
+        if multi_value is not None and not isinstance(multi_value, bool):
+            raise DirectEvidenceReportValidationError(
+                f"{case_label} is invalid: field 'multi_article_coverage_accuracy' must be a boolean or null"
+            )

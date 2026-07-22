@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.evaluation.benchmark.direct_evidence import (  # noqa: E402
     DIRECT_EVIDENCE_CASE_SET_IDENTITY,
     BenchmarkRuntimeConfig,
+    _git_revision,
     build_report_metadata,
     compute_aggregate_metrics,
     evidence_target_from_mapping,
@@ -256,7 +257,7 @@ async def _run_cases(args: argparse.Namespace, cases: list[dict[str, Any]]) -> d
             for item in case_results
         ]
         metadata = build_report_metadata(
-            git_revision=None,
+            git_revision=_git_revision(REPO_ROOT),
             corpus_identity=str(args.chunks),
             case_set_identity=DIRECT_EVIDENCE_CASE_SET_IDENTITY,
             pipeline_family="direct_evidence",
@@ -268,6 +269,9 @@ async def _run_cases(args: argparse.Namespace, cases: list[dict[str, Any]]) -> d
         )
         report = {
             "validation_type": "local_read_only_hybrid_retrieval",
+            "benchmark_id": "local_hybrid_retrieval_validation",
+            "repo_root": str(REPO_ROOT),
+            "production_aligned": runtime_config.production_aligned,
             "collection_name": args.collection_name,
             "collection_metadata": _safe_collection_summary(collection_info),
             "vector_name": config.dense_retrieval.vector_name,
@@ -277,7 +281,8 @@ async def _run_cases(args: argparse.Namespace, cases: list[dict[str, Any]]) -> d
             "fusion_top_k": args.fusion_top_k,
             "selected_evidence_budget": args.selected_evidence_budget,
             "aggregate_metrics": compute_aggregate_metrics(per_case),
-            "cases": case_results,
+            "cases": per_case,
+            "local_hybrid_diagnostics": case_results,
         }
         report.update(metadata.to_dict())
         return report
